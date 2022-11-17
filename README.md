@@ -46,7 +46,7 @@ building the source code and flashing the embedded chips.
 1. Install [stlink](https://github.com/stlink-org/stlink).
 
    1. For Mac users, `brew install stlink` could be a shortcut.
-   2. For Ubuntu users, `sudo apt install stlink` could be a shortcut.
+   2. For Ubuntu users, `sudo apt install stlink-tools` could be a shortcut.
    3. For Arch users, `sudo pacman -S stlink` could be a shortcut.
    4. For Linux users, either use prebuilt binaries, or build from source
       following their compile manual.
