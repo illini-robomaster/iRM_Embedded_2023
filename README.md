@@ -1,4 +1,4 @@
-# iRM Embedded 2022
+# iRM Embedded 2023
 
 ![arm](https://github.com/illini-robomaster/iRM_Embedded_2022/workflows/arm%20build/badge.svg)
 
