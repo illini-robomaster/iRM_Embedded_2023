@@ -137,15 +137,15 @@ Follow the steps below to debug an executable
 5. Debug just like any regular `gdb` debugger: use commands like `continue`,
    `run`, `break`, `watch`, `next`, `step` the same way you will expect.
 
-## Some prerequisites before pushing
-1. Generate a new ssh key if you don't have any (Follow the instruction of "Generating a new SSH key").
-   Reference link: https://docs.github.com/en/authentication/connecting-to-github-with-ssh/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent
+## Prerequisites before merging new changes to main
+1. Generate a new ssh key if you don't have any (Follow the instruction of "Generating a new SSH key" from [this link](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent)).
    
-2. Add the SSH key to your Github account by following the reference below.
-   Reference link: https://docs.github.com/en/authentication/connecting-to-github-with-ssh/adding-a-new-ssh-key-to-your-github-account
+2. [Add your new SSH key](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/adding-a-new-ssh-key-to-your-github-account) to your Github account.
 
-3. Go to your local repo directory and change `.git/config` according to the following link.
-   Reference link: https://stackoverflow.com/a/7771927/20217146
+3. (You only need to complete this step if you cloned our repository using https instead of ssh).
+   Go to your local repository directory, open `.git/config` and change `url=https://github.com/illini-robomaster/iRM_Embedded_2023.git` to
+   `url=git@github.com:illini-robomaster/iRM_Embedded_2023.git`. 
 
-4. Make sure you have generated a personal access token in your Github account setting.
-   Reference link: https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token
+4. Make sure you have created a [personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token).
+   
+5. Create a new branch from main and make all of your changes in that branch. After pushing it to the remote repository, create a pull request and assign at least one reviewer. After one reviewer approves your changes, your code can be merged to main. Learn more about pull requests [here](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-pull-requests).
