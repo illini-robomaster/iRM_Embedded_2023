@@ -136,3 +136,16 @@ Follow the steps below to debug an executable
    source code).
 5. Debug just like any regular `gdb` debugger: use commands like `continue`,
    `run`, `break`, `watch`, `next`, `step` the same way you will expect.
+
+## Some prerequisites before pushing
+1. Generate a new ssh key if you don't have any (Follow the instruction of "Generating a new SSH key").
+   Reference link: https://docs.github.com/en/authentication/connecting-to-github-with-ssh/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent
+   
+2. Add the SSH key to your Github account by following the reference below.
+   Reference link: https://docs.github.com/en/authentication/connecting-to-github-with-ssh/adding-a-new-ssh-key-to-your-github-account
+
+3. Go to your local repo directory and change `.git/config` according to the following link.
+   Reference link: https://stackoverflow.com/a/7771927/20217146
+
+4. Make sure you have generated a personal access token in your Github account setting.
+   Reference link: https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token
