@@ -462,22 +462,24 @@ void SteeringMotor::TurnRelative(float angle) {
   servo_->SetTarget(servo_->GetTarget() + angle, true);
 }
 
-void SteeringMotor::TurnAbsolute(float angle) { servo_->SetTarget(angle); }
-
 bool SteeringMotor::AlignUpdate() {
   if (align_complete_) {
+    // if calibration complete, go to aligned location
     servo_->SetTarget(align_angle_, true);
     servo_->CalcOutput();
     return true;
   } else if (align_detect_func()) {
+    // if calibration sensor True, stop
+    // record align_angle for next alignment
     float current_theta = servo_->motor_->GetTheta();
     float offset = wrap<float>(servo_->align_angle_ - current_theta, -PI, PI);
     float current = (current_theta + offset - servo_->align_angle_) / servo_->transmission_ratio_ +
                     servo_->offset_angle_ + servo_->cumulated_angle_;
     align_angle_ = current + calibrate_offset;
-    align_complete_ = true;
     servo_->SetTarget(align_angle_, true);
     servo_->CalcOutput();
+    // mark alignment as completed
+    align_complete_ = true;
     return true;
   } else {
     servo_->motor_->SetOutput(servo_->omega_pid_.ComputeConstrainedOutput(

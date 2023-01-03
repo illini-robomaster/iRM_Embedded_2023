@@ -487,25 +487,27 @@ class ServoMotor {
   BoolEdgeDetector* jam_detector_;  /* detect motor jam toggling, call jam callback accordingly */
 };
 
+// function pointer for the calibration function of the steering motor, return True when calibrated
 typedef bool (*align_detect_t)(void);
 
 /**
  * @brief structure used when steering motor instance is initialized
  */
 typedef struct {
-  MotorCANBase* motor; /* motor instance to be wrapped as a servomotor      */
-  float max_speed;     /* desired turning speed of motor shaft, in [rad/s]  */
+  MotorCANBase* motor;              /* motor instance to be wrapped as a servomotor       */
+  float max_speed;                  /* desired turning speed of motor shaft, in [rad/s]   */
   float test_speed;
-  float max_acceleration;   /* desired acceleration of motor shaft, in [rad/s^2] */
-  float transmission_ratio; /* transmission ratio of motor                       */
+  float max_acceleration;           /* desired acceleration of motor shaft, in [rad/s^2]  */
+  float transmission_ratio;         /* transmission ratio of motor                        */
   float offset_angle;
-  float* omega_pid_param; /* pid parameter used to control speed of motor      */
+  float* omega_pid_param;           /* pid parameter used to control speed of motor       */
   float max_iout;
   float max_out;
-  align_detect_t align_detect_func;
-  float calibrate_offset;
+  align_detect_t align_detect_func; /* function pointer for calibration function          */
+  float calibrate_offset = 0.0;     /* angle from calibration sensor to starting location */
 } steering_t;
 
+// mode that can turn relative angles in [rad]
 class SteeringMotor {
  public:
   SteeringMotor(steering_t data);
@@ -514,9 +516,22 @@ class SteeringMotor {
    * @brief print out motor data
    */
   void PrintData() const;
+
+  /**
+   * @brief Set the target to a relative angle in [rad]
+   */
   void TurnRelative(float angle);
-  void TurnAbsolute(float angle);
+
+  /**
+   * @brief Align the motor to its calibration position
+   * @return True when the motor is in calibration position
+   */
   bool AlignUpdate();
+
+  /**
+   * @brief calculate the output of the motors under current configuration
+   * Should be the same as CalcOutput()
+   */
   void Update();
 
  private:
