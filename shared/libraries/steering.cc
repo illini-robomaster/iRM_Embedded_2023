@@ -43,7 +43,7 @@ SteeringChassis::SteeringChassis(steering_chassis_t* _chassis) {
   steering_data.max_speed = SPEED;
   steering_data.test_speed = TEST_SPEED;
   steering_data.max_acceleration = ACCELERATION;
-  steering_data.transmission_ratio = 8;
+  steering_data.transmission_ratio = M3508P19_RATIO;
   steering_data.omega_pid_param = new float[3]{140, 1.2, 25};
   steering_data.max_iout = 3000;
   steering_data.max_out = 13000;
