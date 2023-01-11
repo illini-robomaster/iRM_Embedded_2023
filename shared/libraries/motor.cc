@@ -486,20 +486,21 @@ int SteeringMotor::TurnRelative(float angle, bool override) {
 
 bool SteeringMotor::AlignUpdate() {
   if (align_complete_) {
+    // erase previous target
+    servo_->SetTarget(servo_->GetTheta(), true);
     // if calibration complete, go to aligned location
-    servo_->SetTarget(align_angle_, true);
-    servo_->CalcOutput();
+    TurnRelative(align_angle_ - servo_->GetTheta(relative_mode));
+    CalcOutput();
     return true;
   } else if (align_detect_func()) {
     // if calibration sensor True, move an offset and stop.
     servo_->SetTarget(servo_->GetTheta() + calibrate_offset, true);
     servo_->CalcOutput();
     // mark alignment as complete and keep align_angle for next alignment
-    align_angle_ = servo_->GetTheta() + calibrate_offset;
+    align_angle_ = servo_->GetTheta(relative_mode) + calibrate_offset;
     align_complete_ = true;
 
     current_target_ = servo_->GetTarget();
-    print("%10.4f ", current_target_);
     return true;
   } else {
     // rotate slowly with TEST_SPEED, try to hit the calibration sensor
