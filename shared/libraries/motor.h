@@ -29,6 +29,13 @@ namespace control {
 
 constexpr int MOTOR_RANGE = 30000;  // TODO: 32767 or 30000?
 
+/**
+ * @brief two modes for GetTheta()
+ *  absolute_mode: -inf to +inf (Default option)
+ *  relative_mode: 0 - 2pi
+**/
+enum GetThetaMode {absolute_mode, relative_mode};
+
 int16_t ClipMotorRange(float output);
 
 /**
@@ -72,7 +79,7 @@ class MotorCANBase : public MotorBase {
   virtual void PrintData() const = 0;
 
   /**
-   * @brief get motor angle, in [rad]
+   * @brief get rotor (the cap spinning on the back of the motor) angle, in [rad]
    *
    * @return radian angle, range between [0, 2PI]
    */
@@ -411,9 +418,12 @@ class ServoMotor {
   /**
    * @brief get motor angle, in [rad]
    *
-   * @return radian angle, range between [0, 2PI]
+   * @ param mode   if mode == absolute_mode, range -> [-inf to +inf]
+   *                if mode == relative_mode, range -> [0 to 2pi]
+   *
+   * @return radian angle, range between [-inf, +inf]
    */
-  float GetTheta() const;
+  float GetTheta(GetThetaMode mode = absolute_mode) const;
 
   /**
    * @brief get angle difference (target - actual), in [rad]
@@ -496,10 +506,9 @@ typedef bool (*align_detect_t)(void);
 typedef struct {
   MotorCANBase* motor;              /* motor instance to be wrapped as a servomotor       */
   float max_speed;                  /* desired turning speed of motor shaft, in [rad/s]   */
-  float test_speed;
+  float test_speed;                 /* speed used during calibration (alignment) [no unit]*/
   float max_acceleration;           /* desired acceleration of motor shaft, in [rad/s^2]  */
   float transmission_ratio;         /* transmission ratio of motor                        */
-  float offset_angle;
   float* omega_pid_param;           /* pid parameter used to control speed of motor       */
   float max_iout;
   float max_out;
@@ -511,39 +520,57 @@ typedef struct {
 class SteeringMotor {
  public:
   SteeringMotor(steering_t data);
-  float GetRawTheta() const;
   /**
-   * @brief print out motor data
+   * @brief Call ServoMotor::GetTheta() and return theta in [rad]
+   *
+   * @ param mode   if mode == absolute_mode, range -> [-inf to +inf]
+   *                if mode == relative_mode, range -> [0 to 2pi]
+   */
+  float GetTheta(GetThetaMode mode = absolute_mode) const;
+
+  /**
+   * @brief Print out motor data
    */
   void PrintData() const;
 
   /**
    * @brief Set the target to a relative angle in [rad]
+   *        if the underlying servomotor is not holding, the motor won't turn
+   * @param override if true, override current target even if motor is not holding right now
+   * @return 0 when the command is accepted, 1 otherwise
    */
-  void TurnRelative(float angle);
+  int TurnRelative(float angle, bool override = false);
 
   /**
    * @brief Align the motor to its calibration position
-   * @return True when the motor is in calibration position
+   * @return True when the motor has a calibration position
    */
   bool AlignUpdate();
 
   /**
-   * @brief calculate the output of the motors under current configuration
-   * Should be the same as CalcOutput()
+   * @brief Call Servomotor::CalcOutput()
    */
-  void Update();
+  void CalcOutput();
+
+  /**
+   * @brief Call ServoMotor::UpdateData()
+   * @note only used in CAN callback, do not call elsewhere
+   *
+   * @param data[]  raw data bytes
+   */
+  void UpdateData(const uint8_t data[]);
 
  private:
   ServoMotor* servo_;
 
-  float test_speed_;
-  align_detect_t align_detect_func;
-  float calibrate_offset;
+  float test_speed_;                /* speed used during alignment (calibration)                                            */
+  align_detect_t align_detect_func; /* function pointer for the calibration sensor, see comments for align_detect_t typedef */
+  float calibrate_offset;           /* difference between calibration sensor and desired starting position                  */
+  float current_target_;            /* current absolute position in [rad] to drive the underlying servo motor               */
 
-  float align_angle_;
+  float align_angle_;               /* store calibration angle                                                              */
   BoolEdgeDetector* align_detector;
-  bool align_complete_;
+  bool align_complete_;             /* if calibration is previously done, use the align_angle_                              */
 };
 
 } /* namespace control */

@@ -38,9 +38,10 @@
 bsp::CAN* can1 = nullptr;
 control::MotorCANBase* motor = nullptr;
 control::SteeringMotor* steering = nullptr;
-remote::DBUS* dbus = nullptr;
 
 bsp::GPIO* key = nullptr;
+
+BoolEdgeDetector key_detector(false);
 
 bool steering_align_detect() {
   // float theta = wrap<float>(steering->GetRawTheta(), 0, 2 * PI);
@@ -51,10 +52,12 @@ bool steering_align_detect() {
 
 void RM_RTOS_Init() {
   print_use_uart(&huart8);
-  bsp::SetHighresClockTimer(&htim2);
+  bsp::SetHighresClockTimer(&htim5);
 
-  can1 = new bsp::CAN(&hcan1, 0x201);
-  motor = new control::Motor3508(can1, 0x202);
+  can1 = new bsp::CAN(&hcan1, 0x201, true);
+  motor = new control::Motor3508(can1, 0x203);
+
+  key = new bsp::GPIO(KEY_GPIO_GROUP, KEY_GPIO_PIN);
 
   control::steering_t steering_data;
   steering_data.motor = motor;
@@ -62,52 +65,42 @@ void RM_RTOS_Init() {
   steering_data.test_speed = TEST_SPEED;
   steering_data.max_acceleration = ACCELERATION;
   steering_data.transmission_ratio = M3508P19_RATIO;
-  steering_data.offset_angle = 5.36;
-  steering_data.omega_pid_param = new float[3]{100, 0.5, 12};
+  steering_data.omega_pid_param = new float[3]{140, 1.2, 25};
   steering_data.max_iout = 1000;
   steering_data.max_out = 13000;
   steering_data.align_detect_func = steering_align_detect;
-  // steering_data.calibrate_offset = 0.858458848;
   steering_data.calibrate_offset = 0;
   steering = new control::SteeringMotor(steering_data);
-
-  dbus = new remote::DBUS(&huart1);
 }
 
 void RM_RTOS_Default_Task(const void* args) {
   UNUSED(args);
   control::MotorCANBase* motors[] = {motor};
-  key = new bsp::GPIO(KEY_GPIO_GROUP, KEY_GPIO_PIN);
 
   osDelay(500);  // DBUS initialization needs time
+
+  // Press Key to start aligning. Else sudden current change when power is switched on might break
+  // the board.
+  while(!key->Read());
+
+  // wait for release because align_detect also is key press here
+  while(key->Read());
 
   print("Alignment Begin\r\n");
   while (!steering->AlignUpdate()) {
     control::MotorCANBase::TransmitOutput(motors, 1);
-    static int i = 0;
-    if (i > 10) {
-      steering->PrintData();
-      i = 0;
-    } else {
-      i++;
-    }
-    osDelay(2);
+    osDelay(5);
   }
   print("\r\nAlignment End\r\n");
 
   while (true) {
-    // steering->TurnRelative(float(dbus->ch1) / remote::DBUS::ROCKER_MAX / 20);
-    steering->Update();
-    control::MotorCANBase::TransmitOutput(motors, 1);
-
-    static int i = 0;
-    if (i > 10) {
+    key_detector.input(key->Read());
+    if (key_detector.posEdge()){
+      steering->TurnRelative(PI * 0.25);
       steering->PrintData();
-      i = 0;
-    } else {
-      i++;
     }
-
+    steering->CalcOutput();
+    control::MotorCANBase::TransmitOutput(motors, 1);
     osDelay(2);
   }
 }

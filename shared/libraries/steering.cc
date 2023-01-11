@@ -48,28 +48,28 @@ SteeringChassis::SteeringChassis(steering_chassis_t* _chassis) {
   steering_data.max_iout = 3000;
   steering_data.max_out = 13000;
 
-  steering_data.offset_angle = -1;
+
   steering_data.motor = _chassis->fl_steer_motor;
   steering_data.align_detect_func = _chassis->fl_steer_motor_detect_func;
   // steering_data.calibrate_offset = -0.858458848;
   steering_data.calibrate_offset = 0;
   fl_steer_motor = new control::SteeringMotor(steering_data);
 
-  steering_data.offset_angle = -1;
+
   steering_data.motor = _chassis->fr_steer_motor;
   steering_data.align_detect_func = _chassis->fr_steer_motor_detect_func;
   // steering_data.calibrate_offset = 0.858458848;
   steering_data.calibrate_offset = 0;
   fr_steer_motor = new control::SteeringMotor(steering_data);
 
-  steering_data.offset_angle = -1;
+
   steering_data.motor = _chassis->bl_steer_motor;
   steering_data.align_detect_func = _chassis->bl_steer_motor_detect_func;
   // steering_data.calibrate_offset = -2.283133461;
   steering_data.calibrate_offset = 0;
   bl_steer_motor = new control::SteeringMotor(steering_data);
 
-  steering_data.offset_angle = -1;
+
   steering_data.motor = _chassis->br_steer_motor;
   steering_data.align_detect_func = _chassis->br_steer_motor_detect_func;
   // steering_data.calibrate_offset = 2.283133461;
@@ -89,10 +89,10 @@ SteeringChassis::SteeringChassis(steering_chassis_t* _chassis) {
   bl_steer_motor->TurnRelative(0.0);
   br_steer_motor->TurnRelative(0.0);
 
-  fl_steer_motor->Update();
-  fr_steer_motor->Update();
-  bl_steer_motor->Update();
-  br_steer_motor->Update();
+  fl_steer_motor->CalcOutput();
+  fr_steer_motor->CalcOutput();
+  bl_steer_motor->CalcOutput();
+  br_steer_motor->CalcOutput();
 
   fl_wheel_motor->SetOutput(0.0);
   fr_wheel_motor->SetOutput(0.0);
@@ -181,10 +181,10 @@ void SteeringChassis::Update(float _power_limit, float _chassis_power,
   bl_steer_motor->TurnRelative(theta2_diff);
   br_steer_motor->TurnRelative(theta3_diff);
 
-  fl_steer_motor->Update();
-  fr_steer_motor->Update();
-  bl_steer_motor->Update();
-  br_steer_motor->Update();
+  fl_steer_motor->CalcOutput();
+  fr_steer_motor->CalcOutput();
+  bl_steer_motor->CalcOutput();
+  br_steer_motor->CalcOutput();
 
   // compute speed for wheel motors
   float v0 = sqrt(pow(vy + vw * cos(PI / 4), 2.0) + pow(vx - vw * sin(PI / 4), 2.0));
