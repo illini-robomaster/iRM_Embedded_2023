@@ -442,6 +442,11 @@ void ServoMotor::UpdateData(const uint8_t data[]) {
   if (hold_ && diff > proximity_out_) hold_ = false;
 }
 
+void ServoMotor::TestRun(float test_speed) {
+    motor_->SetOutput(omega_pid_.ComputeConstrainedOutput(
+        motor_->GetOmegaDelta(test_speed * transmission_ratio_)));
+}
+
 SteeringMotor::SteeringMotor(steering_t data) {
   servo_t servo_data;
   servo_data.motor = data.motor;
@@ -493,7 +498,7 @@ bool SteeringMotor::AlignUpdate() {
     CalcOutput();
     return true;
   } else if (align_detect_func()) {
-    // if calibration sensor True, move an offset and stop.
+    // if calibration sensor returns True, move for calibration offset and stop.
     servo_->SetTarget(servo_->GetTheta() + calibrate_offset, true);
     servo_->CalcOutput();
     // mark alignment as complete and keep align_angle for next alignment
@@ -504,8 +509,7 @@ bool SteeringMotor::AlignUpdate() {
     return true;
   } else {
     // rotate slowly with TEST_SPEED, try to hit the calibration sensor
-    servo_->motor_->SetOutput(servo_->omega_pid_.ComputeConstrainedOutput(
-        servo_->motor_->GetOmegaDelta(test_speed_ * servo_->transmission_ratio_)));
+    servo_->TestRun(test_speed_);
   }
   return false;
 }
@@ -516,6 +520,14 @@ void SteeringMotor::CalcOutput() {
 
 void SteeringMotor::UpdateData(const uint8_t data[]) {
   servo_->UpdateData(data);
+}
+
+void SteeringMotor::TestRun(float test_speed) {
+  // if input == 0, use private member test_speed_
+  if (test_speed == 0) {
+    test_speed = test_speed_;
+  }
+  servo_->TestRun(test_speed);
 }
 
 } /* namespace control */

@@ -69,8 +69,8 @@ void RM_RTOS_Init() {
   steering_data.max_iout = 1000;
   steering_data.max_out = 13000;
   steering_data.align_detect_func = steering_align_detect;
-  //steering_data.calibrate_offset = 0;
-  steering_data.calibrate_offset = PI/2;
+  steering_data.calibrate_offset = 0;
+  //steering_data.calibrate_offset = PI/2;
   steering = new control::SteeringMotor(steering_data);
 }
 
@@ -104,12 +104,22 @@ void RM_RTOS_Default_Task(const void* args) {
 
   print("\r\nOK!\r\n");
 
+  int dir = 1;
+
   while (true) {
     key_detector.input(key->Read());
     if (key_detector.posEdge()){
-      steering->TurnRelative(PI * 0.25);
-      steering->PrintData();
+      if (dir == 1) {
+        // Motor should turn the give angle
+        steering->TurnRelative(PI * 4 + PI / 4);
+        steering->PrintData();
+      } else {
+        // Motor should go to align angle
+        steering->AlignUpdate();
+      }
+      dir *= -1;
     }
+
     steering->CalcOutput();
     control::MotorCANBase::TransmitOutput(motors, 1);
     osDelay(2);

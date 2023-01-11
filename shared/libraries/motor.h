@@ -458,6 +458,16 @@ class ServoMotor {
    */
   void UpdateData(const uint8_t data[]);
 
+
+  /**
+   * @brief keep the ServoMotor running with test_speed
+   * @note directly drives underlying motor, no need to call CalcOutput()
+   *       will update GetTheta() reads.
+   *
+   * @param test_speed, running speed in [rad / s]
+   */
+  void TestRun(float test_speed);
+
   friend class SteeringMotor;
 
  private:
@@ -543,6 +553,8 @@ class SteeringMotor {
 
   /**
    * @brief Align the motor to its calibration position
+   *        If the motor doesn't have a alignment position, it tries to find one.
+   *        If the motor has one, it turns to it.
    * @return True when the motor has a calibration position
    */
   bool AlignUpdate();
@@ -559,6 +571,16 @@ class SteeringMotor {
    * @param data[]  raw data bytes
    */
   void UpdateData(const uint8_t data[]);
+
+  /**
+   * @brief keep the SteeringMotor running with test_speed
+   * @note directly drives underlying motor, no need to call CalcOutput()
+   *       will update GetTheta() reads.
+   *
+   * @param test_speed, running speed in [rad / s]
+   *        if no args or 0 given, will use private member test_speed_
+   */
+  void TestRun(float test_speed = 0);
 
  private:
   ServoMotor* servo_;
