@@ -60,6 +60,7 @@ void RM_RTOS_Init() {
   motor1 = new control::Motor3508(can1, 0x201);
   motor3 = new control::Motor3508(can1, 0x203);
 
+  // The 'key' is the white button on TypeA boards
   key = new bsp::GPIO(KEY_GPIO_GROUP, KEY_GPIO_PIN);
 
   control::steering_t steering_data;
