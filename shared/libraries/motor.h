@@ -505,8 +505,8 @@ typedef bool (*align_detect_t)(void);
  */
 typedef struct {
   MotorCANBase* motor;              /* motor instance to be wrapped as a servomotor       */
-  float max_speed;                  /* desired turning speed of motor shaft, in [rad/s]   */
-  float test_speed;                 /* speed used during calibration (alignment) [no unit]*/
+  float run_speed;                  /* normal turning speed of motor shaft, in [rad/s]    */
+  float test_speed;                 /* speed of motor shaft during alignment [rad/s]      */
   float max_acceleration;           /* desired acceleration of motor shaft, in [rad/s^2]  */
   float transmission_ratio;         /* transmission ratio of motor                        */
   float* omega_pid_param;           /* pid parameter used to control speed of motor       */
@@ -562,19 +562,11 @@ class SteeringMotor {
    */
   void UpdateData(const uint8_t data[]);
 
-  /**
-   * @brief keep the motor running with test_speed
-   * @note directly drives underlying motor, no need to call CalcOutput()
-   *       will update GetTheta() reads.
-   *
-   * @param test_speed, running speed in [rad / s]
-   */
-  void TestRun(float test_speed);
-
  private:
   ServoMotor* servo_;
 
   float test_speed_;                /* speed used during alignment (calibration)                                            */
+  float run_speed_;                 /* speed used after alignment                                                           */
   align_detect_t align_detect_func; /* function pointer for the calibration sensor, see comments for align_detect_t typedef */
   float calibrate_offset_;          /* difference between calibration sensor and desired starting position                  */
   float current_target_;            /* current absolute position in [rad] to drive the underlying servo motor               */
@@ -582,7 +574,6 @@ class SteeringMotor {
   float align_angle_;               /* store calibration angle                                                              */
   BoolEdgeDetector* align_detector;
   bool align_complete_;             /* if calibration is previously done, use the align_angle_                              */
-  bool mute_calcoutput_;            /* if true, CalcOutput() will be a dummy function. Use this to drive CANmotor directly  */
 };
 
 } /* namespace control */

@@ -40,7 +40,7 @@ SteeringChassis::SteeringChassis(steering_chassis_t* _chassis) {
   // Init Steering Motors from CANBaseMotor
   control::steering_t steering_data;
 
-  steering_data.max_speed = SPEED;
+  steering_data.run_speed = SPEED;
   steering_data.test_speed = TEST_SPEED;
   steering_data.max_acceleration = ACCELERATION;
   steering_data.transmission_ratio = M3508P19_RATIO;
