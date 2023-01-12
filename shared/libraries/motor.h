@@ -458,16 +458,6 @@ class ServoMotor {
    */
   void UpdateData(const uint8_t data[]);
 
-
-  /**
-   * @brief keep the ServoMotor running with test_speed
-   * @note directly drives underlying motor, no need to call CalcOutput()
-   *       will update GetTheta() reads.
-   *
-   * @param test_speed, running speed in [rad / s]
-   */
-  void TestRun(float test_speed);
-
   friend class SteeringMotor;
 
  private:
@@ -573,26 +563,26 @@ class SteeringMotor {
   void UpdateData(const uint8_t data[]);
 
   /**
-   * @brief keep the SteeringMotor running with test_speed
+   * @brief keep the motor running with test_speed
    * @note directly drives underlying motor, no need to call CalcOutput()
    *       will update GetTheta() reads.
    *
    * @param test_speed, running speed in [rad / s]
-   *        if no args or 0 given, will use private member test_speed_
    */
-  void TestRun(float test_speed = 0);
+  void TestRun(float test_speed);
 
  private:
   ServoMotor* servo_;
 
   float test_speed_;                /* speed used during alignment (calibration)                                            */
   align_detect_t align_detect_func; /* function pointer for the calibration sensor, see comments for align_detect_t typedef */
-  float calibrate_offset;           /* difference between calibration sensor and desired starting position                  */
+  float calibrate_offset_;          /* difference between calibration sensor and desired starting position                  */
   float current_target_;            /* current absolute position in [rad] to drive the underlying servo motor               */
 
   float align_angle_;               /* store calibration angle                                                              */
   BoolEdgeDetector* align_detector;
   bool align_complete_;             /* if calibration is previously done, use the align_angle_                              */
+  bool mute_calcoutput_;            /* if true, CalcOutput() will be a dummy function. Use this to drive CANmotor directly  */
 };
 
 } /* namespace control */

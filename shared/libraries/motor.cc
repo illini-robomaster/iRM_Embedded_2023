@@ -442,10 +442,6 @@ void ServoMotor::UpdateData(const uint8_t data[]) {
   if (hold_ && diff > proximity_out_) hold_ = false;
 }
 
-void ServoMotor::TestRun(float test_speed) {
-    motor_->SetOutput(omega_pid_.ComputeConstrainedOutput(
-        motor_->GetOmegaDelta(test_speed * transmission_ratio_)));
-}
 
 SteeringMotor::SteeringMotor(steering_t data) {
   servo_t servo_data;
@@ -460,7 +456,7 @@ SteeringMotor::SteeringMotor(steering_t data) {
 
   test_speed_ = data.test_speed;
   align_detect_func = data.align_detect_func;
-  calibrate_offset = data.calibrate_offset;
+  calibrate_offset_ = data.calibrate_offset;
   align_angle_ = 0;
   align_detector = new BoolEdgeDetector(false);
   align_complete_ = false;
@@ -485,6 +481,7 @@ int SteeringMotor::TurnRelative(float angle, bool override) {
     return 1;
   } else {
     current_target_ += angle;
+    mute_calcoutput_ = false;
     return 0;
   }
 }
@@ -493,28 +490,36 @@ bool SteeringMotor::AlignUpdate() {
   if (align_complete_) {
     // erase previous target
     servo_->SetTarget(servo_->GetTheta(), true);
+    current_target_ = servo_->GetTarget();
     // if calibration complete, go to aligned location
     TurnRelative(align_angle_ - servo_->GetTheta(relative_mode));
+    mute_calcoutput_ = false;
     CalcOutput();
     return true;
   } else if (align_detect_func()) {
     // if calibration sensor returns True, move for calibration offset and stop.
-    servo_->SetTarget(servo_->GetTheta() + calibrate_offset, true);
+    servo_->SetTarget(servo_->GetTheta() + calibrate_offset_, true);
     servo_->CalcOutput();
     // mark alignment as complete and keep align_angle for next alignment
-    align_angle_ = servo_->GetTheta(relative_mode) + calibrate_offset;
+    align_angle_ = servo_->GetTheta(relative_mode) + calibrate_offset_;
     align_complete_ = true;
+    mute_calcoutput_ = false;
 
     current_target_ = servo_->GetTarget();
     return true;
   } else {
     // rotate slowly with TEST_SPEED, try to hit the calibration sensor
-    servo_->TestRun(test_speed_);
+    TestRun(test_speed_);
   }
   return false;
 }
 
 void SteeringMotor::CalcOutput() {
+  // When directly driving the underlying motor of ServoMotor, call servo_->CalcOutput() stops
+  // the motor.
+  if (mute_calcoutput_) {
+    return;
+  }
   servo_->CalcOutput();
 }
 
@@ -523,11 +528,9 @@ void SteeringMotor::UpdateData(const uint8_t data[]) {
 }
 
 void SteeringMotor::TestRun(float test_speed) {
-  // if input == 0, use private member test_speed_
-  if (test_speed == 0) {
-    test_speed = test_speed_;
-  }
-  servo_->TestRun(test_speed);
+  mute_calcoutput_ = true;
+  servo_->motor_->SetOutput(servo_->omega_pid_.ComputeConstrainedOutput(
+      servo_->motor_->GetOmegaDelta(test_speed * servo_->transmission_ratio_)));
 }
 
 } /* namespace control */
