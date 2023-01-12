@@ -45,11 +45,9 @@ bsp::GPIO* key = nullptr;
 
 BoolEdgeDetector key_detector(false);
 
+// temporal alignment sensor for testing
 bool steering_align_detect() {
-  // float theta = wrap<float>(steering->GetRawTheta(), 0, 2 * PI);
-  // return abs(theta - 3) < 0.05;
   return key->Read() == 1;
-  // return true;
 }
 
 void RM_RTOS_Init() {
@@ -60,7 +58,13 @@ void RM_RTOS_Init() {
   motor1 = new control::Motor3508(can1, 0x201);
   motor3 = new control::Motor3508(can1, 0x203);
 
-  // The 'key' is the white button on TypeA boards
+  /* Usage:
+   *   The 'key' is the white button on TypeA boards
+   *   Press key to start alignment and then press key again to finish alignment.
+   *   Now the align angle is recorded:
+   *   Press key once will turn the motors to an angle.
+   *   Press key again will turn them to the align angle.
+  **/
   key = new bsp::GPIO(KEY_GPIO_GROUP, KEY_GPIO_PIN);
 
   control::steering_t steering_data;
