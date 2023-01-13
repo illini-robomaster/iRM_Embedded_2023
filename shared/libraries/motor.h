@@ -516,6 +516,14 @@ typedef struct {
   float calibrate_offset = 0.0;     /* angle from calibration sensor to starting location */
 } steering_t;
 
+
+/**
+ * @brief two modes for SteeringMotor
+ *  align_mode: max speed = test_speed_
+ *  run_mode: max speed = run_speed_
+**/
+enum SteeringMotorMode {align_mode, run_mode};
+
 // mode that can turn relative angles in [rad]
 class SteeringMotor {
  public:
@@ -541,13 +549,32 @@ class SteeringMotor {
    */
   int TurnRelative(float angle, bool override = false);
 
+
+
   /**
-   * @brief Align the motor to its calibration position
-   *        If the motor doesn't have a alignment position, it tries to find one.
-   *        If the motor has one, it turns to it.
-   * @return True when the motor has a calibration position
+   * @brief Turn the motor to the aligned position
+   *        Do nothing if the motor doesn't have an aligned position
+   * @return 1 if the motor doesn't have an aligned position
+   *         0 if the motor has one.
    */
-  bool AlignUpdate();
+  int ReAlign();
+
+  /**
+   * @brief find the aligned position
+   *        If the motor doesn't have an aligned position, the motor keeps rotating until the detector returns True.
+   *        If the motor has one, the motor does nothing and return True.
+   * @return True when the motor has a aligned position
+   */
+  bool Calibrate();
+
+  /**
+   * @brief Set different max speed for the motor
+   *
+   * @ param mode   if mode == align_mode, max speed = test_speed
+   *                if mode == run_mode, max speed = run_speed
+   *                any other inputs yield no effect
+   */
+  void SetSpeedMode(SteeringMotorMode mode);
 
   /**
    * @brief Call Servomotor::CalcOutput()

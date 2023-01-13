@@ -486,21 +486,27 @@ int SteeringMotor::TurnRelative(float angle, bool override) {
   }
 }
 
-bool SteeringMotor::AlignUpdate() {
-  if (align_complete_) {
-    // erase previous target
-    TurnRelative(0, true);
-    servo_->SetMaxSpeed(run_speed_);
+int SteeringMotor::ReAlign() {
+  // turn iff alignment is completed
+  if (!align_complete_) {
+    return 1;
+  }
 
-    // if calibration complete, go to recorded align_angle
-    TurnRelative(align_angle_ - GetTheta(relative_mode));
+  // erase previous target
+  TurnRelative(0, true);
+
+  // if calibration complete, go to recorded align_angle
+  TurnRelative(align_angle_ - GetTheta(relative_mode));
+  return 0;
+}
+
+bool SteeringMotor::Calibrate() {
+  if (align_complete_) {
     return true;
 
   } else if (align_detect_func()) {
     // if calibration sensor returns True, move for calibration offset and stop.
-    servo_->SetMaxSpeed(run_speed_);
     current_target_ = GetTheta(absolute_mode);
-    TurnRelative(calibrate_offset_, true);
     // mark alignment as complete and keep align_angle for next alignment
     align_angle_ = GetTheta(relative_mode) + calibrate_offset_;
     align_complete_ = true;
@@ -508,10 +514,20 @@ bool SteeringMotor::AlignUpdate() {
     return true;
   } else {
     // rotate slowly with TEST_SPEED, try to hit the calibration sensor
-    servo_->SetMaxSpeed(test_speed_);
     TurnRelative(2 * PI);
   }
   return false;
+}
+
+void SteeringMotor::SetSpeedMode(SteeringMotorMode mode) {
+  switch (mode) {
+    case align_mode:
+      servo_->SetMaxSpeed(test_speed_);
+      break;
+    case run_mode:
+      servo_->SetMaxSpeed(run_speed_);
+      break;
+  }
 }
 
 void SteeringMotor::CalcOutput() {

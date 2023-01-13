@@ -41,13 +41,18 @@ control::MotorCANBase* motor3 = nullptr;
 control::SteeringMotor* steering1 = nullptr;
 control::SteeringMotor* steering3 = nullptr;
 
-bsp::GPIO* key = nullptr;
+bsp::GPIO* key1 = nullptr;
+bsp::GPIO* key3 = nullptr;
 
 BoolEdgeDetector key_detector(false);
 
 // temporal alignment sensor for testing
-bool steering_align_detect() {
-  return key->Read() == 1;
+bool steering_align_detect1() {
+  return key1->Read() == 1;
+}
+
+bool steering_align_detect3() {
+  return key3->Read() == 1;
 }
 
 void RM_RTOS_Init() {
@@ -65,7 +70,9 @@ void RM_RTOS_Init() {
    *   Press key once will turn the motors to an angle.
    *   Press key again will turn them to the align angle.
   **/
-  key = new bsp::GPIO(KEY_GPIO_GROUP, KEY_GPIO_PIN);
+  key1 = new bsp::GPIO(KEY_GPIO_GROUP, KEY_GPIO_PIN);
+  // GPIO L1
+  key3 = new bsp::GPIO(GPIOC, GPIO_PIN_2);
 
   control::steering_t steering_data;
   steering_data.motor = motor1;
@@ -76,12 +83,13 @@ void RM_RTOS_Init() {
   steering_data.omega_pid_param = new float[3]{140, 1.2, 25};
   steering_data.max_iout = 1000;
   steering_data.max_out = 13000;
-  steering_data.align_detect_func = steering_align_detect;
   steering_data.calibrate_offset = 0;
   //steering_data.calibrate_offset = PI/2;
 
+  steering_data.align_detect_func = steering_align_detect1;
   steering1 = new control::SteeringMotor(steering_data);
   steering_data.motor = motor3;
+  steering_data.align_detect_func = steering_align_detect3;
   steering3 = new control::SteeringMotor(steering_data);
 }
 
@@ -93,26 +101,31 @@ void RM_RTOS_Default_Task(const void* args) {
 
   // Press Key to start aligning. Else sudden current change when power is switched on might break
   // the board.
-  while(!key->Read());
+  while(!key1->Read());
 
   // wait for release because align_detect also is key press here
-  while(key->Read());
+  while(key1->Read());
 
   print("Alignment Begin\r\n");
-  // Don't put AlignUpdate() in the while case
+  steering1->SetSpeedMode(control::align_mode);
+  steering3->SetSpeedMode(control::align_mode);
+
+  // Don't put Calibrate() in the while case
   bool alignment_complete1 = false;
   bool alignment_complete3 = false;
   while (!alignment_complete1 || !alignment_complete3) {
     steering1->CalcOutput();
     steering3->CalcOutput();
     control::MotorCANBase::TransmitOutput(motors, 2);
-    alignment_complete1 = steering1->AlignUpdate();
-    alignment_complete3 = steering3->AlignUpdate();
+    alignment_complete1 = steering1->Calibrate();
+    alignment_complete3 = steering3->Calibrate();
     osDelay(2);
   }
 
-  steering1->TurnRelative(0, true);
-  steering3->TurnRelative(0, true);
+  steering1->ReAlign();
+  steering3->ReAlign();
+  steering1->SetSpeedMode(control::run_mode);
+  steering3->SetSpeedMode(control::run_mode);
 
   print("\r\nAlignment End\r\n");
 
@@ -124,7 +137,7 @@ void RM_RTOS_Default_Task(const void* args) {
   int dir = 1;
 
   while (true) {
-    key_detector.input(key->Read());
+    key_detector.input(key1->Read());
     if (key_detector.posEdge()){
       if (dir == 1) {
         // Motor should turn the give angle
@@ -132,8 +145,8 @@ void RM_RTOS_Default_Task(const void* args) {
         steering3->TurnRelative(PI / 3);
       } else {
         // Motor should go to align angle
-        steering1->AlignUpdate();
-        steering3->AlignUpdate();
+        steering1->ReAlign();
+        steering3->ReAlign();
       }
       dir *= -1;
     }
