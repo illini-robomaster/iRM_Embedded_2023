@@ -31,9 +31,9 @@
 #define KEY_GPIO_GROUP GPIOB
 #define KEY_GPIO_PIN GPIO_PIN_2
 
-#define SPEED (10 * PI)
-#define TEST_SPEED (0.5 * PI)
-#define ACCELERATION (100 * PI)
+constexpr float RUN_SPEED = (10 * PI);
+constexpr float ALIGN_SPEED = (0.5 * PI);
+constexpr float ACCELERATION = (100 * PI);
 
 bsp::CAN* can1 = nullptr;
 control::MotorCANBase* motor1 = nullptr;
@@ -65,19 +65,18 @@ void RM_RTOS_Init() {
 
   /* Usage:
    *   The 'key' is the white button on TypeA boards
-   *   Press key to start alignment and then press key again to finish alignment.
+   *   Press key to start alignment and then press key again to finish motor1 alignment.
    *   Now the align angle is recorded:
-   *   Press key once will turn the motors to an angle.
-   *   Press key again will turn them to the align angle.
+   *   Press key once will turn the two motors to their angles.
+   *   Press key again will turn them back to their align angles.
   **/
   key1 = new bsp::GPIO(KEY_GPIO_GROUP, KEY_GPIO_PIN);
-  // GPIO L1
+  // GPIO L1 to align motor3. The switch should be wired from L1 pin to R2 pin (5V VCC)
   key3 = new bsp::GPIO(GPIOC, GPIO_PIN_2);
 
   control::steering_t steering_data;
   steering_data.motor = motor1;
-  steering_data.run_speed = SPEED;
-  steering_data.test_speed = TEST_SPEED;
+  steering_data.max_speed = RUN_SPEED;
   steering_data.max_acceleration = ACCELERATION;
   steering_data.transmission_ratio = M3508P19_RATIO;
   steering_data.omega_pid_param = new float[3]{140, 1.2, 25};
@@ -107,8 +106,8 @@ void RM_RTOS_Default_Task(const void* args) {
   while(key1->Read());
 
   print("Alignment Begin\r\n");
-  steering1->SetSpeedMode(control::align_mode);
-  steering3->SetSpeedMode(control::align_mode);
+  steering1->SetMaxSpeed(ALIGN_SPEED);
+  steering3->SetMaxSpeed(ALIGN_SPEED);
 
   // Don't put Calibrate() in the while case
   bool alignment_complete1 = false;
@@ -122,10 +121,12 @@ void RM_RTOS_Default_Task(const void* args) {
     osDelay(2);
   }
 
-  steering1->ReAlign();
-  steering3->ReAlign();
-  steering1->SetSpeedMode(control::run_mode);
-  steering3->SetSpeedMode(control::run_mode);
+  print("motor1 align status: %d ", steering1->ReAlign());
+  print("motor3 align status: %d\r\n", steering3->ReAlign());
+  steering1->SetMaxSpeed(RUN_SPEED);
+  steering3->SetMaxSpeed(RUN_SPEED);
+
+  control::MotorCANBase::TransmitOutput(motors, 2);
 
   print("\r\nAlignment End\r\n");
 
@@ -145,9 +146,9 @@ void RM_RTOS_Default_Task(const void* args) {
         steering3->TurnRelative(PI / 3);
       } else {
         // Motor should go to align angle
-        steering1->ReAlign();
-        steering3->ReAlign();
-      }
+        print("motor1 align status: %d ", steering1->ReAlign());
+        print("motor3 align status: %d\r\n", steering3->ReAlign());
+     }
       dir *= -1;
     }
 
