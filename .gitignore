@@ -160,3 +160,6 @@ compile_commands.json
 
 # VS Code
 .vscode
+
+# Vim
+*.swp
