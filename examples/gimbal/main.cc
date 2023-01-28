@@ -25,11 +25,18 @@
 #include "dbus.h"
 #include "gimbal.h"
 
+#include "bsp_gpio.h"
+
 #define NOTCH (2 * PI / 8)
 #define SERVO_SPEED (PI)
 
+#define KEY_GPIO_GROUP GPIOB
+#define KEY_GPIO_PIN GPIO_PIN_2
+
 bsp::CAN* can1 = nullptr;
 bsp::CAN* can2 = nullptr;
+
+bsp::GPIO* key = nullptr;
 control::MotorCANBase* pitch_motor = nullptr;
 control::MotorCANBase* yaw_motor = nullptr;
 
@@ -40,15 +47,16 @@ bool status = false;
 
 void RM_RTOS_Init() {
   print_use_uart(&huart8);
-  can1 = new bsp::CAN(&hcan1, 0x201, true);
-  can2 = new bsp::CAN(&hcan2, 0x201, false);
-  pitch_motor = new control::Motor6020(can1, 0x205);
-  yaw_motor = new control::Motor6020(can2, 0x206);
+  can1 = new bsp::CAN(&hcan1, 0x205, true);
+  pitch_motor = new control::Motor6020(can1, 0x207);
+  yaw_motor = new control::Motor6020(can1, 0x205);
   gimbal_init_data.pitch_motor = pitch_motor;
   gimbal_init_data.yaw_motor = yaw_motor;
+  gimbal_init_data.model = control::GIMBAL_SENTRY;
   gimbal = new control::Gimbal(gimbal_init_data);
 
   dbus = new remote::DBUS(&huart1);
+  key = new bsp::GPIO(KEY_GPIO_GROUP, KEY_GPIO_PIN);
 }
 
 void RM_RTOS_Default_Task(const void* args) {
@@ -56,20 +64,33 @@ void RM_RTOS_Default_Task(const void* args) {
 
   osDelay(500);  // DBUS initialization needs time
 
-  control::MotorCANBase* motors_can1[2];
-  control::MotorCANBase* motors_can2[2];
-  UNUSED(motors_can2);
-  motors_can1[0] = pitch_motor;
-  motors_can2[0] = yaw_motor;
+  control::MotorCANBase* motors[2] = {pitch_motor, yaw_motor};
   control::gimbal_data_t* gimbal_data = gimbal->GetData();
 
+  while(!key->Read());
+  while(key->Read());
+  print("ok!\r\n");
+
+  float pitch_ratio = 0.0;
+  float yaw_ratio = 0.0;
+
+  int i = 0;
+
   while (true) {
-    float pitch_ratio = dbus->ch3 / 600.0;
-    float yaw_ratio = -dbus->ch2 / 600.0;
+    pitch_ratio = dbus->ch3 / 600.0;
+    yaw_ratio = -dbus->ch2 / 600.0;
     if (dbus->swr == remote::UP) {
       gimbal->TargetAbs(pitch_ratio * gimbal_data->pitch_max_, yaw_ratio * gimbal_data->yaw_max_);
     } else if (dbus->swr == remote::MID) {
       gimbal->TargetRel(pitch_ratio / 30, yaw_ratio / 30);
+    }
+
+    i += 1;
+    if (i >= 100) {
+      print("p = %10.4f, y = %10.4f\r\n", pitch_ratio, yaw_ratio);
+      pitch_motor->PrintData();
+      yaw_motor->PrintData();
+      i = 0;
     }
 
     // Kill switch
@@ -78,8 +99,7 @@ void RM_RTOS_Default_Task(const void* args) {
     }
 
     gimbal->Update();
-    control::MotorCANBase::TransmitOutput(motors_can1, 1);
-    control::MotorCANBase::TransmitOutput(motors_can2, 1);
+    control::MotorCANBase::TransmitOutput(motors, 2);
     osDelay(10);
   }
 }

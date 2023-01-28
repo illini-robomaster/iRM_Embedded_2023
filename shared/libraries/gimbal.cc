@@ -12,6 +12,15 @@ Gimbal::Gimbal(gimbal_t gimbal)
   yaw_motor_ = gimbal.yaw_motor;
   model_ = gimbal.model;
 
+  float pitch_theta_max_iout = 0;
+  float pitch_theta_max_out = 10;
+  float pitch_omega_max_iout = 10000;
+  float pitch_omega_max_out = 30000;
+  float yaw_theta_max_iout = 0;
+  float yaw_theta_max_out = 10;
+  float yaw_omega_max_iout = 25000;
+  float yaw_omega_max_out = 30000;
+
   // data initialization using acquired model
   switch (gimbal.model) {
     case GIMBAL_FORTRESS:
@@ -20,54 +29,46 @@ Gimbal::Gimbal(gimbal_t gimbal)
       data_.pitch_max_ = 0.5080f;
       data_.yaw_max_ = PI;
       {
-        float pitch_theta_max_iout = 0;
-        float pitch_theta_max_out = 10;
-        float pitch_omega_max_iout = 10000;
-        float pitch_omega_max_out = 30000;
-        float yaw_theta_max_iout = 0;
-        float yaw_theta_max_out = 10;
-        float yaw_omega_max_iout = 25000;  // 10000
-        float yaw_omega_max_out = 30000;
+        pitch_theta_max_iout = 0;
+        pitch_theta_max_out = 10;
+        pitch_omega_max_iout = 10000;
+        pitch_omega_max_out = 30000;
+        yaw_theta_max_iout = 0;
+        yaw_theta_max_out = 10;
+        yaw_omega_max_iout = 25000;  // 10000
+        yaw_omega_max_out = 30000;
         pitch_theta_pid_param_ = new float[3]{15, 0, 0};
         pitch_omega_pid_param_ = new float[3]{2900, 60, 0};
         yaw_theta_pid_param_ = new float[3]{26, 0, 0.3};
         yaw_omega_pid_param_ = new float[3]{3600, 20, 0};
-        pitch_theta_pid_ =
-            new ConstrainedPID(pitch_theta_pid_param_, pitch_theta_max_iout, pitch_theta_max_out);
-        pitch_omega_pid_ =
-            new ConstrainedPID(pitch_omega_pid_param_, pitch_omega_max_iout, pitch_omega_max_out);
-        yaw_theta_pid_ =
-            new ConstrainedPID(yaw_theta_pid_param_, yaw_theta_max_iout, yaw_theta_max_out);
-        yaw_omega_pid_ =
-            new ConstrainedPID(yaw_omega_pid_param_, yaw_omega_max_iout, yaw_omega_max_out);
       }
       break;
     case GIMBAL_SENTRY:
-      data_.pitch_offset_ = 1.6352f;
       data_.yaw_offset_ = 2.8718f;
+      data_.pitch_offset_ = 2.8718f;
+      /* original
+      data_.pitch_offset_ = 1.6352f;
       data_.pitch_max_ = 0.5080f;
+      */
+      data_.pitch_max_ = PI;
       data_.yaw_max_ = PI;
       {
-        float pitch_theta_max_iout = 0;
-        float pitch_theta_max_out = 10;
-        float pitch_omega_max_iout = 10000;
-        float pitch_omega_max_out = 30000;
-        float yaw_theta_max_iout = 0;
-        float yaw_theta_max_out = 10;
-        float yaw_omega_max_iout = 10000;
-        float yaw_omega_max_out = 30000;
+        pitch_theta_max_iout = 0;
+        pitch_theta_max_out = 10;
+        pitch_omega_max_iout = 10000;
+        pitch_omega_max_out = 30000;
+        yaw_theta_max_iout = 0;
+        yaw_theta_max_out = 10;
+        yaw_omega_max_iout = 10000;
+        yaw_omega_max_out = 30000;
         pitch_theta_pid_param_ = new float[3]{15, 0, 0};
         pitch_omega_pid_param_ = new float[3]{1740, 25, 0};
+        /* original
         yaw_theta_pid_param_ = new float[3]{26, 0, 0.3};
         yaw_omega_pid_param_ = new float[3]{2160, 12, 0};
-        pitch_theta_pid_ =
-            new ConstrainedPID(pitch_theta_pid_param_, pitch_theta_max_iout, pitch_theta_max_out);
-        pitch_omega_pid_ =
-            new ConstrainedPID(pitch_omega_pid_param_, pitch_omega_max_iout, pitch_omega_max_out);
-        yaw_theta_pid_ =
-            new ConstrainedPID(yaw_theta_pid_param_, yaw_theta_max_iout, yaw_theta_max_out);
-        yaw_omega_pid_ =
-            new ConstrainedPID(yaw_omega_pid_param_, yaw_omega_max_iout, yaw_omega_max_out);
+        */
+        yaw_theta_pid_param_ = new float[3]{15, 0, 0};
+        yaw_omega_pid_param_ = new float[3]{1740, 25, 0};
       }
       break;
     case GIMBAL_STEERING:
@@ -76,31 +77,38 @@ Gimbal::Gimbal(gimbal_t gimbal)
       data_.pitch_max_ = 0.5080f;
       data_.yaw_max_ = PI;
       {
-        float pitch_theta_max_iout = 0;
-        float pitch_theta_max_out = 10;
-        float pitch_omega_max_iout = 10000;
-        float pitch_omega_max_out = 30000;
-        float yaw_theta_max_iout = 0;
-        float yaw_theta_max_out = 10;
-        float yaw_omega_max_iout = 10000;  // 10000
-        float yaw_omega_max_out = 30000;
+        pitch_theta_max_iout = 0;
+        pitch_theta_max_out = 10;
+        pitch_omega_max_iout = 10000;
+        pitch_omega_max_out = 30000;
+        yaw_theta_max_iout = 0;
+        yaw_theta_max_out = 10;
+        yaw_omega_max_iout = 10000;  // 10000
+        yaw_omega_max_out = 30000;
         pitch_theta_pid_param_ = new float[3]{20, 0, 0};
         pitch_omega_pid_param_ = new float[3]{2900, 60, 0};
         yaw_theta_pid_param_ = new float[3]{30, 0, 0.3};
         yaw_omega_pid_param_ = new float[3]{3600, 20, 0};
-        pitch_theta_pid_ =
-            new ConstrainedPID(pitch_theta_pid_param_, pitch_theta_max_iout, pitch_theta_max_out);
-        pitch_omega_pid_ =
-            new ConstrainedPID(pitch_omega_pid_param_, pitch_omega_max_iout, pitch_omega_max_out);
-        yaw_theta_pid_ =
-            new ConstrainedPID(yaw_theta_pid_param_, yaw_theta_max_iout, yaw_theta_max_out);
-        yaw_omega_pid_ =
-            new ConstrainedPID(yaw_omega_pid_param_, yaw_omega_max_iout, yaw_omega_max_out);
       }
       break;
     default:
       RM_ASSERT_TRUE(false, "Not Supported Gimbal Mode\r\n");
   }
+
+  // nullptr guard
+  if (pitch_theta_pid_param_ == nullptr || pitch_omega_pid_param_ == nullptr ||
+      yaw_theta_pid_param_   == nullptr || yaw_omega_pid_param_ == nullptr) {
+      RM_ASSERT_TRUE(false, "Not Supported Gimbal Mode\r\n");
+  }
+
+  pitch_theta_pid_ =
+      new ConstrainedPID(pitch_theta_pid_param_, pitch_theta_max_iout, pitch_theta_max_out);
+  pitch_omega_pid_ =
+      new ConstrainedPID(pitch_omega_pid_param_, pitch_omega_max_iout, pitch_omega_max_out);
+  yaw_theta_pid_ =
+      new ConstrainedPID(yaw_theta_pid_param_, yaw_theta_max_iout, yaw_theta_max_out);
+  yaw_omega_pid_ =
+      new ConstrainedPID(yaw_omega_pid_param_, yaw_omega_max_iout, yaw_omega_max_out);
 
   pitch_angle_ = data_.pitch_offset_;
   yaw_angle_ = data_.yaw_offset_;
