@@ -48,8 +48,8 @@ bool status = false;
 void RM_RTOS_Init() {
   print_use_uart(&huart8);
   can1 = new bsp::CAN(&hcan1, 0x205, true);
-  pitch_motor = new control::Motor6020(can1, 0x207);
-  yaw_motor = new control::Motor6020(can1, 0x205);
+  pitch_motor = new control::Motor6020(can1, 0x205);
+  yaw_motor = new control::Motor6020(can1, 0x206);
   gimbal_init_data.pitch_motor = pitch_motor;
   gimbal_init_data.yaw_motor = yaw_motor;
   gimbal_init_data.model = control::GIMBAL_SENTRY;
