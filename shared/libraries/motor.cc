@@ -446,7 +446,7 @@ void ServoMotor::UpdateData(const uint8_t data[]) {
 SteeringMotor::SteeringMotor(steering_t data) {
   servo_t servo_data;
   servo_data.motor = data.motor;
-  servo_data.max_speed = data.run_speed;
+  servo_data.max_speed = data.max_speed;
   servo_data.max_acceleration = data.max_acceleration;
   servo_data.transmission_ratio = data.transmission_ratio;
   servo_data.omega_pid_param = data.omega_pid_param;
@@ -454,12 +454,9 @@ SteeringMotor::SteeringMotor(steering_t data) {
   servo_data.max_out = data.max_out;
   servo_ = new ServoMotor(servo_data);
 
-  run_speed_ = data.run_speed;
-  test_speed_ = data.test_speed;
-  align_detect_func = data.align_detect_func;
+  align_detect_func_ = data.align_detect_func;
   calibrate_offset_ = data.calibrate_offset;
   align_angle_ = 0;
-  align_detector = new BoolEdgeDetector(false);
   align_complete_ = false;
   current_target_ = 0;
 }
@@ -486,21 +483,28 @@ int SteeringMotor::TurnRelative(float angle, bool override) {
   }
 }
 
-bool SteeringMotor::AlignUpdate() {
-  if (align_complete_) {
-    // erase previous target
-    TurnRelative(0, true);
-    servo_->SetMaxSpeed(run_speed_);
+int SteeringMotor::ReAlign() {
+  // turn iff alignment is completed
+  if (!align_complete_) {
+    return 2;
+  }
 
-    // if calibration complete, go to recorded align_angle
-    TurnRelative(align_angle_ - GetTheta(relative_mode));
+  int ret = 0;
+  // erase previous target
+  ret = TurnRelative(0, true) || ret;
+
+  // if calibration complete, go to recorded align_angle
+  ret = TurnRelative(wrap<float>(align_angle_ - GetTheta(relative_mode), -PI, PI)) || ret;
+  return ret;
+}
+
+bool SteeringMotor::Calibrate() {
+  if (align_complete_) {
     return true;
 
-  } else if (align_detect_func()) {
+  } else if (align_detect_func_ != nullptr && align_detect_func_()) {
     // if calibration sensor returns True, move for calibration offset and stop.
-    servo_->SetMaxSpeed(run_speed_);
     current_target_ = GetTheta(absolute_mode);
-    TurnRelative(calibrate_offset_, true);
     // mark alignment as complete and keep align_angle for next alignment
     align_angle_ = GetTheta(relative_mode) + calibrate_offset_;
     align_complete_ = true;
@@ -508,10 +512,13 @@ bool SteeringMotor::AlignUpdate() {
     return true;
   } else {
     // rotate slowly with TEST_SPEED, try to hit the calibration sensor
-    servo_->SetMaxSpeed(test_speed_);
     TurnRelative(2 * PI);
   }
   return false;
+}
+
+void SteeringMotor::SetMaxSpeed(const float max_speed) {
+  servo_->SetMaxSpeed(max_speed);
 }
 
 void SteeringMotor::CalcOutput() {

@@ -40,8 +40,7 @@ SteeringChassis::SteeringChassis(steering_chassis_t* _chassis) {
   // Init Steering Motors from CANBaseMotor
   control::steering_t steering_data;
 
-  steering_data.run_speed = SPEED;
-  steering_data.test_speed = TEST_SPEED;
+  steering_data.max_speed = SPEED;
   steering_data.max_acceleration = ACCELERATION;
   steering_data.transmission_ratio = M3508P19_RATIO;
   steering_data.omega_pid_param = new float[3]{140, 1.2, 25};
@@ -229,10 +228,10 @@ void SteeringChassis::Update(float _power_limit, float _chassis_power,
 }
 
 bool SteeringChassis::AlignUpdate() {
-  volatile bool fl_complete = fl_steer_motor->AlignUpdate();
-  volatile bool fr_complete = fr_steer_motor->AlignUpdate();
-  volatile bool bl_complete = bl_steer_motor->AlignUpdate();
-  volatile bool br_complete = br_steer_motor->AlignUpdate();
+  volatile bool fl_complete = fl_steer_motor->Calibrate();
+  volatile bool fr_complete = fr_steer_motor->Calibrate();
+  volatile bool bl_complete = bl_steer_motor->Calibrate();
+  volatile bool br_complete = br_steer_motor->Calibrate();
   return fl_complete && fr_complete && bl_complete && br_complete;
 }
 
