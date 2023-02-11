@@ -83,6 +83,16 @@ void MotorCANBase::TransmitOutput(MotorCANBase* motors[], uint8_t num_motors) {
   motors[0]->can_->Transmit(motors[0]->tx_id_, data, 8);
 }
 
+void MotorCANBase::TransmitOutput4310(control::MotorCANBase* motor) {
+  uint8_t data[8] = {0};
+  const uint8_t motor_idx = (motor->rx_id_ - 1) % 4;
+  const int16_t output = motor->output_;
+//  data[2 * motor_idx] = output >> 8;
+//  data[2 * motor_idx + 1] = output & 0xff;
+  motor->can_->Transmit(motor->tx_id_, data, 8);
+
+}
+
 float MotorCANBase::GetTheta() const { return theta_; }
 
 float MotorCANBase::GetThetaDelta(float target) const {
@@ -527,6 +537,26 @@ void SteeringMotor::CalcOutput() {
 
 void SteeringMotor::UpdateData(const uint8_t data[]) {
   servo_->UpdateData(data);
+}
+
+
+Motor4310::Motor4310(bsp::CAN* can, uint16_t rx_id) : MotorCANBase(can, rx_id) {
+  can->RegisterRxCallback(rx_id, can_motor_callback, this);
+}
+
+void Motor4310::UpdateData(const uint8_t data[]) {
+  // TODO
+}
+
+void Motor4310::PrintData() const {
+  print("Position: % .4f ", raw_pos_);
+  print("Velocity: % .4f ", raw_vel_);
+  print("Torque: % .4f ", raw_torque_);
+  print("Rotor temp: % .4f \r\n", raw_rotorTemp);
+}
+
+void Motor4310::SetOutput(int16_t val) {
+  // TODO
 }
 
 } /* namespace control */

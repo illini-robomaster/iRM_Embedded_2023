@@ -122,6 +122,8 @@ class MotorCANBase : public MotorBase {
    */
   static void TransmitOutput(MotorCANBase* motors[], uint8_t num_motors);
 
+  static void TransmitOutput4310(MotorCANBase* motor);
+
   /**
    * @brief set ServoMotor as friend of MotorCANBase since they need to use
    *        many of the private parameters of MotorCANBase.
@@ -594,5 +596,31 @@ class SteeringMotor {
   float align_angle_;               /* store calibration angle                                                              */
   bool align_complete_;             /* if calibration is previously done, use the align_angle_                              */
 };
+
+/**
+ * @brief 4310 motor class
+ */
+class Motor4310 : public MotorCANBase {
+ public:
+  /* constructor wrapper over MotorCANBase */
+  Motor4310(bsp::CAN* can, uint16_t rx_id_);
+  /* implements data update callback */
+  void UpdateData(const uint8_t data[]) override final;
+  /* implements data printout */
+  void PrintData() const override final;
+  /* override base implementation with max current protection */
+  // TODO: change parameters
+  void SetOutput(int16_t val) override final;
+
+ private:
+  volatile int16_t kp_ = 0;
+  volatile int16_t
+  volatile int16_t raw_pos_ = 0;
+  volatile int16_t raw_vel_ = 0;
+  volatile int16_t raw_torque_ = 0;
+  volatile int16_t raw_rotorTemp = 0;
+
+};
+
 
 } /* namespace control */
