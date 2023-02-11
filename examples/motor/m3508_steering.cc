@@ -56,7 +56,7 @@ bool steering_align_detect3() {
 }
 
 void RM_RTOS_Init() {
-  print_use_uart(&huart8);
+  print_use_uart(&huart6);
   bsp::SetHighresClockTimer(&htim5);
 
   can1 = new bsp::CAN(&hcan1, 0x201, true);
@@ -94,7 +94,8 @@ void RM_RTOS_Init() {
 
 void RM_RTOS_Default_Task(const void* args) {
   UNUSED(args);
-  control::MotorCANBase* motors[] = {motor1, motor3};
+  // control::MotorCANBase* motors[] = {motor1, motor3};
+  control::MotorCANBase* motors[] = {motor1};
 
   osDelay(500);  // DBUS initialization needs time
 
@@ -107,55 +108,23 @@ void RM_RTOS_Default_Task(const void* args) {
 
   print("Alignment Begin\r\n");
   steering1->SetMaxSpeed(ALIGN_SPEED);
-  steering3->SetMaxSpeed(ALIGN_SPEED);
-
-  // Don't put Calibrate() in the while case
-  bool alignment_complete1 = false;
-  bool alignment_complete3 = false;
-  while (!alignment_complete1 || !alignment_complete3) {
-    steering1->CalcOutput();
-    steering3->CalcOutput();
-    control::MotorCANBase::TransmitOutput(motors, 2);
-    alignment_complete1 = steering1->Calibrate();
-    alignment_complete3 = steering3->Calibrate();
-    osDelay(2);
-  }
-
-  print("motor1 align status: %d ", steering1->ReAlign());
-  print("motor3 align status: %d\r\n", steering3->ReAlign());
-  steering1->SetMaxSpeed(RUN_SPEED);
-  steering3->SetMaxSpeed(RUN_SPEED);
-
-  control::MotorCANBase::TransmitOutput(motors, 2);
-
-  print("\r\nAlignment End\r\n");
 
   // Wait for key to release
   osDelay(500);
 
   print("\r\nOK!\r\n");
 
-  int dir = 1;
 
   while (true) {
     key_detector.input(key1->Read());
     if (key_detector.posEdge()){
-      if (dir == 1) {
-        // Motor should turn the give angle
-        steering1->TurnRelative(PI * 4 + PI / 4);
-        steering3->TurnRelative(PI / 3);
-      } else {
-        // Motor should go to align angle
-        print("motor1 align status: %d ", steering1->ReAlign());
-        print("motor3 align status: %d\r\n", steering3->ReAlign());
-     }
-      dir *= -1;
+      // Motor should turn the give angle
+      steering1->TurnRelative(PI * 4 + PI / 4);
     }
 
     steering1->CalcOutput();
-    steering3->CalcOutput();
 
-    control::MotorCANBase::TransmitOutput(motors, 2);
+    control::MotorCANBase::TransmitOutput(motors, 1);
     osDelay(2);
   }
 }
