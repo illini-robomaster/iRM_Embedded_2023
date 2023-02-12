@@ -30,6 +30,7 @@
 #include "protocol.h"
 #include "rgb.h"
 #include "steering.h"
+#include <ctime>
 
 static bsp::CAN* can1 = nullptr;
 static bsp::CAN* can2 = nullptr;
@@ -302,6 +303,10 @@ static bool debug = false;
 void RM_RTOS_Default_Task(const void* args) {
   UNUSED(args);
 
+  time_t t;
+  time_t curr;
+  time(&t);
+
   while (true) {
     if (receive->dead) {
       Dead = true;
@@ -310,8 +315,9 @@ void RM_RTOS_Default_Task(const void* args) {
     if (debug) {
       set_cursor(0, 0);
       clear_screen();
-      print("vx: %f, vy: %f, angle: %f, mode: %f, dead: %f\r\n", receive->vx, receive->vy,
-            receive->relative_angle, receive->mode, receive->dead);
+      time(&curr);
+//      print("%ld,%f\n", curr-t, referee->power_heat_data.chassis_power);
+      print("%f\n", referee->power_heat_data.chassis_power);
     }
     osDelay(DEFAULT_TASK_DELAY);
   }
