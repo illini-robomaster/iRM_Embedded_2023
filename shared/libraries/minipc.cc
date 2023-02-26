@@ -47,8 +47,8 @@ void MiniPCProtocol::Receive(const uint8_t* data, uint8_t length) {
     for (int32_t i = 0; i < (int32_t)length; i++) {
       if ((data[i] == 'S' && data[i + 1] == 'T') || (data[i] == 'M' && data[i + 1] == 'Y')) {
         index = 0;
-
-        memcpy(host_command, data + i, index = std::min((int)PKG_LEN, (int)(length - i)));
+        index = std::min((int)PKG_LEN, (int)(length - i));
+        memcpy(host_command, data + i, index);
         if (index == PKG_LEN) {
           // handling here! TODO:
           index = -1;
@@ -60,7 +60,23 @@ void MiniPCProtocol::Receive(const uint8_t* data, uint8_t length) {
   }
 }
 
-void MiniPCProtocol::handle(void) { flag = 1; }
+void MiniPCProtocol::handle(void) {
+  // TODO: implement thread-safe logic here (use a lock to handle changes from interrupt)
+  // here we can assume that the package is complete
+  // in the host_command buffer
+
+  // check end of packet is 'ED'
+  if (host_command[PKG_LEN - 2] != 'E' || host_command[PKG_LEN - 1] != 'D') {
+    flag = 0;
+    return;
+  }
+
+  if (verify_crc8_check_sum(host_command, PKG_LEN - 2)) {
+    flag = 1;
+  } else {
+    flag = 0;
+  }
+}
 
 uint8_t MiniPCProtocol::get(void) {
   uint8_t temp = flag;

@@ -23,6 +23,7 @@
 #include "bsp_print.h"
 #include "bsp_uart.h"
 #include "cmsis_os.h"
+#include "crc8.h"
 
 namespace communication {
 
@@ -36,7 +37,7 @@ class MiniPCProtocol {
 
  private:
   int index;
-  static constexpr uint8_t PKG_LEN = 16;
+  static constexpr uint8_t PKG_LEN = 17;
   uint8_t flag;
   uint8_t host_command[PKG_LEN];
   void handle();
