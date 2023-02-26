@@ -20,8 +20,6 @@
 
 #include "crc8.h"
 
-#include <iostream>
-
 // crc8 generator polynomial:G(x)=x8+x5+x4+1
 // CRC-8-Dallas/Maxim
 // Table gathered from https://crccalc.com/
@@ -47,7 +45,7 @@ const uint8_t CRC8_TAB[256] = {
     0x74, 0x2a, 0xc8, 0x96, 0x15, 0x4b, 0xa9, 0xf7, 0xb6, 0xe8, 0x0a, 0x54, 0xd7, 0x89, 0x6b, 0x35,
 };
 
-static uint8_t get_crc8_check_sum(uint8_t* pchMessage, uint16_t dwLength, uint8_t ucCRC8) {
+uint8_t get_crc8_check_sum(uint8_t* pchMessage, uint16_t dwLength, uint8_t ucCRC8) {
   uint8_t ucIndex;
   while (dwLength--) {
     ucIndex = ucCRC8 ^ (*pchMessage++);
@@ -68,12 +66,4 @@ void append_crc8_check_sum(uint8_t* pchMessage, uint16_t dwLength) {
   if ((pchMessage == 0) || (dwLength <= 2)) return;
   ucCRC = get_crc8_check_sum((uint8_t*)pchMessage, dwLength - 1, CRC8_INIT);
   pchMessage[dwLength - 1] = ucCRC;
-}
-
-int main() {
-  uint8_t name[8] = {'i','l','l','i','n', 'i', 'r', 'm'};  
-  uint8_t ret = get_crc8_check_sum(name, 8, CRC8_INIT);
-  printf("Computed CRC8: %d", ret);
-  std::cout << "Computed CRC8: " << ret << std::endl;
-  return 0;
 }
