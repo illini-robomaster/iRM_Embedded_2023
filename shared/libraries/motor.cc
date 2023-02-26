@@ -66,6 +66,13 @@ MotorCANBase::MotorCANBase(bsp::CAN* can, uint16_t rx_id)
     tx_id_ = TX1_ID;
 }
 
+MotorCANBase::MotorCANBase(bsp::CAN* can, uint16_t rx_id, uint16_t type)
+  : theta_(0), omega_(0), can_(can), rx_id_(rx_id) {
+  if (type == 4310){
+    tx_id_ = 0x01;
+  }
+}
+
 void MotorCANBase::TransmitOutput(MotorCANBase* motors[], uint8_t num_motors) {
   uint8_t data[8] = {0};
 
@@ -83,12 +90,30 @@ void MotorCANBase::TransmitOutput(MotorCANBase* motors[], uint8_t num_motors) {
   motors[0]->can_->Transmit(motors[0]->tx_id_, data, 8);
 }
 
-void MotorCANBase::TransmitOutput4310(control::MotorCANBase* motor) {
+void Motor4310::Initialize4310(Motor4310* motor) {
   uint8_t data[8] = {0};
-  const uint8_t motor_idx = (motor->rx_id_ - 1) % 4;
-  const int16_t output = motor->output_;
-//  data[2 * motor_idx] = output >> 8;
-//  data[2 * motor_idx + 1] = output & 0xff;
+  data[0] = 0xff;
+  data[1] = 0xff;
+  data[2] = 0xff;
+  data[3] = 0xff;
+  data[4] = 0xff;
+  data[5] = 0xff;
+  data[6] = 0xff;
+  data[7] = 0xfc;
+  motor->can_->Transmit(motor->tx_id_, data, 8);
+}
+
+void Motor4310::TransmitOutput4310(Motor4310* motor) {
+  uint8_t data[8] = {0};
+  //  follow the datasheet of the MIT mode data format
+  data[0] = motor->p_set_ >> 8;
+  data[1] = motor->p_set_ & 0x00ff;
+  data[2] = (motor->v_set_ >> 4) & 0x00ff;
+  data[3] = (motor->v_set_ & 0x000f) | ((motor->kp_ >> 8) & 0x000f);
+  data[4] = motor->kp_ & 0x00ff;
+  data[5] = (motor->kd_ >> 4) & 0x00ff;
+  data[6] = (motor->kd_ & 0x000f) | ((motor->t_set_ >> 8) & 0x000f);
+  data[7] = motor->t_set_ & 0x00ff;
   motor->can_->Transmit(motor->tx_id_, data, 8);
 
 }
@@ -540,12 +565,14 @@ void SteeringMotor::UpdateData(const uint8_t data[]) {
 }
 
 
-Motor4310::Motor4310(bsp::CAN* can, uint16_t rx_id) : MotorCANBase(can, rx_id) {
+Motor4310::Motor4310(bsp::CAN* can, uint16_t rx_id) : MotorCANBase(can, rx_id, 4310) {
   can->RegisterRxCallback(rx_id, can_motor_callback, this);
 }
 
 void Motor4310::UpdateData(const uint8_t data[]) {
   // TODO
+  UNUSED(data);
+
 }
 
 void Motor4310::PrintData() const {
@@ -555,8 +582,13 @@ void Motor4310::PrintData() const {
   print("Rotor temp: % .4f \r\n", raw_rotorTemp);
 }
 
-void Motor4310::SetOutput(int16_t val) {
-  // TODO
+// set output parameters for m4310
+void Motor4310::SetOutput4310(int16_t position, int16_t velocity, int16_t kp, int16_t kd, int16_t torque) {
+  p_set_ = position;
+  v_set_ = velocity;
+  kp_ = kp;
+  kd_ = kd;
+  t_set_ = torque;
 }
 
 } /* namespace control */

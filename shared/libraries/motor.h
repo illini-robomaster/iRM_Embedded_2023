@@ -64,6 +64,7 @@ class MotorCANBase : public MotorBase {
    * @param rx_id  CAN rx id
    */
   MotorCANBase(bsp::CAN* can, uint16_t rx_id);
+  MotorCANBase(bsp::CAN* can, uint16_t rx_id, uint16_t type);
 
   /**
    * @brief update motor feedback data
@@ -121,14 +122,12 @@ class MotorCANBase : public MotorBase {
    * @param num_motors  number of motors to transmit
    */
   static void TransmitOutput(MotorCANBase* motors[], uint8_t num_motors);
-
-  static void TransmitOutput4310(MotorCANBase* motor);
-
   /**
    * @brief set ServoMotor as friend of MotorCANBase since they need to use
    *        many of the private parameters of MotorCANBase.
    */
   friend class ServoMotor;
+  friend class Motor4310;
 
   volatile bool connection_flag_ = false;
 
@@ -606,19 +605,27 @@ class Motor4310 : public MotorCANBase {
   Motor4310(bsp::CAN* can, uint16_t rx_id_);
   /* implements data update callback */
   void UpdateData(const uint8_t data[]) override final;
+
+  static void Initialize4310(Motor4310* motor);
+  /* implements transmit output specifically for 4310 */
+  static void TransmitOutput4310(control::Motor4310* motor);
   /* implements data printout */
   void PrintData() const override final;
   /* override base implementation with max current protection */
   // TODO: change parameters
-  void SetOutput(int16_t val) override final;
+  void SetOutput4310(int16_t position, int16_t velocity, int16_t kp, int16_t kd, int16_t torque);
 
  private:
-  volatile int16_t kp_ = 0;
-  volatile int16_t
-  volatile int16_t raw_pos_ = 0;
-  volatile int16_t raw_vel_ = 0;
-  volatile int16_t raw_torque_ = 0;
-  volatile int16_t raw_rotorTemp = 0;
+  volatile int16_t kp_ = 0;   // defined kp value
+  volatile int16_t kd_ = 0;   // defined kd value
+  volatile int16_t v_set_ = 0;  // defined velocity
+  volatile int16_t p_set_ = 0;  // defined position
+  volatile int16_t t_set_ = 0;  // defined torque
+
+  volatile int16_t raw_pos_ = 0;  // actual position
+  volatile int16_t raw_vel_ = 0;  // actual velocity
+  volatile int16_t raw_torque_ = 0; // actual torque
+  volatile int16_t raw_rotorTemp = 0; // motor temp
 
 };
 
