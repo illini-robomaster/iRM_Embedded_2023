@@ -75,7 +75,7 @@ void RM_RTOS_Default_Task(const void* argument) {
       miniPCreceiver.Receive(data, length);
       if (miniPCreceiver.get_valid_flag() == 1) {
         // green
-        if (miniPCreceiver.get_relative_yaw() == 1000000) {
+        if (miniPCreceiver.get_relative_yaw() == 1) {
           led->Display(0xFF00FF00);
         }
       }
