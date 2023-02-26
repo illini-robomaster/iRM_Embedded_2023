@@ -36,19 +36,25 @@ class MiniPCProtocol {
   // dummy send
   void Send();
   uint8_t get_valid_flag(void);
-  int32_t get_relative_yaw(void);
-  int32_t get_relative_pitch(void);
+  float get_relative_yaw(void);
+  float get_relative_pitch(void);
 
  private:
-  int index;
+  /* For definitions of constants, check out the documentation at */
   static constexpr uint8_t PKG_LEN = 17;
+  static constexpr int32_t INT_FP_SCALE = 1000000;
+  static constexpr uint8_t SEQNUM_OFFSET = 2;
+  static constexpr uint8_t REL_YAW_OFFSET = SEQNUM_OFFSET + 4;
+  static constexpr uint8_t REL_PITCH_OFFSET = REL_YAW_OFFSET + 4;
+
+  int index;
   uint8_t flag;
   uint8_t host_command[PKG_LEN];
   void handle();
   void process_data();
 
-  int32_t relative_yaw;
-  int32_t relative_pitch;
+  float relative_yaw;
+  float relative_pitch;
 }; /* class MiniPCProtocol */
 
 } /* namespace communication */

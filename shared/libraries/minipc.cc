@@ -79,21 +79,21 @@ void MiniPCProtocol::handle(void) {
   }
 }
 
-int32_t MiniPCProtocol::get_relative_yaw(void) {
+float MiniPCProtocol::get_relative_yaw(void) {
   return relative_yaw;
 }
 
-int32_t MiniPCProtocol::get_relative_pitch(void) {
+float MiniPCProtocol::get_relative_pitch(void) {
   return relative_pitch;
 }
 
 void MiniPCProtocol::process_data() {
   // Assume that the host_command is a complete and verified message
-  uint8_t* rel_yaw_start = host_command + 6;
-  uint8_t* rel_pitch_start = host_command + 10;
+  uint8_t* rel_yaw_start = host_command + this->REL_YAW_OFFSET;
+  uint8_t* rel_pitch_start = host_command + this->REL_PITCH_OFFSET;
 
-  relative_yaw = *(int32_t *)rel_yaw_start;
-  relative_pitch = *(int32_t *)rel_pitch_start;
+  relative_yaw = (*(int32_t *)rel_yaw_start) * 1.0f / this->INT_FP_SCALE;
+  relative_pitch = *(int32_t *)rel_pitch_start *1.0f / this->INT_FP_SCALE;
 }
 
 uint8_t MiniPCProtocol::get_valid_flag(void) {

@@ -70,7 +70,7 @@ void RM_RTOS_Default_Task(const void* argument) {
       gpio_red->High();
 
       miniPCreceiver.Receive(data, length);
-      if (miniPCreceiver.get() == 1) {
+      if (miniPCreceiver.get_valid_flag() == 1) {
         gpio_green->High();
       }
       osDelay(200);
