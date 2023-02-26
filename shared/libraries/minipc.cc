@@ -72,13 +72,31 @@ void MiniPCProtocol::handle(void) {
   }
 
   if (verify_crc8_check_sum(host_command, PKG_LEN - 2)) {
+    process_data();
     flag = 1;
   } else {
     flag = 0;
   }
 }
 
-uint8_t MiniPCProtocol::get(void) {
+int32_t MiniPCProtocol::get_relative_yaw(void) {
+  return relative_yaw;
+}
+
+int32_t MiniPCProtocol::get_relative_pitch(void) {
+  return relative_pitch;
+}
+
+void MiniPCProtocol::process_data() {
+  // Assume that the host_command is a complete and verified message
+  uint8_t* rel_yaw_start = host_command + 6;
+  uint8_t* rel_pitch_start = host_command + 10;
+
+  relative_yaw = *(int32_t *)rel_yaw_start;
+  relative_pitch = *(int32_t *)rel_pitch_start;
+}
+
+uint8_t MiniPCProtocol::get_valid_flag(void) {
   uint8_t temp = flag;
   flag = 0;
   return temp;

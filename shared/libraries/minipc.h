@@ -27,13 +27,17 @@
 
 namespace communication {
 
+// WARNING: THIS CLASS IS NOT THREAD SAFE!!!
+
 class MiniPCProtocol {
  public:
   MiniPCProtocol();
   void Receive(const uint8_t* data, uint8_t len);
   // dummy send
   void Send();
-  uint8_t get(void);
+  uint8_t get_valid_flag(void);
+  int32_t get_relative_yaw(void);
+  int32_t get_relative_pitch(void);
 
  private:
   int index;
@@ -41,6 +45,10 @@ class MiniPCProtocol {
   uint8_t flag;
   uint8_t host_command[PKG_LEN];
   void handle();
+  void process_data();
+
+  int32_t relative_yaw;
+  int32_t relative_pitch;
 }; /* class MiniPCProtocol */
 
 } /* namespace communication */

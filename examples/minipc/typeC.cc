@@ -73,9 +73,11 @@ void RM_RTOS_Default_Task(const void* argument) {
       led->Display(0xFFFF0000);
 
       miniPCreceiver.Receive(data, length);
-      if (miniPCreceiver.get() == 1) {
+      if (miniPCreceiver.get_valid_flag() == 1) {
         // green
-        led->Display(0xFF00FF00);
+        if (miniPCreceiver.get_relative_yaw() == 1000000) {
+          led->Display(0xFF00FF00);
+        }
       }
       osDelay(200);
       // blue when nothing is received
