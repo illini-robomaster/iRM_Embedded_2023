@@ -40,7 +40,9 @@ class MiniPCProtocol {
   float get_relative_pitch(void);
 
  private:
-  /* For definitions of constants, check out the documentation at */
+  // For definitions of constants, check out the documentation at either
+  // https://github.com/illini-robomaster/iRM_Vision_2023/blob/roger/crc_comm/docs/comm_protocol.md
+  // or https://github.com/illini-robomaster/iRM_Vision_2023/tree/docs/comm_protocol.md
   static constexpr uint8_t PKG_LEN = 17;
   static constexpr int32_t INT_FP_SCALE = 1000000;
   static constexpr uint8_t SEQNUM_OFFSET = 2;
