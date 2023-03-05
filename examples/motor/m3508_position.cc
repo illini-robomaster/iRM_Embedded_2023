@@ -18,7 +18,7 @@
  *                                                                          *
  ****************************************************************************/
 
-// #define WITH_CONTROLLER
+ #define WITH_CONTROLLER
 
 #include "bsp_gpio.h"
 #include "bsp_os.h"
