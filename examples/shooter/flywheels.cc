@@ -28,43 +28,43 @@
 #define TARGET_SPEED 30
 
 bsp::CAN* can = nullptr;
-control::MotorCANBase* motor1 = nullptr;
-control::MotorCANBase* motor2 = nullptr;
+control::MotorCANBase* left = nullptr;
+control::MotorCANBase* right = nullptr;
 static remote::DBUS* dbus;
 
 void RM_RTOS_Init() {
 //  print_use_uart(&huart1);
   dbus = new remote::DBUS(&huart1);
   can = new bsp::CAN(&hcan1, 0x201, true);
-  motor1 = new control::Motor3508(can, 0x201);
-  motor2 = new control::Motor3508(can, 0x202);
+  right = new control::Motor3508(can, 0x201);
+  left = new control::Motor3508(can, 0x202);
 }
 
 void RM_RTOS_Default_Task(const void* args) {
   UNUSED(args);
 
-  control::MotorCANBase* motors[] = {motor1, motor2};
+  control::MotorCANBase* motors[] = {right, left};
   control::PIDController pid1(75, 15, 30);
   control::PIDController pid2(75, 15, 30);
 
   while (true) {
     if (dbus->swr == remote::UP){
-      float diff1 = motor1->GetOmegaDelta(500);
-      float diff2 = motor2->GetOmegaDelta(-500);
+      float diff1 = right->GetOmegaDelta(500);
+      float diff2 = left->GetOmegaDelta(-500);
       int16_t out1 = pid1.ComputeConstrainedOutput(diff1);
       int16_t out2 = pid2.ComputeConstrainedOutput(diff2);
-      motor1->SetOutput(out1);
-      motor2->SetOutput(out2);
+      right->SetOutput(out1);
+      left->SetOutput(out2);
       control::MotorCANBase::TransmitOutput(motors, 2);
       osDelay(10);
     }
     else if (dbus->swr == remote::DOWN){
-      float diff1 = motor1->GetOmegaDelta(0);
-      float diff2 = motor2->GetOmegaDelta(0);
+      float diff1 = right->GetOmegaDelta(0);
+      float diff2 = left->GetOmegaDelta(0);
       int16_t out1 = pid1.ComputeConstrainedOutput(diff1);
       int16_t out2 = pid2.ComputeConstrainedOutput(diff2);
-      motor1->SetOutput(out1);
-      motor2->SetOutput(out2);
+      right->SetOutput(out1);
+      left->SetOutput(out2);
       control::MotorCANBase::TransmitOutput(motors, 2);
       osDelay(10);
     }
