@@ -38,6 +38,8 @@ class MiniPCProtocol {
   uint8_t get_valid_flag(void);
   float get_relative_yaw(void);
   float get_relative_pitch(void);
+  uint32_t get_seqnum(void);
+  uint32_t get_valid_packet_cnt(void);
 
  private:
   // For definitions of constants, check out the documentation at either
@@ -57,6 +59,8 @@ class MiniPCProtocol {
 
   float relative_yaw;
   float relative_pitch;
+  uint32_t seqnum;
+  uint32_t valid_packet_cnt = 0;
 }; /* class MiniPCProtocol */
 
 } /* namespace communication */

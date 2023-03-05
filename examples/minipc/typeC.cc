@@ -60,6 +60,7 @@ void RM_RTOS_Default_Task(const void* argument) {
   uart->SetupTx(50);
 
   auto miniPCreceiver = communication::MiniPCProtocol();
+  int total_processed_bytes = 0;
 
   while (true) {
     /* wait until rx data is available */
@@ -67,19 +68,21 @@ void RM_RTOS_Default_Task(const void* argument) {
     uint32_t flags = osThreadFlagsWait(RX_SIGNAL, osFlagsWaitAll, osWaitForever);
     if (flags & RX_SIGNAL) {  // unnecessary check
       /* time the non-blocking rx / tx calls (should be <= 1 osTick) */
+
+      // max length of the UART buffer at 150Hz is ~50 bytes
       length = uart->Read(&data);
+      total_processed_bytes += length;
 
       // if read anything, flash red
       led->Display(0xFFFF0000);
 
       miniPCreceiver.Receive(data, length);
-      if (miniPCreceiver.get_valid_flag() == 1) {
-        // green
-        if (miniPCreceiver.get_relative_yaw() == 1) {
-          led->Display(0xFF00FF00);
-        }
+      uint32_t valid_packet_cnt = miniPCreceiver.get_valid_packet_cnt();
+      if (valid_packet_cnt > 998) {
+        // If at least 99.9% packets are valid, pass
+        led->Display(0xFF00FF00);
+        osDelay(10000);
       }
-      osDelay(200);
       // blue when nothing is received
       led->Display(0xFF0000FF);
     }
