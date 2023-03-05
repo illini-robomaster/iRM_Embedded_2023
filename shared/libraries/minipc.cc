@@ -37,7 +37,7 @@ void MiniPCProtocol::Receive(const uint8_t* data, uint8_t length) {
     memcpy(host_command + index, data, remain);
     index += remain;
 
-    if (index == PKG_LEN - 1) {
+    if (index == PKG_LEN) {
       // done package reading
       index = -1;
       // package handling here!TODO:
