@@ -20,6 +20,10 @@
 
 project(example_shooter ASM C CXX)
 
-irm_add_arm_executable(${PROJECT_NAME}
+irm_add_arm_executable(${PROJECT_NAME}_shooter
         TARGET DJI_Board_TypeA
-        SOURCES main.cc)
+        SOURCES shooter.cc)
+
+irm_add_arm_executable(${PROJECT_NAME}_flywheels
+        TARGET DJI_Board_TypeA
+        SOURCES flywheels.cc)

@@ -23,30 +23,65 @@
 #include "controller.h"
 #include "main.h"
 #include "motor.h"
+#include "dbus.h"
 
 #define TARGET_SPEED 30
 
 bsp::CAN* can = nullptr;
-control::MotorCANBase* motor = nullptr;
+control::MotorCANBase* left_flywheel_motor = nullptr;
+control::MotorCANBase* right_flywheel_motor = nullptr;
+remote::DBUS* dbus = nullptr;
 
 void RM_RTOS_Init() {
   // print_use_uart(&huart1);
   can = new bsp::CAN(&hcan1, 0x201, true);
-  motor = new control::Motor3508(can, 0x201);
+  right_flywheel_motor = new control::Motor3508(can, 0x201);
+  left_flywheel_motor = new control::Motor3508(can, 0x202);
+
+  dbus = new remote::DBUS(&huart1);
 }
 
 void RM_RTOS_Default_Task(const void* args) {
   UNUSED(args);
 
-  control::MotorCANBase* motors[] = {motor};
-  control::PIDController pid(20, 15, 30);
+  osDelay(500);  // DBUS initialization needs time
+  control::MotorCANBase* motors[] = {right_flywheel_motor, left_flywheel_motor};
+  control::PIDController pid_right(20, 30, 25);
+  control::PIDController pid_left(20, 30, 25);
+  float target = 20;
+  float diff_right = 0;
+  int16_t out_right = 0;
+  float diff_left = 0;
+  int16_t out_left = 0;
+
 
   while (true) {
-    float diff = motor->GetOmegaDelta(TARGET_SPEED);
-    int16_t out = pid.ComputeConstrainedOutput(diff);
-    motor->SetOutput(out);
-    control::MotorCANBase::TransmitOutput(motors, 1);
-    motor->PrintData();
+    
+    if (dbus->swr == remote::UP) {
+      target = 20;
+      diff_right = motors[0]->GetOmegaDelta(target);
+      out_right = pid_right.ComputeConstrainedOutput(diff_right);
+      motors[0]->SetOutput(out_right);
+
+      diff_left = motors[1]->GetOmegaDelta(-target);
+      out_left = pid_right.ComputeConstrainedOutput(diff_left);
+      motors[1]->SetOutput(out_left);
+
+      control::MotorCANBase::TransmitOutput(motors, 2);
+      // motor->PrintData();
+    } else {
+      target = 0;
+      diff_right = motors[0]->GetOmegaDelta(target);
+      out_right = pid_right.ComputeConstrainedOutput(diff_right);
+      motors[0]->SetOutput(out_right);
+
+      diff_left = motors[1]->GetOmegaDelta(-target);
+      out_left = pid_right.ComputeConstrainedOutput(diff_left);
+      motors[1]->SetOutput(out_left);
+
+      control::MotorCANBase::TransmitOutput(motors, 2);
+    }
+    
     osDelay(10);
   }
 }
