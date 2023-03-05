@@ -78,6 +78,10 @@ void RM_RTOS_Default_Task(const void* argument) {
 
       miniPCreceiver.Receive(data, length);
       uint32_t valid_packet_cnt = miniPCreceiver.get_valid_packet_cnt();
+
+      // Jetson / PC sends 200Hz valid packets for stress testing
+      // For testing script, please see iRM_Vision_2023/Communication/communicator.py
+      // For comm protocol details, please see iRM_Vision_2023/docs/comm_protocol.md
       if (valid_packet_cnt > 998) {
         // If at least 99.9% packets are valid, pass
         led->Display(0xFF00FF00);
