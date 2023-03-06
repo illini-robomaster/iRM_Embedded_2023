@@ -74,8 +74,8 @@ void RM_RTOS_Default_Task(const void* args) {
   control::MotorCANBase* motors_flywheels[] = {right, left};
   control::MotorCANBase* motors[] = {fl_motor, fr_motor, bl_motor, br_motor};
 
-  control::PIDController pid_left(75, 15, 30);
-  control::PIDController pid_right(75, 15, 30);
+  control::PIDController pid_left(75, 0, 50);
+  control::PIDController pid_right(75, 0, 50);
 
   while (true) {
     chassis->SetSpeed(dbus->ch0, dbus->ch1, dbus->ch2);
@@ -88,8 +88,8 @@ void RM_RTOS_Default_Task(const void* args) {
     chassis->Update(false, 30, 20, 60);
 
     if (dbus->swr == remote::UP){
-      float diff1 = right->GetOmegaDelta(500);
-      float diff2 = left->GetOmegaDelta(-500);
+      float diff1 = right->GetOmegaDelta(3000);
+      float diff2 = left->GetOmegaDelta(-3000);
       int16_t out1 = pid_right.ComputeConstrainedOutput(diff1);
       int16_t out2 = pid_left.ComputeConstrainedOutput(diff2);
       right->SetOutput(out1);
