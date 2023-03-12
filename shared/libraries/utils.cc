@@ -59,3 +59,5 @@ bool FloatEdgeDetector::edge() { return posEdge_ || negEdge_; }
 bool FloatEdgeDetector::posEdge() { return posEdge_; }
 
 bool FloatEdgeDetector::negEdge() { return negEdge_; }
+
+int float_to_int

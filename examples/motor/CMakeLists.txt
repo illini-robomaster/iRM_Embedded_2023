@@ -56,6 +56,6 @@ irm_add_arm_executable(${PROJECT_NAME}_steering_align
     TARGET DJI_Board_TypeC
     SOURCES m3508_steering_align.cc)
 
-irm_add_arm_executable(${PROJECT_NAME}_4310
+irm_add_arm_executable(${PROJECT_NAME}_m4310
         TARGET DJI_Board_TypeA
         SOURCES m4310.cc)

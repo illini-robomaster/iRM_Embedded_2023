@@ -613,11 +613,23 @@ class Motor4310 : public MotorCANBase {
   void PrintData() const override final;
   /* override base implementation with max current protection */
   // TODO: change parameters
+
+  /* set parameters for m4310 */
   void SetOutput4310(int16_t position, int16_t velocity, int16_t kp, int16_t kd, int16_t torque);
 
+  /**
+ * @brief Converts a float to an unsigned int, given range and number of bits
+ * @param x value to be converted
+ * @param x_min minimum value of the current parameter
+ * @param x_max maximum value of the current parameter
+ * @param bits size in bits
+ * @return value converted from float to unsigned int
+   */
+  int float_to_uint(float x, float x_min, float x_max, int bits);
+
  private:
-  volatile int16_t kp_ = 0;   // defined kp value
-  volatile int16_t kd_ = 0;   // defined kd value
+  volatile int16_t kp_set_ = 0;   // defined kp value
+  volatile int16_t kd_set_ = 0;   // defined kd value
   volatile int16_t v_set_ = 0;  // defined velocity
   volatile int16_t p_set_ = 0;  // defined position
   volatile int16_t t_set_ = 0;  // defined torque

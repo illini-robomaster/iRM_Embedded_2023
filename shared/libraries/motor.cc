@@ -109,10 +109,10 @@ void Motor4310::TransmitOutput4310(Motor4310* motor) {
   data[0] = motor->p_set_ >> 8;
   data[1] = motor->p_set_ & 0x00ff;
   data[2] = (motor->v_set_ >> 4) & 0x00ff;
-  data[3] = (motor->v_set_ & 0x000f) | ((motor->kp_ >> 8) & 0x000f);
-  data[4] = motor->kp_ & 0x00ff;
-  data[5] = (motor->kd_ >> 4) & 0x00ff;
-  data[6] = (motor->kd_ & 0x000f) | ((motor->t_set_ >> 8) & 0x000f);
+  data[3] = ((motor->v_set_ & 0x000f) << 4) | ((motor->kp_set_ >> 8) & 0x000f);
+  data[4] = motor->kp_set_ & 0x00ff;
+  data[5] = (motor->kd_set_ >> 4) & 0x00ff;
+  data[6] = ((motor->kd_set_ & 0x000f) << 4) | ((motor->t_set_ >> 8) & 0x000f);
   data[7] = motor->t_set_ & 0x00ff;
   motor->can_->Transmit(motor->tx_id_, data, 8);
 
@@ -586,9 +586,15 @@ void Motor4310::PrintData() const {
 void Motor4310::SetOutput4310(int16_t position, int16_t velocity, int16_t kp, int16_t kd, int16_t torque) {
   p_set_ = position;
   v_set_ = velocity;
-  kp_ = kp;
-  kd_ = kd;
+  kp_set_ = kp;
+  kd_set_ = kd;
   t_set_ = torque;
+}
+
+int Motor4310::float_to_uint(float x, float x_min, float x_max, int bits) {
+  float span = x_max - x_min;
+  float offset = x_min;
+  return (int) ((x-offset)*((float)((1<<bits)-1))/span);
 }
 
 } /* namespace control */
