@@ -90,34 +90,6 @@ void MotorCANBase::TransmitOutput(MotorCANBase* motors[], uint8_t num_motors) {
   motors[0]->can_->Transmit(motors[0]->tx_id_, data, 8);
 }
 
-void Motor4310::Initialize4310(Motor4310* motor) {
-  uint8_t data[8] = {0};
-  data[0] = 0xff;
-  data[1] = 0xff;
-  data[2] = 0xff;
-  data[3] = 0xff;
-  data[4] = 0xff;
-  data[5] = 0xff;
-  data[6] = 0xff;
-  data[7] = 0xfc;
-  motor->can_->Transmit(motor->tx_id_, data, 8);
-}
-
-void Motor4310::TransmitOutput4310(Motor4310* motor) {
-  uint8_t data[8] = {0};
-  //  follow the datasheet of the MIT mode data format
-  data[0] = motor->p_set_ >> 8;
-  data[1] = motor->p_set_ & 0x00ff;
-  data[2] = (motor->v_set_ >> 4) & 0x00ff;
-  data[3] = ((motor->v_set_ & 0x000f) << 4) | ((motor->kp_set_ >> 8) & 0x000f);
-  data[4] = motor->kp_set_ & 0x00ff;
-  data[5] = (motor->kd_set_ >> 4) & 0x00ff;
-  data[6] = ((motor->kd_set_ & 0x000f) << 4) | ((motor->t_set_ >> 8) & 0x000f);
-  data[7] = motor->t_set_ & 0x00ff;
-  motor->can_->Transmit(motor->tx_id_, data, 8);
-
-}
-
 float MotorCANBase::GetTheta() const { return theta_; }
 
 float MotorCANBase::GetThetaDelta(float target) const {
@@ -569,6 +541,41 @@ Motor4310::Motor4310(bsp::CAN* can, uint16_t rx_id) : MotorCANBase(can, rx_id, 4
   can->RegisterRxCallback(rx_id, can_motor_callback, this);
 }
 
+void Motor4310::Initialize4310(Motor4310* motor) {
+  uint8_t data[8] = {0};
+  data[0] = 0xff;
+  data[1] = 0xff;
+  data[2] = 0xff;
+  data[3] = 0xff;
+  data[4] = 0xff;
+  data[5] = 0xff;
+  data[6] = 0xff;
+  data[7] = 0xfc;
+  motor->can_->Transmit(motor->tx_id_, data, 8);
+}
+
+void Motor4310::SetOutput4310(float position, float velocity, float kp, float kd, float torque) {
+  kp_set_ = float_to_uint(kp, 0.0, 500.0, 12);
+  kd_set_ = float_to_uint(kd, 0, 5, 12);
+  pos_set_ = float_to_uint(position, -12.5, 12.5, 16);
+  vel_set_ = float_to_uint(velocity, -45.0, 45.0, 12);
+  torque_set_ = float_to_uint(torque, -18, 18, 12);
+}
+
+void Motor4310::TransmitOutput4310(Motor4310* motor) {
+  uint8_t data[8] = {0};
+  //  follow the datasheet of the MIT mode data format
+  data[0] = motor->pos_set_ >> 8;
+  data[1] = motor->pos_set_ & 0x00ff;
+  data[2] = (motor->vel_set_ >> 4) & 0x00ff;
+  data[3] = ((motor->vel_set_ & 0x000f) << 4) | ((motor->kp_set_ >> 8) & 0x000f);
+  data[4] = motor->kp_set_ & 0x00ff;
+  data[5] = (motor->kd_set_ >> 4) & 0x00ff;
+  data[6] = ((motor->kd_set_ & 0x000f) << 4) | ((motor->torque_set_ >> 8) & 0x000f);
+  data[7] = motor->torque_set_ & 0x00ff;
+  motor->can_->Transmit(motor->tx_id_, data, 8);
+}
+
 void Motor4310::UpdateData(const uint8_t data[]) {
   // TODO
   UNUSED(data);
@@ -582,19 +589,10 @@ void Motor4310::PrintData() const {
   print("Rotor temp: % .4f \r\n", raw_rotorTemp);
 }
 
-// set output parameters for m4310
-void Motor4310::SetOutput4310(int16_t position, int16_t velocity, int16_t kp, int16_t kd, int16_t torque) {
-  p_set_ = position;
-  v_set_ = velocity;
-  kp_set_ = kp;
-  kd_set_ = kd;
-  t_set_ = torque;
-}
-
-int Motor4310::float_to_uint(float x, float x_min, float x_max, int bits) {
+int16_t Motor4310::float_to_uint(float x, float x_min, float x_max, int bits) {
   float span = x_max - x_min;
   float offset = x_min;
-  return (int) ((x-offset)*((float)((1<<bits)-1))/span);
+  return (int16_t) ((x-offset) * ((float)((1<<bits)-1))/span);
 }
 
 } /* namespace control */
