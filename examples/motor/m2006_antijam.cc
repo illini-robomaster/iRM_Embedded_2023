@@ -18,6 +18,8 @@
  *                                                                          *
  ****************************************************************************/
 
+// #define WITH_CONTROLLER
+
 #include "bsp_gpio.h"
 #include "bsp_os.h"
 #include "bsp_print.h"
@@ -26,15 +28,15 @@
 #include "main.h"
 #include "motor.h"
 #include "utils.h"
-#include <unistd.h>
 
 
 #define KEY_GPIO_GROUP GPIOB
 #define KEY_GPIO_PIN GPIO_PIN_2
 
-#define NOTCH (2 * PI / 4)
+#define NOTCH (2 * PI / 16)
+#define LOAD_ANGLE (2 * PI / 8)
 #define SPEED (2 * PI)
-#define ACCELERATION (8 * PI)
+#define ACCELERATION (20 * PI)
 
 bsp::CAN* can1 = nullptr;
 control::MotorCANBase* motor = nullptr;
@@ -54,7 +56,7 @@ void jam_callback(control::ServoMotor* servo, const control::servo_jam_t data) {
 }
 
 void RM_RTOS_Init() {
-  // print_use_uart(&huart8);
+  print_use_uart(&huart8);
   bsp::SetHighresClockTimer(&htim2);
 
   can1 = new bsp::CAN(&hcan1, 0x201);
@@ -66,10 +68,9 @@ void RM_RTOS_Init() {
   servo_data.max_acceleration = ACCELERATION;
   servo_data.transmission_ratio = M2006P36_RATIO;
   servo_data.omega_pid_param = new float[3]{150, 4, 0};
-  servo_data.max_iout = 2000;
+  servo_data.max_iout = 1000;
   servo_data.max_out = 10000;
   servo = new control::ServoMotor(servo_data);
-
   servo->RegisterJamCallback(jam_callback, 0.6);
 }
 
@@ -77,19 +78,17 @@ void RM_RTOS_Default_Task(const void* args) {
   UNUSED(args);
 
   control::MotorCANBase* motors[] = {motor};
-  bsp::GPIO key(KEY_GPIO_GROUP, KEY_GPIO_PIN);
+  // bsp::GPIO key(KEY_GPIO_GROUP, KEY_GPIO_PIN);
 
   while (true) {
-    //key_detector.input(key.Read());
-    //if (key_detector.posEdge() && servo->SetTarget(servo->GetTarget() + NOTCH) != 0) {
-    // const TickType_t tDelay = 1000;
-    // vTaskDelay(tDelay);
-    // sleep(1);
-    if (servo->SetTarget(servo->GetTarget() + NOTCH) != 0) {
+    // key_detector.input(key.Read());
+    if (key_detector.posEdge() && servo->SetTarget(servo->GetTarget() + NOTCH) != 0) {
       print("Servomotor step forward, target: %8.4f\r\n", servo->GetTarget());
     }
+    
+    servo->SetTarget(servo->GetTarget() + LOAD_ANGLE);
     servo->CalcOutput();
     control::MotorCANBase::TransmitOutput(motors, 1);
-    osDelay(500);
+    osDelay(2);
   }
 }
