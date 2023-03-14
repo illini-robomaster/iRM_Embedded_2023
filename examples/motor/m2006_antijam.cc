@@ -67,7 +67,7 @@ void RM_RTOS_Init() {
   servo_data.max_speed = SPEED;
   servo_data.max_acceleration = ACCELERATION;
   servo_data.transmission_ratio = M2006P36_RATIO;
-  servo_data.omega_pid_param = new float[3]{150, 4, 0};
+  servo_data.omega_pid_param = new float[3]{60, 20, 100};
   servo_data.max_iout = 1000;
   servo_data.max_out = 10000;
   servo = new control::ServoMotor(servo_data);
