@@ -25,33 +25,20 @@
 #include "power_limit.h"
 
 constexpr uint16_t MOTOR_NUM = 4;
-constexpr float SPEED = 10 * PI;
-constexpr float TEST_SPEED = 0.5 * PI;
-constexpr float ACCELERATION = 50 * PI;
 constexpr float WHEEL_SPEED_FACTOR = 16;
 
 namespace control {
 
 typedef struct {
-  control::MotorCANBase* fl_steer_motor = nullptr;
-  control::MotorCANBase* fr_steer_motor = nullptr;
-  control::MotorCANBase* bl_steer_motor = nullptr;
-  control::MotorCANBase* br_steer_motor = nullptr;
-
-  align_detect_t fl_steer_motor_detect_func = nullptr;
-  align_detect_t fr_steer_motor_detect_func = nullptr;
-  align_detect_t bl_steer_motor_detect_func = nullptr;
-  align_detect_t br_steer_motor_detect_func = nullptr;
+  control::SteeringMotor* fl_steer_motor = nullptr;
+  control::SteeringMotor* fr_steer_motor = nullptr;
+  control::SteeringMotor* bl_steer_motor = nullptr;
+  control::SteeringMotor* br_steer_motor = nullptr;
 
   control::MotorCANBase* fl_wheel_motor = nullptr;
   control::MotorCANBase* fr_wheel_motor = nullptr;
   control::MotorCANBase* bl_wheel_motor = nullptr;
   control::MotorCANBase* br_wheel_motor = nullptr;
-
-  double fl_calibration_offset;
-  double fr_calibration_offset;
-  double bl_calibration_offset;
-  double br_calibration_offset;
 } steering_chassis_t;
 
 class SteeringChassis {
@@ -71,7 +58,35 @@ class SteeringChassis {
 
   void Update(float power_limit, float chassis_power, float chassis_power_buffer);
 
-  bool AlignUpdate();
+  /**
+   * @brief find the aligned position
+   *        If the motors don't have an aligned position, the motors rotate until their detectors return True.
+   *        If the motors have one, this function does nothing and return True.
+   * @note  Calibrate() only find the aligned position, it doesn't guarantee the motor ends in the aligned position or stops
+   *
+   *
+   * @return True only when all four motors have a aligned position
+   */
+  bool Calibrate();
+
+  /**
+   * @brief Call ReAlign() for all four SteeringMotor
+   *        Turn the motor to the aligned position
+   *        Do nothing if the motor doesn't have an aligned position
+   * @return sum of all returned values
+   *         0 if success
+   */
+  int ReAlign();
+
+  /**
+   * @brief Call SteeringMotor::CalcOutput() for all 4 Steering Motors
+   */
+  void SteerCalcOutput();
+
+  /**
+   * @brief Call SetMaxSpeed() for all 4 Steering Motor
+   */
+  void SteerSetMaxSpeed(const float max_speed);
 
   void PrintData();
 

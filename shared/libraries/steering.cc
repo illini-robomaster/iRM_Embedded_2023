@@ -35,46 +35,14 @@ SteeringChassis::SteeringChassis(steering_chassis_t* _chassis) {
       _chassis->bl_steer_motor == nullptr || _chassis->br_steer_motor == nullptr ||
       _chassis->fl_wheel_motor == nullptr || _chassis->fr_wheel_motor == nullptr ||
       _chassis->bl_wheel_motor == nullptr || _chassis->br_wheel_motor == nullptr) {
-    RM_ASSERT_TRUE(false, "Chassis pointer is null\r\n");
+    RM_ASSERT_TRUE(false, "At least one motor pointer is null\r\n");
   }
-  // Init Steering Motors from CANBaseMotor
-  control::steering_t steering_data;
 
-  steering_data.max_speed = SPEED;
-  steering_data.max_acceleration = ACCELERATION;
-  steering_data.transmission_ratio = M3508P19_RATIO;
-  steering_data.omega_pid_param = new float[3]{140, 1.2, 25};
-  steering_data.max_iout = 3000;
-  steering_data.max_out = 13000;
-
-
-  steering_data.motor = _chassis->fl_steer_motor;
-  steering_data.align_detect_func = _chassis->fl_steer_motor_detect_func;
-  // steering_data.calibrate_offset = -0.858458848;
-  steering_data.calibrate_offset = 0;
-  fl_steer_motor = new control::SteeringMotor(steering_data);
-
-
-  steering_data.motor = _chassis->fr_steer_motor;
-  steering_data.align_detect_func = _chassis->fr_steer_motor_detect_func;
-  // steering_data.calibrate_offset = 0.858458848;
-  steering_data.calibrate_offset = 0;
-  fr_steer_motor = new control::SteeringMotor(steering_data);
-
-
-  steering_data.motor = _chassis->bl_steer_motor;
-  steering_data.align_detect_func = _chassis->bl_steer_motor_detect_func;
-  // steering_data.calibrate_offset = -2.283133461;
-  steering_data.calibrate_offset = 0;
-  bl_steer_motor = new control::SteeringMotor(steering_data);
-
-
-  steering_data.motor = _chassis->br_steer_motor;
-  steering_data.align_detect_func = _chassis->br_steer_motor_detect_func;
-  // steering_data.calibrate_offset = 2.283133461;
-  steering_data.calibrate_offset = 0;
-  br_steer_motor = new control::SteeringMotor(steering_data);
-  // Init Steering Motors complete
+  // Init Steer Motors
+  fl_steer_motor = _chassis->fl_steer_motor;
+  fr_steer_motor = _chassis->fr_steer_motor;
+  bl_steer_motor = _chassis->bl_steer_motor;
+  br_steer_motor = _chassis->br_steer_motor;
 
   // Init Wheel Motors
   fl_wheel_motor = _chassis->fl_wheel_motor;
@@ -227,13 +195,40 @@ void SteeringChassis::Update(float _power_limit, float _chassis_power,
   br_wheel_motor->SetOutput(output[3]);
 }
 
-bool SteeringChassis::AlignUpdate() {
-  volatile bool fl_complete = fl_steer_motor->Calibrate();
-  volatile bool fr_complete = fr_steer_motor->Calibrate();
-  volatile bool bl_complete = bl_steer_motor->Calibrate();
-  volatile bool br_complete = br_steer_motor->Calibrate();
-  return fl_complete && fr_complete && bl_complete && br_complete;
+bool SteeringChassis::Calibrate() {
+  bool alignment_complete_fl = fl_steer_motor->Calibrate();
+  bool alignment_complete_fr = fr_steer_motor->Calibrate();
+  bool alignment_complete_bl = bl_steer_motor->Calibrate();
+  bool alignment_complete_br = br_steer_motor->Calibrate();
+
+  return alignment_complete_fl && alignment_complete_fr &&
+  alignment_complete_bl && alignment_complete_br;
 }
+
+int SteeringChassis::ReAlign() {
+  int ret = 0;
+  ret += fl_steer_motor->ReAlign();
+  ret += fr_steer_motor->ReAlign();
+  ret += bl_steer_motor->ReAlign();
+  ret += br_steer_motor->ReAlign();
+
+  return ret;
+}
+
+void SteeringChassis::SteerCalcOutput() {
+  fl_steer_motor->CalcOutput();
+  fr_steer_motor->CalcOutput();
+  bl_steer_motor->CalcOutput();
+  br_steer_motor->CalcOutput();
+}
+
+void SteeringChassis::SteerSetMaxSpeed(const float max_speed) {
+  fl_steer_motor->SetMaxSpeed(max_speed);
+  fr_steer_motor->SetMaxSpeed(max_speed);
+  bl_steer_motor->SetMaxSpeed(max_speed);
+  br_steer_motor->SetMaxSpeed(max_speed);
+}
+
 
 void SteeringChassis::PrintData() {
   fl_steer_motor->PrintData();

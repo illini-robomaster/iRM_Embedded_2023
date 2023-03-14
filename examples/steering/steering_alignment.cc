@@ -1,6 +1,6 @@
 /****************************************************************************
  *                                                                          *
- *  Copyright (C) 2022 RoboMaster.                                          *
+ *  Copyright (C) 2023 RoboMaster.                                          *
  *  Illini RoboMaster @ University of Illinois at Urbana-Champaign          *
  *                                                                          *
  *  This program is free software: you can redistribute it and/or modify    *
@@ -32,10 +32,20 @@
 bsp::CAN* can1 = nullptr;
 bsp::CAN* can2 = nullptr;
 
+constexpr float RUN_SPEED = (10 * PI) / 32;
+constexpr float ALIGN_SPEED = (PI);
+constexpr float ACCELERATION = (100 * PI);
+
 control::MotorCANBase* motor1 = nullptr;
 control::MotorCANBase* motor2 = nullptr;
 control::MotorCANBase* motor3 = nullptr;
 control::MotorCANBase* motor4 = nullptr;
+
+control::SteeringMotor* steering1 = nullptr;
+control::SteeringMotor* steering2 = nullptr;
+control::SteeringMotor* steering3 = nullptr;
+control::SteeringMotor* steering4 = nullptr;
+
 control::MotorCANBase* motor5 = nullptr;
 control::MotorCANBase* motor6 = nullptr;
 control::MotorCANBase* motor7 = nullptr;
@@ -44,19 +54,32 @@ control::MotorCANBase* motor8 = nullptr;
 remote::DBUS* dbus = nullptr;
 
 bsp::GPIO* key1 = nullptr;
-bsp::GPIO* key2 = nullptr;
-bsp::GPIO* key3 = nullptr;
-bsp::GPIO* key4 = nullptr;
+BoolEdgeDetector key_detector(false);
 
-bool steering_align_detect1() { return !key1->Read(); }
+bsp::GPIO* pe1 = nullptr;
+bsp::GPIO* pe2 = nullptr;
+bsp::GPIO* pe3 = nullptr;
+bsp::GPIO* pe4 = nullptr;
 
-bool steering_align_detect2() { return !key2->Read(); }
+bool steering_align_detect1() {
+  return pe1->Read() == 0;
+}
 
-bool steering_align_detect3() { return !key3->Read(); }
+bool steering_align_detect2() {
+  return true;
+  return pe2->Read() == 0;
+}
 
-bool steering_align_detect4() { return !key4->Read(); }
+bool steering_align_detect3() {
+  return true;
+  return pe3->Read() == 0;
+}
 
-// used to init
+bool steering_align_detect4() {
+  return true;
+  return pe4->Read() == 0;
+}
+
 control::steering_chassis_t* steering_chassis;
 
 control::SteeringChassis* chassis;
@@ -65,32 +88,57 @@ void RM_RTOS_Init() {
   print_use_uart(&huart1);
   bsp::SetHighresClockTimer(&htim5);
 
-  can1 = new bsp::CAN(&hcan1, 0x201, true);
-  can2 = new bsp::CAN(&hcan2, 0x201, false);
+  // button on typeC. 1 if not pressed 0 otherwise
+  key1 = new bsp::GPIO(GPIOA, GPIO_PIN_0);
 
+  pe1 = new bsp::GPIO(IN1_GPIO_Port, IN1_Pin);
+  pe2 = new bsp::GPIO(IN2_GPIO_Port, IN2_Pin);
+  pe3 = new bsp::GPIO(IN3_GPIO_Port, IN3_Pin);
+  pe4 = new bsp::GPIO(IN4_GPIO_Port, IN4_Pin);
+
+  // init steerings
   motor1 = new control::Motor3508(can1, 0x201);
   motor2 = new control::Motor3508(can1, 0x202);
   motor3 = new control::Motor3508(can1, 0x203);
   motor4 = new control::Motor3508(can1, 0x204);
 
+  control::steering_t steering_data;
+  steering_data.motor = motor1;
+  steering_data.max_speed = RUN_SPEED;
+  steering_data.max_acceleration = ACCELERATION;
+  steering_data.transmission_ratio = 8;
+  steering_data.omega_pid_param = new float[3]{140, 1.2, 25};
+  steering_data.max_iout = 1000;
+  steering_data.max_out = 13000;
+  steering_data.calibrate_offset = 0;
+
+  steering_data.align_detect_func = steering_align_detect1;
+  steering1 = new control::SteeringMotor(steering_data);
+
+  steering_data.motor = motor2;
+  steering_data.align_detect_func = steering_align_detect2;
+  steering2 = new control::SteeringMotor(steering_data);
+  steering_data.motor = motor3;
+  steering_data.align_detect_func = steering_align_detect3;
+  steering3 = new control::SteeringMotor(steering_data);
+  steering_data.motor = motor4;
+  steering_data.align_detect_func = steering_align_detect4;
+  steering4 = new control::SteeringMotor(steering_data);
+
+  steering_chassis = new control::steering_chassis_t(); 
+
+  steering_chassis->fl_steer_motor = steering4;
+  steering_chassis->fr_steer_motor = steering3;
+  steering_chassis->bl_steer_motor = steering1;
+  steering_chassis->br_steer_motor = steering2;
+
+  // init wheels
+  // Need to init because steering chassis rejects nullptr
   motor5 = new control::Motor3508(can2, 0x205);
   motor6 = new control::Motor3508(can2, 0x206);
   motor7 = new control::Motor3508(can2, 0x207);
   motor8 = new control::Motor3508(can2, 0x208);
 
-  steering_chassis = new control::steering_chassis_t();
-
-  steering_chassis->fl_steer_motor = motor4;
-  steering_chassis->fr_steer_motor = motor3;
-  steering_chassis->bl_steer_motor = motor1;
-  steering_chassis->br_steer_motor = motor2;
-
-  steering_chassis->fl_steer_motor_detect_func = steering_align_detect4;
-  steering_chassis->fr_steer_motor_detect_func = steering_align_detect3;
-  steering_chassis->bl_steer_motor_detect_func = steering_align_detect1;
-  steering_chassis->br_steer_motor_detect_func = steering_align_detect2;
-
-  // TODO init wheels
   steering_chassis->fl_wheel_motor = motor8;
   steering_chassis->fr_wheel_motor = motor7;
   steering_chassis->bl_wheel_motor = motor5;
@@ -104,43 +152,32 @@ void RM_RTOS_Init() {
 void RM_RTOS_Default_Task(const void* args) {
   UNUSED(args);
   control::MotorCANBase* steer_motors[] = {motor1, motor2, motor3, motor4};
-  control::MotorCANBase* wheel_motors[] = {motor5, motor6, motor7, motor8};
-
-  key1 = new bsp::GPIO(IN1_GPIO_Port, IN1_Pin);
-  key2 = new bsp::GPIO(IN2_GPIO_Port, IN2_Pin);
-  key3 = new bsp::GPIO(IN3_GPIO_Port, IN3_Pin);
-  key4 = new bsp::GPIO(IN4_GPIO_Port, IN4_Pin);
 
   osDelay(500);  // DBUS initialization needs time
 
-  //  print("Alignment Begin\r\n");
-  while (!chassis->AlignUpdate()) {
+  // Press Key to start aligning. Else sudden current change when power is switched on might break
+  // the board.
+  while(key1->Read());
+
+  // wait for release because align_detect also is key press here
+  while(!key1->Read());
+
+  print("Alignment Begin\r\n");
+
+  chassis->SteerSetMaxSpeed(ALIGN_SPEED);
+
+  bool alignment_complete = false;
+  while (!alignment_complete) {
+    chassis->SteerCalcOutput();
     control::MotorCANBase::TransmitOutput(steer_motors, 4);
-    //      static int i = 0;
-    //      if (i > 20) {
-    //        chassis->PrintData();
-    //        i = 0;
-    //      } else {
-    //        i++;
-    //      }
+    alignment_complete = chassis->Calibrate();
     osDelay(2);
   }
-  //  print("\r\nAlignment End\r\n");
 
-  while (true) {
-    // kill switch
-    if (dbus->swl == remote::UP || dbus->swl == remote::DOWN) {
-      RM_ASSERT_TRUE(false, "operation killed");
-    }
+  chassis->ReAlign();
 
-    chassis->SetYSpeed(-static_cast<float>(dbus->ch0) / 660 * 50);
-    chassis->SetXSpeed(-static_cast<float>(dbus->ch1) / 660 * 50);
-    chassis->SetWSpeed(static_cast<float>(dbus->ch2) / 660 * 50);
-    chassis->Update(30, 20, 60);
+  control::MotorCANBase::TransmitOutput(steer_motors, 4);
 
-    control::MotorCANBase::TransmitOutput(wheel_motors, 4);
-    control::MotorCANBase::TransmitOutput(steer_motors, 4);
+  print("\r\nAlignment End\r\n");
 
-    osDelay(2);
-  }
 }
