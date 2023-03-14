@@ -1,6 +1,6 @@
 /****************************************************************************
  *                                                                          *
- *  Copyright (C) 2022 RoboMaster.                                          *
+ *  Copyright (C) 2023 RoboMaster.                                          *
  *  Illini RoboMaster @ University of Illinois at Urbana-Champaign          *
  *                                                                          *
  *  This program is free software: you can redistribute it and/or modify    *
@@ -20,47 +20,32 @@
 
 #pragma once
 
-#include "bsp_print.h"
-#include "bsp_uart.h"
-#include "cmsis_os.h"
-#include "crc8.h"
+#include <stdint.h>
+#include <string.h>
 
-namespace communication {
+/**
+ * CRC8 checksum calculation
+ *
+ * @param  pchMessage Message to check
+ * @param  dwLength   Length of the message
+ * @param  ucCRC8     Initialized checksum
+ * @return            CRC checksum
+ */
+uint8_t get_crc8_check_sum(uint8_t* pchMessage, uint16_t dwLength, uint8_t ucCRC8);
 
-// WARNING: THIS CLASS IS NOT THREAD SAFE!!!
+/**
+ * Verify CRC8
+ *
+ * @param  pchMessage Message to verify
+ * @param  dwLength   Length = Data + Checksum
+ * @return            1 for true, 0 for false
+ */
+uint8_t verify_crc8_check_sum(uint8_t* pchMessage, uint16_t dwLength);
 
-class MiniPCProtocol {
- public:
-  MiniPCProtocol();
-  void Receive(const uint8_t* data, uint8_t len);
-  // dummy send
-  void Send();
-  uint8_t get_valid_flag(void);
-  float get_relative_yaw(void);
-  float get_relative_pitch(void);
-  uint32_t get_seqnum(void);
-  uint32_t get_valid_packet_cnt(void);
-
- private:
-  // For definitions of constants, check out the documentation at either
-  // https://github.com/illini-robomaster/iRM_Vision_2023/blob/roger/crc_comm/docs/comm_protocol.md
-  // or https://github.com/illini-robomaster/iRM_Vision_2023/tree/docs/comm_protocol.md
-  static constexpr uint8_t PKG_LEN = 17;
-  static constexpr int32_t INT_FP_SCALE = 1000000;
-  static constexpr uint8_t SEQNUM_OFFSET = 2;
-  static constexpr uint8_t REL_YAW_OFFSET = SEQNUM_OFFSET + 4;
-  static constexpr uint8_t REL_PITCH_OFFSET = REL_YAW_OFFSET + 4;
-
-  int index;
-  uint8_t flag;
-  uint8_t host_command[PKG_LEN];
-  void handle();
-  void process_data();
-
-  float relative_yaw;
-  float relative_pitch;
-  uint32_t seqnum;
-  uint32_t valid_packet_cnt = 0;
-}; /* class MiniPCProtocol */
-
-} /* namespace communication */
+/**
+ * Append CRC8 to the end of message
+ *
+ * @param  pchMessage Message to calculate CRC and append
+ * @param  dwLength   Length = Data + Checksum
+ */
+void append_crc8_check_sum(uint8_t* pchMessage, uint16_t dwLength);
