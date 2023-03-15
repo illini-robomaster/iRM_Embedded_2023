@@ -88,6 +88,11 @@ class SteeringChassis {
    */
   void SteerSetMaxSpeed(const float max_speed);
 
+  /**
+   * @brief Call PrintData() for all 4 Steering Motor
+   * The order is FrontLeft, FrontRight, BackLeft, BackRight
+   * It prints current target, current position, and align position
+   */
   void PrintData();
 
  private:

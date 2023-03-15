@@ -91,10 +91,11 @@ void RM_RTOS_Init() {
   key1 = new bsp::GPIO(GPIOA, GPIO_PIN_0);
 
   /* Usage:
-   *   The 'key' is the button on TypeC boards
-   *   Press key to start alignment
-   *   When alignment finishes, press key again to turn off motors' power
-   *   Now align motors by hand to measure the offset of each motor
+   *   The 'key' is the button on TypeC board.
+   *   The goal of this example is to measure the offset (position of photoelectric sensors to real alignment position)
+   *   Press key to start alignment, you should see four wheels turning to align.
+   *   When alignment finishes, press key again to turn off motors' power.
+   *   Now you can turn the motor manually. Align motors by hand to measure the offset of each motor.
   **/
   pe1 = new bsp::GPIO(IN1_GPIO_Port, IN1_Pin);
   pe2 = new bsp::GPIO(IN2_GPIO_Port, IN2_Pin);
