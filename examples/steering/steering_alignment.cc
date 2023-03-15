@@ -23,7 +23,6 @@
 #include "bsp_print.h"
 #include "cmsis_os.h"
 #include "controller.h"
-#include "dbus.h"
 #include "main.h"
 #include "motor.h"
 #include "steering.h"
@@ -35,6 +34,11 @@ bsp::CAN* can2 = nullptr;
 constexpr float RUN_SPEED = (10 * PI) / 32;
 constexpr float ALIGN_SPEED = (PI);
 constexpr float ACCELERATION = (100 * PI);
+
+constexpr float OFFSET_MOTOR1 = 0;
+constexpr float OFFSET_MOTOR2 = 0;
+constexpr float OFFSET_MOTOR3 = 0;
+constexpr float OFFSET_MOTOR4 = 0;
 
 control::MotorCANBase* motor1 = nullptr;
 control::MotorCANBase* motor2 = nullptr;
@@ -51,8 +55,6 @@ control::MotorCANBase* motor6 = nullptr;
 control::MotorCANBase* motor7 = nullptr;
 control::MotorCANBase* motor8 = nullptr;
 
-remote::DBUS* dbus = nullptr;
-
 bsp::GPIO* key1 = nullptr;
 BoolEdgeDetector key_detector(false);
 
@@ -66,17 +68,14 @@ bool steering_align_detect1() {
 }
 
 bool steering_align_detect2() {
-  return true;
   return pe2->Read() == 0;
 }
 
 bool steering_align_detect3() {
-  return true;
   return pe3->Read() == 0;
 }
 
 bool steering_align_detect4() {
-  return true;
   return pe4->Read() == 0;
 }
 
@@ -91,10 +90,19 @@ void RM_RTOS_Init() {
   // button on typeC. 1 if not pressed 0 otherwise
   key1 = new bsp::GPIO(GPIOA, GPIO_PIN_0);
 
+  /* Usage:
+   *   The 'key' is the button on TypeC boards
+   *   Press key to start alignment
+   *   When alignment finishes, press key again to turn off motors' power
+   *   Now align motors by hand to measure the offset of each motor
+  **/
   pe1 = new bsp::GPIO(IN1_GPIO_Port, IN1_Pin);
   pe2 = new bsp::GPIO(IN2_GPIO_Port, IN2_Pin);
   pe3 = new bsp::GPIO(IN3_GPIO_Port, IN3_Pin);
   pe4 = new bsp::GPIO(IN4_GPIO_Port, IN4_Pin);
+
+  can1 = new bsp::CAN(&hcan1, 0x201, true);
+  can2 = new bsp::CAN(&hcan2, 0x201, false);
 
   // init steerings
   motor1 = new control::Motor3508(can1, 0x201);
@@ -110,22 +118,26 @@ void RM_RTOS_Init() {
   steering_data.omega_pid_param = new float[3]{140, 1.2, 25};
   steering_data.max_iout = 1000;
   steering_data.max_out = 13000;
-  steering_data.calibrate_offset = 0;
-
+  steering_data.calibrate_offset = OFFSET_MOTOR1;
   steering_data.align_detect_func = steering_align_detect1;
   steering1 = new control::SteeringMotor(steering_data);
 
+  steering_data.calibrate_offset = OFFSET_MOTOR2;
   steering_data.motor = motor2;
   steering_data.align_detect_func = steering_align_detect2;
   steering2 = new control::SteeringMotor(steering_data);
+
+  steering_data.calibrate_offset = OFFSET_MOTOR3;
   steering_data.motor = motor3;
   steering_data.align_detect_func = steering_align_detect3;
   steering3 = new control::SteeringMotor(steering_data);
+
   steering_data.motor = motor4;
+  steering_data.calibrate_offset = OFFSET_MOTOR4;
   steering_data.align_detect_func = steering_align_detect4;
   steering4 = new control::SteeringMotor(steering_data);
 
-  steering_chassis = new control::steering_chassis_t(); 
+  steering_chassis = new control::steering_chassis_t();
 
   steering_chassis->fl_steer_motor = steering4;
   steering_chassis->fr_steer_motor = steering3;
@@ -145,15 +157,13 @@ void RM_RTOS_Init() {
   steering_chassis->br_wheel_motor = motor6;
 
   chassis = new control::SteeringChassis(steering_chassis);
-
-  dbus = new remote::DBUS(&huart3);
 }
 
 void RM_RTOS_Default_Task(const void* args) {
   UNUSED(args);
   control::MotorCANBase* steer_motors[] = {motor1, motor2, motor3, motor4};
 
-  osDelay(500);  // DBUS initialization needs time
+  osDelay(500);
 
   // Press Key to start aligning. Else sudden current change when power is switched on might break
   // the board.
@@ -171,13 +181,26 @@ void RM_RTOS_Default_Task(const void* args) {
     chassis->SteerCalcOutput();
     control::MotorCANBase::TransmitOutput(steer_motors, 4);
     alignment_complete = chassis->Calibrate();
-    osDelay(2);
+    osDelay(1);
   }
 
   chassis->ReAlign();
-
-  control::MotorCANBase::TransmitOutput(steer_motors, 4);
+  chassis->PrintData();
 
   print("\r\nAlignment End\r\n");
+
+  while(1) {
+    chassis->SteerCalcOutput();
+    control::MotorCANBase::TransmitOutput(steer_motors, 4);
+    osDelay(2);
+    if (!key1->Read()) {
+      break;
+    }
+  }
+
+  while(1) {
+    chassis->PrintData();
+    osDelay(1000);
+  }
 
 }
