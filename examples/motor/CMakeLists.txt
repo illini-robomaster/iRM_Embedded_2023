@@ -51,7 +51,3 @@ irm_add_arm_executable(${PROJECT_NAME}_m6623
 irm_add_arm_executable(${PROJECT_NAME}_pwm
     TARGET DJI_Board_TypeA
     SOURCES pwm.cc)
-
-irm_add_arm_executable(${PROJECT_NAME}_steering_align
-    TARGET DJI_Board_TypeC
-    SOURCES m3508_steering_align.cc)
