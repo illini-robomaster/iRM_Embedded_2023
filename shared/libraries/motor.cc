@@ -293,7 +293,7 @@ ServoMotor::ServoMotor(servo_t data, float align_angle, float proximity_in, floa
 }
 
 void ServoMotor::ResetTheta() {
-  // servo_angle_ = 0;
+  servo_angle_ = 0;
   cumulated_angle_ = 0;
 }
 
@@ -327,12 +327,8 @@ void ServoMotor::CalcOutput() {
   // calculate desired output with pid
   int command;
   float target_diff = (target_angle_ - servo_angle_ - cumulated_angle_) * transmission_ratio_;
-  // print("target_diff: %f", target_diff);
   // v = sqrt(2 * a * d)
   uint32_t current_time = GetHighresTickMicroSec();
-  // print("%d",hold_);
-  print("theta: %f\n", GetTheta());
-  print("target: %f\n", GetTarget());
   if (!hold_) {
     float speed_max_start =
         (current_time - start_time_) / 10e6 * max_acceleration_ * transmission_ratio_;
@@ -356,13 +352,10 @@ void ServoMotor::CalcOutput() {
     detect_head_ = detect_head_ + 1 < detect_period_ ? detect_head_ + 1 : 0;
 
     // detect if motor is jammed
-    jam_detector_->input(abs(detect_total_) >= jam_threshold_);
-    // print("jam_detecr: %d\n", jam_threshold_);
-    // print("detect_total: %d\n", detect_total_);
-    // print("%d\n", jam_detector_->posEdge());
+    // detect total is used as filter.
     if (abs(detect_total_) >= jam_threshold_) {
       servo_jam_t data;
-      data.speed = max_speed_;/// transmission_ratio_;
+      data.speed = max_speed_;
       jam_callback_(this, data);
     }
   }

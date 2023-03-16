@@ -36,8 +36,8 @@
 
 #define NOTCH (2 * PI / 8)
 #define LOAD_ANGLE (2 * PI / 8)
-#define SPEED (4 * PI)
-#define ACCELERATION (20 * PI)
+#define SPEED (6 * PI)
+#define ACCELERATION (200 * PI)
 
 bsp::CAN* can1 = nullptr;
 control::MotorCANBase* motor = nullptr;
@@ -71,8 +71,8 @@ void RM_RTOS_Init() {
   servo_data.max_speed = SPEED;
   servo_data.max_acceleration = ACCELERATION;
   servo_data.transmission_ratio = M2006P36_RATIO;
-  servo_data.omega_pid_param = new float[3]{60, 20, 100};
-  servo_data.max_iout = 1000;
+  servo_data.omega_pid_param = new float[3]{150, 4, 0};
+  servo_data.max_iout = 2000;
   servo_data.max_out = 10000;
   servo = new control::ServoMotor(servo_data);
   servo->RegisterJamCallback(jam_callback, 0.305);
@@ -87,22 +87,11 @@ void RM_RTOS_Default_Task(const void* args) {
   // bsp::GPIO key(KEY_GPIO_GROUP, KEY_GPIO_PIN);
 
   while (true) {
-    // key_detector.input(key.Read());
-    if (servo->GetTheta() == 500) {
-      servo->ResetTheta();
-      servo->SetTarget(0, true);
-    }
-
     if (dbus->swr == remote::UP) {
-      // print("stop");
       servo->SetTarget(servo->GetTarget(), false);
       servo->SetMaxSpeed(0);
     } else {
-      // if (key_detector.posEdge() && servo->SetTarget(servo->GetTarget() + NOTCH) != 0) {
-      //   print("Servomotor step forward, target: %8.4f\r\n", servo->GetTarget());
-      // }
       servo->SetTarget(servo->GetTarget() + LOAD_ANGLE, false);
-      
       servo->SetMaxSpeed(SPEED);
     }
     servo->CalcOutput();
