@@ -40,11 +40,12 @@
 #define SPEED (6 * PI)
 #define ACCELERATION_DOUBLE (100 * PI)
 #define ACCELERATION_CONTINUE (200 * PI)
+#define ACCELERATION_CONTINUE_SLOWLY (20 * PI)
+#define DELAY (5e5)
 
 bsp::CAN* can1 = nullptr;
 control::MotorCANBase* motor = nullptr;
 control::ServoMotor* servo = nullptr;
-BoolEdgeDetector key_detector(false);
 
 remote::DBUS* dbus = nullptr;
 
@@ -78,7 +79,7 @@ void RM_RTOS_Init() {
   servo_data.max_out = 10000;
   servo = new control::ServoMotor(servo_data);
 
-  servo->RegisterJamCallback(jam_callback, 0.305);
+  servo->RegisterJamCallback(jam_callback, 0.304);
   dbus = new remote::DBUS(&huart1);
 }
 
@@ -86,22 +87,31 @@ void RM_RTOS_Default_Task(const void* args) {
   UNUSED(args);
 
   control::MotorCANBase* motors[] = {motor};
-  bsp::GPIO key(KEY_GPIO_GROUP, KEY_GPIO_PIN);
+  uint32_t start_time = 0;
+  int slow_shoot_detect = 0;
 
   while (true) {
     if (dbus->swr == remote::UP) {
       servo->SetTarget(servo->GetTarget() + LOAD_ANGLE_CONTINUE, false);
       servo->SetMaxSpeed(SPEED);
       servo->SetMaxAcceleration(ACCELERATION_CONTINUE);
-    } else if (dbus->swr == remote::DOWN){
+    } else if (dbus->swr == remote::MID){
       servo->SetMaxSpeed(0);
+      start_time = bsp::GetHighresTickMicroSec();
+      slow_shoot_detect = 0;
     } else {
-      key_detector.input(key.Read());
-      if (key_detector.posEdge()) {
-        servo->SetTarget(servo->GetTarget() + LOAD_ANGLE_DOUBLE);
+      if (bsp::GetHighresTickMicroSec() - start_time > DELAY) {
+        servo->SetTarget(servo->GetTarget() + LOAD_ANGLE_CONTINUE, false);
+        servo->SetMaxSpeed(SPEED);
+        servo->SetMaxAcceleration(ACCELERATION_CONTINUE_SLOWLY);
+      } else {
+        if (slow_shoot_detect == 0) {
+          slow_shoot_detect = 1;
+          servo->SetTarget(servo->GetTarget() + LOAD_ANGLE_DOUBLE);
+          servo->SetMaxSpeed(SPEED);
+          servo->SetMaxAcceleration(ACCELERATION_DOUBLE);
+        }
       }
-      servo->SetMaxSpeed(SPEED);
-      servo->SetMaxAcceleration(ACCELERATION_DOUBLE);
     }
     servo->CalcOutput();
     control::MotorCANBase::TransmitOutput(motors, 1);
