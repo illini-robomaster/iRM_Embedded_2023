@@ -68,9 +68,7 @@ MotorCANBase::MotorCANBase(bsp::CAN* can, uint16_t rx_id)
 
 MotorCANBase::MotorCANBase(bsp::CAN* can, uint16_t rx_id, uint16_t type)
   : theta_(0), omega_(0), can_(can), rx_id_(rx_id) {
-  if (type == 4310){
-    tx_id_ = 0x01;
-  }
+  UNUSED(type);
 }
 
 void MotorCANBase::TransmitOutput(MotorCANBase* motors[], uint8_t num_motors) {
@@ -537,8 +535,19 @@ void SteeringMotor::UpdateData(const uint8_t data[]) {
 }
 
 
-Motor4310::Motor4310(bsp::CAN* can, uint16_t rx_id) : MotorCANBase(can, rx_id, 4310) {
+Motor4310::Motor4310(bsp::CAN* can, uint16_t rx_id, uint16_t tx_id, uint8_t mode) : MotorCANBase(can, rx_id, 4310) {
   can->RegisterRxCallback(rx_id, can_motor_callback, this);
+  /* following the CAN id format from the document */
+  mode_ = mode;
+  if (mode == 0) {
+    tx_id_ = tx_id;
+  } else if (mode == 1) {
+    tx_id_ = tx_id + 0x100;
+  } else if (mode == 2) {
+    tx_id_ = tx_id + 0x200;
+  } else {
+    RM_EXPECT_TRUE(false, "Invalid mode number!");
+  }
 }
 
 void Motor4310::Initialize4310(Motor4310* motor) {
@@ -554,25 +563,76 @@ void Motor4310::Initialize4310(Motor4310* motor) {
   motor->can_->Transmit(motor->tx_id_, data, 8);
 }
 
+void Motor4310::SetZeroPos4310(control::Motor4310* motor) {
+  uint8_t data[8] = {0};
+  data[0] = 0xff;
+  data[1] = 0xff;
+  data[2] = 0xff;
+  data[3] = 0xff;
+  data[4] = 0xff;
+  data[5] = 0xff;
+  data[6] = 0xff;
+  data[7] = 0xfe;
+  motor->can_->Transmit(motor->tx_id_, data, 8);
+}
+
 void Motor4310::SetOutput4310(float position, float velocity, float kp, float kd, float torque) {
-  kp_set_ = float_to_uint(kp, 0.0, 500.0, 12);
-  kd_set_ = float_to_uint(kd, 0, 5, 12);
-  pos_set_ = float_to_uint(position, -12.5, 12.5, 16);
-  vel_set_ = float_to_uint(velocity, -45.0, 45.0, 12);
-  torque_set_ = float_to_uint(torque, -18, 18, 12);
+  kp_set_ = kp;
+  kd_set_ = kd;
+  pos_set_ = position;
+  vel_set_ = velocity;
+  torque_set_ = torque;
+}
+
+void Motor4310::SetOutput4310(float position, float velocity) {
+  pos_set_ = position;
+  vel_set_ = velocity;  // TODO check type
+}
+
+void Motor4310::SetOutput4310(float velocity) {
+  vel_set_ = velocity;
 }
 
 void Motor4310::TransmitOutput4310(Motor4310* motor) {
   uint8_t data[8] = {0};
-  //  follow the datasheet of the MIT mode data format
-  data[0] = motor->pos_set_ >> 8;
-  data[1] = motor->pos_set_ & 0x00ff;
-  data[2] = (motor->vel_set_ >> 4) & 0x00ff;
-  data[3] = ((motor->vel_set_ & 0x000f) << 4) | ((motor->kp_set_ >> 8) & 0x000f);
-  data[4] = motor->kp_set_ & 0x00ff;
-  data[5] = (motor->kd_set_ >> 4) & 0x00ff;
-  data[6] = ((motor->kd_set_ & 0x000f) << 4) | ((motor->torque_set_ >> 8) & 0x000f);
-  data[7] = motor->torque_set_ & 0x00ff;
+  int16_t kp_tmp, kd_tmp, pos_tmp, vel_tmp, torque_tmp;
+  kp_tmp = float_to_uint(kp_set_, 0.0, 500.0, 12);
+  kd_tmp = float_to_uint(kd_set_, 0, 5, 12);
+  pos_tmp = float_to_uint(pos_set_, -12.5, 12.5, 16);
+  vel_tmp = float_to_uint(vel_set_, -45.0, 45.0, 12);
+  torque_tmp = float_to_uint(torque_set_, -18, 18, 12);
+
+  if (mode_ == 0){
+    data[0] = pos_tmp >> 8;
+    data[1] = pos_tmp & 0x00ff;
+    data[2] = (vel_tmp >> 4) & 0x00ff;
+    data[3] = ((vel_tmp & 0x000f) << 4) | ((kp_tmp >> 8) & 0x000f);
+    data[4] = kp_tmp & 0x00ff;
+    data[5] = (kd_tmp >> 4) & 0x00ff;
+    data[6] = ((kd_tmp & 0x000f) << 4) | ((torque_tmp >> 8) & 0x000f);
+    data[7] = torque_tmp & 0x00ff;
+  } else if (mode_ == 1) {
+    uint8_t *pbuf, *vbuf;
+    pbuf = (uint8_t*) &pos_set_;
+    vbuf = (uint8_t*) &vel_set_;
+    data[0] = *pbuf;
+    data[1] = *(pbuf + 1);
+    data[2] = *(pbuf + 2);
+    data[3] = *(pbuf + 3);
+    data[4] = *vbuf;
+    data[5] = *(vbuf + 1);
+    data[6] = *(vbuf + 2);
+    data[7] = *(vbuf + 3);
+  } else if (mode_ == 2) {
+    uint8_t  *vbuf;
+    vbuf = (uint8_t*) &vel_set_;
+    data[0] = *vbuf;
+    data[1] = *(vbuf + 1);
+    data[2] = *(vbuf + 2);
+    data[3] = *(vbuf + 3);
+  } else {
+    RM_EXPECT_TRUE(false, "Invalid mode number!");
+  }
   motor->can_->Transmit(motor->tx_id_, data, 8);
 }
 

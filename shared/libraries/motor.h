@@ -64,6 +64,13 @@ class MotorCANBase : public MotorBase {
    * @param rx_id  CAN rx id
    */
   MotorCANBase(bsp::CAN* can, uint16_t rx_id);
+
+  /**
+   * @brief base constructor for non-DJI motors
+   * @param can     CAN instance
+   * @param rx_id   CAN rx id
+   * @param type    motor type
+   */
   MotorCANBase(bsp::CAN* can, uint16_t rx_id, uint16_t type);
 
   /**
@@ -597,25 +604,54 @@ class SteeringMotor {
 };
 
 /**
- * @brief 4310 motor class
+ * @brief m4310 motor class
  */
 class Motor4310 : public MotorCANBase {
  public:
-  /* constructor wrapper over MotorCANBase */
-  Motor4310(bsp::CAN* can, uint16_t rx_id_);
+  /** constructor wrapper over MotorCANBase
+   *  CAN frame id for different modes:
+   *      MIT:                  actual CAN id.
+   *      position-velocity:    CAN id + 0x100.
+   *      velocity:             CAN id + 0x200.
+   *  @param can    CAN object
+   *  @param rx_id  Master id
+   *  @param tx_id  CAN id *** NOT the actual CAN id but the id configured in software ***
+   *  @param mode   0: MIT
+   *                1: position-velocity
+   *                2: velocity
+   */
+  Motor4310(bsp::CAN* can, uint16_t rx_id, uint16_t tx_id, uint8_t mode);
+
   /* implements data update callback */
   void UpdateData(const uint8_t data[]) override final;
 
-  static void Initialize4310(Motor4310* motor);
-  /* implements transmit output specifically for 4310 */
-  static void TransmitOutput4310(control::Motor4310* motor);
+  /* initialize m4310 */
+  void Initialize4310(Motor4310* motor);
+
+  /* set zero position */
+  void SetZeroPos4310(Motor4310* motor);
+
+  /**
+   * implements transmit output specifically for 4310
+   * @param motor m4310 motor object
+   * @param mode operation modes:
+   *                0: MIT
+   *                1: position-velocity
+   *                2: velocity
+   */
+  void TransmitOutput4310(control::Motor4310* motor);
+
   /* implements data printout */
   void PrintData() const override final;
-  /* override base implementation with max current protection */
-  // TODO: change parameters
 
-  /* set output parameters for m4310 */
+  /* set output parameters for m4310 using MIT mode */
   void SetOutput4310(float position, float velocity, float kp, float kd, float torque);
+
+  /* set output parameters for m4310 using position-velocity mode */
+  void SetOutput4310(float position, float velocity);
+
+  /* set output parameters for m4310 using velocity mode */
+  void SetOutput4310(float velocity);
 
   /**
  * @brief Converts a float to an unsigned int, given range and number of bits
@@ -628,11 +664,13 @@ class Motor4310 : public MotorCANBase {
   static int16_t float_to_uint(float x, float x_min, float x_max, int bits);
 
  private:
-  volatile int16_t kp_set_ = 0;   // defined kp value
-  volatile int16_t kd_set_ = 0;   // defined kd value
-  volatile int16_t vel_set_ = 0;  // defined velocity
-  volatile int16_t pos_set_ = 0;  // defined position
-  volatile int16_t torque_set_ = 0;  // defined torque
+  volatile uint8_t mode_;  // current motor mode
+
+  volatile float kp_set_ = 0;   // defined kp value
+  volatile float kd_set_ = 0;   // defined kd value
+  volatile float vel_set_ = 0;  // defined velocity
+  volatile float pos_set_ = 0;  // defined position
+  volatile float torque_set_ = 0;  // defined torque
 
   volatile int16_t raw_pos_ = 0;  // actual position
   volatile int16_t raw_vel_ = 0;  // actual velocity

@@ -38,18 +38,29 @@ remote::DBUS* dbus = nullptr;
 
 void RM_RTOS_Init() {
   print_use_uart(&huart1);
-  can = new bsp::CAN(&hcan1, 0x201, true);
-  motor = new control::Motor4310(can, 0x01);
+  can = new bsp::CAN(&hcan1, 0x01, true);
+
+  /* rx_id = Master id
+   * tx_id = CAN id
+   * mode:
+   *  0: MIT mode
+   *  1: position-velocity mode
+   *  2: velocity mode  */
+  motor = new control::Motor4310(can, 0x02, 0x01, 1);
 }
 
 void RM_RTOS_Default_Task(const void* args) {
   // need to press reset to start
   UNUSED(args);
-  control::Motor4310::Initialize4310(motor);
+//  motor->SetZeroPos4310(motor);
+  motor->Initialize4310(motor);
 
   while (true) {
-    motor->SetOutput4310(0, 0, 0.4, 0.05, 0);
-    control::Motor4310::TransmitOutput4310(motor);
+//    motor->SetOutput4310(0, 0, 0.4, 0.05, 0); // testing MIT pos mode
+//    motor->SetOutput4310(2*PI, 3, 0, 1, 0);   // testing MIT vel mode
+    motor->SetOutput4310(2*PI, 10);   // testing pos-vel mode
+//    motor->SetOutput4310(2);  // testing vel mode
+    motor->TransmitOutput4310(motor);
     osDelay(10);
   }
 }
