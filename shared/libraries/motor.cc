@@ -292,6 +292,11 @@ ServoMotor::ServoMotor(servo_t data, float align_angle, float proximity_in, floa
   detect_buf_ = nullptr;
 }
 
+void ServoMotor::ResetTheta() {
+  // servo_angle_ = 0;
+  cumulated_angle_ = 0;
+}
+
 servo_status_t ServoMotor::SetTarget(const float target, bool override) {
   if (!hold_ && !override) return INPUT_REJECT;
   servo_status_t dir = target < target_angle_ ? TURNING_ANTICLOCKWISE : TURNING_CLOCKWISE;
@@ -300,7 +305,7 @@ servo_status_t ServoMotor::SetTarget(const float target, bool override) {
 }
 
 void ServoMotor::SetMaxSpeed(const float max_speed) {
-  if (max_speed > 0)
+  if (max_speed >= 0)
     max_speed_ = transmission_ratio_ * max_speed;
   else
     RM_EXPECT_TRUE(false, "Max speed should be positive");
@@ -320,20 +325,26 @@ void ServoMotor::CalcOutput() {
   if (hold_detector_->negEdge()) start_time_ = GetHighresTickMicroSec();
 
   // calculate desired output with pid
-  int16_t command;
+  int command;
   float target_diff = (target_angle_ - servo_angle_ - cumulated_angle_) * transmission_ratio_;
+  // print("target_diff: %f", target_diff);
   // v = sqrt(2 * a * d)
   uint32_t current_time = GetHighresTickMicroSec();
+  // print("%d",hold_);
+  print("theta: %f\n", GetTheta());
+  print("target: %f\n", GetTarget());
   if (!hold_) {
     float speed_max_start =
         (current_time - start_time_) / 10e6 * max_acceleration_ * transmission_ratio_;
     float speed_max_target = sqrt(2 * max_acceleration_ * abs(target_diff));
+    // print("%f\n", speed_max_target);
     float current_speed = speed_max_start > speed_max_target ? speed_max_target : speed_max_start;
     current_speed = clip<float>(current_speed, 0, max_speed_);
     command = omega_pid_.ComputeConstrainedOutput(
         motor_->GetOmegaDelta(sign<float>(target_diff, 0) * current_speed));
   } else {
     command = omega_pid_.ComputeConstrainedOutput(motor_->GetOmegaDelta(target_diff * 50));
+    // print("3");
   }
   motor_->SetOutput(command);
 
@@ -346,9 +357,12 @@ void ServoMotor::CalcOutput() {
 
     // detect if motor is jammed
     jam_detector_->input(abs(detect_total_) >= jam_threshold_);
-    if (jam_detector_->posEdge()) {
+    // print("jam_detecr: %d\n", jam_threshold_);
+    // print("detect_total: %d\n", detect_total_);
+    // print("%d\n", jam_detector_->posEdge());
+    if (abs(detect_total_) >= jam_threshold_) {
       servo_jam_t data;
-      data.speed = max_speed_ / transmission_ratio_;
+      data.speed = max_speed_;/// transmission_ratio_;
       jam_callback_(this, data);
     }
   }

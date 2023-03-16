@@ -28,14 +28,15 @@
 #include "main.h"
 #include "motor.h"
 #include "utils.h"
+#include "dbus.h"
 
 
 #define KEY_GPIO_GROUP GPIOB
 #define KEY_GPIO_PIN GPIO_PIN_2
 
-#define NOTCH (2 * PI / 16)
+#define NOTCH (2 * PI / 8)
 #define LOAD_ANGLE (2 * PI / 8)
-#define SPEED (2 * PI)
+#define SPEED (4 * PI)
 #define ACCELERATION (20 * PI)
 
 bsp::CAN* can1 = nullptr;
@@ -43,12 +44,15 @@ control::MotorCANBase* motor = nullptr;
 control::ServoMotor* servo = nullptr;
 BoolEdgeDetector key_detector(false);
 
+remote::DBUS* dbus = nullptr;
+
 void jam_callback(control::ServoMotor* servo, const control::servo_jam_t data) {
   UNUSED(data);
   float servo_target = servo->GetTarget();
   if (servo_target < servo->GetTheta()) {
     print("Antijam in operation\r\n");
   } else {
+    servo->SetTarget(servo->GetTheta(), true);
     float prev_target = servo->GetTarget() - NOTCH;
     servo->SetTarget(prev_target, true);
     print("Antijam engage\r\n");
@@ -71,7 +75,9 @@ void RM_RTOS_Init() {
   servo_data.max_iout = 1000;
   servo_data.max_out = 10000;
   servo = new control::ServoMotor(servo_data);
-  servo->RegisterJamCallback(jam_callback, 0.6);
+  servo->RegisterJamCallback(jam_callback, 0.305);
+
+  dbus = new remote::DBUS(&huart1);
 }
 
 void RM_RTOS_Default_Task(const void* args) {
@@ -82,11 +88,23 @@ void RM_RTOS_Default_Task(const void* args) {
 
   while (true) {
     // key_detector.input(key.Read());
-    if (key_detector.posEdge() && servo->SetTarget(servo->GetTarget() + NOTCH) != 0) {
-      print("Servomotor step forward, target: %8.4f\r\n", servo->GetTarget());
+    if (servo->GetTheta() == 500) {
+      servo->ResetTheta();
+      servo->SetTarget(0, true);
     }
-    
-    servo->SetTarget(servo->GetTarget() + LOAD_ANGLE);
+
+    if (dbus->swr == remote::UP) {
+      // print("stop");
+      servo->SetTarget(servo->GetTarget(), false);
+      servo->SetMaxSpeed(0);
+    } else {
+      // if (key_detector.posEdge() && servo->SetTarget(servo->GetTarget() + NOTCH) != 0) {
+      //   print("Servomotor step forward, target: %8.4f\r\n", servo->GetTarget());
+      // }
+      servo->SetTarget(servo->GetTarget() + LOAD_ANGLE, false);
+      
+      servo->SetMaxSpeed(SPEED);
+    }
     servo->CalcOutput();
     control::MotorCANBase::TransmitOutput(motors, 1);
     osDelay(2);
