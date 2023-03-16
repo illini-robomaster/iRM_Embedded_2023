@@ -88,7 +88,7 @@ void RM_RTOS_Default_Task(const void* args) {
 
   while (true) {
     if (dbus->swr == remote::UP) {
-      servo->SetTarget(servo->GetTarget(), false);
+      // servo->SetTarget(servo->GetTarget(), false);
       servo->SetMaxSpeed(0);
     } else {
       servo->SetTarget(servo->GetTarget() + LOAD_ANGLE, false);
