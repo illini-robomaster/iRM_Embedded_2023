@@ -28,19 +28,25 @@
 #include "main.h"
 #include "motor.h"
 #include "utils.h"
+#include "dbus.h"
+
 
 #define KEY_GPIO_GROUP GPIOB
 #define KEY_GPIO_PIN GPIO_PIN_2
 
 #define NOTCH (2 * PI / 8)
-#define LOAD_ANGLE (2 * PI / 4)
+#define LOAD_ANGLE_CONTINUE (2 * PI / 8)
+#define LOAD_ANGLE_DOUBLE (2 * PI / 4)
 #define SPEED (6 * PI)
-#define ACCELERATION (100 * PI)
+#define ACCELERATION_DOUBLE (100 * PI)
+#define ACCELERATION_CONTINUE (200 * PI)
 
 bsp::CAN* can1 = nullptr;
 control::MotorCANBase* motor = nullptr;
 control::ServoMotor* servo = nullptr;
 BoolEdgeDetector key_detector(false);
+
+remote::DBUS* dbus = nullptr;
 
 void jam_callback(control::ServoMotor* servo, const control::servo_jam_t data) {
   UNUSED(data);
@@ -65,7 +71,7 @@ void RM_RTOS_Init() {
   control::servo_t servo_data;
   servo_data.motor = motor;
   servo_data.max_speed = SPEED;
-  servo_data.max_acceleration = ACCELERATION;
+  servo_data.max_acceleration = ACCELERATION_DOUBLE;
   servo_data.transmission_ratio = M2006P36_RATIO;
   servo_data.omega_pid_param = new float[3]{150, 4, 0};
   servo_data.max_iout = 2000;
@@ -73,6 +79,7 @@ void RM_RTOS_Init() {
   servo = new control::ServoMotor(servo_data);
 
   servo->RegisterJamCallback(jam_callback, 0.305);
+  dbus = new remote::DBUS(&huart1);
 }
 
 void RM_RTOS_Default_Task(const void* args) {
@@ -82,9 +89,19 @@ void RM_RTOS_Default_Task(const void* args) {
   bsp::GPIO key(KEY_GPIO_GROUP, KEY_GPIO_PIN);
 
   while (true) {
-    key_detector.input(key.Read());
-    if (key_detector.posEdge() && servo->SetTarget(servo->GetTarget() + LOAD_ANGLE) != 0) {
-      print("Servomotor step forward, target: %8.4f\r\n", servo->GetTarget());
+    if (dbus->swr == remote::UP) {
+      servo->SetTarget(servo->GetTarget() + LOAD_ANGLE_CONTINUE, false);
+      servo->SetMaxSpeed(SPEED);
+      servo->SetMaxAcceleration(ACCELERATION_CONTINUE);
+    } else if (dbus->swr == remote::DOWN){
+      servo->SetMaxSpeed(0);
+    } else {
+      key_detector.input(key.Read());
+      if (key_detector.posEdge()) {
+        servo->SetTarget(servo->GetTarget() + LOAD_ANGLE_DOUBLE);
+      }
+      servo->SetMaxSpeed(SPEED);
+      servo->SetMaxAcceleration(ACCELERATION_DOUBLE);
     }
     servo->CalcOutput();
     control::MotorCANBase::TransmitOutput(motors, 1);
