@@ -2,6 +2,6 @@
 Language: Cpp
 BasedOnStyle: Google
 
-ColumnLimit: 100
+ColumnLimit: 0
 DerivePointerAlignment: false
 ---

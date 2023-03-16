@@ -28,12 +28,13 @@
 #include "bsp_uart.h"
 #include "cmsis_os.h"
 #include "minipc.h"
+#include "rgb.h"
 
 #define RX_SIGNAL (1 << 0)
 
 extern osThreadId_t defaultTaskHandle;
 
-static bsp::GPIO *gpio_red, *gpio_green;
+static display::RGB* led = nullptr;
 
 class CustomUART : public bsp::UART {
  public:
@@ -44,38 +45,50 @@ class CustomUART : public bsp::UART {
   void RxCompleteCallback() override final { osThreadFlagsSet(defaultTaskHandle, RX_SIGNAL); }
 };
 
+void RM_RTOS_Init(void) {
+  led = new display::RGB(&htim5, 3, 2, 1, 1000000);
+}
+
 void RM_RTOS_Default_Task(const void* argument) {
   UNUSED(argument);
 
   uint32_t length;
   uint8_t* data;
 
-  auto uart = std::make_unique<CustomUART>(&huart8);  // see cmake for which uart
+  auto uart = std::make_unique<CustomUART>(&huart1);  // see cmake for which uart
   uart->SetupRx(50);
   uart->SetupTx(50);
 
-  gpio_red = new bsp::GPIO(LED_RED_GPIO_Port, LED_RED_Pin);
-  gpio_green = new bsp::GPIO(LED_GREEN_GPIO_Port, LED_GREEN_Pin);
-
   auto miniPCreceiver = communication::MiniPCProtocol();
+  int total_processed_bytes = 0;
 
   while (true) {
     /* wait until rx data is available */
+    led->Display(0xFF0000FF);
     uint32_t flags = osThreadFlagsWait(RX_SIGNAL, osFlagsWaitAll, osWaitForever);
     if (flags & RX_SIGNAL) {  // unnecessary check
       /* time the non-blocking rx / tx calls (should be <= 1 osTick) */
+
+      // max length of the UART buffer at 150Hz is ~50 bytes
       length = uart->Read(&data);
+      total_processed_bytes += length;
 
       // if read anything, flash red
-      gpio_red->High();
+      led->Display(0xFFFF0000);
 
       miniPCreceiver.Receive(data, length);
-      if (miniPCreceiver.get() == 1) {
-        gpio_green->High();
+      uint32_t valid_packet_cnt = miniPCreceiver.get_valid_packet_cnt();
+
+      // Jetson / PC sends 200Hz valid packets for stress testing
+      // For testing script, please see iRM_Vision_2023/Communication/communicator.py
+      // For comm protocol details, please see iRM_Vision_2023/docs/comm_protocol.md
+      if (valid_packet_cnt > 998) {
+        // If at least 99.9% packets are valid, pass
+        led->Display(0xFF00FF00);
+        osDelay(10000);
       }
-      osDelay(200);
-      gpio_green->Low();
-      gpio_red->Low();
+      // blue when nothing is received
+      led->Display(0xFF0000FF);
     }
   }
 }

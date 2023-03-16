@@ -292,6 +292,11 @@ ServoMotor::ServoMotor(servo_t data, float align_angle, float proximity_in, floa
   detect_buf_ = nullptr;
 }
 
+void ServoMotor::ResetTheta() {
+  servo_angle_ = 0;
+  cumulated_angle_ = 0;
+}
+
 servo_status_t ServoMotor::SetTarget(const float target, bool override) {
   if (!hold_ && !override) return INPUT_REJECT;
   servo_status_t dir = target < target_angle_ ? TURNING_ANTICLOCKWISE : TURNING_CLOCKWISE;
@@ -300,7 +305,7 @@ servo_status_t ServoMotor::SetTarget(const float target, bool override) {
 }
 
 void ServoMotor::SetMaxSpeed(const float max_speed) {
-  if (max_speed > 0)
+  if (max_speed >= 0)
     max_speed_ = transmission_ratio_ * max_speed;
   else
     RM_EXPECT_TRUE(false, "Max speed should be positive");
@@ -320,7 +325,7 @@ void ServoMotor::CalcOutput() {
   if (hold_detector_->negEdge()) start_time_ = GetHighresTickMicroSec();
 
   // calculate desired output with pid
-  int16_t command;
+  int command;
   float target_diff = (target_angle_ - servo_angle_ - cumulated_angle_) * transmission_ratio_;
   // v = sqrt(2 * a * d)
   uint32_t current_time = GetHighresTickMicroSec();
@@ -345,10 +350,10 @@ void ServoMotor::CalcOutput() {
     detect_head_ = detect_head_ + 1 < detect_period_ ? detect_head_ + 1 : 0;
 
     // detect if motor is jammed
-    jam_detector_->input(abs(detect_total_) >= jam_threshold_);
-    if (jam_detector_->posEdge()) {
+    // detect total is used as filter.
+    if (abs(detect_total_) >= jam_threshold_) {
       servo_jam_t data;
-      data.speed = max_speed_ / transmission_ratio_;
+      data.speed = max_speed_;
       jam_callback_(this, data);
     }
   }
