@@ -333,7 +333,6 @@ void ServoMotor::CalcOutput() {
     float speed_max_start =
         (current_time - start_time_) / 10e6 * max_acceleration_ * transmission_ratio_;
     float speed_max_target = sqrt(2 * max_acceleration_ * abs(target_diff));
-    // print("%f\n", speed_max_target);
     float current_speed = speed_max_start > speed_max_target ? speed_max_target : speed_max_start;
     current_speed = clip<float>(current_speed, 0, max_speed_);
     command = omega_pid_.ComputeConstrainedOutput(
