@@ -55,3 +55,7 @@ irm_add_arm_executable(${PROJECT_NAME}_pwm
 irm_add_arm_executable(${PROJECT_NAME}_steering_align
     TARGET DJI_Board_TypeC
     SOURCES m3508_steering_align.cc)
+
+irm_add_arm_executable(${PROJECT_NAME}_m2006_antijam
+    TARGET DJI_Board_TypeA
+    SOURCES m2006_antijam.cc)
