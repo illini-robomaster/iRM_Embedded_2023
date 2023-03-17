@@ -18,39 +18,41 @@
 *                                                                          *
 ****************************************************************************/
 
-#include "bsp_gpio.h"
 #include "bsp_print.h"
 #include "cmsis_os.h"
 #include "main.h"
 #include "motor.h"
+#include "dbus.h"
 
-static bsp::CAN* can = nullptr;
-static control::Motor4310* motor = nullptr;
+bsp::CAN* can = nullptr;
+control::Motor4310* motor = nullptr;
+remote::DBUS* dbus = nullptr;
 
 void RM_RTOS_Init() {
-  print_use_uart(&huart1);
+  print_use_uart(&huart8);
   can = new bsp::CAN(&hcan1, 0x01, true);
-
-  /* rx_id = Master id
-   * tx_id = CAN id
-   * mode:
-   *  0: MIT mode
-   *  1: position-velocity mode
-   *  2: velocity mode  */
   motor = new control::Motor4310(can, 0x02, 0x01, 1);
+  dbus = new remote::DBUS(&huart1);
 }
 
 void RM_RTOS_Default_Task(const void* args) {
   // need to press reset to begin
   UNUSED(args);
-//  motor->SetZeroPos4310(motor);  // for setting the zero position
+  //  motor->SetZeroPos4310(motor);
   motor->Initialize4310(motor);
 
+  float pos = 0;
   while (true) {
-//    motor->SetOutput4310(0, 0, 0.4, 0.05, 0); // MIT pos mode
-//    motor->SetOutput4310(2*PI, 3, 0, 1, 0);   // MIT vel mode
-    motor->SetOutput4310(2*PI, 10);   // pos-vel mode
-//    motor->SetOutput4310(2);  // vel mode
+    float vel;
+    vel = clip<float>(dbus->ch1 / 660.0 * 30.0, -30, 30);
+    pos += vel / 200;
+    pos = clip<float>(pos, -PI/4, PI/4);
+
+    set_cursor(0, 0);
+    clear_screen();
+    print("Vel Set: %f  Pos Set: %f\n", vel, pos);
+
+    motor->SetOutput4310(pos, vel);
     motor->TransmitOutput4310(motor);
     osDelay(10);
   }
