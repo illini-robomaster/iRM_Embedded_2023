@@ -43,6 +43,12 @@ constexpr float OFFSET_MOTOR2 = 0;
 constexpr float OFFSET_MOTOR3 = 0;
 constexpr float OFFSET_MOTOR4 = 0;
 
+/* Usage:
+ * Working Steering Chassis Example
+ * Left stick for translation, right stick for rotation
+ * Right switch UP is to start an alignment (calibration)
+**/
+
 control::MotorCANBase* motor1 = nullptr;
 control::MotorCANBase* motor2 = nullptr;
 control::MotorCANBase* motor3 = nullptr;
