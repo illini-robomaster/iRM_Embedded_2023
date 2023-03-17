@@ -261,10 +261,10 @@ void RM_RTOS_Default_Task(const void* args) {
         _theta1 = atan2(vy - vw * cos(PI / 4), vx - vw * sin(PI / 4));
         _theta2 = atan2(vy - vw * cos(PI / 4), vx + vw * sin(PI / 4));
 
-        ret1 = steering1->TurnRelative(_theta1 - theta1);
-        ret2 = steering2->TurnRelative(_theta2 - theta2);
-        ret3 = steering3->TurnRelative(_theta3 - theta3);
-        ret4 = steering4->TurnRelative(_theta4 - theta4);
+        ret1 = steering1->TurnRelative(wrap<double>(_theta1 - theta1, -PI, PI));
+        ret2 = steering2->TurnRelative(wrap<double>(_theta2 - theta2, -PI, PI));
+        ret3 = steering3->TurnRelative(wrap<double>(_theta3 - theta3, -PI, PI));
+        ret4 = steering4->TurnRelative(wrap<double>(_theta4 - theta4, -PI, PI));
 
         if (cnt % 500 == 0) {
           print("%10.4f, %10.4f, %10.4f, %10.4f\r\n", _theta1, _theta2, _theta3, _theta4);
