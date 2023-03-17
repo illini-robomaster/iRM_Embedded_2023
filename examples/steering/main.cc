@@ -30,15 +30,13 @@
 #include "steering.h"
 #include "motor.h"
 
-#define KEY_GPIO_GROUP GPIOA
-#define KEY_GPIO_PIN GPIO_PIN_0
-
 bsp::CAN* can1 = nullptr;
 bsp::CAN* can2 = nullptr;
 
 constexpr float RUN_SPEED = (4 * PI);
 constexpr float ALIGN_SPEED = (PI);
 constexpr float ACCELERATION = (100 * PI);
+constexpr float WHEEL_SPEED = 200;
 
 constexpr float OFFSET_MOTOR1 = 0;
 constexpr float OFFSET_MOTOR2 = 0;
@@ -59,9 +57,6 @@ control::MotorCANBase* motor5 = nullptr;
 control::MotorCANBase* motor6 = nullptr;
 control::MotorCANBase* motor7 = nullptr;
 control::MotorCANBase* motor8 = nullptr;
-
-bsp::GPIO* key1 = nullptr;
-BoolEdgeDetector key_detector(false);
 
 bsp::GPIO* pe1 = nullptr;
 bsp::GPIO* pe2 = nullptr;
@@ -92,9 +87,6 @@ remote::DBUS* dbus = nullptr;
 void RM_RTOS_Init() {
   print_use_uart(&huart1);
   bsp::SetHighresClockTimer(&htim5);
-
-  // button on typeC. 1 if not pressed 0 otherwise
-  key1 = new bsp::GPIO(GPIOA, GPIO_PIN_0);
 
   pe1 = new bsp::GPIO(IN1_GPIO_Port, IN1_Pin);
   pe2 = new bsp::GPIO(IN2_GPIO_Port, IN2_Pin);
@@ -145,7 +137,6 @@ void RM_RTOS_Init() {
   steering_chassis->br_steer_motor = steering2;
 
   // init wheels
-  // Need to init because steering chassis rejects nullptr
   motor5 = new control::Motor3508(can2, 0x205);
   motor6 = new control::Motor3508(can2, 0x206);
   motor7 = new control::Motor3508(can2, 0x207);
@@ -167,10 +158,10 @@ void RM_RTOS_Default_Task(const void* args) {
   control::MotorCANBase* steer_motors[] = {motor1, motor2, motor3, motor4};
 
   control::MotorCANBase* wheel_motors[] = {motor5, motor6, motor7, motor8};
-  control::PIDController pid5(40, 15, 30);
-  control::PIDController pid6(40, 15, 30);
-  control::PIDController pid7(40, 15, 30);
-  control::PIDController pid8(40, 15, 30);
+  control::PIDController pid5(120, 15, 30);
+  control::PIDController pid6(120, 15, 30);
+  control::PIDController pid7(120, 15, 30);
+  control::PIDController pid8(120, 15, 30);
 
   osDelay(500);  // DBUS initialization needs time
 
@@ -200,6 +191,16 @@ void RM_RTOS_Default_Task(const void* args) {
   float v7 = 0;
   float v8 = 0;
 
+  float s1 = 1.0;
+  float s2 = 1.0;
+  float s3 = 1.0;
+  float s4 = 1.0;
+
+  double _theta4_alt = 0.0;
+  double _theta3_alt = 0.0;
+  double _theta1_alt = 0.0;
+  double _theta2_alt = 0.0;
+
   bool alignment = false;
 
   while (true) {
@@ -212,10 +213,11 @@ void RM_RTOS_Default_Task(const void* args) {
       RM_ASSERT_TRUE(false, "Operation killed");
     }
 
+    // Only Calibrate once per Switch change
     if (dbus->swr != remote::UP) {
       alignment = false;
     }
-
+    // Right Switch Up to start a calibration
     if (dbus->swr == remote::UP && alignment == false) {
       chassis->SteerSetMaxSpeed(ALIGN_SPEED);
       bool alignment_complete = false;
@@ -242,8 +244,13 @@ void RM_RTOS_Default_Task(const void* args) {
       _theta2 = 0.0;
       _theta3 = 0.0;
       _theta4 = 0.0;
-    } else {
 
+      _theta4_alt = 0.0;
+      _theta3_alt = 0.0;
+      _theta1_alt = 0.0;
+      _theta2_alt = 0.0;
+    } else {
+      // Stay at current position when no command is given
       if (vx == 0 && vy == 0 && vw == 0) {
         ret1 = steering1->TurnRelative(0);
         ret2 = steering2->TurnRelative(0);
@@ -256,41 +263,78 @@ void RM_RTOS_Default_Task(const void* args) {
         v8 = 0;
 
       } else {
+        // Compute 2 position proposals, theta and theta + PI.
         _theta4 = atan2(vy + vw * cos(PI / 4), vx - vw * sin(PI / 4));
         _theta3 = atan2(vy + vw * cos(PI / 4), vx + vw * sin(PI / 4));
         _theta1 = atan2(vy - vw * cos(PI / 4), vx - vw * sin(PI / 4));
         _theta2 = atan2(vy - vw * cos(PI / 4), vx + vw * sin(PI / 4));
 
-        ret1 = steering1->TurnRelative(wrap<double>(_theta1 - theta1, -PI, PI));
-        ret2 = steering2->TurnRelative(wrap<double>(_theta2 - theta2, -PI, PI));
-        ret3 = steering3->TurnRelative(wrap<double>(_theta3 - theta3, -PI, PI));
-        ret4 = steering4->TurnRelative(wrap<double>(_theta4 - theta4, -PI, PI));
+        _theta4_alt = wrap<double>(_theta4 + PI, -PI, PI);
+        _theta3_alt = wrap<double>(_theta3 + PI, -PI, PI);
+        _theta1_alt = wrap<double>(_theta1 + PI, -PI, PI);
+        _theta2_alt = wrap<double>(_theta2 + PI, -PI, PI);
+
+        // Go to the closer proposal and change wheel direction accordingly
+        if (abs(wrap<double>(_theta1 - theta1, -PI, PI)) <
+            abs(wrap<double>(_theta1_alt - theta1, -PI, PI))) {
+          s1 = 1.0;
+          ret1 = steering1->TurnRelative(wrap<double>(_theta1 - theta1, -PI, PI));
+        } else {
+          s1 = -1.0;
+          ret1 = steering1->TurnRelative(wrap<double>(_theta1_alt - theta1, -PI, PI));
+        }
+        if (abs(wrap<double>(_theta2 - theta2, -PI, PI)) <
+            abs(wrap<double>(_theta2_alt - theta2, -PI, PI))) {
+          s2 = 1.0;
+          ret2 = steering2->TurnRelative(wrap<double>(_theta2 - theta2, -PI, PI));
+        } else {
+          s2 = -1.0;
+          ret2 = steering2->TurnRelative(wrap<double>(_theta2_alt - theta2, -PI, PI));
+        }
+        if (abs(wrap<double>(_theta3 - theta3, -PI, PI)) <
+            abs(wrap<double>(_theta3_alt - theta3, -PI, PI))) {
+          s3 = 1.0;
+          ret3 = steering3->TurnRelative(wrap<double>(_theta3 - theta3, -PI, PI));
+        } else {
+          s3 = -1.0;
+          ret3 = steering3->TurnRelative(wrap<double>(_theta3_alt - theta3, -PI, PI));
+        }
+        if (abs(wrap<double>(_theta4 - theta4, -PI, PI)) <
+            abs(wrap<double>(_theta4_alt - theta4, -PI, PI))) {
+          s4 = 1.0;
+          ret4 = steering4->TurnRelative(wrap<double>(_theta4 - theta4, -PI, PI));
+        } else {
+          s4 = -1.0;
+          ret4 = steering4->TurnRelative(wrap<double>(_theta4_alt - theta4, -PI, PI));
+        }
 
         if (cnt % 500 == 0) {
           print("%10.4f, %10.4f, %10.4f, %10.4f\r\n", _theta1, _theta2, _theta3, _theta4);
           cnt = 0;
         }
-
         cnt += 1;
+
+        // Update theta when TurnRelative complete
         if (ret1 == 0) {
-          theta1 = _theta1;
+          theta1 = s1 == 1.0 ? _theta1 : _theta1_alt;
         }
         if (ret2 == 0) {
-          theta2 = _theta2;
+          theta2 = s2 == 1.0 ? _theta2 : _theta2_alt;
         }
         if (ret3 == 0) {
-          theta3 = _theta3;
+          theta3 = s3 == 1.0 ? _theta3 : _theta3_alt;
         }
         if (ret4 == 0) {
-          theta4 = _theta4;
+          theta4 = s4 == 1.0 ? _theta4 : _theta4_alt;
         }
 
+        // Wheels move only when all SteeringMotors are in position
         if (ret1 == 0 && ret2 == 0 && ret3 == 0 && ret4 == 0) {
 
-          v5 = sqrt(pow(vy - vw * cos(PI / 4), 2.0) + pow(vx - vw * sin(PI / 4), 2.0));
-          v6 = sqrt(pow(vy - vw * cos(PI / 4), 2.0) + pow(vx + vw * sin(PI / 4), 2.0));
-          v7 = sqrt(pow(vy + vw * cos(PI / 4), 2.0) + pow(vx + vw * sin(PI / 4), 2.0));
-          v8 = sqrt(pow(vy + vw * cos(PI / 4), 2.0) + pow(vx - vw * sin(PI / 4), 2.0));
+          v5 = s1 * sqrt(pow(vy - vw * cos(PI / 4), 2.0) + pow(vx - vw * sin(PI / 4), 2.0));
+          v6 = s2 * sqrt(pow(vy - vw * cos(PI / 4), 2.0) + pow(vx + vw * sin(PI / 4), 2.0));
+          v7 = s3 * sqrt(pow(vy + vw * cos(PI / 4), 2.0) + pow(vx + vw * sin(PI / 4), 2.0));
+          v8 = s4 * sqrt(pow(vy + vw * cos(PI / 4), 2.0) + pow(vx - vw * sin(PI / 4), 2.0));
 
         }
       }
@@ -298,10 +342,10 @@ void RM_RTOS_Default_Task(const void* args) {
 
     chassis->SteerCalcOutput();
 
-    motor5->SetOutput(pid5.ComputeConstrainedOutput(motor5->GetOmegaDelta(v5 * 60)));
-    motor6->SetOutput(pid6.ComputeConstrainedOutput(motor6->GetOmegaDelta(v6 * 60)));
-    motor7->SetOutput(pid7.ComputeConstrainedOutput(motor7->GetOmegaDelta(v7 * 60)));
-    motor8->SetOutput(pid8.ComputeConstrainedOutput(motor8->GetOmegaDelta(v8 * 60)));
+    motor5->SetOutput(pid5.ComputeConstrainedOutput(motor5->GetOmegaDelta(v5 * WHEEL_SPEED)));
+    motor6->SetOutput(pid6.ComputeConstrainedOutput(motor6->GetOmegaDelta(v6 * WHEEL_SPEED)));
+    motor7->SetOutput(pid7.ComputeConstrainedOutput(motor7->GetOmegaDelta(v7 * WHEEL_SPEED)));
+    motor8->SetOutput(pid8.ComputeConstrainedOutput(motor8->GetOmegaDelta(v8 * WHEEL_SPEED)));
 
     control::MotorCANBase::TransmitOutput(steer_motors, 4);
     control::MotorCANBase::TransmitOutput(wheel_motors, 4);
