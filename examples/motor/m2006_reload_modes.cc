@@ -20,6 +20,13 @@
 
 // #define WITH_CONTROLLER
 
+/* Example for three modes of reloading controlled by dbus.
+ * dbus->swr == MID: Stationary state, Dial doesn't move
+ * dbus->swr == UP: Fast continue shooting mode, Dial runs fast to supply the bullets
+ * dbus->swr == DOWN(less than 0.5s, then switch back to MID): Double shooting mode, Dial runs pi/2 to supply 2 bullets at once.
+ * dbus->swr == DOWN(more than 0.5s): Slowly continue shooting mode, Dial runs slowly to supply the bullets
+ */
+
 #include "bsp_gpio.h"
 #include "bsp_os.h"
 #include "bsp_print.h"
@@ -35,14 +42,17 @@
 #define KEY_GPIO_PIN GPIO_PIN_2
 
 #define NOTCH (2 * PI / 8)
-#define LOAD_ANGLE (2 * PI / 8)
+#define LOAD_ANGLE_CONTINUE (2 * PI / 8)
+#define LOAD_ANGLE_DOUBLE (2 * PI / 4)
 #define SPEED (6 * PI)
-#define ACCELERATION (200 * PI)
+#define ACCELERATION_DOUBLE (100 * PI)
+#define ACCELERATION_CONTINUE (200 * PI)
+#define ACCELERATION_CONTINUE_SLOWLY (20 * PI)
+#define DELAY (5e5)
 
 bsp::CAN* can1 = nullptr;
 control::MotorCANBase* motor = nullptr;
 control::ServoMotor* servo = nullptr;
-BoolEdgeDetector key_detector(false);
 
 remote::DBUS* dbus = nullptr;
 
@@ -69,14 +79,14 @@ void RM_RTOS_Init() {
   control::servo_t servo_data;
   servo_data.motor = motor;
   servo_data.max_speed = SPEED;
-  servo_data.max_acceleration = ACCELERATION;
+  servo_data.max_acceleration = ACCELERATION_DOUBLE;
   servo_data.transmission_ratio = M2006P36_RATIO;
   servo_data.omega_pid_param = new float[3]{150, 4, 0};
   servo_data.max_iout = 2000;
   servo_data.max_out = 10000;
   servo = new control::ServoMotor(servo_data);
-  servo->RegisterJamCallback(jam_callback, 0.305);
 
+  servo->RegisterJamCallback(jam_callback, 0.304);
   dbus = new remote::DBUS(&huart1);
 }
 
@@ -84,14 +94,31 @@ void RM_RTOS_Default_Task(const void* args) {
   UNUSED(args);
 
   control::MotorCANBase* motors[] = {motor};
-  // bsp::GPIO key(KEY_GPIO_GROUP, KEY_GPIO_PIN);
+  uint32_t start_time = 0;
+  int slow_shoot_detect = 0;
 
   while (true) {
     if (dbus->swr == remote::UP) {
-      servo->SetMaxSpeed(0);
-    } else {
-      servo->SetTarget(servo->GetTarget() + LOAD_ANGLE, false);
+      servo->SetTarget(servo->GetTarget() + LOAD_ANGLE_CONTINUE, false);
       servo->SetMaxSpeed(SPEED);
+      servo->SetMaxAcceleration(ACCELERATION_CONTINUE);
+    } else if (dbus->swr == remote::MID){
+      servo->SetMaxSpeed(0);
+      start_time = bsp::GetHighresTickMicroSec();
+      slow_shoot_detect = 0;
+    } else {
+      if (bsp::GetHighresTickMicroSec() - start_time > DELAY) {
+        servo->SetTarget(servo->GetTarget() + LOAD_ANGLE_CONTINUE, false);
+        servo->SetMaxSpeed(SPEED);
+        servo->SetMaxAcceleration(ACCELERATION_CONTINUE_SLOWLY);
+      } else {
+        if (slow_shoot_detect == 0) {
+          slow_shoot_detect = 1;
+          servo->SetTarget(servo->GetTarget() + LOAD_ANGLE_DOUBLE);
+          servo->SetMaxSpeed(SPEED);
+          servo->SetMaxAcceleration(ACCELERATION_DOUBLE);
+        }
+      }
     }
     servo->CalcOutput();
     control::MotorCANBase::TransmitOutput(motors, 1);
