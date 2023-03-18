@@ -30,6 +30,20 @@ MiniPCProtocol::MiniPCProtocol() {
   flag = 0;
 }
 
+void MiniPCProtocol::Send(STMToJetsonData* packet, uint8_t color) {
+  packet->header[0] = 'H';
+  packet->header[1] = 'D';
+  packet->my_color = color;
+
+  const int tail_offset = 3; // size of data minus uint8_t checksum and 2 uint8_t tail
+  packet->crc8_checksum = get_crc8_check_sum((uint8_t*)packet,
+                                              sizeof(STMToJetsonData) - tail_offset,
+                                              0);
+
+  packet->tail[0] = 'E';
+  packet->tail[1] = 'D';
+}
+
 void MiniPCProtocol::Receive(const uint8_t* data, uint8_t length) {
   // Four cases
   // Case 1: everything is fresh with complete package(s)
