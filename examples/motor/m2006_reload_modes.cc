@@ -98,15 +98,11 @@ void RM_RTOS_Default_Task(const void* args) {
   int slow_shoot_detect = 0;
 
   while (true) {
-    if (dbus->swr == remote::UP) {
+    if (dbus->swr == remote::UP || dbus->mouse.r) {
       servo->SetTarget(servo->GetTarget() + LOAD_ANGLE_CONTINUE, false);
       servo->SetMaxSpeed(SPEED);
       servo->SetMaxAcceleration(ACCELERATION_CONTINUE);
-    } else if (dbus->swr == remote::MID){
-      servo->SetMaxSpeed(0);
-      start_time = bsp::GetHighresTickMicroSec();
-      slow_shoot_detect = 0;
-    } else {
+    } else if (dbus->swr == remote::DOWN || dbus->mouse.l){
       if (bsp::GetHighresTickMicroSec() - start_time > DELAY) {
         servo->SetTarget(servo->GetTarget() + LOAD_ANGLE_CONTINUE, false);
         servo->SetMaxSpeed(SPEED);
@@ -119,6 +115,10 @@ void RM_RTOS_Default_Task(const void* args) {
           servo->SetMaxAcceleration(ACCELERATION_DOUBLE);
         }
       }
+    } else {
+      servo->SetMaxSpeed(0);
+      start_time = bsp::GetHighresTickMicroSec();
+      slow_shoot_detect = 0;
     }
     servo->CalcOutput();
     control::MotorCANBase::TransmitOutput(motors, 1);
