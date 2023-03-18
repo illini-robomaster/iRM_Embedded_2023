@@ -63,4 +63,3 @@ irm_add_arm_executable(${PROJECT_NAME}_m2006_antijam
 irm_add_arm_executable(${PROJECT_NAME}_m2006_double_continue_shoot
     TARGET DJI_Board_TypeA
     SOURCES m2006_double_continue_shoot.cc)
-    

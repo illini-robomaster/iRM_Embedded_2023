@@ -20,7 +20,7 @@
 
 // #define WITH_CONTROLLER
 
-/* This is example is for using three kinds of mode of shooting by using the dbus.
+/* Example for three modes of reloading controlled by dbus.
  * dbus->swr == MID: Stationary state, Dial doesn't move
  * dbus->swr == UP: Fast continue shooting mode, Dial runs fast to supply the bullets
  * dbus->swr == DOWN(less than 0.5s, then switch back to MID): Double shooting mode, Dial runs pi/2 to supply 2 bullets at once.
