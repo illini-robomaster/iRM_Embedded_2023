@@ -59,6 +59,27 @@ class SteeringChassis {
   void Update(float power_limit, float chassis_power, float chassis_power_buffer);
 
   /**
+   * @brief set the speed for chassis steer motors
+   *
+   * @param x_speed: chassis speed on x-direction, positive = front
+   * @param y_speed: chassis speed on y-direction, positive = left
+   * @param turn_speed: chassis counterclockwise turning speed
+   */
+  void SetSpeed(const float _vx, const float _vy, const float _vw);
+
+  /**
+   * @brief reset theta to 0
+   * use after ReAlign()
+   */
+  void SteerThetaReset();
+
+  /**
+   * @brief set the speed for chassis wheel motors
+   * Only change values, need to call WheelSetOutput()
+   */
+  void SetWheelSpeed(float v_fl, float v_fr, float v_bl, float v_br);
+
+  /**
    * @brief find the aligned position
    *        If the motors don't have an aligned position, the motors rotate until their detectors return True.
    *        If the motors have one, this function does nothing and return True.
@@ -84,6 +105,14 @@ class SteeringChassis {
   void SteerCalcOutput();
 
   /**
+   * @brief Compute theta for 4 SteerMotors and velocity for 4 Wheel Motors
+   *        When vx, vy, and vw are all 0s, Stay at current position
+   *        Else Steer motors will turn as little as possible to reach the desired configuration
+   * @note  The idea is compute 2 potential position and choose the closer one
+   */
+  void CalcOutput();
+
+  /**
    * @brief Call SetMaxSpeed() for all 4 Steering Motor
    */
   void SteerSetMaxSpeed(const float max_speed);
@@ -94,6 +123,12 @@ class SteeringChassis {
    * It prints current target, current position, and align position
    */
   void PrintData();
+
+  // speed of four wheels
+  float v_fl_;
+  float v_fr_;
+  float v_bl_;
+  float v_br_;
 
  private:
   control::SteeringMotor* fl_steer_motor;
@@ -107,12 +142,25 @@ class SteeringChassis {
   control::MotorCANBase* br_wheel_motor;
 
   // current velocity
-  // right -> positive, left -> negative
+  // left -> positive, right -> negative
   // front -> positive, back -> negative
   // counterclockwise -> positive
   float vx;
   float vy;
   float vw;
+
+  // current angle of 4 steers motors
+  double theta_fl_;
+  double theta_fr_;
+  double theta_bl_;
+  double theta_br_;
+
+  // ret values of TurnRelative(), used to sync steer and wheels
+  // ret_**_ == 0 means the corresponding steer motor is in position so the wheels can turn
+  int ret_fl_;
+  int ret_fr_;
+  int ret_bl_;
+  int ret_br_;
 
   // current steering pos of the 4 wheels
   float theta0;
