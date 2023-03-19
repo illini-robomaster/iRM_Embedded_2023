@@ -67,30 +67,20 @@ SteeringChassis::SteeringChassis(steering_chassis_t* _chassis) {
   br_wheel_motor->SetOutput(0.0);
   // safety lock ends
 
+  // Init private variables starts
   vx = 0.0;
   vy = 0.0;
   vw = 0.0;
-
-  theta0 = 0.0;
-  theta1 = 0.0;
-  theta2 = 0.0;
-  theta3 = 0.0;
 
   v_fl_ = 0.0;
   v_fr_ = 0.0;
   v_bl_ = 0.0;
   v_br_ = 0.0;
 
-  theta_fl_ = 0.0;
-  theta_fr_ = 0.0;
-  theta_bl_ = 0.0;
-  theta_br_ = 0.0;
+  SteerThetaReset();
+  // Init private variables ends
 
-  ret_fl_ = 0;
-  ret_fr_ = 0;
-  ret_bl_ = 0;
-  ret_br_ = 0;
-
+  // TODO change to params
   float* pid_params = new float[3]{40, 3, 0};
   float motor_max_iout = 2000;
   float motor_max_out = 20000;
@@ -120,76 +110,21 @@ void SteeringChassis::SetWSpeed(float _vw) { vw = _vw; }
 
 void SteeringChassis::Update(float _power_limit, float _chassis_power,
                              float _chassis_power_buffer) {
-  //    UNUSED(_power_limit);
-  //    UNUSED(_chassis_power);
-  //    UNUSED(_chassis_power_buffer);
 
-  // Update Steer
-
-  // compute angle for steer motors
-  float effort = sqrt(pow(vx, 2) + pow(vy, 2) + pow(vw, 2));
-
-  float theta0_diff;
-  float theta1_diff;
-  float theta2_diff;
-  float theta3_diff;
-
-  // only if effort > 0.1 update theta difference
-  // otherwise, diff = 0.0
-  if (effort > 0.1) {
-    float theta0_new = -atan2(vy - vw * cos(PI / 4), vx - vw * sin(PI / 4));
-    float theta1_new = -atan2(vy - vw * cos(PI / 4), vx + vw * sin(PI / 4));
-    float theta2_new = -atan2(vy + vw * cos(PI / 4), vx - vw * sin(PI / 4));
-    float theta3_new = -atan2(vy + vw * cos(PI / 4), vx + vw * sin(PI / 4));
-
-    theta0_diff = wrap<float>(theta0_new - theta0, -PI, PI);
-    theta1_diff = wrap<float>(theta1_new - theta1, -PI, PI);
-    theta2_diff = wrap<float>(theta2_new - theta2, -PI, PI);
-    theta3_diff = wrap<float>(theta3_new - theta3, -PI, PI);
-
-    theta0 = wrap<float>(theta0 + theta0_diff, -PI, PI);
-    theta1 = wrap<float>(theta1 + theta1_diff, -PI, PI);
-    theta2 = wrap<float>(theta2 + theta2_diff, -PI, PI);
-    theta3 = wrap<float>(theta3 + theta3_diff, -PI, PI);
-  } else {
-    theta0_diff = 0;
-    theta1_diff = 0;
-    theta2_diff = 0;
-    theta3_diff = 0;
-  }
-
-  fl_steer_motor->TurnRelative(theta0_diff);
-  fr_steer_motor->TurnRelative(theta1_diff);
-  bl_steer_motor->TurnRelative(theta2_diff);
-  br_steer_motor->TurnRelative(theta3_diff);
-
-  fl_steer_motor->CalcOutput();
-  fr_steer_motor->CalcOutput();
-  bl_steer_motor->CalcOutput();
-  br_steer_motor->CalcOutput();
-
-  // compute speed for wheel motors
-  float v0 = sqrt(pow(vy + vw * cos(PI / 4), 2.0) + pow(vx - vw * sin(PI / 4), 2.0));
-  float v1 = sqrt(pow(vy + vw * cos(PI / 4), 2.0) + pow(vx + vw * sin(PI / 4), 2.0));
-  float v2 = sqrt(pow(vy - vw * cos(PI / 4), 2.0) + pow(vx - vw * sin(PI / 4), 2.0));
-  float v3 = sqrt(pow(vy - vw * cos(PI / 4), 2.0) + pow(vx + vw * sin(PI / 4), 2.0));
-
-  // 16 is a arbitrary factor
-  v0 = v0 * WHEEL_SPEED_FACTOR;
-  v1 = v1 * WHEEL_SPEED_FACTOR;
-  v2 = v2 * WHEEL_SPEED_FACTOR;
-  v3 = v3 * WHEEL_SPEED_FACTOR;
+  constexpr float WHEEL_SPEED_FACTOR = 16;
+  SteerUpdateTarget();
+  WheelUpdateSpeed(WHEEL_SPEED_FACTOR);
 
   // Update Wheels
   float PID_output[MOTOR_NUM];
+  float output[MOTOR_NUM];
 
   // compute PID output
-  PID_output[0] = pids[0].ComputeOutput(fl_wheel_motor->GetOmegaDelta(v0));
-  PID_output[1] = pids[1].ComputeOutput(fr_wheel_motor->GetOmegaDelta(v1));
-  PID_output[2] = pids[2].ComputeOutput(bl_wheel_motor->GetOmegaDelta(v2));
-  PID_output[3] = pids[3].ComputeOutput(br_wheel_motor->GetOmegaDelta(v3));
+  PID_output[0] = pids[0].ComputeOutput(fl_wheel_motor->GetOmegaDelta(v_fl_));
+  PID_output[1] = pids[1].ComputeOutput(fr_wheel_motor->GetOmegaDelta(v_fr_));
+  PID_output[2] = pids[2].ComputeOutput(bl_wheel_motor->GetOmegaDelta(v_bl_));
+  PID_output[3] = pids[3].ComputeOutput(br_wheel_motor->GetOmegaDelta(v_br_));
 
-  float output[MOTOR_NUM];
   // compute power limit
   power_limit_info.power_limit = _power_limit;
   power_limit_info.WARNING_power = _power_limit * 0.9;
@@ -222,6 +157,11 @@ void SteeringChassis::SteerThetaReset() {
   ret_fr_ = 0;
   ret_bl_ = 0;
   ret_br_ = 0;
+
+  wheel_dir_fl_ = 1.0;
+  wheel_dir_fr_ = 1.0;
+  wheel_dir_bl_ = 1.0;
+  wheel_dir_br_ = 1.0;
 }
 
 void SteeringChassis::SetWheelSpeed(float _v_fl, float _v_fr, float _v_bl, float _v_br) {
@@ -258,15 +198,13 @@ void SteeringChassis::SteerCalcOutput() {
   br_steer_motor->CalcOutput();
 }
 
-void SteeringChassis::CalcOutput() {
+void SteeringChassis::SteerUpdateTarget() {
   // Stay at current position when no command is given
   if (vx == 0 && vy == 0 && vw == 0) {
     ret_fl_ = fl_steer_motor->TurnRelative(0);
     ret_fr_ = fr_steer_motor->TurnRelative(0);
     ret_bl_ = bl_steer_motor->TurnRelative(0);
     ret_br_ = br_steer_motor->TurnRelative(0);
-
-    SetWheelSpeed(0,0,0,0);
 
   } else {
     // Compute 2 position proposals, theta and theta + PI.
@@ -280,68 +218,76 @@ void SteeringChassis::CalcOutput() {
     double _theta_bl_alt = wrap<double>(_theta_bl + PI, -PI, PI);
     double _theta_br_alt = wrap<double>(_theta_br + PI, -PI, PI);
 
-    float wheel_dir_fl = 1.0;
-    float wheel_dir_fr = 1.0;
-    float wheel_dir_bl = 1.0;
-    float wheel_dir_br = 1.0;
+    wheel_dir_fl_ = 1.0;
+    wheel_dir_fr_ = 1.0;
+    wheel_dir_bl_ = 1.0;
+    wheel_dir_br_ = 1.0;
 
     // Go to the closer proposal and change wheel direction accordingly
     if (abs(wrap<double>(_theta_bl - theta_bl_, -PI, PI)) <
         abs(wrap<double>(_theta_bl_alt - theta_bl_, -PI, PI))) {
-      wheel_dir_bl = 1.0;
+      wheel_dir_bl_ = 1.0;
       ret_bl_ = bl_steer_motor->TurnRelative(wrap<double>(_theta_bl - theta_bl_, -PI, PI));
     } else {
-      wheel_dir_bl = -1.0;
+      wheel_dir_bl_ = -1.0;
       ret_bl_ = bl_steer_motor->TurnRelative(wrap<double>(_theta_bl_alt - theta_bl_, -PI, PI));
     }
     if (abs(wrap<double>(_theta_br - theta_br_, -PI, PI)) <
         abs(wrap<double>(_theta_br_alt - theta_br_, -PI, PI))) {
-      wheel_dir_br = 1.0;
+      wheel_dir_br_ = 1.0;
       ret_br_ = br_steer_motor->TurnRelative(wrap<double>(_theta_br - theta_br_, -PI, PI));
     } else {
-      wheel_dir_br = -1.0;
+      wheel_dir_br_ = -1.0;
       ret_br_ = br_steer_motor->TurnRelative(wrap<double>(_theta_br_alt - theta_br_, -PI, PI));
     }
     if (abs(wrap<double>(_theta_fr - theta_fr_, -PI, PI)) <
         abs(wrap<double>(_theta_fr_alt - theta_fr_, -PI, PI))) {
-      wheel_dir_fr = 1.0;
+      wheel_dir_fr_ = 1.0;
       ret_fr_ = fr_steer_motor->TurnRelative(wrap<double>(_theta_fr - theta_fr_, -PI, PI));
     } else {
-      wheel_dir_fr = -1.0;
+      wheel_dir_fr_ = -1.0;
       ret_fr_ = fr_steer_motor->TurnRelative(wrap<double>(_theta_fr_alt - theta_fr_, -PI, PI));
     }
     if (abs(wrap<double>(_theta_fl - theta_fl_, -PI, PI)) <
         abs(wrap<double>(_theta_fl_alt - theta_fl_, -PI, PI))) {
-      wheel_dir_fl = 1.0;
+      wheel_dir_fl_ = 1.0;
       ret_fl_ = fl_steer_motor->TurnRelative(wrap<double>(_theta_fl - theta_fl_, -PI, PI));
     } else {
-      wheel_dir_fl = -1.0;
+      wheel_dir_fl_ = -1.0;
       ret_fl_ = fl_steer_motor->TurnRelative(wrap<double>(_theta_fl_alt - theta_fl_, -PI, PI));
     }
 
     // Update theta when TurnRelative complete
     if (ret_bl_ == 0) {
-      theta_bl_ = wheel_dir_bl == 1.0 ? _theta_bl : _theta_bl_alt;
+      theta_bl_ = wheel_dir_bl_ == 1.0 ? _theta_bl : _theta_bl_alt;
     }
     if (ret_br_ == 0) {
-      theta_br_ = wheel_dir_br == 1.0 ? _theta_br : _theta_br_alt;
+      theta_br_ = wheel_dir_br_ == 1.0 ? _theta_br : _theta_br_alt;
     }
     if (ret_fr_ == 0) {
-      theta_fr_ = wheel_dir_fr == 1.0 ? _theta_fr : _theta_fr_alt;
+      theta_fr_ = wheel_dir_fr_ == 1.0 ? _theta_fr : _theta_fr_alt;
     }
     if (ret_fl_ == 0) {
-      theta_fl_ = wheel_dir_fl == 1.0 ? _theta_fl : _theta_fl_alt;
+      theta_fl_ = wheel_dir_fl_ == 1.0 ? _theta_fl : _theta_fl_alt;
     }
+  }
+}
 
+void SteeringChassis::WheelUpdateSpeed(float wheel_speed_factor) {
+  // Stay at current position when no command is given
+  if (vx == 0 && vy == 0 && vw == 0) {
+    SetWheelSpeed(0,0,0,0);
+  } else if (ret_bl_ == 0 && ret_br_ == 0 && ret_fr_ == 0 && ret_fl_ == 0) {
     // Wheels move only when all SteeringMotors are in position
-    if (ret_bl_ == 0 && ret_br_ == 0 && ret_fr_ == 0 && ret_fl_ == 0) {
-      SetWheelSpeed(
-        wheel_dir_fl * sqrt(pow(vy + vw * cos(PI / 4), 2.0) + pow(vx - vw * sin(PI / 4), 2.0)),
-        wheel_dir_fr * sqrt(pow(vy + vw * cos(PI / 4), 2.0) + pow(vx + vw * sin(PI / 4), 2.0)),
-        wheel_dir_bl * sqrt(pow(vy - vw * cos(PI / 4), 2.0) + pow(vx - vw * sin(PI / 4), 2.0)),
-        wheel_dir_br * sqrt(pow(vy - vw * cos(PI / 4), 2.0) + pow(vx + vw * sin(PI / 4), 2.0))
-      );
-    }
+    v_fl_ = wheel_dir_fl_ * sqrt(pow(vy + vw * cos(PI / 4), 2.0) + pow(vx - vw * sin(PI / 4), 2.0));
+    v_fr_ = wheel_dir_fr_ * sqrt(pow(vy + vw * cos(PI / 4), 2.0) + pow(vx + vw * sin(PI / 4), 2.0));
+    v_bl_ = wheel_dir_bl_ * sqrt(pow(vy - vw * cos(PI / 4), 2.0) + pow(vx - vw * sin(PI / 4), 2.0));
+    v_br_ = wheel_dir_br_ * sqrt(pow(vy - vw * cos(PI / 4), 2.0) + pow(vx + vw * sin(PI / 4), 2.0));
+
+    v_fl_ = v_fl_ * wheel_speed_factor;
+    v_fr_ = v_fr_ * wheel_speed_factor;
+    v_bl_ = v_bl_ * wheel_speed_factor;
+    v_br_ = v_br_ * wheel_speed_factor;
   }
 }
 

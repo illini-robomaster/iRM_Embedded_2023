@@ -218,7 +218,8 @@ void RM_RTOS_Default_Task(const void* args) {
       chassis->SetWheelSpeed(0,0,0,0);
     } else {
       chassis->SetSpeed(vx, vy, vw);
-      chassis->CalcOutput();
+      chassis->SteerUpdateTarget();
+      chassis->WheelUpdateSpeed(WHEEL_SPEED);
       v5 = chassis->v_bl_;
       v6 = chassis->v_br_;
       v7 = chassis->v_fr_;
@@ -227,10 +228,10 @@ void RM_RTOS_Default_Task(const void* args) {
 
     chassis->SteerCalcOutput();
 
-    motor5->SetOutput(pid5.ComputeConstrainedOutput(motor5->GetOmegaDelta(v5 * WHEEL_SPEED)));
-    motor6->SetOutput(pid6.ComputeConstrainedOutput(motor6->GetOmegaDelta(v6 * WHEEL_SPEED)));
-    motor7->SetOutput(pid7.ComputeConstrainedOutput(motor7->GetOmegaDelta(v7 * WHEEL_SPEED)));
-    motor8->SetOutput(pid8.ComputeConstrainedOutput(motor8->GetOmegaDelta(v8 * WHEEL_SPEED)));
+    motor5->SetOutput(pid5.ComputeConstrainedOutput(motor5->GetOmegaDelta(v5)));
+    motor6->SetOutput(pid6.ComputeConstrainedOutput(motor6->GetOmegaDelta(v6)));
+    motor7->SetOutput(pid7.ComputeConstrainedOutput(motor7->GetOmegaDelta(v7)));
+    motor8->SetOutput(pid8.ComputeConstrainedOutput(motor8->GetOmegaDelta(v8)));
 
     control::MotorCANBase::TransmitOutput(steer_motors, 4);
     control::MotorCANBase::TransmitOutput(wheel_motors, 4);
