@@ -499,7 +499,7 @@ int SteeringMotor::ReAlign() {
   ret = TurnRelative(0, true) || ret;
 
   // if calibration complete, go to recorded align_angle
-  ret = TurnRelative(wrap<float>(align_angle_ - GetTheta(relative_mode), -PI, PI)) || ret;
+  ret = TurnRelative(align_angle_ - GetTheta(relative_mode)) || ret;
   return ret;
 }
 
@@ -511,7 +511,7 @@ bool SteeringMotor::Calibrate() {
     // if calibration sensor returns True, move for calibration offset and stop.
     current_target_ = GetTheta(absolute_mode);
     // mark alignment as complete and keep align_angle for next alignment
-    align_angle_ = GetTheta(relative_mode) + calibrate_offset_;
+    align_angle_ = wrap<float>(GetTheta(relative_mode) + calibrate_offset_, 0, 2 * PI);
     align_complete_ = true;
 
     return true;
