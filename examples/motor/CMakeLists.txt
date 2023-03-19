@@ -61,5 +61,5 @@ irm_add_arm_executable(${PROJECT_NAME}_m2006_antijam
     SOURCES m2006_antijam.cc)
 
 irm_add_arm_executable(${PROJECT_NAME}_m2006_reload_modes
-    TARGET DJI_Board_TypeA
+    TARGET DJI_Board_TypeC
     SOURCES m2006_reload_modes.cc)
