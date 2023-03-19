@@ -29,16 +29,16 @@ control::Motor4310* motor = nullptr;
 remote::DBUS* dbus = nullptr;
 
 void RM_RTOS_Init() {
-  print_use_uart(&huart8);
+//  print_use_uart(&huart8);
   can = new bsp::CAN(&hcan1, 0x01, true);
   motor = new control::Motor4310(can, 0x02, 0x01, 2);
-  dbus = new remote::DBUS(&huart1);
+  dbus = new remote::DBUS(&huart3);
 }
 
 void RM_RTOS_Default_Task(const void* args) {
   // need to press reset to begin
   UNUSED(args);
-  //  motor->SetZeroPos4310(motor);
+  motor->SetZeroPos4310(motor);
   motor->Initialize4310(motor);
 
   while (true) {
