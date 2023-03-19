@@ -354,6 +354,8 @@ class ServoMotor {
    */
   servo_status_t SetTarget(const float target, bool override = false);
 
+  void ResetTheta();
+
   /**
    * @brief set turning speed of motor when moving
    *

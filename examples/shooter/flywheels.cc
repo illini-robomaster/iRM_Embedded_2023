@@ -1,6 +1,6 @@
 /****************************************************************************
  *                                                                          *
- *  Copyright (C) 2022 RoboMaster.                                          *
+ *  Copyright (C) 2023 RoboMaster.                                          *
  *  Illini RoboMaster @ University of Illinois at Urbana-Champaign          *
  *                                                                          *
  *  This program is free software: you can redistribute it and/or modify    *
@@ -18,61 +18,56 @@
  *                                                                          *
  ****************************************************************************/
 
-#include "main.h"
-
 #include "bsp_print.h"
-#include "chassis.h"
 #include "cmsis_os.h"
+#include "controller.h"
+#include "main.h"
+#include "motor.h"
 #include "dbus.h"
 
-bsp::CAN* can = nullptr;
-control::MotorCANBase* fl_motor = nullptr;
-control::MotorCANBase* fr_motor = nullptr;
-control::MotorCANBase* bl_motor = nullptr;
-control::MotorCANBase* br_motor = nullptr;
+#define TARGET_SPEED 30
 
-control::Chassis* chassis = nullptr;
-remote::DBUS* dbus = nullptr;
+bsp::CAN* can = nullptr;
+control::MotorCANBase* left = nullptr;
+control::MotorCANBase* right = nullptr;
+static remote::DBUS* dbus;
 
 void RM_RTOS_Init() {
-  // print_use_uart(&huart8)
-  can = new bsp::CAN(&hcan1, 0x201, true);
-  fl_motor = new control::Motor3508(can, 0x201);
-  fr_motor = new control::Motor3508(can, 0x202);
-  bl_motor = new control::Motor3508(can, 0x203);
-  br_motor = new control::Motor3508(can, 0x204);
-
-  control::MotorCANBase* motors[control::FourWheel::motor_num];
-  motors[control::FourWheel::front_left] = fl_motor;
-  motors[control::FourWheel::front_right] = fr_motor;
-  motors[control::FourWheel::back_left] = bl_motor;
-  motors[control::FourWheel::back_right] = br_motor;
-
-  control::chassis_t chassis_data;
-  chassis_data.motors = motors;
-  chassis_data.model = control::CHASSIS_MECANUM_WHEEL;
-  chassis = new control::Chassis(chassis_data);
-
+//  print_use_uart(&huart1);
   dbus = new remote::DBUS(&huart1);
+  can = new bsp::CAN(&hcan1, 0x201, true);
+  right = new control::Motor3508(can, 0x201);
+  left = new control::Motor3508(can, 0x202);
 }
 
 void RM_RTOS_Default_Task(const void* args) {
   UNUSED(args);
 
-  osDelay(500);  // DBUS initialization needs time
-
-  control::MotorCANBase* motors[] = {fl_motor, fr_motor, bl_motor, br_motor};
+  control::MotorCANBase* motors[] = {right, left};
+  control::PIDController pid1(75, 15, 30);
+  control::PIDController pid2(75, 15, 30);
 
   while (true) {
-    chassis->SetSpeed(dbus->ch0, dbus->ch1, dbus->ch2);
-
-    // Kill switch
-    if (dbus->swr == remote::UP || dbus->swr == remote::DOWN) {
-      RM_ASSERT_TRUE(false, "Operation killed");
+    if (dbus->swr == remote::UP){
+      float diff1 = right->GetOmegaDelta(500);
+      float diff2 = left->GetOmegaDelta(-500);
+      int16_t out1 = pid1.ComputeConstrainedOutput(diff1);
+      int16_t out2 = pid2.ComputeConstrainedOutput(diff2);
+      right->SetOutput(out1);
+      left->SetOutput(out2);
+      control::MotorCANBase::TransmitOutput(motors, 2);
+      osDelay(10);
+    }
+    else if (dbus->swr == remote::DOWN){
+      float diff1 = right->GetOmegaDelta(0);
+      float diff2 = left->GetOmegaDelta(0);
+      int16_t out1 = pid1.ComputeConstrainedOutput(diff1);
+      int16_t out2 = pid2.ComputeConstrainedOutput(diff2);
+      right->SetOutput(out1);
+      left->SetOutput(out2);
+      control::MotorCANBase::TransmitOutput(motors, 2);
+      osDelay(10);
     }
 
-    chassis->Update(false, 30, 20, 60);
-    control::MotorCANBase::TransmitOutput(motors, 4);
-    osDelay(10);
   }
 }
