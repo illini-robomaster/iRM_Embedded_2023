@@ -46,8 +46,8 @@ static const int KILLALL_DELAY = 100;
 static const int DEFAULT_TASK_DELAY = 100;
 static const int CHASSIS_TASK_DELAY = 2;
 
-constexpr float RUN_SPEED = (10 * PI) / 32;
-// constexpr float ALIGN_SPEED = (PI);
+constexpr float RUN_SPEED = (4 * PI);
+constexpr float ALIGN_SPEED = (PI);
 constexpr float ACCELERATION = (100 * PI);
 
 //==================================================================================================
@@ -145,12 +145,33 @@ void chassisTask(void* arg) {
   control::MotorCANBase* steer_motors[] = {motor1, motor2, motor3, motor4};
   control::MotorCANBase* wheel_motors[] = {motor5, motor6, motor7, motor8};
 
+  control::PIDController pid5(120, 15, 30);
+  control::PIDController pid6(120, 15, 30);
+  control::PIDController pid7(120, 15, 30);
+  control::PIDController pid8(120, 15, 30);
+
   float spin_speed = 10;
   float follow_speed = 10;
 
   while (!receive->start) osDelay(100);
 
   while (receive->start < 0.5) osDelay(100);
+
+  // Alignment
+  chassis->SteerSetMaxSpeed(ALIGN_SPEED);
+  bool alignment_complete = false;
+  while (!alignment_complete) {
+    chassis->SteerCalcOutput();
+    control::MotorCANBase::TransmitOutput(steer_motors, 4);
+    alignment_complete = chassis->Calibrate();
+    osDelay(1);
+  }
+  chassis->ReAlign();
+  chassis->SteerCalcOutput();
+  chassis->SteerSetMaxSpeed(RUN_SPEED);
+  chassis->SteerThetaReset();
+  chassis->SetWheelSpeed(0,0,0,0);
+
 
   while (true) {
     float relative_angle = receive->relative_angle;
@@ -175,14 +196,20 @@ void chassisTask(void* arg) {
       if (-CHASSIS_DEADZONE < relative_angle && relative_angle < CHASSIS_DEADZONE) wz_set = 0;
     }
 
-    chassis->SetYSpeed(-vx_set / 10);
-    chassis->SetXSpeed(-vy_set / 10);
-    chassis->SetWSpeed(wz_set);
-    chassis->Update((float)referee->game_robot_status.chassis_power_limit,
-                    referee->power_heat_data.chassis_power,
-                    (float)referee->power_heat_data.chassis_power_buffer);
+    chassis->SetSpeed(vx_set / 10, vy_set / 10, wz_set * 10);
+    chassis->SteerUpdateTarget();
+    constexpr float WHEEL_SPEED_FACTOR = 4;
+    chassis->WheelUpdateSpeed(WHEEL_SPEED_FACTOR);
+
+    chassis->SteerCalcOutput();
+
+    motor5->SetOutput(pid5.ComputeConstrainedOutput(motor5->GetOmegaDelta(chassis->v_bl_)));
+    motor6->SetOutput(pid6.ComputeConstrainedOutput(motor6->GetOmegaDelta(chassis->v_br_)));
+    motor7->SetOutput(pid7.ComputeConstrainedOutput(motor7->GetOmegaDelta(chassis->v_fr_)));
+    motor8->SetOutput(pid8.ComputeConstrainedOutput(motor8->GetOmegaDelta(chassis->v_fl_)));
 
     if (Dead) {
+      chassis->SetSpeed(0,0,0);
       motor5->SetOutput(0);
       motor6->SetOutput(0);
       motor7->SetOutput(0);
