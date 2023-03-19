@@ -675,8 +675,8 @@ class Motor4310 : public MotorCANBase {
   volatile int16_t raw_pos_ = 0;  // actual position
   volatile int16_t raw_vel_ = 0;  // actual velocity
   volatile int16_t raw_torque_ = 0; // actual torque
-  volatile int16_t raw_rotorTemp = 0; // motor temp
-
+  volatile int16_t raw_rotorTemp_ = 0; // motor temp
+  volatile int16_t raw_mosTemp_ = 0; // MOS temp
 };
 
 

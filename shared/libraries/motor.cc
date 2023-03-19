@@ -638,7 +638,13 @@ void Motor4310::TransmitOutput4310(Motor4310* motor) {
 
 void Motor4310::UpdateData(const uint8_t data[]) {
   // TODO
-  UNUSED(data);
+
+  raw_pos_ = data[1]<<8 | data[2];
+  raw_vel_ = data[3]<<4 | data[4]>>4;
+  raw_torque_ = data[4] - ((data[4]>>4)<<4);
+  raw_torque_ = raw_torque_<<8 | data[5];
+  raw_mosTemp_ = data[6];
+  raw_rotorTemp_ = data[7];
 
 }
 
@@ -646,7 +652,7 @@ void Motor4310::PrintData() const {
   print("Position: % .4f ", raw_pos_);
   print("Velocity: % .4f ", raw_vel_);
   print("Torque: % .4f ", raw_torque_);
-  print("Rotor temp: % .4f \r\n", raw_rotorTemp);
+  print("Rotor temp: % .4f \r\n", raw_rotorTemp_);
 }
 
 int16_t Motor4310::float_to_uint(float x, float x_min, float x_max, int bits) {
