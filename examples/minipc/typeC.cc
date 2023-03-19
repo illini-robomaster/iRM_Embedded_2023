@@ -73,9 +73,6 @@ void RM_RTOS_Default_Task(const void* argument) {
       length = uart->Read(&data);
       total_processed_bytes += length;
 
-      // if read anything, flash red
-      led->Display(0xFFFF0000);
-
       miniPCreceiver.Receive(data, length);
       uint32_t valid_packet_cnt = miniPCreceiver.get_valid_packet_cnt();
 
@@ -97,10 +94,12 @@ void RM_RTOS_Default_Task(const void* argument) {
           }
           miniPCreceiver.Send(&packet_to_send, my_color);
           uart->Write((uint8_t*)&packet_to_send, sizeof(communication::STMToJetsonData));
+          osDelay(1);
         }
       }
       // blue when nothing is received
       led->Display(0xFF0000FF);
     }
+    osDelay(1);
   }
 }
