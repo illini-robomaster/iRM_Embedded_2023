@@ -30,8 +30,8 @@
 #define NOTCH (2 * PI / 8)
 #define SERVO_SPEED (PI)
 
-#define KEY_GPIO_GROUP GPIOB
-#define KEY_GPIO_PIN GPIO_PIN_2
+#define KEY_GPIO_GROUP GPIOA
+#define KEY_GPIO_PIN GPIO_PIN_0
 
 bsp::CAN* can1 = nullptr;
 bsp::CAN* can2 = nullptr;
@@ -46,7 +46,7 @@ remote::DBUS* dbus = nullptr;
 bool status = false;
 
 void RM_RTOS_Init() {
-  print_use_uart(&huart8);
+  print_use_uart(&huart1);
   can1 = new bsp::CAN(&hcan1, 0x205, true);
   pitch_motor = new control::Motor6020(can1, 0x205);
   yaw_motor = new control::Motor6020(can1, 0x206);
@@ -55,7 +55,7 @@ void RM_RTOS_Init() {
   gimbal_init_data.model = control::GIMBAL_SENTRY;
   gimbal = new control::Gimbal(gimbal_init_data);
 
-  dbus = new remote::DBUS(&huart1);
+  dbus = new remote::DBUS(&huart3);
   key = new bsp::GPIO(KEY_GPIO_GROUP, KEY_GPIO_PIN);
 }
 
@@ -75,21 +75,18 @@ void RM_RTOS_Default_Task(const void* args) {
   float yaw_ratio = 0.0;
 
   int i = 0;
+  UNUSED(gimbal_data);
 
   while (true) {
     pitch_ratio = dbus->ch3 / 600.0;
     yaw_ratio = -dbus->ch2 / 600.0;
-    if (dbus->swr == remote::UP) {
-      gimbal->TargetAbs(pitch_ratio * gimbal_data->pitch_max_, yaw_ratio * gimbal_data->yaw_max_);
-    } else if (dbus->swr == remote::MID) {
+    if (dbus->swr == remote::MID) {
       gimbal->TargetRel(pitch_ratio / 30, yaw_ratio / 30);
     }
 
     i += 1;
     if (i >= 100) {
       print("p = %10.4f, y = %10.4f\r\n", pitch_ratio, yaw_ratio);
-      pitch_motor->PrintData();
-      yaw_motor->PrintData();
       i = 0;
     }
 
