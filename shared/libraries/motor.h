@@ -354,6 +354,8 @@ class ServoMotor {
    */
   servo_status_t SetTarget(const float target, bool override = false);
 
+  void ResetTheta();
+
   /**
    * @brief set turning speed of motor when moving
    *
@@ -497,6 +499,7 @@ class ServoMotor {
   BoolEdgeDetector* jam_detector_;  /* detect motor jam toggling, call jam callback accordingly */
 };
 
+
 // function pointer for the calibration function of the steering motor, return True when calibrated
 typedef bool (*align_detect_t)(void);
 
@@ -505,14 +508,13 @@ typedef bool (*align_detect_t)(void);
  */
 typedef struct {
   MotorCANBase* motor;              /* motor instance to be wrapped as a servomotor       */
-  float run_speed;                  /* normal turning speed of motor shaft, in [rad/s]    */
-  float test_speed;                 /* speed of motor shaft during alignment [rad/s]      */
+  float max_speed;                  /* max turning speed of motor shaft, in [rad/s]       */
   float max_acceleration;           /* desired acceleration of motor shaft, in [rad/s^2]  */
   float transmission_ratio;         /* transmission ratio of motor                        */
   float* omega_pid_param;           /* pid parameter used to control speed of motor       */
   float max_iout;
   float max_out;
-  align_detect_t align_detect_func; /* function pointer for calibration function          */
+  align_detect_t align_detect_func = nullptr; /* function pointer for calibration function*/
   float calibrate_offset = 0.0;     /* angle from calibration sensor to starting location */
 } steering_t;
 
@@ -542,12 +544,34 @@ class SteeringMotor {
   int TurnRelative(float angle, bool override = false);
 
   /**
-   * @brief Align the motor to its calibration position
-   *        If the motor doesn't have a alignment position, it tries to find one.
-   *        If the motor has one, it turns to it.
-   * @return True when the motor has a calibration position
+   * @brief Turn the motor to the aligned position
+   *        Do nothing if the motor doesn't have an aligned position
+   * @return 2 if the motor doesn't have an aligned position
+   *         1 if the motor has one but failed to reach it
+   *         0 if success
    */
-  bool AlignUpdate();
+  int ReAlign();
+
+  /**
+   * @brief find the aligned position
+   *        If the motor doesn't have an aligned position, the motor keeps rotating until the detector returns True.
+   *        If the motor has one, the motor does nothing and return True.
+   * @note  Calibrate() only find the aligned position, it doesn't guarantee the motor ends in the aligned position or stops
+   *
+   *
+   * @return True when the motor has a aligned position
+   */
+  bool Calibrate();
+
+  /**
+   * @brief set turning speed of motor when moving
+   *        Call ServoMotor::SetMaxSpeed()
+   *
+   * @note should always be positive, negative inputs will be ignored
+   *
+   * @param max_speed speed of desired motor shaft turning speed, in [rad/s]
+   */
+  void SetMaxSpeed(const float max_speed);
 
   /**
    * @brief Call Servomotor::CalcOutput()
@@ -565,14 +589,11 @@ class SteeringMotor {
  private:
   ServoMotor* servo_;
 
-  float test_speed_;                /* speed used during alignment (calibration)                                            */
-  float run_speed_;                 /* speed used after alignment                                                           */
-  align_detect_t align_detect_func; /* function pointer for the calibration sensor, see comments for align_detect_t typedef */
+  align_detect_t align_detect_func_;/* function pointer for the calibration sensor, see comments for align_detect_t typedef */
   float calibrate_offset_;          /* difference between calibration sensor and desired starting position                  */
   float current_target_;            /* current absolute position in [rad] to drive the underlying servo motor               */
 
   float align_angle_;               /* store calibration angle                                                              */
-  BoolEdgeDetector* align_detector;
   bool align_complete_;             /* if calibration is previously done, use the align_angle_                              */
 };
 
