@@ -156,6 +156,10 @@ void RM_RTOS_Default_Task(const void* args) {
     // TODO: WANING: this is NOT thread-safe!
     const float rel_pitch_buffer = relative_pitch;
     const float rel_yaw_buffer = relative_yaw;
+
+    // clear after read
+    relative_pitch = 0;
+    relative_yaw = 0;
     // pitch_ratio = dbus->ch3 / 600.0;
     // yaw_ratio = -dbus->ch2 / 600.0;
 
