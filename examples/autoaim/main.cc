@@ -30,6 +30,7 @@
 #include "minipc.h"
 
 /* Define Gimabal-related parameters */
+
 #define NOTCH (2 * PI / 8)
 #define SERVO_SPEED (PI)
 
@@ -76,7 +77,11 @@ class CustomUART : public bsp::UART {
 
 static display::RGB* led = nullptr;
 
-/* Initialize relavant parameters */
+/* Initialize autoaim parameters */
+
+// TODO: this is NOT thread-safe!
+float relative_yaw = 0;
+float relative_pitch = 0;
 
 void RM_RTOS_Init() {
   can1 = new bsp::CAN(&hcan1, 0x205, true);
@@ -108,7 +113,7 @@ void jetsonCommTask(void* arg) {
 
   while (true) {
     /* wait until rx data is available */
-    led->Display(0xFF0000FF);
+    // led->Display(0xFF0000FF);
     uint32_t flags = osThreadFlagsWait(RX_SIGNAL, osFlagsWaitAll, osWaitForever);
     if (flags & RX_SIGNAL) {  // unnecessary check
       /* time the non-blocking rx / tx calls (should be <= 1 osTick) */
@@ -118,31 +123,12 @@ void jetsonCommTask(void* arg) {
       total_processed_bytes += length;
 
       miniPCreceiver.Receive(data, length);
-      uint32_t valid_packet_cnt = miniPCreceiver.get_valid_packet_cnt();
 
-      // Jetson / PC sends 200Hz valid packets for stress testing
-      // For testing script, please see iRM_Vision_2023/Communication/communicator.py
-      // For comm protocol details, please see iRM_Vision_2023/docs/comm_protocol.md
-      if (valid_packet_cnt == 1000) {
-        // Jetson test cases write 1000 packets. Pass
-        led->Display(0xFF00FF00);
-        osDelay(10000);
-        // after 10 seconds, write 1000 alternating packets to Jetson
-        communication::STMToJetsonData packet_to_send;
-        uint8_t my_color = 1; // blue
-        for (int i = 0; i < 1000; ++i) {
-          if (i % 2 == 0) {
-            my_color = 1; // blue
-          } else {
-            my_color = 0; // red
-          }
-          miniPCreceiver.Send(&packet_to_send, my_color);
-          uart->Write((uint8_t*)&packet_to_send, sizeof(communication::STMToJetsonData));
-          osDelay(1);
-        }
+      if (miniPCreceiver.get_valid_flag()) {
+        // there is at least one unprocessed valid packet
+        relative_yaw = miniPCreceiver.get_relative_yaw();
+        relative_pitch = miniPCreceiver.get_relative_pitch();
       }
-      // blue when nothing is received
-      led->Display(0xFF0000FF);
     }
     osDelay(1);
   }
@@ -164,22 +150,24 @@ void RM_RTOS_Default_Task(const void* args) {
   while(!key->Read());
   while(key->Read());
 
-  float pitch_ratio = 0.0;
-  float yaw_ratio = 0.0;
-
   UNUSED(gimbal_data);
 
   while (true) {
-    pitch_ratio = dbus->ch3 / 600.0;
-    yaw_ratio = -dbus->ch2 / 600.0;
-    if (dbus->swr == remote::MID) {
-      gimbal->TargetRel(pitch_ratio / 30, yaw_ratio / 30);
-    }
+    // TODO: WANING: this is NOT thread-safe!
+    const float rel_pitch_buffer = relative_pitch;
+    const float rel_yaw_buffer = relative_yaw;
+    // pitch_ratio = dbus->ch3 / 600.0;
+    // yaw_ratio = -dbus->ch2 / 600.0;
+
+    // TODO: add this option to allow user-select autoaim mode
+    // if (dbus->swr == remote::MID) {
+    gimbal->TargetRel(rel_pitch_buffer, rel_yaw_buffer);
+    // }
 
     // Kill switch
-    if (dbus->swl == remote::UP || dbus->swl == remote::DOWN) {
-      RM_ASSERT_TRUE(false, "Operation killed");
-    }
+    // if (dbus->swl == remote::UP || dbus->swl == remote::DOWN) {
+    //   RM_ASSERT_TRUE(false, "Operation killed");
+    // }
 
     gimbal->Update();
     control::MotorCANBase::TransmitOutput(motors, 2);
