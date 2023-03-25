@@ -54,15 +54,15 @@ BoolEdgeDetector key_detector(false);
 #endif
 
 // #define USING_M3508
-// #define USING_M2006
-#define USING_M3508_STEERING
+ #define USING_M2006
+//#define USING_M3508_STEERING
 
 void RM_RTOS_Init() {
-  print_use_uart(&huart1);
+  print_use_uart(&huart8);
   bsp::SetHighresClockTimer(&htim5);
 
   can1 = new bsp::CAN(&hcan1, 0x201);
-  key = new bsp::GPIO(IN2_GPIO_Port, IN2_Pin);
+//  key = new bsp::GPIO(IN2_GPIO_Port, IN2_Pin);
 
 #ifdef USING_M3508
   motor = new control::Motor3508(can1, 0x201);
@@ -124,9 +124,9 @@ void RM_RTOS_Default_Task(const void* args) {
     target = float(dbus->ch1) / remote::DBUS::ROCKER_MAX * 6 * PI;
     servo->SetTarget(target, true);
 #else
-    key_detector.input(key->Read());
+//    key_detector.input(key->Read());
     constexpr float desired_target = 0.5 * 2 * PI;
-    if (key_detector.posEdge() && servo->SetTarget(desired_target - target) != 0) {
+    if (servo->SetTarget(desired_target - target) != 0) {
       target = desired_target - target;
     }
 #endif
@@ -136,7 +136,7 @@ void RM_RTOS_Default_Task(const void* args) {
     static int i = 0;
     if (i > 10) {
       // print("%10.2f %10.2f %10.2f %10.2f ", dbus->ch0, dbus->ch0, dbus->ch0, dbus->ch0);
-      print("%d ", !key->Read());
+//      print("%d ", !key->Read());
       servo->PrintData();
       i = 0;
     } else {

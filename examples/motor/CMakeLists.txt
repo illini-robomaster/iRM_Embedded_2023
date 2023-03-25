@@ -29,7 +29,7 @@ irm_add_arm_executable(${PROJECT_NAME}_m3508_speed
     SOURCES m3508_speed.cc)
 
 irm_add_arm_executable(${PROJECT_NAME}_m3508_position
-    TARGET DJI_Board_TypeC
+    TARGET DJI_Board_TypeA
     SOURCES m3508_position.cc)
 
 irm_add_arm_executable(${PROJECT_NAME}_m3508_antijam

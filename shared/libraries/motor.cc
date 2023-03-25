@@ -385,14 +385,16 @@ void ServoMotor::RegisterJamCallback(jam_callback_t callback, float effort_thres
 }
 
 void ServoMotor::PrintData() const {
-  print("Svo-align: % 10.6f ", align_angle_);
-  print("Svo-theta: % 10.6f ", GetTheta());
-  print("Svo-omega: % 10.6f ", GetOmega());
-  print("Svo-target: % 10.6f ", target_angle_);
+  clear_screen();
+  set_cursor(0, 0);
+  print("Svo-align: % 10.6f \r\n", align_angle_);
+  print("Svo-theta: % 10.6f \r\n", GetTheta());
+  print("Svo-omega: % 10.6f \r\n", GetOmega());
+  print("Svo-target: % 10.6f \r\n", target_angle_);
   if (hold_)
-    print("Svo-status: holding ");
+    print("Svo-status: holding \r\n");
   else
-    print("Svo-status: moving  ");
+    print("Svo-status: moving  \r\n");
   motor_->PrintData();
 }
 

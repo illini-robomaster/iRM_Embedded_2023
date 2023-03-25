@@ -48,26 +48,14 @@ void RM_RTOS_Default_Task(const void* args) {
   control::PIDController pid2(75, 15, 30);
 
   while (true) {
-    if (dbus->swr == remote::UP){
-      float diff1 = right->GetOmegaDelta(500);
-      float diff2 = left->GetOmegaDelta(-500);
-      int16_t out1 = pid1.ComputeConstrainedOutput(diff1);
-      int16_t out2 = pid2.ComputeConstrainedOutput(diff2);
-      right->SetOutput(out1);
-      left->SetOutput(out2);
-      control::MotorCANBase::TransmitOutput(motors, 2);
-      osDelay(10);
-    }
-    else if (dbus->swr == remote::DOWN){
-      float diff1 = right->GetOmegaDelta(0);
-      float diff2 = left->GetOmegaDelta(0);
-      int16_t out1 = pid1.ComputeConstrainedOutput(diff1);
-      int16_t out2 = pid2.ComputeConstrainedOutput(diff2);
-      right->SetOutput(out1);
-      left->SetOutput(out2);
-      control::MotorCANBase::TransmitOutput(motors, 2);
-      osDelay(10);
-    }
+    float diff1 = right->GetOmegaDelta(500);
+    float diff2 = left->GetOmegaDelta(-500);
+    int16_t out1 = pid1.ComputeConstrainedOutput(diff1);
+    int16_t out2 = pid2.ComputeConstrainedOutput(diff2);
+    right->SetOutput(out1);
+    left->SetOutput(out2);
+    control::MotorCANBase::TransmitOutput(motors, 2);
+    osDelay(10);
 
   }
 }
