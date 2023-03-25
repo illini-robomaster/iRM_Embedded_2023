@@ -348,10 +348,9 @@ void ServoMotor::CalcOutput() {
     detect_total_ += command - detect_buf_[detect_head_];
     detect_buf_[detect_head_] = command;
     detect_head_ = detect_head_ + 1 < detect_period_ ? detect_head_ + 1 : 0;
-
     // detect if motor is jammed
     // detect total is used as filter.
-    if (abs(detect_total_) >= jam_threshold_) {
+    if (detect_total_ >= jam_threshold_) {
       servo_jam_t data;
       data.speed = max_speed_;
       jam_callback_(this, data);

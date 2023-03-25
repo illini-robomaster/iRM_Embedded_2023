@@ -32,8 +32,7 @@ void jam_callback(control::ServoMotor* servo, const control::servo_jam_t data) {
   if (servo_target < servo->GetTheta()) {
     print("Antijam in operation\r\n");
   } else {
-    servo->SetTarget(servo->GetTheta(), true);
-    float prev_target = servo->GetTarget() - (2 * PI/8);
+    float prev_target = servo->GetTheta() - (2 * PI/6);
     servo->SetTarget(prev_target, true);
     print("Antijam engage\r\n");
   }
@@ -89,7 +88,7 @@ Shooter::Shooter(shooter_t shooter) {
   }
   // Initialize servomotor instance using data provided and register default jam callback
   load_servo_ = new control::ServoMotor(servo_data);
-  load_servo_->RegisterJamCallback(jam_callback, 0.6);
+  load_servo_->RegisterJamCallback(jam_callback, 0.304);
 
   // Register in step_angles_ so callback function can find step angle corresponding to
   // specific servomotor instance.
