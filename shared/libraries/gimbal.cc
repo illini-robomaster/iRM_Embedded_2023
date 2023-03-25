@@ -61,14 +61,14 @@ Gimbal::Gimbal(gimbal_t gimbal)
         yaw_theta_max_out = 10;
         yaw_omega_max_iout = 10000;
         yaw_omega_max_out = 30000;
-        pitch_theta_pid_param_ = new float[3]{40, 0, 0};
-        pitch_omega_pid_param_ = new float[3]{2500, 25, 0};
+        pitch_theta_pid_param_ = new float[3]{100, 1, 20};
+        pitch_omega_pid_param_ = new float[3]{2500, 20, 30};
         /* original
         yaw_theta_pid_param_ = new float[3]{26, 0, 0.3};
         yaw_omega_pid_param_ = new float[3]{2160, 12, 0};
         */
-        yaw_theta_pid_param_ = new float[3]{30, 13, 13};
-        yaw_omega_pid_param_ = new float[3]{2500, 13, 13};
+        yaw_theta_pid_param_ = new float[3]{100, 1, 20};
+        yaw_omega_pid_param_ = new float[3]{2500, 20, 30};
       }
       break;
     case GIMBAL_STEERING:
