@@ -64,12 +64,12 @@ Shooter::Shooter(shooter_t shooter) {
       break;
 
     case SHOOTER_STANDARD:
-      servo_data.max_speed = 6 * PI;
-      servo_data.max_acceleration = 100 * PI;
+      servo_data.max_speed = 100 * PI;
+      servo_data.max_acceleration = 80 * PI;
       servo_data.transmission_ratio = M2006P36_RATIO;
-      servo_data.omega_pid_param = new float[3]{150, 4, 0};
-      servo_data.max_iout = 2000;
-      servo_data.max_out = 10000;
+      servo_data.omega_pid_param = new float[3]{10, 0, 1};
+      servo_data.max_iout = 9000;
+      servo_data.max_out = 20000;
 
       left_pid_ = new PIDController(80, 3, 0.1);
       right_pid_ = new PIDController(80, 3, 0.1);
@@ -77,9 +77,9 @@ Shooter::Shooter(shooter_t shooter) {
       load_step_angle_ = 2 * PI / 8;
       load_double_angle_ = 2 * PI / 4;
       speed_ = 0;
-      dial_speed_ = 6 * PI;
-      dial_continue_fast_acceleration = 200 * PI;
-      dial_continue_slowly_acceleration = 20 * PI;
+      dial_speed_ = 20 * PI;
+      dial_continue_fast_acceleration = 100 * PI;
+      dial_continue_slowly_acceleration = 40 * PI;
       dial_double_acceleration = 100 * PI;
       break;
 

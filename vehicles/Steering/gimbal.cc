@@ -50,6 +50,7 @@ static const int SHOOTER_TASK_DELAY = 10;
 static const int SELFTEST_TASK_DELAY = 100;
 static const int KILLALL_DELAY = 100;
 static const int DEFAULT_TASK_DELAY = 100;
+static const int SHOOTER_MODE_DELAY = 5e5;
 
 static bsp::CanBridge* send = nullptr;
 
@@ -278,6 +279,9 @@ static unsigned stepper_length = 700;
 static unsigned stepper_speed = 1000;
 static bool stepper_direction = true;
 
+uint32_t start_time = 0;
+int slow_shoot_detect = 0;
+
 void shooterTask(void* arg) {
   UNUSED(arg);
 
@@ -319,9 +323,25 @@ void shooterTask(void* arg) {
       stepper_direction = !stepper_direction;
     }
 
-    if (send->shooter_power && send->cooling_heat1 < send->cooling_limit1 - 20 &&
-        (dbus->mouse.l || dbus->swr == remote::UP))
-      shooter->LoadNext();
+    if (send->shooter_power && send->cooling_heat1 < send->cooling_limit1 - 20) {
+      if (dbus->mouse.l || dbus->swr == remote::UP) {
+        if (bsp::GetHighresTickMicroSec() - start_time > SHOOTER_MODE_DELAY) {
+          shooter->SlowContinueShoot();
+        } else {
+          if (slow_shoot_detect == 0) {
+            slow_shoot_detect = 1;
+            shooter->DoubleShoot();
+          }
+        }
+      } else if (dbus->mouse.r) {
+        shooter->FastContinueShoot();
+      } else {
+        shooter->DialStop();
+        start_time = bsp::GetHighresTickMicroSec();
+        slow_shoot_detect = 0;
+      }
+    }
+      
     if (!send->shooter_power || dbus->keyboard.bit.Q || dbus->swr == remote::DOWN) {
       flywheelFlag = false;
       shooter->SetFlywheelSpeed(0);
