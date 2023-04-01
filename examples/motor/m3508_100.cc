@@ -32,8 +32,10 @@
 #define KEY_GPIO_PIN GPIO_PIN_2
 
 constexpr float RUN_SPEED = (10 * PI);
-constexpr float ALIGN_SPEED = (0.5 * PI / 100);
+constexpr float ALIGN_SPEED = (0.5 * PI / 10);
 constexpr float ACCELERATION = (100 * PI);
+
+static remote::DBUS *dbus = nullptr;
 
 bsp::CAN* can1 = nullptr;
 control::MotorCANBase* motor1 = nullptr;
@@ -56,12 +58,13 @@ bool steering_align_detect3() {
 }
 
 void RM_RTOS_Init() {
-  print_use_uart(&huart6);
+  print_use_uart(&huart8);
   bsp::SetHighresClockTimer(&htim5);
 
   can1 = new bsp::CAN(&hcan1, 0x201, true);
   motor1 = new control::Motor3508(can1, 0x201);
   motor3 = new control::Motor3508(can1, 0x202);
+  dbus = new remote::DBUS(&huart1);
 
   /* Usage:
    *   The 'key' is the white button on TypeA boards
@@ -116,13 +119,34 @@ void RM_RTOS_Default_Task(const void* args) {
 
   print("\r\nOK!\r\n");
 
+  float pos = 0;
+  float pos2 = 0;
 
   while (true) {
+    float vel;
+    float vel2;
+
+    //key_detector.input(key1->Read());
+    //if (key_detector.posEdge()){
+    // Motor should turn the give angle
+
+    vel = clip<float>(dbus->ch1 / 660.0 * 30.0, -30, 30);
+    vel2 = clip<float>(dbus->ch3 / 660.0 * 30.0, -30, 30);
+    pos += vel / 1000;
+    pos2 += vel2 / 1000;
+    pos = clip<float>(pos, -PI/4, PI/4);
+    pos2 = clip<float>(pos2, -PI/4, PI/4);
+
+    clear_screen();
+    set_cursor(0, 0);
+    print("vel set: %f pos set: %f\r\n", vel, pos);
+    print("vel2 set: %f pos2 set: %f\r\n", vel2, pos2);
+
     key_detector.input(key1->Read());
     if (key_detector.posEdge()){
       // Motor should turn the give angle
-      steering1->TurnRelative(PI * 4 + PI / 4);
-      steering3->TurnRelative(PI / 3);
+      steering1->TurnRelative(pos);
+      steering3->TurnRelative(pos2);
     }
 
     steering1->CalcOutput();

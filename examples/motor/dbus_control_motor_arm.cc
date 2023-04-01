@@ -32,7 +32,7 @@
 //#define KEY_GPIO_PIN GPIO_PIN_2
 
 constexpr float RUN_SPEED = (10 * PI);
-constexpr float ALIGN_SPEED = (0.5 * PI / 100);
+constexpr float ALIGN_SPEED = (0.5 * PI / 10);
 constexpr float ACCELERATION = (100 * PI);
 
 bsp::CAN* can1 = nullptr;
@@ -142,18 +142,18 @@ void RM_RTOS_Default_Task(const void* args) {
       
       vel = clip<float>(dbus->ch1 / 660.0 * 30.0, -30, 30);
       vel2 = clip<float>(dbus->ch3 / 660.0 * 30.0, -30, 30);
-      pos += vel / 200;
-      pos2 += vel2 / 200;
-      pos = clip<float>(pos, 0, PI/4);
-      pos2 = clip<float>(pos2, 0, PI/4);
+      pos += vel / 1000;
+      pos2 += vel2 / 1000;
+      pos = clip<float>(pos, -PI/4, PI/4);
+      pos2 = clip<float>(pos2, -PI/4, PI/4);
 
       clear_screen();
       set_cursor(0, 0);
-      print("vel set: %f pos set: %f\n", vel, pos);
-      print("vel2 set: %f pos2 set: %f\n", vel2, pos2);
+      print("vel set: %f pos set: %f\r\n", vel, pos);
+      print("vel2 set: %f pos2 set: %f\r\n", vel2, pos2);
  
-      steering1->TurnRelative(pos);
-      steering3->TurnRelative(pos2);
+      steering1->TurnRelative(PI/4);
+      steering3->TurnRelative(PI/4);
     //}
 
     
