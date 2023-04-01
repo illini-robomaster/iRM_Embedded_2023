@@ -25,11 +25,11 @@ irm_add_arm_executable(${PROJECT_NAME}_m3508
     SOURCES m3508.cc)
 
 irm_add_arm_executable(${PROJECT_NAME}_m3508_speed
-    TARGET DJI_Board_TypeC
+    TARGET DJI_Board_TypeA
     SOURCES m3508_speed.cc)
 
 irm_add_arm_executable(${PROJECT_NAME}_m3508_position
-    TARGET DJI_Board_TypeC
+    TARGET DJI_Board_TypeA
     SOURCES m3508_position.cc)
 
 irm_add_arm_executable(${PROJECT_NAME}_m3508_antijam
@@ -55,3 +55,15 @@ irm_add_arm_executable(${PROJECT_NAME}_pwm
 irm_add_arm_executable(${PROJECT_NAME}_steering_align
     TARGET DJI_Board_TypeC
     SOURCES m3508_steering_align.cc)
+
+irm_add_arm_executable(${PROJECT_NAME}_m3508_100
+    TARGET DJI_Board_TypeA
+    SOURCES m3508_100.cc)
+
+irm_add_arm_executable(${PROJECT_NAME}_dbus_control_motor_arm
+    TARGET DJI_Board_TypeA
+    SOURCES dbus_control_motor_arm.cc)
+
+irm_add_arm_executable(${PROJECT_NAME}_m3508_speed_2motor
+    TARGET DJI_Board_TypeA
+    SOURCES m3508_speed_2motor.cc)

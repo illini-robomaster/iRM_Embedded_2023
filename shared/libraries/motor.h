@@ -295,7 +295,7 @@ typedef enum {
 /**
  * @brief transmission ratios of DJI motors, reference to motor manuals for more details
  */
-#define M3508P19_RATIO (3591.0 / 187) /* Transmission ratio of M3508P19 */
+#define M3508P19_RATIO (99.506) /* Transmission ratio of M3508P19 */
 #define M2006P36_RATIO 36             /* Transmission ratio of M2006P36 */
 
 typedef struct {

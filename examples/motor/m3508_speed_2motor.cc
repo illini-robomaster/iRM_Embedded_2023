@@ -18,28 +18,44 @@
  *                                                                          *
  ****************************************************************************/
 
-#include "main.h"
-
-#include "bsp_print.h"
+#include "bsp_print.h"   
 #include "cmsis_os.h"
+#include "controller.h"
+#include "main.h"
+#include "motor.h"
 #include "dbus.h"
 
-static remote::DBUS* dbus;
+//#define TARGET_SPEED 30
 
-void RM_RTOS_Init(void) {
+bsp::CAN* can = nullptr;
+control::MotorCANBase* motor1 = nullptr;
+control::MotorCANBase* motor2 = nullptr;
+static remote::DBUS *dbus = nullptr;
+
+void RM_RTOS_Init() {
   print_use_uart(&huart6);
   dbus = new remote::DBUS(&huart1);
+  can = new bsp::CAN(&hcan1, 0x201, true);
+  motor1 = new control::Motor3508(can, 0x201);
+  motor2 = new control::Motor3508(can, 0x202);
 }
 
-void RM_RTOS_Default_Task(const void* arguments) {
-  UNUSED(arguments);
+void RM_RTOS_Default_Task(const void* args) {
+  UNUSED(args);
 
-  // NOTE(alvin): print is split because of stack usage is almost reaching limits
+  control::MotorCANBase* motors[] = {motor1, motor2};
+  control::PIDController pid1(20, 15, 30);
+  control::PIDController pid2(20, 15, 30);
+
   while (true) {
-    set_cursor(0, 0);
-    clear_screen();
-    print("CH0: %-4d CH1: %-4d CH2: %-4d CH3: %-4d ", dbus->ch0, dbus->ch1, dbus->ch2, dbus->ch3);
-    print("SWL: %d SWR: %d @ %d ms\r\n", dbus->swl, dbus->swr, dbus->timestamp);
-    osDelay(100);
+    float diff1 = motor1->GetOmegaDelta(dbus->ch1 / 50);
+    float diff2 = motor2->GetOmegaDelta(dbus->ch3 / 50);
+    int16_t out1 = pid1.ComputeConstrainedOutput(diff1);
+    int16_t out2 = pid2.ComputeConstrainedOutput(diff2);
+    motor1->SetOutput(out1);
+    motor2->SetOutput(out2);
+    control::MotorCANBase::TransmitOutput(motors, 1);
+    //motor->PrintData();
+    osDelay(10);
   }
 }
