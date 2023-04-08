@@ -68,31 +68,31 @@ void RM_RTOS_Default_Task(const void* args) {
   control::MotorCANBase* motors[] = {left_flywheel_motor, right_flywheel_motor, load_motor};
   // bsp::GPIO laser(LASER_GPIO_Port, LASER_Pin);
   // laser.High();
-  // uint32_t start_time = 0;
-  // int slow_shoot_detect = 0;
+  uint32_t start_time = 0;
+  int slow_shoot_detect = 0;
 
   while (true) {
-    // if (dbus->swl == remote::UP) {
+    if (dbus->swr != remote::DOWN) {
       shooter->SetFlywheelSpeed(TARGET_SPEED_FLYWHEELS);
-    // } else {
-      // shooter->SetFlywheelSpeed(0);
-    // }
-    // if (dbus->swr == remote::UP || dbus->mouse.r) {
+    } else {
+      shooter->SetFlywheelSpeed(0);
+    }
+    if (dbus->mouse.r) {
       shooter->FastContinueShoot();
-    // } else if (dbus->swr == remote::DOWN || dbus->mouse.l){
-    //   if (bsp::GetHighresTickMicroSec() - start_time > DELAY) {
-    //     shooter->SlowContinueShoot();
-    //   } else {
-    //     if (slow_shoot_detect == 0) {
-    //       slow_shoot_detect = 1;
-    //       shooter->DoubleShoot();
-    //     }
-    //   }
-    // } else {
-    //   shooter->DialStop();
-    //   start_time = bsp::GetHighresTickMicroSec();
-    //   slow_shoot_detect = 0;
-    // }
+    } else if (dbus->swr == remote::UP || dbus->mouse.l){
+      if (bsp::GetHighresTickMicroSec() - start_time > DELAY) {
+        shooter->SlowContinueShoot();
+      } else {
+        if (slow_shoot_detect == 0) {
+          slow_shoot_detect = 1;
+          shooter->DoubleShoot();
+        }
+      }
+    } else {
+      shooter->DialStop();
+      start_time = bsp::GetHighresTickMicroSec();
+      slow_shoot_detect = 0;
+    }
 
     shooter->Update();
     control::MotorCANBase::TransmitOutput(motors, 3);
