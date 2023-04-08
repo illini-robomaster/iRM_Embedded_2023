@@ -33,10 +33,12 @@
 #include "dbus.h"
 #include "i2c.h"
 #include "main.h"
+#include "motor.h"
 #include "oled.h"
 #include "protocol.h"
 #include "rgb.h"
 #include "shooter.h"
+#include "steering.h"
 #include "stepper.h"
 
 static bsp::CAN* can1 = nullptr;
@@ -439,10 +441,7 @@ osThreadId_t selfTestTaskHandle;
 using Note = bsp::BuzzerNote;
 
 static bsp::BuzzerNoteDelayed Mario[] = {
-    {Note::Mi3M, 80}, {Note::Silent, 80},  {Note::Mi3M, 80}, {Note::Silent, 240},
-    {Note::Mi3M, 80}, {Note::Silent, 240}, {Note::Do1M, 80}, {Note::Silent, 80},
-    {Note::Mi3M, 80}, {Note::Silent, 240}, {Note::So5M, 80}, {Note::Silent, 560},
-    {Note::So5L, 80}, {Note::Silent, 0},   {Note::Finish, 0}};
+    {Note::Mi3M, 80}, {Note::Silent, 80}, {Note::Mi3M, 80}, {Note::Silent, 240}, {Note::Mi3M, 80}, {Note::Silent, 240}, {Note::Do1M, 80}, {Note::Silent, 80}, {Note::Mi3M, 80}, {Note::Silent, 240}, {Note::So5M, 80}, {Note::Silent, 560}, {Note::So5L, 80}, {Note::Silent, 0}, {Note::Finish, 0}};
 
 static bsp::Buzzer* buzzer = nullptr;
 static display::OLED* OLED = nullptr;
@@ -476,6 +475,7 @@ void selfTestTask(void* arg) {
     sl_motor->connection_flag_ = false;
     sr_motor->connection_flag_ = false;
     ld_motor->connection_flag_ = false;
+
     //    fl_motor->connection_flag_ = false;
     //    fr_motor->connection_flag_ = false;
     //    bl_motor->connection_flag_ = false;
@@ -488,6 +488,7 @@ void selfTestTask(void* arg) {
     sl_motor_flag = sl_motor->connection_flag_;
     sr_motor_flag = sr_motor->connection_flag_;
     ld_motor_flag = ld_motor->connection_flag_;
+
     //    fl_motor_flag = fl_motor->connection_flag_;
     //    fr_motor_flag = fr_motor->connection_flag_;
     //    bl_motor_flag = bl_motor->connection_flag_;

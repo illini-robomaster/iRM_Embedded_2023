@@ -35,6 +35,15 @@ static bsp::CAN* can1 = nullptr;
 static bsp::CAN* can2 = nullptr;
 static display::RGB* RGB = nullptr;
 
+static bool volatile fl_steer_motor_flag = false;
+static bool volatile fr_steer_motor_flag = false;
+static bool volatile bl_steer_motor_flag = false;
+static bool volatile br_steer_motor_flag = false;
+static bool volatile fl_wheel_motor_flag = false;
+static bool volatile fr_wheel_motor_flag = false;
+static bool volatile bl_wheel_motor_flag = false;
+static bool volatile br_wheel_motor_flag = false;
+
 static BoolEdgeDetector FakeDeath(false);
 static volatile bool Dead = false;
 static BoolEdgeDetector ChangeSpinMode(false);
@@ -49,7 +58,7 @@ static const int CHASSIS_TASK_DELAY = 2;
 constexpr float RUN_SPEED = (10 * PI) / 32;
 // constexpr float ALIGN_SPEED = (PI);
 constexpr float ACCELERATION = (100 * PI);
-
+static bsp::CanBridge* send = nullptr;
 //==================================================================================================
 // Referee
 //==================================================================================================
@@ -220,6 +229,7 @@ void chassisTask(void* arg) {
     receive->cmd.data_float = (float)referee->game_robot_status.shooter_id2_17mm_speed_limit;
     receive->TransmitOutput();
 
+
     osDelay(CHASSIS_TASK_DELAY);
   }
 }
@@ -290,10 +300,41 @@ void RM_RTOS_Init() {
   referee_uart->SetupRx(300);
   referee_uart->SetupTx(300);
   referee = new communication::Referee;
-
   receive = new bsp::CanBridge(can2, 0x20B, 0x20A);
 }
+void selfTestTask(void* arg) {
+  UNUSED(arg);
+  while (true) {
+    // fl_steer_motor
+    motor4->connection_flag_ = false;
+    // fr_steer_motor
+    motor3->connection_flag_ = false;
+    // bl_steer_motor
+    motor1->connection_flag_ = false;
+    // br_steer_motor
+    motor2->connection_flag_ = false;
 
+    // fl_wheel_motor
+    motor8->connection_flag_ = false;
+    // fr_wheel_motor
+    motor7->connection_flag_ = false;
+    // bl_wheel_motor
+    motor6->connection_flag_ = false;
+    // br_wheel_motor
+    motor5->connection_flag_ = false;
+    osDelay(100);
+
+    fl_steer_motor_flag = motor4->connection_flag_;
+    fr_steer_motor_flag = motor3->connection_flag_;
+    bl_steer_motor_flag = motor1->connection_flag_;
+    br_steer_motor_flag = motor2->connection_flag_;
+    fl_wheel_motor_flag = motor8->connection_flag_;
+    fr_wheel_motor_flag = motor7->connection_flag_;
+    bl_wheel_motor_flag = motor6->connection_flag_;
+    br_wheel_motor_flag = motor5->connection_flag_;
+
+  }
+}
 void RM_RTOS_Threads_Init(void) {
   refereeTaskHandle = osThreadNew(refereeTask, nullptr, &refereeTaskAttribute);
   chassisTaskHandle = osThreadNew(chassisTask, nullptr, &chassisTaskAttribute);
