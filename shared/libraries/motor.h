@@ -627,7 +627,8 @@ class Motor4310 : public MotorCANBase {
 
   /* initialize m4310 */
   void Initialize4310(Motor4310* motor);
-
+  /* uninitialize m4310 */
+  void Unintialize4310(Motor4310* motor);
   /* set zero position */
   void SetZeroPos4310(Motor4310* motor);
 

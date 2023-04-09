@@ -1,6 +1,6 @@
 /****************************************************************************
  *                                                                          *
- *  Copyright (C) 2022 RoboMaster.                                          *
+ *  Copyright (C) 2023 RoboMaster.                                          *
  *  Illini RoboMaster @ University of Illinois at Urbana-Champaign          *
  *                                                                          *
  *  This program is free software: you can redistribute it and/or modify    *
@@ -127,7 +127,8 @@ const osThreadAttr_t gimbalTaskAttribute = {.name = "gimbalTask",
                                             .reserved = 0};
 osThreadId_t gimbalTaskHandle;
 
-static control::MotorCANBase* pitch_motor = nullptr;
+//static control::MotorCANBase* pitch_motor = nullptr;
+static control::Motor4310* pitch_motor = nullptr;
 static control::MotorCANBase* yaw_motor = nullptr;
 static control::Gimbal* gimbal = nullptr;
 static control::gimbal_data_t* gimbal_param = nullptr;
@@ -136,7 +137,7 @@ static bsp::Laser* laser = nullptr;
 void gimbalTask(void* arg) {
   UNUSED(arg);
 
-  control::MotorCANBase* motors_can1_gimbal[] = {pitch_motor, yaw_motor};
+  control::MotorCANBase* motors_can1_gimbal[] = {yaw_motor};
 
   print("Wait for beginning signal...\r\n");
   RGB->Display(display::color_red);
@@ -151,7 +152,7 @@ void gimbalTask(void* arg) {
   while (i < 1000 || !imu->DataReady()) {
     gimbal->TargetAbs(0, 0);
     gimbal->Update();
-    control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 2);
+    control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
     osDelay(GIMBAL_TASK_DELAY);
     ++i;
   }
@@ -164,7 +165,9 @@ void gimbalTask(void* arg) {
   while (!imu->DataReady() || !imu->CaliDone()) {
     gimbal->TargetAbs(0, 0);
     gimbal->Update();
-    control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 2);
+//    pitch_motor->SetOutput4310(0, 1, 95, 0.5, 0);
+//    pitch_motor->TransmitOutput4310(pitch_motor);
+    control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
     osDelay(GIMBAL_TASK_DELAY);
   }
 
@@ -172,14 +175,20 @@ void gimbalTask(void* arg) {
   RGB->Display(display::color_green);
   laser->On();
 
+  pitch_motor->Initialize4310(pitch_motor);
+
   send->cmd.id = bsp::START;
   send->cmd.data_bool = true;
   send->TransmitOutput();
+
+//  pitch_motor->SetZeroPos4310(pitch_motor);
+//  pitch_motor->Initialize4310(pitch_motor);
 
   float pitch_ratio, yaw_ratio;
   float pitch_curr, yaw_curr;
   float pitch_target = 0, yaw_target = 0;
   float pitch_diff, yaw_diff;
+  float pos = 0;
 
   while (true) {
     while (Dead) osDelay(100);
@@ -200,10 +209,20 @@ void gimbalTask(void* arg) {
     pitch_diff = clip<float>(pitch_target - pitch_curr, -PI, PI);
     yaw_diff = wrap<float>(yaw_target - yaw_curr, -PI, PI);
 
-    gimbal->TargetRel(-pitch_diff, yaw_diff);
+    float vel;
+    vel = -1 * clip<float>(dbus->ch3 / 660.0, -15, 15);
+    pos += vel / 200;
+    pos = clip<float>(pos, -PI/8, PI/6);
+    print("pos: %f\r\n", pos);
+    print("vel: %f\r\n", vel);
 
+    gimbal->TargetRel(-pitch_diff, yaw_diff);
     gimbal->Update();
-    control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 2);
+
+    pitch_motor->SetOutput4310(pos, vel, 115, 0.5, 0);
+    //pitch_motor->SetOutput4310(pos, vel, 95, 0.5, 0); as example, but require more test and calculations
+    control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
+    pitch_motor->TransmitOutput4310(pitch_motor);
     osDelay(GIMBAL_TASK_DELAY);
   }
 }
@@ -555,12 +574,13 @@ void RM_RTOS_Init(void) {
   imu = new IMU(imu_init, false);
 
   laser = new bsp::Laser(LASER_GPIO_Port, LASER_Pin);
-  pitch_motor = new control::Motor6020(can1, 0x205);
+//  pitch_motor = new control::Motor6020(can1, 0x205);
+  pitch_motor = new control::Motor4310(can1, 0x02, 0x01, 0);
   yaw_motor = new control::Motor6020(can1, 0x206);
   control::gimbal_t gimbal_data;
   gimbal_data.pitch_motor = pitch_motor;
   gimbal_data.yaw_motor = yaw_motor;
-  gimbal_data.model = control::GIMBAL_STEERING;
+  gimbal_data.model = control::GIMBAL_STEERING_4310;
   gimbal = new control::Gimbal(gimbal_data);
   gimbal_param = gimbal->GetData();
 
@@ -599,7 +619,7 @@ void RM_RTOS_Threads_Init(void) {
 void KillAll() {
   RM_EXPECT_TRUE(false, "Operation Killed!\r\n");
 
-  control::MotorCANBase* motors_can1_gimbal[] = {pitch_motor};
+//  control::MotorCANBase* motors_can1_gimbal[] = {pitch_motor};
   control::MotorCANBase* motors_can2_gimbal[] = {yaw_motor};
   control::MotorCANBase* motors_can1_shooter[] = {sl_motor, sr_motor, ld_motor};
 
@@ -620,9 +640,10 @@ void KillAll() {
       break;
     }
 
-    pitch_motor->SetOutput(0);
+//    pitch_motor->SetOutput(0);
+    pitch_motor->Unintialize4310(pitch_motor);
     yaw_motor->SetOutput(0);
-    control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
+//    control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
     control::MotorCANBase::TransmitOutput(motors_can2_gimbal, 1);
 
     sl_motor->SetOutput(0);

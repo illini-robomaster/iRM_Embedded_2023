@@ -563,6 +563,19 @@ void Motor4310::Initialize4310(Motor4310* motor) {
   motor->can_->Transmit(motor->tx_id_, data, 8);
 }
 
+void Motor4310::Unintialize4310(control::Motor4310* motor) {
+  uint8_t data[8] = {0};
+  data[0] = 0xff;
+  data[1] = 0xff;
+  data[2] = 0xff;
+  data[3] = 0xff;
+  data[4] = 0xff;
+  data[5] = 0xff;
+  data[6] = 0xff;
+  data[7] = 0xfd;
+  motor->can_->Transmit(motor->tx_id_, data, 8);
+}
+
 void Motor4310::SetZeroPos4310(control::Motor4310* motor) {
   uint8_t data[8] = {0};
   data[0] = 0xff;
