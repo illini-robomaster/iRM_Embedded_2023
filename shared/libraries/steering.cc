@@ -76,7 +76,7 @@ SteeringChassis::SteeringChassis(steering_chassis_t* _chassis) {
   theta2 = 0.0;
   theta3 = 0.0;
 
-  float* pid_params = new float[3]{40, 3, 0};
+  float* pid_params = new float[3]{40, 4, 35};
   float motor_max_iout = 2000;
   float motor_max_out = 20000;
   for (int i = 0; i < MOTOR_NUM; i++) {

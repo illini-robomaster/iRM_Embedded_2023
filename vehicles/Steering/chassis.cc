@@ -174,13 +174,12 @@ void chassisTask(void* arg) {
       wz_set = std::min(follow_speed, follow_speed * relative_angle);
       if (-CHASSIS_DEADZONE < relative_angle && relative_angle < CHASSIS_DEADZONE) wz_set = 0;
     }
-
     chassis->SetYSpeed(-vx_set / 10);
     chassis->SetXSpeed(-vy_set / 10);
     chassis->SetWSpeed(wz_set);
     chassis->Update((float)referee->game_robot_status.chassis_power_limit,
                     referee->power_heat_data.chassis_power,
-                    (float)referee->power_heat_data.chassis_power_buffer);
+                    (float)(referee->power_heat_data.chassis_power_buffer - 10));
 
     if (Dead) {
       motor5->SetOutput(0);
