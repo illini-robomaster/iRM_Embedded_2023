@@ -50,7 +50,7 @@ static BoolEdgeDetector ChangeSpinMode(false);
 static volatile bool SpinMode = false;
 
 static bsp::CanBridge* receive = nullptr;
-
+static unsigned int flag_summary = 0;
 static const int KILLALL_DELAY = 100;
 static const int DEFAULT_TASK_DELAY = 100;
 static const int CHASSIS_TASK_DELAY = 2;
@@ -304,7 +304,6 @@ void RM_RTOS_Init() {
 }
 void selfTestTask(void* arg) {
   UNUSED(arg);
-  while (true) {
     // fl_steer_motor
     motor4->connection_flag_ = false;
     // fr_steer_motor
@@ -324,16 +323,45 @@ void selfTestTask(void* arg) {
     motor5->connection_flag_ = false;
     osDelay(100);
 
-    fl_steer_motor_flag = motor4->connection_flag_;
-    fr_steer_motor_flag = motor3->connection_flag_;
     bl_steer_motor_flag = motor1->connection_flag_;
-    br_steer_motor_flag = motor2->connection_flag_;
-    fl_wheel_motor_flag = motor8->connection_flag_;
-    fr_wheel_motor_flag = motor7->connection_flag_;
-    bl_wheel_motor_flag = motor6->connection_flag_;
-    br_wheel_motor_flag = motor5->connection_flag_;
+    flag_summary += int(bl_steer_motor_flag);
 
-  }
+    flag_summary = flag_summary << 1;
+    br_steer_motor_flag = motor2->connection_flag_;
+    flag_summary += int(br_steer_motor_flag);
+
+    flag_summary = flag_summary << 1;
+    fr_steer_motor_flag = motor3->connection_flag_;
+    flag_summary += int(fr_steer_motor_flag);
+
+    flag_summary = flag_summary << 1;
+    fl_steer_motor_flag = motor4->connection_flag_;
+    flag_summary += int(fl_steer_motor_flag);
+
+    flag_summary = flag_summary << 1;
+    br_wheel_motor_flag = motor5->connection_flag_;
+    flag_summary += int(br_wheel_motor_flag);
+
+    flag_summary = flag_summary << 1;
+    bl_wheel_motor_flag = motor6->connection_flag_;
+    flag_summary += int(bl_wheel_motor_flag);
+
+    flag_summary = flag_summary << 1;
+    fr_wheel_motor_flag = motor7->connection_flag_;
+    flag_summary += int(fr_wheel_motor_flag);
+
+    flag_summary = flag_summary << 1;
+    fl_wheel_motor_flag = motor8->connection_flag_;
+    flag_summary += int(fl_wheel_motor_flag);
+
+    delete(receive);
+    send = new bsp::CanBridge(can2, 0x20A, 0x20B);
+    osDelay(100);
+    send->cmd.id = bsp::CHASSIS_FLAG;
+    send->chassis_flag = flag_summary;
+    send->TransmitOutput();
+    delete(send);
+    receive = new bsp::CanBridge(can2, 0x20B, 0x20A);
 }
 void RM_RTOS_Threads_Init(void) {
   refereeTaskHandle = osThreadNew(refereeTask, nullptr, &refereeTaskAttribute);

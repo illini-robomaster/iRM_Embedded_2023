@@ -54,6 +54,7 @@ static const int KILLALL_DELAY = 100;
 static const int DEFAULT_TASK_DELAY = 100;
 
 static bsp::CanBridge* send = nullptr;
+static bsp::CanBridge* receive = nullptr;
 
 static BoolEdgeDetector FakeDeath(false);
 static volatile bool Dead = false;
@@ -61,7 +62,7 @@ static BoolEdgeDetector ChangeSpinMode(false);
 static volatile bool SpinMode = false;
 
 static volatile float relative_angle = 0;
-
+static unsigned int chassis_flag_summary = 0;
 static bool volatile pitch_motor_flag = false;
 static bool volatile yaw_motor_flag = false;
 static bool volatile sl_motor_flag = false;
@@ -448,7 +449,14 @@ static display::OLED* OLED = nullptr;
 
 void selfTestTask(void* arg) {
   UNUSED(arg);
-
+  delete(send);
+  receive = new bsp::CanBridge(can2, 0x20B, 0x20A);
+  receive->cmd.id = bsp::CHASSIS_FLAG;
+  chassis_flag_summary = receive->chassis_flag;
+  receive->TransmitOutput();
+  delete(receive);
+  send = new bsp::CanBridge(can2, 0x20A, 0x20B);
+  //Could need more time to test it out.
   OLED->ShowIlliniRMLOGO();
   buzzer->SingSong(Mario, [](uint32_t milli) { osDelay(milli); });
   OLED->OperateGram(display::PEN_CLEAR);
