@@ -324,7 +324,7 @@ void selfTestTask(void* arg) {
     osDelay(100);
 
     bl_steer_motor_flag = motor1->connection_flag_;
-    flag_summary += int(bl_steer_motor_flag);
+    flag_summary += 0b0+int(bl_steer_motor_flag);
 
     flag_summary = flag_summary << 1;
     br_steer_motor_flag = motor2->connection_flag_;

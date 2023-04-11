@@ -62,21 +62,24 @@ static BoolEdgeDetector ChangeSpinMode(false);
 static volatile bool SpinMode = false;
 
 static volatile float relative_angle = 0;
-static unsigned int chassis_flag_summary = 0;
+static unsigned int chassis_flag_bitmap = 0;
 static bool volatile pitch_motor_flag = false;
 static bool volatile yaw_motor_flag = false;
 static bool volatile sl_motor_flag = false;
 static bool volatile sr_motor_flag = false;
 static bool volatile ld_motor_flag = false;
-// static bool volatile fl_motor_flag = false;
-// static bool volatile fr_motor_flag = false;
-// static bool volatile bl_motor_flag = false;
-// static bool volatile br_motor_flag = false;
+static bool volatile fl_wheel_flag = false;
+static bool volatile fr_wheel_flag = false;
+static bool volatile bl_wheel_flag = false;
+static bool volatile br_wheel_flag = false;
+static bool volatile fl_steering_flag = false;
+static bool volatile fr_steering_flag = false;
+static bool volatile bl_steering_flag = false;
+static bool volatile br_steering_flag = false;
 static bool volatile calibration_flag = false;
 // static bool volatile referee_flag = false;
 static bool volatile dbus_flag = false;
 static bool volatile lidar_flag = false;
-
 static volatile bool selftestStart = false;
 
 //==================================================================================================
@@ -222,7 +225,7 @@ const osThreadAttr_t refereeTaskAttribute = {.name = "refereeTask",
                                              .cb_mem = nullptr,
                                              .cb_size = 0,
                                              .stack_mem = nullptr,
-                                             .stack_size = 1024 * 4,
+                                             
                                              .priority = (osPriority_t)osPriorityAboveNormal,
                                              .tz_module = 0,
                                              .reserved = 0};
@@ -446,17 +449,33 @@ static bsp::BuzzerNoteDelayed Mario[] = {
 
 static bsp::Buzzer* buzzer = nullptr;
 static display::OLED* OLED = nullptr;
+static unsigned createMask(unsigned a, unsigned b)
+{
+  unsigned r = 0;
+  for (unsigned i=a; i<=b; i++)
+    r |= 1 << i;
 
+  return r;
+}
+//simple bitmask function for chassis flag
 void selfTestTask(void* arg) {
   UNUSED(arg);
   delete(send);
   receive = new bsp::CanBridge(can2, 0x20B, 0x20A);
   receive->cmd.id = bsp::CHASSIS_FLAG;
-  chassis_flag_summary = receive->chassis_flag;
+  chassis_flag_bitmap = receive->chassis_flag;
   receive->TransmitOutput();
   delete(receive);
   send = new bsp::CanBridge(can2, 0x20A, 0x20B);
-  //Could need more time to test it out.
+  fl_wheel_flag = (createMask(0,0)&chassis_flag_bitmap)>0; //motor 8
+  fr_wheel_flag = (createMask(1,1)&chassis_flag_bitmap)>0; //motor 7
+  bl_wheel_flag = (createMask(2,2)&chassis_flag_bitmap)>0; //motor 6
+  br_wheel_flag = (createMask(3,3)&chassis_flag_bitmap)>0; //motor 5
+  fl_steering_flag = (createMask(4,4)&chassis_flag_bitmap)>0; //motor 4
+  fr_steering_flag = (createMask(5,5)&chassis_flag_bitmap)>0; //motor 3
+  br_steering_flag = (createMask(6,6)&chassis_flag_bitmap)>0; //motor 2
+  bl_steering_flag = (createMask(7,7)&chassis_flag_bitmap)>0; //motor 1
+ //Could need more time to test it out.
   OLED->ShowIlliniRMLOGO();
   buzzer->SingSong(Mario, [](uint32_t milli) { osDelay(milli); });
   OLED->OperateGram(display::PEN_CLEAR);
@@ -484,10 +503,6 @@ void selfTestTask(void* arg) {
     sr_motor->connection_flag_ = false;
     ld_motor->connection_flag_ = false;
 
-    //    fl_motor->connection_flag_ = false;
-    //    fr_motor->connection_flag_ = false;
-    //    bl_motor->connection_flag_ = false;
-    //    br_motor->connection_flag_ = false;
     referee->connection_flag_ = false;
     dbus->connection_flag_ = false;
     osDelay(SELFTEST_TASK_DELAY);
@@ -497,10 +512,7 @@ void selfTestTask(void* arg) {
     sr_motor_flag = sr_motor->connection_flag_;
     ld_motor_flag = ld_motor->connection_flag_;
 
-    //    fl_motor_flag = fl_motor->connection_flag_;
-    //    fr_motor_flag = fr_motor->connection_flag_;
-    //    bl_motor_flag = bl_motor->connection_flag_;
-    //    br_motor_flag = br_motor->connection_flag_;
+
     calibration_flag = imu->CaliDone();
     //    referee_flag = referee->connection_flag_;
     dbus_flag = dbus->connection_flag_;
