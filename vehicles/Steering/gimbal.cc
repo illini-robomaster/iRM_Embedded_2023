@@ -467,14 +467,22 @@ void selfTestTask(void* arg) {
   receive->TransmitOutput();
   delete(receive);
   send = new bsp::CanBridge(can2, 0x20A, 0x20B);
-  fl_wheel_flag = (createMask(0,0)&chassis_flag_bitmap)>0; //motor 8
-  fr_wheel_flag = (createMask(1,1)&chassis_flag_bitmap)>0; //motor 7
-  bl_wheel_flag = (createMask(2,2)&chassis_flag_bitmap)>0; //motor 6
-  br_wheel_flag = (createMask(3,3)&chassis_flag_bitmap)>0; //motor 5
-  fl_steering_flag = (createMask(4,4)&chassis_flag_bitmap)>0; //motor 4
-  fr_steering_flag = (createMask(5,5)&chassis_flag_bitmap)>0; //motor 3
-  br_steering_flag = (createMask(6,6)&chassis_flag_bitmap)>0; //motor 2
-  bl_steering_flag = (createMask(7,7)&chassis_flag_bitmap)>0; //motor 1
+  fl_wheel_flag = (createMask(0,0)&chassis_flag_bitmap)>0;
+  //motor 8
+  fr_wheel_flag = (createMask(1,1)&chassis_flag_bitmap)>0;
+  //motor 7
+  bl_wheel_flag = (createMask(2,2)&chassis_flag_bitmap)>0;
+  //motor 6
+  br_wheel_flag = (createMask(3,3)&chassis_flag_bitmap)>0;
+  //motor 5
+  fl_steering_flag = (createMask(4,4)&chassis_flag_bitmap)>0;
+  //motor 4
+  fr_steering_flag = (createMask(5,5)&chassis_flag_bitmap)>0;
+  //motor 3
+  br_steering_flag = (createMask(6,6)&chassis_flag_bitmap)>0;
+  //motor 2
+  bl_steering_flag = (createMask(7,7)&chassis_flag_bitmap)>0;
+  //motor 1
  //Could need more time to test it out.
   OLED->ShowIlliniRMLOGO();
   buzzer->SingSong(Mario, [](uint32_t milli) { osDelay(milli); });

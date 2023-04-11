@@ -64,6 +64,15 @@ static bsp::CanBridge* send = nullptr;
 //==================================================================================================
 
 #define REFEREE_RX_SIGNAL (1 << 1)
+const osThreadAttr_t selfTestTaskAttribute = {.name = "selfCheckTask",
+                                              .attr_bits = osThreadDetached,
+                                              .cb_mem = nullptr,
+                                              .cb_size = 0,
+                                              .stack_mem = nullptr,
+                                              .stack_size = 1024 * 4,
+                                              .priority = (osPriority_t)osPriorityBelowNormal,
+                                              .tz_module = 0,
+                                              .reserved = 0};
 
 const osThreadAttr_t refereeTaskAttribute = {.name = "refereeTask",
                                              .attr_bits = osThreadDetached,
@@ -74,8 +83,18 @@ const osThreadAttr_t refereeTaskAttribute = {.name = "refereeTask",
                                              .priority = (osPriority_t)osPriorityAboveNormal,
                                              .tz_module = 0,
                                              .reserved = 0};
+const osThreadAttr_t chassisTaskAttribute = {.name = "chassisTask",
+                                             .attr_bits = osThreadDetached,
+                                             .cb_mem = nullptr,
+                                             .cb_size = 0,
+                                             .stack_mem = nullptr,
+                                             .stack_size = 256 * 4,
+                                             .priority = (osPriority_t)osPriorityNormal,
+                                             .tz_module = 0,
+                                             .reserved = 0};
 osThreadId_t refereeTaskHandle;
-
+osThreadId_t chassisTaskHandle;
+osThreadId_t selfTestTaskHandle;
 class RefereeUART : public bsp::UART {
  public:
   using bsp::UART::UART;
@@ -105,16 +124,7 @@ void refereeTask(void* arg) {
 // Chassis
 //==================================================================================================
 
-const osThreadAttr_t chassisTaskAttribute = {.name = "chassisTask",
-                                             .attr_bits = osThreadDetached,
-                                             .cb_mem = nullptr,
-                                             .cb_size = 0,
-                                             .stack_mem = nullptr,
-                                             .stack_size = 256 * 4,
-                                             .priority = (osPriority_t)osPriorityNormal,
-                                             .tz_module = 0,
-                                             .reserved = 0};
-osThreadId_t chassisTaskHandle;
+
 
 static control::MotorCANBase* motor1 = nullptr;
 static control::MotorCANBase* motor2 = nullptr;
@@ -324,7 +334,7 @@ void selfTestTask(void* arg) {
     osDelay(100);
 
     bl_steer_motor_flag = motor1->connection_flag_;
-    flag_summary += 0b0+int(bl_steer_motor_flag);
+    flag_summary += int(bl_steer_motor_flag);
 
     flag_summary = flag_summary << 1;
     br_steer_motor_flag = motor2->connection_flag_;
@@ -354,18 +364,19 @@ void selfTestTask(void* arg) {
     fl_wheel_motor_flag = motor8->connection_flag_;
     flag_summary += int(fl_wheel_motor_flag);
 
-    delete(receive);
+    delete (receive);
     send = new bsp::CanBridge(can2, 0x20A, 0x20B);
     osDelay(100);
     send->cmd.id = bsp::CHASSIS_FLAG;
     send->chassis_flag = flag_summary;
     send->TransmitOutput();
-    delete(send);
+    delete (send);
     receive = new bsp::CanBridge(can2, 0x20B, 0x20A);
 }
 void RM_RTOS_Threads_Init(void) {
   refereeTaskHandle = osThreadNew(refereeTask, nullptr, &refereeTaskAttribute);
   chassisTaskHandle = osThreadNew(chassisTask, nullptr, &chassisTaskAttribute);
+  selfTestTaskHandle = osThreadNew(selfTestTask, nullptr, &selfTestTaskAttribute);
 }
 
 void KillAll() {

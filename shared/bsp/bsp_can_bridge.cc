@@ -78,6 +78,8 @@ void CanBridge::UpdateData(const uint8_t* data) {
     case SPEED_LIMIT2:
       speed_limit2 = cmd.data_float;
       break;
+    case CHASSIS_FLAG:
+      chassis_flag = cmd.data_uint;
     default:;
   }
 }

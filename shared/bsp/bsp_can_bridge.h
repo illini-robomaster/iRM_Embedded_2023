@@ -47,6 +47,7 @@ typedef struct {
     float data_float;
     int data_int;
     bool data_bool;
+    unsigned int data_uint;
   };
 } bridge_data_t;
 
