@@ -64,12 +64,12 @@ static bsp::CanBridge* send = nullptr;
 //==================================================================================================
 
 #define REFEREE_RX_SIGNAL (1 << 1)
-const osThreadAttr_t selfTestTaskAttribute = {.name = "selfCheckTask",
+const osThreadAttr_t selfTestTaskAttribute = {.name = "selfTestTask",
                                               .attr_bits = osThreadDetached,
                                               .cb_mem = nullptr,
                                               .cb_size = 0,
                                               .stack_mem = nullptr,
-                                              .stack_size = 1024 * 4,
+                                              .stack_size = 256 * 4,
                                               .priority = (osPriority_t)osPriorityBelowNormal,
                                               .tz_module = 0,
                                               .reserved = 0};

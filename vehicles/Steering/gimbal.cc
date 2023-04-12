@@ -483,7 +483,8 @@ void selfTestTask(void* arg) {
   //motor 2
   bl_steering_flag = (createMask(7,7)&chassis_flag_bitmap)>0;
   //motor 1
- //Could need more time to test it out.
+  //Could need more time to test it out.
+  //The self test task for chassis will not update after the first check.
   OLED->ShowIlliniRMLOGO();
   buzzer->SingSong(Mario, [](uint32_t milli) { osDelay(milli); });
   OLED->OperateGram(display::PEN_CLEAR);
@@ -493,10 +494,12 @@ void selfTestTask(void* arg) {
   OLED->ShowString(1, 0, (uint8_t*)"SL");
   OLED->ShowString(1, 5, (uint8_t*)"SR");
   OLED->ShowString(1, 10, (uint8_t*)"LD");
-  //  OLED->ShowString(2, 0, (uint8_t*)"FL");
-  //  OLED->ShowString(2, 5, (uint8_t*)"FR");
-  //  OLED->ShowString(2, 10, (uint8_t*)"BL");
-  //  OLED->ShowString(2, 15, (uint8_t*)"BR");
+
+  OLED->ShowString(2, 0, (uint8_t*)"FL");
+  OLED->ShowString(2, 5, (uint8_t*)"FR");
+  OLED->ShowString(2, 10, (uint8_t*)"BL");
+  OLED->ShowString(2, 15, (uint8_t*)"BR");
+
   OLED->ShowString(3, 0, (uint8_t*)"Cali");
   OLED->ShowString(3, 7, (uint8_t*)"Temp:");
   //  OLED->ShowString(4, 0, (uint8_t*)"Ref");
@@ -530,10 +533,19 @@ void selfTestTask(void* arg) {
     OLED->ShowBlock(1, 2, sl_motor_flag);
     OLED->ShowBlock(1, 7, sr_motor_flag);
     OLED->ShowBlock(1, 12, ld_motor_flag);
-    //    OLED->ShowBlock(2, 2, fl_motor_flag);
-    //    OLED->ShowBlock(2, 7, fr_motor_flag);
-    //    OLED->ShowBlock(2, 12, bl_motor_flag);
-    //    OLED->ShowBlock(2, 17, br_motor_flag);
+
+    OLED->ShowBlock(2, 2, fl_wheel_flag);
+    OLED->ShowBlock(2,3,fl_steering_flag);
+
+    OLED->ShowBlock(2, 7, fr_wheel_flag);
+    OLED->ShowBlock(2,8,fr_steering_flag);
+
+    OLED->ShowBlock(2, 12, bl_wheel_flag);
+    OLED->ShowBlock(2,13,bl_steering_flag);
+
+    OLED->ShowBlock(2, 17, br_wheel_flag);
+    OLED->ShowBlock(2,18,br_steering_flag);
+    
     OLED->ShowBlock(3, 4, imu->CaliDone());
     snprintf(temp, 6, "%.2f", imu->Temp);
     OLED->ShowString(3, 12, (uint8_t*)temp);
