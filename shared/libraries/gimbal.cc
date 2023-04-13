@@ -44,8 +44,8 @@ Gimbal::Gimbal(gimbal_t gimbal)
       }
       break;
     case GIMBAL_SENTRY:
-      data_.yaw_offset_ = 2.8718f;
-      data_.pitch_offset_ = 2.8718f;
+      data_.yaw_offset_ = 0.0f;
+      data_.pitch_offset_ = 0.0f;
       /* original
       data_.pitch_offset_ = 1.6352f;
       data_.pitch_max_ = 0.5080f;

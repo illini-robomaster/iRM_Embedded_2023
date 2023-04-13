@@ -56,6 +56,40 @@ T wrap(T value, T min, T max) {
 }
 
 /**
+ * @brief clip a value to fall into a given range; can wrap around domain
+ *
+ * @tparam T        type of the value
+ * @param value     value to the clipped
+ * @param min       clipping range min
+ * @param max       clipping range max
+ * @param range_min domain range min
+ * @param range_max domain range max
+ *
+ * @return clipped value that falls in the range [min, max]
+ *
+ * @note undefined behavior if min > max
+ */
+template <typename T>
+T wrapping_clip(T value, T min, T max, T range_min, T range_max) {
+  value = wrap<T>(value, range_min, range_max);
+  if (max >= min) {
+    return value < min ? min : (value > max ? max : value);
+  } else {
+    // min > max; wrap around
+    T middle = (min + max) / 2;
+    if (value <= max && value >= range_min) {
+      return value;
+    } else if (value >= min && value <= range_max) {
+      return value;
+    } else if (value > max && value < middle) {
+      return max;
+    } else {
+      return min;
+    }
+  }
+}
+
+/**
  * @brief max of two values
  *
  * @tparam T     type of the value

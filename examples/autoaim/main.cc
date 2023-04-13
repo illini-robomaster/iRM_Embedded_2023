@@ -84,18 +84,15 @@ float relative_yaw = 0;
 float relative_pitch = 0;
 
 // const value for the ICRA gimbal
-const float YAW_MAX = 2;
-const float YAW_MIN = 1;
+const float YAW_MIDDLE = 0.2;
+const float PITCH_MIDDLE = 1.5;
 
-const float PITCH_MAX = 4.8;
-const float PITCH_MIN = 2.0;
-
-const float PITCH_OFFSET = 2.8718f;
-const float YAW_OFFSET = 2.8718f;
+const float PITCH_OFFSET = 0.0f;
+const float YAW_OFFSET = 0.0f;
 
 // initialize to middle position
-float absolute_yaw = (YAW_MAX + YAW_MIN) / 2 - YAW_OFFSET;
-float absolute_pitch = (PITCH_MAX + PITCH_MIN) / 2 - PITCH_OFFSET;
+float absolute_yaw = YAW_MIDDLE - YAW_OFFSET;
+float absolute_pitch = PITCH_MIDDLE - PITCH_OFFSET;
 
 void RM_RTOS_Init() {
   can1 = new bsp::CAN(&hcan1, 0x205, true);
@@ -184,8 +181,10 @@ void RM_RTOS_Default_Task(const void* args) {
     absolute_yaw = absolute_yaw + rel_yaw_buffer;
 
     // Debugging clip on official gimbal to avoid breaking mechnical limit
-    absolute_pitch = clip<float>(absolute_pitch, 1  - 2.8718f, 2 - 2.8718f);
-    absolute_yaw = clip<float>(absolute_yaw, 2.0 - 2.8718f, 4.8 - 2.8718f);
+    // absolute_pitch = clip<float>(absolute_pitch, 1  - PITCH_OFFSET, 2 - PITCH_OFFSET);
+    // absolute_yaw = clip<float>(absolute_yaw, 2.0 - YAW_OFFSET, 4.8 - YAW_OFFSET);
+    absolute_pitch = wrapping_clip<float>(absolute_pitch, 1.2, 1.9, 0, 2 * PI);
+    absolute_yaw = wrapping_clip<float>(absolute_yaw, 5, 1.9, 0, 2 * PI);
     // gimbal->TargetRel(rel_pitch_buffer, rel_yaw_buffer);
     gimbal->TargetAbs(absolute_pitch, absolute_yaw);
     // }
