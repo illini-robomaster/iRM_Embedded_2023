@@ -83,17 +83,6 @@ static display::RGB* led = nullptr;
 float relative_yaw = 0;
 float relative_pitch = 0;
 
-// const value for the ICRA gimbal
-const float YAW_MIDDLE = 0.2;
-const float PITCH_MIDDLE = 1.5;
-
-const float PITCH_OFFSET = 0.0f;
-const float YAW_OFFSET = 0.0f;
-
-// initialize to middle position
-float absolute_yaw = YAW_MIDDLE - YAW_OFFSET;
-float absolute_pitch = PITCH_MIDDLE - PITCH_OFFSET;
-
 void RM_RTOS_Init() {
   can1 = new bsp::CAN(&hcan1, 0x205, true);
   pitch_motor = new control::Motor6020(can1, 0x205);
@@ -177,16 +166,13 @@ void RM_RTOS_Default_Task(const void* args) {
     // TODO: add this option to allow user-select autoaim mode
     // if (dbus->swr == remote::MID) {
       // 2.8718f magic number comes from gimbal init to cancel out the offset
-    absolute_pitch = absolute_pitch + rel_pitch_buffer;
-    absolute_yaw = absolute_yaw + rel_yaw_buffer;
-
     // Debugging clip on official gimbal to avoid breaking mechnical limit
     // absolute_pitch = clip<float>(absolute_pitch, 1  - PITCH_OFFSET, 2 - PITCH_OFFSET);
     // absolute_yaw = clip<float>(absolute_yaw, 2.0 - YAW_OFFSET, 4.8 - YAW_OFFSET);
-    absolute_pitch = wrapping_clip<float>(absolute_pitch, 1.2, 1.9, 0, 2 * PI);
-    absolute_yaw = wrapping_clip<float>(absolute_yaw, 5, 1.9, 0, 2 * PI);
-    // gimbal->TargetRel(rel_pitch_buffer, rel_yaw_buffer);
-    gimbal->TargetAbs(absolute_pitch, absolute_yaw);
+    // absolute_pitch = wrapping_clip<float>(absolute_pitch, 1.2, 1.9, 0, 2 * PI);
+    // absolute_yaw = wrapping_clip<float>(absolute_yaw, 5, 1.9, 0, 2 * PI);
+    // gimbal->TargetAbsWOffset(absolute_pitch, absolute_yaw);
+    gimbal->TargetRel(rel_pitch_buffer, rel_yaw_buffer);
     // }
 
     // Kill switch

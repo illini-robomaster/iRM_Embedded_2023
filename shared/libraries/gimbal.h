@@ -89,7 +89,7 @@ class Gimbal {
    * @param new_pitch new pitch angled
    * @param new_yaw   new yaw angled
    */
-  void TargetAbs(float new_pitch, float new_yaw);
+  void TargetAbsWOffset(float new_pitch, float new_yaw);
 
   /**
    * @brief set motors to point to a new orientation
@@ -121,8 +121,13 @@ class Gimbal {
   ConstrainedPID* yaw_omega_pid_ = nullptr;   /* yaw omega pid   */
 
   // pitch and yaw angle
-  float pitch_angle_; /* current gimbal pitch angle */
-  float yaw_angle_;   /* current gimbal yaw angle   */
+  float pitch_angle_; /* current TARGET gimbal pitch angle */
+  float yaw_angle_;   /* current TARGET gimbal yaw angle   */
+
+  float pitch_lower_limit_; /* lower limit of pitch angle */
+  float pitch_upper_limit_; /* upper limit of pitch angle */
+  float yaw_lower_limit_;   /* lower limit of yaw angle   */
+  float yaw_upper_limit_;   /* upper limit of yaw angle   */
 
   // state detectors
   BoolEdgeDetector pitch_detector_; /* pitch pid mode toggle detector */

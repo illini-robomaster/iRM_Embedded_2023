@@ -44,14 +44,11 @@ Gimbal::Gimbal(gimbal_t gimbal)
       }
       break;
     case GIMBAL_SENTRY:
-      data_.yaw_offset_ = 0.0f;
-      data_.pitch_offset_ = 0.0f;
-      /* original
-      data_.pitch_offset_ = 1.6352f;
-      data_.pitch_max_ = 0.5080f;
-      */
-      data_.pitch_max_ = PI;
-      data_.yaw_max_ = PI;
+      /* ICRA gimbal setting */
+      data_.yaw_offset_ = 0.2f;
+      data_.pitch_offset_ = 1.5f;
+      data_.pitch_max_ = 0.3;
+      data_.yaw_max_ = 1.5;
       {
         pitch_theta_max_iout = 0;
         pitch_theta_max_out = 10;
@@ -61,14 +58,10 @@ Gimbal::Gimbal(gimbal_t gimbal)
         yaw_theta_max_out = 10;
         yaw_omega_max_iout = 10000;
         yaw_omega_max_out = 30000;
-        pitch_theta_pid_param_ = new float[3]{100, 1, 20};
-        pitch_omega_pid_param_ = new float[3]{2500, 20, 30};
-        /* original
-        yaw_theta_pid_param_ = new float[3]{26, 0, 0.3};
-        yaw_omega_pid_param_ = new float[3]{2160, 12, 0};
-        */
-        yaw_theta_pid_param_ = new float[3]{100, 1, 20};
-        yaw_omega_pid_param_ = new float[3]{2500, 20, 30};
+        pitch_theta_pid_param_ = new float[3]{15, 0, 30};
+        pitch_omega_pid_param_ = new float[3]{2000, 15, 40};
+        yaw_theta_pid_param_ = new float[3]{13, 0, 20};
+        yaw_omega_pid_param_ = new float[3]{2100, 10, 30};
       }
       break;
     case GIMBAL_STEERING:
@@ -112,6 +105,11 @@ Gimbal::Gimbal(gimbal_t gimbal)
 
   pitch_angle_ = data_.pitch_offset_;
   yaw_angle_ = data_.yaw_offset_;
+
+  pitch_lower_limit_ = wrap<float>(data_.pitch_offset_ - data_.pitch_max_, 0, 2 * PI);
+  pitch_upper_limit_ = wrap<float>(data_.pitch_offset_ + data_.pitch_max_, 0, 2 * PI);
+  yaw_lower_limit_ = wrap<float>(data_.yaw_offset_ - data_.yaw_max_, 0, 2 * PI);
+  yaw_upper_limit_ = wrap<float>(data_.yaw_offset_ + data_.yaw_max_, 0, 2 * PI);
 }
 
 Gimbal::~Gimbal() {
@@ -150,16 +148,18 @@ void Gimbal::Update() {
   yaw_motor_->SetOutput(yo_out);
 }
 
-void Gimbal::TargetAbs(float abs_pitch, float abs_yaw) {
+void Gimbal::TargetAbsWOffset(float abs_pitch, float abs_yaw) {
   float clipped_pitch = clip<float>(abs_pitch, -data_.pitch_max_, data_.pitch_max_);
   float clipped_yaw = clip<float>(abs_yaw, -data_.yaw_max_, data_.yaw_max_);
-  pitch_angle_ = wrap<float>(clipped_pitch + data_.pitch_offset_, 0, 2 * PI);
-  yaw_angle_ = wrap<float>(clipped_yaw + data_.yaw_offset_, 0, 2 * PI);
+  pitch_angle_ = wrapping_clip<float>(clipped_pitch, pitch_lower_limit_, pitch_upper_limit_, 0, 2 * PI);
+  yaw_angle_ = wrapping_clip<float>(clipped_yaw, yaw_lower_limit_, yaw_upper_limit_, 0, 2 * PI);
 }
 
 void Gimbal::TargetRel(float rel_pitch, float rel_yaw) {
-  pitch_angle_ = pitch_motor_->GetTheta() + rel_pitch;
-  yaw_angle_ = yaw_motor_->GetTheta() + rel_yaw;
+  rel_pitch = clip<float>(rel_pitch, -2 * PI, 2 * PI);
+  rel_yaw = clip<float>(rel_yaw, -2 * PI, 2 * PI);
+  pitch_angle_ = wrapping_clip<float>(pitch_angle_ + rel_pitch, pitch_lower_limit_, pitch_upper_limit_, 0, 2 * PI);
+  yaw_angle_ = wrapping_clip<float>(yaw_angle_ + rel_yaw, yaw_lower_limit_, yaw_upper_limit_, 0, 2 * PI);
 }
 
 }  // namespace control
