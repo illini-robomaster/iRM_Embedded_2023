@@ -58,10 +58,10 @@ Gimbal::Gimbal(gimbal_t gimbal)
         yaw_theta_max_out = 10;
         yaw_omega_max_iout = 10000;
         yaw_omega_max_out = 30000;
-        pitch_theta_pid_param_ = new float[3]{15, 0, 30};
-        pitch_omega_pid_param_ = new float[3]{2000, 15, 40};
-        yaw_theta_pid_param_ = new float[3]{13, 0, 20};
-        yaw_omega_pid_param_ = new float[3]{2100, 10, 30};
+        pitch_theta_pid_param_ = new float[3]{17, 0, 1};
+        pitch_omega_pid_param_ = new float[3]{2000, 15, 5};
+        yaw_theta_pid_param_ = new float[3]{18, 0, 5};
+        yaw_omega_pid_param_ = new float[3]{2100, 10, 10};
       }
       break;
     case GIMBAL_STEERING:
