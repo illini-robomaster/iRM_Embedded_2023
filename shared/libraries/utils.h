@@ -38,6 +38,19 @@ T clip(T value, T min, T max) {
 }
 
 /**
+ * @brief absolute value
+ *
+ * @tparam T type of the value
+ * @param val value to be taken absolute value of
+ *
+ * @return absolute value of the value
+ */
+// template <typename T>
+// T abs(T val) {
+//   return val < 0 ? -val : val;
+// }
+
+/**
  * @brief wrap around a value to fall into a given range
  *
  * @tparam T    type of the value
@@ -57,6 +70,7 @@ T wrap(T value, T min, T max) {
 
 /**
  * @brief clip a value to fall into a given range; can wrap around domain
+ *                        (designed for angle-based control 2*pi!)
  *
  * @tparam T        type of the value
  * @param value     value to the clipped
@@ -72,6 +86,10 @@ T wrap(T value, T min, T max) {
 template <typename T>
 T wrapping_clip(T value, T min, T max, T range_min, T range_max) {
   value = wrap<T>(value, range_min, range_max);
+  // if mim and max are too close, directly return value for omni
+  if (abs(max - min) < 1e-4) {
+    return value;
+  }
   if (max >= min) {
     return value < min ? min : (value > max ? max : value);
   } else {

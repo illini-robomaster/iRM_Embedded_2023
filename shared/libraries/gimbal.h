@@ -113,6 +113,20 @@ class Gimbal {
    */
   float GetTargetYawAngle();
 
+  /**
+   * @brief Get absolute pitch angle with wrapping and clipping
+   * 
+   * @return float 
+   */
+  float ComputePitchRel(float new_pitch);
+
+  /**
+   * @brief Get absolute yaw angle with wrapping and clipping
+   * 
+   * @return float 
+   */
+  float ComputeYawRel(float new_yaw);
+
  private:
   // acquired from user
   MotorCANBase* pitch_motor_ = nullptr;
