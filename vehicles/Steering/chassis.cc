@@ -44,6 +44,8 @@ static bool volatile fr_wheel_motor_flag = false;
 static bool volatile bl_wheel_motor_flag = false;
 static bool volatile br_wheel_motor_flag = false;
 
+static volatile bool selftestStart = false;
+
 static BoolEdgeDetector FakeDeath(false);
 static volatile bool Dead = false;
 static BoolEdgeDetector ChangeSpinMode(false);
@@ -372,6 +374,7 @@ void selfTestTask(void* arg) {
     send->TransmitOutput();
     delete (send);
     receive = new bsp::CanBridge(can2, 0x20B, 0x20A);
+    selftestStart = true;
 }
 void RM_RTOS_Threads_Init(void) {
   refereeTaskHandle = osThreadNew(refereeTask, nullptr, &refereeTaskAttribute);
