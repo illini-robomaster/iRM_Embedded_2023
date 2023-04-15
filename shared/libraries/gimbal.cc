@@ -151,8 +151,19 @@ void Gimbal::Update() {
 void Gimbal::TargetAbsWOffset(float abs_pitch, float abs_yaw) {
   float clipped_pitch = clip<float>(abs_pitch, -data_.pitch_max_, data_.pitch_max_);
   float clipped_yaw = clip<float>(abs_yaw, -data_.yaw_max_, data_.yaw_max_);
-  pitch_angle_ = wrapping_clip<float>(clipped_pitch, pitch_lower_limit_, pitch_upper_limit_, 0, 2 * PI);
-  yaw_angle_ = wrapping_clip<float>(clipped_yaw, yaw_lower_limit_, yaw_upper_limit_, 0, 2 * PI);
+  if (data_.pitch_max_ == PI) {
+    // for unlimited pitch
+    pitch_angle_ = wrap<float>(clipped_pitch, 0, 2 * PI);
+  } else {
+    pitch_angle_ = wrapping_clip<float>(clipped_pitch, pitch_lower_limit_, pitch_upper_limit_, 0, 2 * PI);
+  }
+  
+  if (data_.yaw_max_ == PI) {
+    // for unlimited yaw
+    yaw_angle_ = wrap<float>(clipped_yaw, 0, 2 * PI);
+  } else {
+    yaw_angle_ = wrapping_clip<float>(clipped_yaw, yaw_lower_limit_, yaw_upper_limit_, 0, 2 * PI);
+  }
 }
 
 void Gimbal::TargetRel(float rel_pitch, float rel_yaw) {
@@ -161,5 +172,9 @@ void Gimbal::TargetRel(float rel_pitch, float rel_yaw) {
   pitch_angle_ = wrapping_clip<float>(pitch_angle_ + rel_pitch, pitch_lower_limit_, pitch_upper_limit_, 0, 2 * PI);
   yaw_angle_ = wrapping_clip<float>(yaw_angle_ + rel_yaw, yaw_lower_limit_, yaw_upper_limit_, 0, 2 * PI);
 }
+
+float Gimbal::GetTargetPitchAngle() { return pitch_angle_; }
+
+float Gimbal::GetTargetYawAngle() { return yaw_angle_; }
 
 }  // namespace control

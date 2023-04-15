@@ -99,6 +99,20 @@ class Gimbal {
    */
   void TargetRel(float new_pitch, float new_yaw);
 
+  /**
+   * @brief Get pitch angle target
+   * 
+   * @return float 
+   */
+  float GetTargetPitchAngle();
+
+  /**
+   * @brief Get yaw angle target
+   * 
+   * @return float 
+   */
+  float GetTargetYawAngle();
+
  private:
   // acquired from user
   MotorCANBase* pitch_motor_ = nullptr;
