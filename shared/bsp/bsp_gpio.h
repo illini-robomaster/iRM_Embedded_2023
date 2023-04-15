@@ -27,6 +27,7 @@
  *    M1: Input,   M2: Output
  *    P1: Input,   P2: Output
  *    Q1: Input,   Q2: Output
+ *    L1 and M1 on board A is PULLUP mode
  */
 
 #include "bsp_error_handler.h"
