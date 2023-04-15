@@ -153,16 +153,16 @@ void Gimbal::TargetAbsWOffset(float abs_pitch, float abs_yaw) {
   float clipped_yaw = clip<float>(abs_yaw, -data_.yaw_max_, data_.yaw_max_);
   if (data_.pitch_max_ == PI) {
     // for unlimited pitch
-    pitch_angle_ = wrap<float>(clipped_pitch, 0, 2 * PI);
+    pitch_angle_ = wrap<float>(clipped_pitch + data_.pitch_offset_, 0, 2 * PI);
   } else {
-    pitch_angle_ = wrapping_clip<float>(clipped_pitch, pitch_lower_limit_, pitch_upper_limit_, 0, 2 * PI);
+    pitch_angle_ = wrapping_clip<float>(clipped_pitch + data_.pitch_offset_, pitch_lower_limit_, pitch_upper_limit_, 0, 2 * PI);
   }
   
   if (data_.yaw_max_ == PI) {
     // for unlimited yaw
-    yaw_angle_ = wrap<float>(clipped_yaw, 0, 2 * PI);
+    yaw_angle_ = wrap<float>(clipped_yaw + data_.yaw_offset_, 0, 2 * PI);
   } else {
-    yaw_angle_ = wrapping_clip<float>(clipped_yaw, yaw_lower_limit_, yaw_upper_limit_, 0, 2 * PI);
+    yaw_angle_ = wrapping_clip<float>(clipped_yaw + data_.yaw_offset_, yaw_lower_limit_, yaw_upper_limit_, 0, 2 * PI);
   }
 }
 
