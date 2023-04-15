@@ -24,6 +24,8 @@ class FilterBase {
 public:
     virtual void register_state(float input) = 0;
 
+    virtual ~FilterBase();
+
 protected:
     // The observation array
     float* x_obs_arr;
@@ -37,6 +39,7 @@ protected:
 class MovingAverageFilter : public FilterBase {
 public:
     MovingAverageFilter(int window_size);
+    ~MovingAverageFilter();
     void register_state(float input);
     float get_estimation();
 

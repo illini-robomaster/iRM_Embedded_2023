@@ -20,7 +20,7 @@ MovingAverageFilter::~MovingAverageFilter() {
 void MovingAverageFilter::register_state(float input) {
     if (_initialized) {
         float removed_obs = x_obs_arr[0];
-        float removed_interval = interval_arr[0];
+        // float removed_interval = interval_arr[0];
         // Update the observation array
         for (int i = 0; i < _window_size - 1; i++) {
             x_obs_arr[i] = x_obs_arr[i + 1];
