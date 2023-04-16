@@ -27,6 +27,13 @@
 
 namespace communication {
 
+struct STMToJetsonData {
+  char header[2];
+  uint8_t my_color; // RED is 0; BLUE is one
+  uint8_t crc8_checksum;
+  char tail[2];
+};
+
 // WARNING: THIS CLASS IS NOT THREAD SAFE!!!
 
 class MiniPCProtocol {
@@ -34,7 +41,7 @@ class MiniPCProtocol {
   MiniPCProtocol();
   void Receive(const uint8_t* data, uint8_t len);
   // dummy send
-  void Send();
+  void Send(STMToJetsonData* packet, uint8_t color);
   uint8_t get_valid_flag(void);
   float get_relative_yaw(void);
   float get_relative_pitch(void);
