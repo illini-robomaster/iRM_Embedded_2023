@@ -179,7 +179,7 @@ void chassisTask(void* arg) {
     chassis->SetWSpeed(wz_set);
     chassis->Update((float)referee->game_robot_status.chassis_power_limit,
                     referee->power_heat_data.chassis_power,
-                    (float)(referee->power_heat_data.chassis_power_buffer - 10));
+                    (float)(referee->power_heat_data.chassis_power_buffer - 10)); // decrease 10W for safety
 
     if (Dead) {
       motor5->SetOutput(0);
