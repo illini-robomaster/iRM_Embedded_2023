@@ -28,6 +28,7 @@
 #include "rgb.h"
 #include "bsp_gpio.h"
 #include "minipc.h"
+#include "filtering.h"
 
 /* Define Gimabal-related parameters */
 
@@ -82,6 +83,7 @@ static display::RGB* led = nullptr;
 // TODO: this is NOT thread-safe!
 float relative_yaw = 0;
 float relative_pitch = 0;
+float last_timestamp = 0;  // in milliseconds
 
 void RM_RTOS_Init() {
   can1 = new bsp::CAN(&hcan1, 0x205, true);
@@ -128,6 +130,7 @@ void jetsonCommTask(void* arg) {
         // there is at least one unprocessed valid packet
         relative_yaw = miniPCreceiver.get_relative_yaw();
         relative_pitch = miniPCreceiver.get_relative_pitch();
+        last_timestamp = HAL_GetTick() / 1000.0;
       }
     }
     osDelay(1);
@@ -155,6 +158,9 @@ void RM_RTOS_Default_Task(const void* args) {
   float abs_autoaim_pitch = gimbal->GetTargetPitchAngle();
   float abs_autoaim_yaw = gimbal->GetTargetYawAngle();
 
+  KalmanFilter yaw_filter(abs_autoaim_yaw, HAL_GetTick() / 1000.0);
+  KalmanFilter pitch_filter(abs_autoaim_pitch, HAL_GetTick() / 1000.0);
+
   while (true) {
     // TODO: WANING: this is NOT thread-safe!
     const float rel_pitch_buffer = relative_pitch;
@@ -164,11 +170,25 @@ void RM_RTOS_Default_Task(const void* args) {
     relative_pitch = 0;
     relative_yaw = 0;
 
+    // abs_autoaim_pitch = gimbal->ComputePitchRel(rel_pitch_buffer, abs_autoaim_pitch);
+    // abs_autoaim_yaw = gimbal->ComputeYawRel(rel_yaw_buffer, abs_autoaim_yaw);
+    // gimbal->TargetAbsNoOffset(abs_autoaim_pitch, abs_autoaim_yaw);
+
+    if (rel_pitch_buffer != 0 && rel_yaw_buffer != 0) {
+      // new data comes in
+      abs_autoaim_pitch = gimbal->ComputePitchRel(rel_pitch_buffer, abs_autoaim_pitch);
+      abs_autoaim_yaw = gimbal->ComputeYawRel(rel_yaw_buffer, abs_autoaim_yaw);
+
+      pitch_filter.register_state(abs_autoaim_pitch, last_timestamp);
+      yaw_filter.register_state(abs_autoaim_yaw, last_timestamp);
+    }
+    float abs_pitch_filtered = pitch_filter.iter_and_get_estimation();
+    float abs_yaw_filtered = yaw_filter.iter_and_get_estimation();
+    gimbal->TargetAbsNoOffset(abs_pitch_filtered, abs_yaw_filtered);
+
+
     // TODO: add this option to allow user-select autoaim mode
     // if (dbus->swr == remote::MID) {
-    abs_autoaim_pitch = gimbal->ComputePitchRel(rel_pitch_buffer, abs_autoaim_pitch);
-    abs_autoaim_yaw = gimbal->ComputeYawRel(rel_yaw_buffer, abs_autoaim_yaw);
-    gimbal->TargetAbsNoOffset(abs_autoaim_pitch, abs_autoaim_yaw);
     // gimbal->TargetRel(rel_pitch_buffer, rel_yaw_buffer);
 
     // Kill switch

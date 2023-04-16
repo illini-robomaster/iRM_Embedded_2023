@@ -22,28 +22,32 @@
 
 class FilterBase {
 public:
-    virtual void register_state(float input) = 0;
+    virtual void register_state(float input, float timestamp) = 0;
 
-    virtual ~FilterBase();
-
-protected:
-    // The observation array
-    float* x_obs_arr;
-
-    // The time interval between observation i - 1 and i
-    float* interval_arr;
-
-    bool _initialized=false;
+    virtual float get_estimation() = 0;
 };
 
-class MovingAverageFilter : public FilterBase {
+class KalmanFilter : public FilterBase {
 public:
-    MovingAverageFilter(int window_size);
-    ~MovingAverageFilter();
-    void register_state(float input);
+    KalmanFilter(float init_x, float init_t);
+    void register_state(float input, float timestamp);
     float get_estimation();
+    float iter_and_get_estimation();
 
 private:
-    int _window_size;
-    float _sum;
+    float xhat = 0;  // a posteriori estimate of x
+    float xhatminus = 0;  // a priori estimate of x
+    float P = 0;  // posteriori error estimate
+    float Pminus = 0;  // a priori error estimate
+
+    float Q = 2; // process noise covariance
+    float H = 1; // measurement function
+
+    float A = 1; // state transition matrix
+    float B = 0; // control matrix
+
+    float R = 2; // measurement noise covariance
+
+    float last_x = 0;
+    float last_t = 0;
 };
