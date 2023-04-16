@@ -370,7 +370,7 @@ void selfTestTask(void* arg) {
     send = new bsp::CanBridge(can2, 0x20A, 0x20B);
     osDelay(100);
     send->cmd.id = bsp::CHASSIS_FLAG;
-    send->chassis_flag = flag_summary;
+    send->cmd.data_uint = flag_summary;
     send->TransmitOutput();
     delete (send);
     receive = new bsp::CanBridge(can2, 0x20B, 0x20A);

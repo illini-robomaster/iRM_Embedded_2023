@@ -460,6 +460,8 @@ static unsigned createMask(unsigned a, unsigned b)
 //simple bitmask function for chassis flag
 void selfTestTask(void* arg) {
   UNUSED(arg);
+  osDelay(1000);
+  //Try to make the chassis Flags initialized at first.
   delete(send);
   receive = new bsp::CanBridge(can2, 0x20B, 0x20A);
   receive->cmd.id = bsp::CHASSIS_FLAG;
