@@ -84,6 +84,14 @@ class Gimbal {
   void Update();
 
   /**
+   * @brief set motors to point to a new orientation with no offset
+   *
+   * @param new_pitch new pitch angled
+   * @param new_yaw   new yaw angled
+   */
+  void TargetAbsNoOffset(float new_pitch, float new_yaw);
+
+  /**
    * @brief set motors to point to a new orientation
    *
    * @param new_pitch new pitch angled
@@ -118,14 +126,14 @@ class Gimbal {
    * 
    * @return float 
    */
-  float ComputePitchRel(float new_pitch);
+  float ComputePitchRel(float new_pitch, float pitch_ref);
 
   /**
    * @brief Get absolute yaw angle with wrapping and clipping
    * 
    * @return float 
    */
-  float ComputeYawRel(float new_yaw);
+  float ComputeYawRel(float new_yaw, float yaw_ref);
 
  private:
   // acquired from user

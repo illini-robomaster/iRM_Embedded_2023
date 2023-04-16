@@ -152,6 +152,9 @@ void RM_RTOS_Default_Task(const void* args) {
 
   UNUSED(gimbal_data);
 
+  float abs_autoaim_pitch = gimbal->GetTargetPitchAngle();
+  float abs_autoaim_yaw = gimbal->GetTargetYawAngle();
+
   while (true) {
     // TODO: WANING: this is NOT thread-safe!
     const float rel_pitch_buffer = relative_pitch;
@@ -160,20 +163,13 @@ void RM_RTOS_Default_Task(const void* args) {
     // clear after read
     relative_pitch = 0;
     relative_yaw = 0;
-    // pitch_ratio = dbus->ch3 / 600.0;
-    // yaw_ratio = -dbus->ch2 / 600.0;
 
     // TODO: add this option to allow user-select autoaim mode
     // if (dbus->swr == remote::MID) {
-      // 2.8718f magic number comes from gimbal init to cancel out the offset
-    // Debugging clip on official gimbal to avoid breaking mechnical limit
-    // absolute_pitch = clip<float>(absolute_pitch, 1  - PITCH_OFFSET, 2 - PITCH_OFFSET);
-    // absolute_yaw = clip<float>(absolute_yaw, 2.0 - YAW_OFFSET, 4.8 - YAW_OFFSET);
-    // absolute_pitch = wrapping_clip<float>(absolute_pitch, 1.2, 1.9, 0, 2 * PI);
-    // absolute_yaw = wrapping_clip<float>(absolute_yaw, 5, 1.9, 0, 2 * PI);
-    // gimbal->TargetAbsWOffset(absolute_pitch, absolute_yaw);
-    gimbal->TargetRel(rel_pitch_buffer, rel_yaw_buffer);
-    // }
+    abs_autoaim_pitch = gimbal->ComputePitchRel(rel_pitch_buffer, abs_autoaim_pitch);
+    abs_autoaim_yaw = gimbal->ComputeYawRel(rel_yaw_buffer, abs_autoaim_yaw);
+    gimbal->TargetAbsNoOffset(abs_autoaim_pitch, abs_autoaim_yaw);
+    // gimbal->TargetRel(rel_pitch_buffer, rel_yaw_buffer);
 
     // Kill switch
     // if (dbus->swl == remote::UP || dbus->swl == remote::DOWN) {
