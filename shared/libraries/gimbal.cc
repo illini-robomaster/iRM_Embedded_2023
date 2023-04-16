@@ -72,7 +72,7 @@ Gimbal::Gimbal(gimbal_t gimbal)
       break;
     case GIMBAL_STEERING:
       data_.pitch_offset_ = 5.25f;
-      data_.yaw_offset_ = 0.3451;
+      data_.yaw_offset_ = 4.52;
       data_.pitch_max_ = 0.5080f;
       data_.yaw_max_ = PI;
       {
