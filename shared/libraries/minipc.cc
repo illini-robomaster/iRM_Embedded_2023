@@ -30,6 +30,20 @@ MiniPCProtocol::MiniPCProtocol() {
   flag = 0;
 }
 
+void MiniPCProtocol::Send(STMToJetsonData* packet, uint8_t color) {
+  packet->header[0] = 'H';
+  packet->header[1] = 'D';
+  packet->my_color = color;
+
+  const int tail_offset = 3; // size of data minus uint8_t checksum and 2 uint8_t tail
+  packet->crc8_checksum = get_crc8_check_sum((uint8_t*)packet,
+                                              sizeof(STMToJetsonData) - tail_offset,
+                                              0);
+
+  packet->tail[0] = 'E';
+  packet->tail[1] = 'D';
+}
+
 void MiniPCProtocol::Receive(const uint8_t* data, uint8_t length) {
   // Four cases
   // Case 1: everything is fresh with complete package(s)
@@ -48,7 +62,6 @@ void MiniPCProtocol::Receive(const uint8_t* data, uint8_t length) {
       // Case 3
       // done package reading
       index = 0;
-      // package handling here!TODO:
       handle();
     } else {
       if (remain == length) {
@@ -63,7 +76,7 @@ void MiniPCProtocol::Receive(const uint8_t* data, uint8_t length) {
   while (i < (int)length) {
     if (index == 0) {
       if (i == (int)length - 1) {
-        // Handle the last byte; index must be zero
+        // A special case to handle the last byte; index must be zero
         if (data[i] == 'S' || data[i] == 'M') {
           host_command[index++] = data[i];
         }
@@ -91,6 +104,21 @@ void MiniPCProtocol::handle(void) {
   // TODO: implement thread-safe logic here (use a lock to handle changes from interrupt)
   // here we can assume that the package is complete
   // in the host_command buffer
+
+  // TODO: add a logic here such that when the checking fails; it moves the write pointer 'index'
+  // to the next 'S' or 'M' for more robustness.
+  // A minor issue with current implementation: imagine the following case:
+  //  Two packets arrive in two UART calls.
+  //  The first packet misses 1 byte, but the second one is complete.
+  //  In this case, when the host_command buffer is filled
+  //  (the last byte is 'S' or 'M' for the second packet), handle() will be called. The whole buffer
+  //  would be tossed, resulting in two unusable packets. However, if we implement this logic, we would be
+  //  able to recover the second packet.
+
+  // This is a minor issue because
+  //    1) we don't observe this even when packets are sent at 200Hz
+  //    2) probability of this happening is very low. The second packet has to be sent in two slices to
+  //       trigger this issue. (first slice: S/T is sent to host_command; second slide: the rest)
 
   // check end of packet is 'ED'
   if (host_command[PKG_LEN - 2] != 'E' || host_command[PKG_LEN - 1] != 'D') {
