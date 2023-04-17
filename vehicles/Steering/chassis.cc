@@ -60,7 +60,6 @@ static const int CHASSIS_TASK_DELAY = 2;
 constexpr float RUN_SPEED = (10 * PI) / 32;
 // constexpr float ALIGN_SPEED = (PI);
 constexpr float ACCELERATION = (100 * PI);
-static bsp::CanBridge* send = nullptr;
 //==================================================================================================
 // Referee
 //==================================================================================================
@@ -316,64 +315,63 @@ void RM_RTOS_Init() {
 }
 void selfTestTask(void* arg) {
   UNUSED(arg);
-    // fl_steer_motor
-    motor4->connection_flag_ = false;
-    // fr_steer_motor
-    motor3->connection_flag_ = false;
-    // bl_steer_motor
-    motor1->connection_flag_ = false;
-    // br_steer_motor
-    motor2->connection_flag_ = false;
 
-    // fl_wheel_motor
-    motor8->connection_flag_ = false;
-    // fr_wheel_motor
-    motor7->connection_flag_ = false;
-    // bl_wheel_motor
-    motor6->connection_flag_ = false;
-    // br_wheel_motor
-    motor5->connection_flag_ = false;
-    osDelay(100);
 
-    bl_steer_motor_flag = motor1->connection_flag_;
-    flag_summary += int(bl_steer_motor_flag);
+  osDelay(100);
+while(true){
+  motor4->connection_flag_ = false;
+  // fr_steer_motor
+  motor3->connection_flag_ = false;
+  // bl_steer_motor
+  motor1->connection_flag_ = false;
+  // br_steer_motor
+  motor2->connection_flag_ = false;
+  // fl_wheel_motor
+  motor8->connection_flag_ = false;
+  // fr_wheel_motor
+  motor7->connection_flag_ = false;
+  // bl_wheel_motor
+  motor6->connection_flag_ = false;
+  // br_wheel_motor
+  motor5->connection_flag_ = false;
+  // fl_steer_motor
+  flag_summary = 0;
+  bl_steer_motor_flag = motor1->connection_flag_;
+  flag_summary += int(bl_steer_motor_flag);
 
-    flag_summary = flag_summary << 1;
-    br_steer_motor_flag = motor2->connection_flag_;
-    flag_summary += int(br_steer_motor_flag);
+  flag_summary = flag_summary << 1;
+  br_steer_motor_flag = motor2->connection_flag_;
+  flag_summary += int(br_steer_motor_flag);
 
-    flag_summary = flag_summary << 1;
-    fr_steer_motor_flag = motor3->connection_flag_;
-    flag_summary += int(fr_steer_motor_flag);
+  flag_summary = flag_summary << 1;
+  fr_steer_motor_flag = motor3->connection_flag_;
+  flag_summary += int(fr_steer_motor_flag);
 
-    flag_summary = flag_summary << 1;
-    fl_steer_motor_flag = motor4->connection_flag_;
-    flag_summary += int(fl_steer_motor_flag);
+  flag_summary = flag_summary << 1;
+  fl_steer_motor_flag = motor4->connection_flag_;
+  flag_summary += int(fl_steer_motor_flag);
 
-    flag_summary = flag_summary << 1;
-    br_wheel_motor_flag = motor5->connection_flag_;
-    flag_summary += int(br_wheel_motor_flag);
+  flag_summary = flag_summary << 1;
+  br_wheel_motor_flag = motor5->connection_flag_;
+  flag_summary += int(br_wheel_motor_flag);
 
-    flag_summary = flag_summary << 1;
-    bl_wheel_motor_flag = motor6->connection_flag_;
-    flag_summary += int(bl_wheel_motor_flag);
+  flag_summary = flag_summary << 1;
+  bl_wheel_motor_flag = motor6->connection_flag_;
+  flag_summary += int(bl_wheel_motor_flag);
 
-    flag_summary = flag_summary << 1;
-    fr_wheel_motor_flag = motor7->connection_flag_;
-    flag_summary += int(fr_wheel_motor_flag);
+  flag_summary = flag_summary << 1;
+  fr_wheel_motor_flag = motor7->connection_flag_;
+  flag_summary += int(fr_wheel_motor_flag);
 
-    flag_summary = flag_summary << 1;
-    fl_wheel_motor_flag = motor8->connection_flag_;
-    flag_summary += int(fl_wheel_motor_flag);
+  flag_summary = flag_summary << 1;
+  fl_wheel_motor_flag = motor8->connection_flag_;
+  flag_summary += int(fl_wheel_motor_flag);
 
-    delete (receive);
-    send = new bsp::CanBridge(can2, 0x20A, 0x20B);
-    osDelay(100);
-    send->cmd.id = bsp::CHASSIS_FLAG;
-    send->cmd.data_uint = flag_summary;
-    send->TransmitOutput();
-    delete (send);
-    receive = new bsp::CanBridge(can2, 0x20B, 0x20A);
+  osDelay(100);
+  receive->cmd.id = bsp::CHASSIS_FLAG;
+  receive->cmd.data_uint = flag_summary;
+  receive->TransmitOutput();
+}
     selftestStart = true;
 }
 void RM_RTOS_Threads_Init(void) {

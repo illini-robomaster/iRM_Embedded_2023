@@ -54,7 +54,6 @@ static const int KILLALL_DELAY = 100;
 static const int DEFAULT_TASK_DELAY = 100;
 
 static bsp::CanBridge* send = nullptr;
-static bsp::CanBridge* receive = nullptr;
 
 static BoolEdgeDetector FakeDeath(false);
 static volatile bool Dead = false;
@@ -462,12 +461,7 @@ void selfTestTask(void* arg) {
   UNUSED(arg);
   osDelay(1000);
   //Try to make the chassis Flags initialized at first.
-  delete(send);
-  receive = new bsp::CanBridge(can2, 0x20B, 0x20A);
-  receive->cmd.id = bsp::CHASSIS_FLAG;
-  chassis_flag_bitmap = receive->chassis_flag;
-  receive->TransmitOutput();
-  delete(receive);
+  chassis_flag_bitmap = send->chassis_flag;
   send = new bsp::CanBridge(can2, 0x20A, 0x20B);
   fl_wheel_flag = (createMask(0,0)&chassis_flag_bitmap)>0;
   //motor 8
