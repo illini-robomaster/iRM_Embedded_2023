@@ -647,6 +647,7 @@ void Motor4310::TransmitOutput4310(Motor4310* motor) {
     RM_EXPECT_TRUE(false, "Invalid mode number!");
   }
   motor->can_->Transmit(motor->tx_id_, data, 8);
+  connection_flag_ = true;  // temp
 }
 
 void Motor4310::UpdateData(const uint8_t data[]) {
@@ -659,6 +660,7 @@ void Motor4310::UpdateData(const uint8_t data[]) {
   raw_mosTemp_ = data[6];
   raw_rotorTemp_ = data[7];
 
+  connection_flag_ = true;
 }
 
 void Motor4310::PrintData() const {

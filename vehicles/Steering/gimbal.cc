@@ -50,6 +50,7 @@ static const int SHOOTER_TASK_DELAY = 10;
 static const int SELFTEST_TASK_DELAY = 100;
 static const int KILLALL_DELAY = 100;
 static const int DEFAULT_TASK_DELAY = 100;
+static const float start_pitch_pos = PI/5;
 
 static bsp::CanBridge* send = nullptr;
 
@@ -59,6 +60,7 @@ static BoolEdgeDetector ChangeSpinMode(false);
 static volatile bool SpinMode = false;
 
 static volatile float relative_angle = 0;
+static volatile float pitch_pos = start_pitch_pos;
 
 static bool volatile pitch_motor_flag = false;
 static bool volatile yaw_motor_flag = false;
@@ -135,7 +137,6 @@ static control::MotorCANBase* yaw_motor = nullptr;
 static control::Gimbal* gimbal = nullptr;
 static control::gimbal_data_t* gimbal_param = nullptr;
 static bsp::Laser* laser = nullptr;
-const float start_pitch_pos = PI/5;
 
 void gimbalTask(void* arg) {
   UNUSED(arg);
@@ -194,11 +195,9 @@ void gimbalTask(void* arg) {
   float pitch_curr, yaw_curr;
   float pitch_target = 0, yaw_target = 0;
   float pitch_diff, yaw_diff;
-  float pitch_pos = start_pitch_pos;
 
   while (true) {
     while (Dead) osDelay(100);
-//    pitch_motor->Initialize4310(pitch_motor);
 
     pitch_ratio = dbus->mouse.y / 32767.0;
     yaw_ratio = -dbus->mouse.x / 32767.0;
@@ -222,7 +221,14 @@ void gimbalTask(void* arg) {
     pitch_pos = clip<float>(pitch_pos, 0.1, 1); // measured range
 
     if (pitch_reset) {
-      pitch_pos = 0;
+      // 4310 soft start
+      tmp_pos = 0;
+      for (int j = 0; j < 1000; j++){
+        tmp_pos += start_pitch_pos / 1000;
+        pitch_motor->SetOutput4310(tmp_pos, 1, 115, 0.5, 0);
+        pitch_motor->TransmitOutput4310(pitch_motor);
+      }
+      pitch_pos = tmp_pos;
       pitch_reset = false;
     }
 
@@ -657,14 +663,13 @@ void KillAll() {
     }
 
     // 4310 soft kill
-    float tmp_pos = start_pitch_pos;
-    for (int j = 0; j < 2000; j++){
-      tmp_pos -= start_pitch_pos / 2000;
+    float tmp_pos = pitch_pos;
+    for (int j = 0; j < 1000; j++){
+      tmp_pos -= start_pitch_pos / 1000;
       pitch_motor->SetOutput4310(tmp_pos, 1, 115, 0.5, 0);
       pitch_motor->TransmitOutput4310(pitch_motor);
     }
-//    pitch_motor->SetOutput4310(0, 1, 10, 0.5, 0);
-//    pitch_motor->TransmitOutput4310(pitch_motor);
+
     pitch_reset = true;
     pitch_motor->Unintialize4310(pitch_motor);
 
@@ -675,8 +680,6 @@ void KillAll() {
     sr_motor->SetOutput(0);
     ld_motor->SetOutput(0);
     control::MotorCANBase::TransmitOutput(motors_can1_shooter, 3);
-
-//    pitch_motor->Unintialize4310(pitch_motor);
 
     osDelay(KILLALL_DELAY);
   }
