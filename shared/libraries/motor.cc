@@ -662,9 +662,11 @@ void Motor4310::UpdateData(const uint8_t data[]) {
 }
 
 void Motor4310::PrintData() const {
-  print("Position: % .4f ", raw_pos_);
-  print("Velocity: % .4f ", raw_vel_);
-  print("Torque: % .4f ", raw_torque_);
+  set_cursor(0, 0);
+  clear_screen();
+  print("Position: % .4f \r\n", raw_pos_);
+  print("Velocity: % .4f \r\n", raw_vel_);
+  print("Torque: % .4f \r\n", raw_torque_);
   print("Rotor temp: % .4f \r\n", raw_rotorTemp_);
 }
 

@@ -73,6 +73,8 @@ static bool volatile calibration_flag = false;
 // static bool volatile referee_flag = false;
 static bool volatile dbus_flag = false;
 static bool volatile lidar_flag = false;
+static bool volatile pitch_reset = false;
+
 
 static volatile bool selftestStart = false;
 
@@ -133,6 +135,7 @@ static control::MotorCANBase* yaw_motor = nullptr;
 static control::Gimbal* gimbal = nullptr;
 static control::gimbal_data_t* gimbal_param = nullptr;
 static bsp::Laser* laser = nullptr;
+const float start_pitch_pos = PI/5;
 
 void gimbalTask(void* arg) {
   UNUSED(arg);
@@ -157,6 +160,16 @@ void gimbalTask(void* arg) {
     ++i;
   }
 
+  pitch_motor->Initialize4310(pitch_motor);
+
+  // 4310 soft start
+  float tmp_pos = 0;
+  for (int j = 0; j < 2000; j++){
+    tmp_pos += start_pitch_pos / 2000;
+    pitch_motor->SetOutput4310(tmp_pos, 1, 115, 0.5, 0);
+    pitch_motor->TransmitOutput4310(pitch_motor);
+  }
+
   print("Start Calibration.\r\n");
   RGB->Display(display::color_yellow);
   laser->Off();
@@ -165,8 +178,6 @@ void gimbalTask(void* arg) {
   while (!imu->DataReady() || !imu->CaliDone()) {
     gimbal->TargetAbs(0, 0);
     gimbal->Update();
-//    pitch_motor->SetOutput4310(0, 1, 95, 0.5, 0);
-//    pitch_motor->TransmitOutput4310(pitch_motor);
     control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
     osDelay(GIMBAL_TASK_DELAY);
   }
@@ -175,23 +186,19 @@ void gimbalTask(void* arg) {
   RGB->Display(display::color_green);
   laser->On();
 
-  pitch_motor->Initialize4310(pitch_motor);
-
   send->cmd.id = bsp::START;
   send->cmd.data_bool = true;
   send->TransmitOutput();
-
-//  pitch_motor->SetZeroPos4310(pitch_motor);
-//  pitch_motor->Initialize4310(pitch_motor);
 
   float pitch_ratio, yaw_ratio;
   float pitch_curr, yaw_curr;
   float pitch_target = 0, yaw_target = 0;
   float pitch_diff, yaw_diff;
-  float pos = 0;
+  float pitch_pos = start_pitch_pos;
 
   while (true) {
     while (Dead) osDelay(100);
+//    pitch_motor->Initialize4310(pitch_motor);
 
     pitch_ratio = dbus->mouse.y / 32767.0;
     yaw_ratio = -dbus->mouse.x / 32767.0;
@@ -209,18 +216,26 @@ void gimbalTask(void* arg) {
     pitch_diff = clip<float>(pitch_target - pitch_curr, -PI, PI);
     yaw_diff = wrap<float>(yaw_target - yaw_curr, -PI, PI);
 
-    float vel;
-    vel = -1 * clip<float>(dbus->ch3 / 660.0, -15, 15);
-    pos += vel / 200;
-    pos = clip<float>(pos, -PI/8, PI/6);
-    print("pos: %f\r\n", pos);
-    print("vel: %f\r\n", vel);
+    float pitch_vel;
+    pitch_vel = -1 * clip<float>(dbus->ch3 / 660.0, -15, 15);
+    pitch_pos += pitch_vel / 200 + dbus->mouse.y / 32767.0;
+    pitch_pos = clip<float>(pitch_pos, 0.1, 1); // measured range
+
+    if (pitch_reset) {
+      pitch_pos = 0;
+      pitch_reset = false;
+    }
+
+    set_cursor(0, 0);
+    clear_screen();
+    print("pitch ratio: %f\r\n", pitch_ratio);
+    print("pitch_pos: %f\r\n", pitch_pos);
+    print("pitch_vel: %f\r\n", pitch_vel);
 
     gimbal->TargetRel(-pitch_diff, yaw_diff);
     gimbal->Update();
 
-    pitch_motor->SetOutput4310(pos, vel, 115, 0.5, 0);
-    //pitch_motor->SetOutput4310(pos, vel, 95, 0.5, 0); as example, but require more test and calculations
+    pitch_motor->SetOutput4310(pitch_pos, pitch_vel, 115, 0.5, 0);
     control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
     pitch_motor->TransmitOutput4310(pitch_motor);
     osDelay(GIMBAL_TASK_DELAY);
@@ -637,13 +652,23 @@ void KillAll() {
       Dead = false;
       RGB->Display(display::color_green);
       laser->On();
+      pitch_motor->Initialize4310(pitch_motor);
       break;
     }
 
-//    pitch_motor->SetOutput(0);
+    // 4310 soft kill
+    float tmp_pos = start_pitch_pos;
+    for (int j = 0; j < 2000; j++){
+      tmp_pos -= start_pitch_pos / 2000;
+      pitch_motor->SetOutput4310(tmp_pos, 1, 115, 0.5, 0);
+      pitch_motor->TransmitOutput4310(pitch_motor);
+    }
+//    pitch_motor->SetOutput4310(0, 1, 10, 0.5, 0);
+//    pitch_motor->TransmitOutput4310(pitch_motor);
+    pitch_reset = true;
     pitch_motor->Unintialize4310(pitch_motor);
+
     yaw_motor->SetOutput(0);
-//    control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
     control::MotorCANBase::TransmitOutput(motors_can2_gimbal, 1);
 
     sl_motor->SetOutput(0);
@@ -651,11 +676,13 @@ void KillAll() {
     ld_motor->SetOutput(0);
     control::MotorCANBase::TransmitOutput(motors_can1_shooter, 3);
 
+//    pitch_motor->Unintialize4310(pitch_motor);
+
     osDelay(KILLALL_DELAY);
   }
 }
 
-static bool debug = true;
+static bool debug = false;
 
 void RM_RTOS_Default_Task(const void* arg) {
   UNUSED(arg);
@@ -689,6 +716,7 @@ void RM_RTOS_Default_Task(const void* arg) {
 
       print("CH0: %-4d CH1: %-4d CH2: %-4d CH3: %-4d ", dbus->ch0, dbus->ch1, dbus->ch2, dbus->ch3);
       print("SWL: %d SWR: %d @ %d ms\r\n", dbus->swl, dbus->swr, dbus->timestamp);
+
     }
 
     osDelay(DEFAULT_TASK_DELAY);

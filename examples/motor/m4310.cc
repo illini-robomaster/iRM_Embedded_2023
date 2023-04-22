@@ -50,29 +50,28 @@ void RM_RTOS_Default_Task(const void* args) {
   motor->SetZeroPos4310(motor);  // for setting the zero position
   motor->Initialize4310(motor);
 
-//  while (true) {
-////    motor->SetOutput4310(0, 0, 0.4, 0.05, 0); // MIT pos mode
-////    motor->SetOutput4310(2*PI, 3, 0, 1, 0);   // MIT vel mode
-//    motor->SetOutput4310(2*PI, 10);   // pos-vel mode
-////    motor->SetOutput4310(2);  // vel mode
-//    motor->TransmitOutput4310(motor);
-//    osDelay(10);
-//  }
-
-  float pos = 0;
   while (true) {
-    float vel;
-    vel = clip<float>(dbus->ch1 / 660.0 * 15.0, -15, 15);
-    pos += vel / 200;
-    pos = clip<float>(pos, -PI/8, PI/6);
-
-    set_cursor(0, 0);
-    clear_screen();
-    print("Vel Set: %f  Pos Set: %f\n", vel, pos);
-
-    motor->SetOutput4310(pos, vel, 95, 0.5, 0);
-//    motor->SetOutput4310(pos, vel);
+//    motor->SetOutput4310(0, 0, 0.4, 0.05, 0); // MIT pos mode
+    motor->SetOutput4310(PI/8, 0.1, 0, 1, 0);   // MIT vel mode
+//    motor->SetOutput4310(2*PI, 10);   // pos-vel mode
+//    motor->SetOutput4310(2);  // vel mode
     motor->TransmitOutput4310(motor);
     osDelay(10);
   }
+
+//  float pos = 0;
+//  while (true) {
+//    float vel;
+//    vel = clip<float>(dbus->ch1 / 660.0 * 15.0, -15, 15);
+//    pos += vel / 200;
+//    pos = clip<float>(pos, -PI/8, PI/6);
+//
+//    set_cursor(0, 0);
+//    clear_screen();
+//    print("Vel Set: %f  Pos Set: %f\n", vel, pos);
+//
+//    motor->SetOutput4310(pos, vel, 95, 0.5, 0);
+//    motor->TransmitOutput4310(motor);
+//    osDelay(10);
+//  }
 }
