@@ -1,6 +1,6 @@
 /****************************************************************************
  *                                                                          *
- *  Copyright (C) 2022 RoboMaster.                                          *
+ *  Copyright (C) 2023 RoboMaster.                                          *
  *  Illini RoboMaster @ University of Illinois at Urbana-Champaign          *
  *                                                                          *
  *  This program is free software: you can redistribute it and/or modify    *
@@ -18,48 +18,34 @@
  *                                                                          *
  ****************************************************************************/
 
-#include "bsp_gpio.h"
-#include "bsp_print.h"
-#include "cmsis_os.h"
-#include "main.h"
-#include "motor.h"
+#pragma once
 
-#define KEY_GPIO_GROUP GPIOA
-#define KEY_GPIO_PIN GPIO_PIN_0
+#include <stdint.h>
+#include <string.h>
 
-bsp::CAN* can1 = NULL;
-bsp::GPIO* key = nullptr;
-control::MotorCANBase* motor1 = NULL;
-control::MotorCANBase* motor2 = NULL;
+/**
+ * CRC8 checksum calculation
+ *
+ * @param  pchMessage Message to check
+ * @param  dwLength   Length of the message
+ * @param  ucCRC8     Initialized checksum
+ * @return            CRC checksum
+ */
+uint8_t get_crc8_check_sum(uint8_t* pchMessage, uint16_t dwLength, uint8_t ucCRC8);
 
-void RM_RTOS_Init() {
-  print_use_uart(&huart1);
+/**
+ * Verify CRC8
+ *
+ * @param  pchMessage Message to verify
+ * @param  dwLength   Length = Data + Checksum
+ * @return            1 for true, 0 for false
+ */
+uint8_t verify_crc8_check_sum(uint8_t* pchMessage, uint16_t dwLength);
 
-  can1 = new bsp::CAN(&hcan1, 0x205, true);
-  motor1 = new control::Motor6020(can1, 0x205);
-  motor2 = new control::Motor6020(can1, 0x207);
-  key = new bsp::GPIO(KEY_GPIO_GROUP, KEY_GPIO_PIN);
-}
-
-void RM_RTOS_Default_Task(const void* args) {
-  UNUSED(args);
-  control::MotorCANBase* motors[] = {motor1, motor2};
-
-  while(!key->Read());
-
-  while(key->Read());
-
-  print("ok!\r\n");
-
-  while (true) {
-    if (key->Read()) {
-      motor2->SetOutput(0);
-      motor1->SetOutput(0);
-    } else {
-      motor1->SetOutput(800);
-      print("%10.4f ", motor1->GetTheta());
-    }
-    control::MotorCANBase::TransmitOutput(motors, 2);
-    osDelay(2);
-  }
-}
+/**
+ * Append CRC8 to the end of message
+ *
+ * @param  pchMessage Message to calculate CRC and append
+ * @param  dwLength   Length = Data + Checksum
+ */
+void append_crc8_check_sum(uint8_t* pchMessage, uint16_t dwLength);

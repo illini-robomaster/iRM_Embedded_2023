@@ -52,6 +52,14 @@ irm_add_arm_executable(${PROJECT_NAME}_pwm
     TARGET DJI_Board_TypeA
     SOURCES pwm.cc)
 
+irm_add_arm_executable(${PROJECT_NAME}_m2006_antijam
+    TARGET DJI_Board_TypeA
+    SOURCES m2006_antijam.cc)
+
+irm_add_arm_executable(${PROJECT_NAME}_m2006_reload_modes
+    TARGET DJI_Board_TypeA
+    SOURCES m2006_reload_modes.cc)
+
 irm_add_arm_executable(${PROJECT_NAME}_m4310
         TARGET DJI_Board_TypeC
         SOURCES m4310.cc)
