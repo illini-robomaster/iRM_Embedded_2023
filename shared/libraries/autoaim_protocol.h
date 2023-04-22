@@ -36,9 +36,9 @@ struct STMToJetsonData {
 
 // WARNING: THIS CLASS IS NOT THREAD SAFE!!!
 
-class MiniPCProtocol {
+class AutoaimProtocol {
  public:
-  MiniPCProtocol();
+  AutoaimProtocol();
   void Receive(const uint8_t* data, uint8_t len);
   // dummy send
   void Send(STMToJetsonData* packet, uint8_t color);
@@ -68,6 +68,6 @@ class MiniPCProtocol {
   float relative_pitch;
   uint32_t seqnum;
   uint32_t valid_packet_cnt = 0;
-}; /* class MiniPCProtocol */
+}; /* class AutoaimProtocol */
 
 } /* namespace communication */
