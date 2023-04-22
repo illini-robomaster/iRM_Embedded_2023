@@ -1,6 +1,6 @@
 /****************************************************************************
  *                                                                          *
- *  Copyright (C) 2022 RoboMaster.                                          *
+ *  Copyright (C) 2023 RoboMaster.                                          *
  *  Illini RoboMaster @ University of Illinois at Urbana-Champaign          *
  *                                                                          *
  *  This program is free software: you can redistribute it and/or modify    *
@@ -18,48 +18,36 @@
  *                                                                          *
  ****************************************************************************/
 
-#include "bsp_gpio.h"
-#include "bsp_print.h"
-#include "cmsis_os.h"
-#include "main.h"
-#include "motor.h"
+#pragma once
 
-#define KEY_GPIO_GROUP GPIOA
-#define KEY_GPIO_PIN GPIO_PIN_0
+class FilterBase {
+public:
+    virtual void register_state(float input, float timestamp) = 0;
 
-bsp::CAN* can1 = NULL;
-bsp::GPIO* key = nullptr;
-control::MotorCANBase* motor1 = NULL;
-control::MotorCANBase* motor2 = NULL;
+    virtual float get_estimation() = 0;
+};
 
-void RM_RTOS_Init() {
-  print_use_uart(&huart1);
+class KalmanFilter : public FilterBase {
+public:
+    KalmanFilter(float init_x, float init_t);
+    void register_state(float input, float timestamp);
+    float get_estimation();
+    float iter_and_get_estimation();
 
-  can1 = new bsp::CAN(&hcan1, 0x205, true);
-  motor1 = new control::Motor6020(can1, 0x205);
-  motor2 = new control::Motor6020(can1, 0x207);
-  key = new bsp::GPIO(KEY_GPIO_GROUP, KEY_GPIO_PIN);
-}
+private:
+    float xhat = 0;  // a posteriori estimate of x
+    float xhatminus = 0;  // a priori estimate of x
+    float P = 0;  // posteriori error estimate
+    float Pminus = 0;  // a priori error estimate
 
-void RM_RTOS_Default_Task(const void* args) {
-  UNUSED(args);
-  control::MotorCANBase* motors[] = {motor1, motor2};
+    float Q = 2; // process noise covariance
+    float H = 1; // measurement function
 
-  while(!key->Read());
+    float A = 1; // state transition matrix
+    float B = 0; // control matrix
 
-  while(key->Read());
+    float R = 2; // measurement noise covariance
 
-  print("ok!\r\n");
-
-  while (true) {
-    if (key->Read()) {
-      motor2->SetOutput(0);
-      motor1->SetOutput(0);
-    } else {
-      motor1->SetOutput(800);
-      print("%10.4f ", motor1->GetTheta());
-    }
-    control::MotorCANBase::TransmitOutput(motors, 2);
-    osDelay(2);
-  }
-}
+    float last_x = 0;
+    float last_t = 0;
+};
