@@ -1,5 +1,6 @@
 #include "filtering.h"
-#include "util.h"
+#include "controller.h"
+#include "utils.h"
 
 /* Designed for ANGLE!!! */
 
@@ -13,6 +14,15 @@ KalmanFilter::KalmanFilter(float init_x, float init_t) : FilterBase() {
 void KalmanFilter::register_state(float input, float timestamp) {
     last_x = input;
     last_t = timestamp;
+
+    // Wrap xhat and xhatminus
+    if (abs(xhat + 2 * PI - input) < abs(xhat - input)) {
+        xhat += 2 * PI;
+        xhatminus += 2 * PI;
+    } else if (abs(xhat - 2 * PI - input) < abs(xhat - input)) {
+        xhat -= 2 * PI;
+        xhatminus -= 2 * PI;
+    }
 }
 
 float KalmanFilter::iter_and_get_estimation() {

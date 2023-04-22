@@ -170,10 +170,12 @@ void RM_RTOS_Default_Task(const void* args) {
     relative_pitch = 0;
     relative_yaw = 0;
 
+  // naive implementation
     // abs_autoaim_pitch = gimbal->ComputePitchRel(rel_pitch_buffer, abs_autoaim_pitch);
     // abs_autoaim_yaw = gimbal->ComputeYawRel(rel_yaw_buffer, abs_autoaim_yaw);
     // gimbal->TargetAbsNoOffset(abs_autoaim_pitch, abs_autoaim_yaw);
 
+    // kalman filter implementation
     if (rel_pitch_buffer != 0 && rel_yaw_buffer != 0) {
       // new data comes in
       abs_autoaim_pitch = gimbal->ComputePitchRel(rel_pitch_buffer, abs_autoaim_pitch);
