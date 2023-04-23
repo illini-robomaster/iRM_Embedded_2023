@@ -27,7 +27,7 @@
 #include "gimbal.h"
 #include "rgb.h"
 #include "bsp_gpio.h"
-#include "minipc.h"
+#include "autoaim_protocol.h"
 #include "filtering.h"
 
 /* Define Gimabal-related parameters */
@@ -110,7 +110,7 @@ void jetsonCommTask(void* arg) {
   uart->SetupRx(50);
   uart->SetupTx(50);
 
-  auto miniPCreceiver = communication::MiniPCProtocol();
+  auto miniPCreceiver = communication::AutoaimProtocol();
   int total_processed_bytes = 0;
 
   while (true) {
