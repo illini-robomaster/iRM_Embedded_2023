@@ -38,8 +38,8 @@ void RM_RTOS_Init() {
 void RM_RTOS_Default_Task(const void* args) {
   // need to press reset to begin
   UNUSED(args);
-  motor->SetZeroPos4310(motor);
-  motor->Initialize4310(motor);
+  motor->SetZeroPos(motor);
+  motor->MotorEnable(motor);
 
   float pos = 0;
   while (true) {
@@ -52,8 +52,8 @@ void RM_RTOS_Default_Task(const void* args) {
     clear_screen();
     print("Vel Set: %f  Pos Set: %f\n", vel, pos);
 
-    motor->SetOutput4310(pos, vel);
-    motor->TransmitOutput4310(motor);
+    motor->SetOutput(pos, vel);
+    motor->TransmitOutput(motor);
     osDelay(10);
   }
 }

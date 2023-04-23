@@ -50,7 +50,7 @@ static const int SHOOTER_TASK_DELAY = 10;
 static const int SELFTEST_TASK_DELAY = 100;
 static const int KILLALL_DELAY = 100;
 static const int DEFAULT_TASK_DELAY = 100;
-static const float start_pitch_pos = PI/5;
+static const float START_PITCH_POS = PI/5;
 
 static bsp::CanBridge* send = nullptr;
 
@@ -60,7 +60,7 @@ static BoolEdgeDetector ChangeSpinMode(false);
 static volatile bool SpinMode = false;
 
 static volatile float relative_angle = 0;
-static volatile float pitch_pos = start_pitch_pos;
+static volatile float pitch_pos = START_PITCH_POS;
 
 static bool volatile pitch_motor_flag = false;
 static bool volatile yaw_motor_flag = false;
@@ -161,14 +161,14 @@ void gimbalTask(void* arg) {
     ++i;
   }
 
-  pitch_motor->Initialize4310(pitch_motor);
+  pitch_motor->MotorEnable(pitch_motor);
 
   // 4310 soft start
   float tmp_pos = 0;
-  for (int j = 0; j < 2000; j++){
-    tmp_pos += start_pitch_pos / 2000;
-    pitch_motor->SetOutput4310(tmp_pos, 1, 115, 0.5, 0);
-    pitch_motor->TransmitOutput4310(pitch_motor);
+  for (int j = 0; j < 1000; j++){
+    tmp_pos += START_PITCH_POS / 1000;  // increase position gradually
+    pitch_motor->SetOutput(tmp_pos, 1, 115, 0.5, 0);
+    pitch_motor->TransmitOutput(pitch_motor);
   }
 
   print("Start Calibration.\r\n");
@@ -224,9 +224,9 @@ void gimbalTask(void* arg) {
       // 4310 soft start
       tmp_pos = 0;
       for (int j = 0; j < 1000; j++){
-        tmp_pos += start_pitch_pos / 1000;
-        pitch_motor->SetOutput4310(tmp_pos, 1, 115, 0.5, 0);
-        pitch_motor->TransmitOutput4310(pitch_motor);
+        tmp_pos += START_PITCH_POS / 1000;  // increase position gradually
+        pitch_motor->SetOutput(tmp_pos, 1, 115, 0.5, 0);
+        pitch_motor->TransmitOutput(pitch_motor);
       }
       pitch_pos = tmp_pos;
       pitch_reset = false;
@@ -241,9 +241,9 @@ void gimbalTask(void* arg) {
     gimbal->TargetRel(-pitch_diff, yaw_diff);
     gimbal->Update();
 
-    pitch_motor->SetOutput4310(pitch_pos, pitch_vel, 115, 0.5, 0);
+    pitch_motor->SetOutput(pitch_pos, pitch_vel, 115, 0.5, 0);
     control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
-    pitch_motor->TransmitOutput4310(pitch_motor);
+    pitch_motor->TransmitOutput(pitch_motor);
     osDelay(GIMBAL_TASK_DELAY);
   }
 }
@@ -599,7 +599,7 @@ void RM_RTOS_Init(void) {
   pitch_motor = new control::Motor4310(can1, 0x02, 0x01, 0);
   yaw_motor = new control::Motor6020(can1, 0x206);
   control::gimbal_t gimbal_data;
-  gimbal_data.pitch_motor = pitch_motor;
+  gimbal_data.pitch_motor_4310_ = pitch_motor;
   gimbal_data.yaw_motor = yaw_motor;
   gimbal_data.model = control::GIMBAL_STEERING_4310;
   gimbal = new control::Gimbal(gimbal_data);
@@ -658,20 +658,20 @@ void KillAll() {
       Dead = false;
       RGB->Display(display::color_green);
       laser->On();
-      pitch_motor->Initialize4310(pitch_motor);
+      pitch_motor->MotorEnable(pitch_motor);
       break;
     }
 
     // 4310 soft kill
     float tmp_pos = pitch_pos;
     for (int j = 0; j < 1000; j++){
-      tmp_pos -= start_pitch_pos / 1000;
-      pitch_motor->SetOutput4310(tmp_pos, 1, 115, 0.5, 0);
-      pitch_motor->TransmitOutput4310(pitch_motor);
+      tmp_pos -= START_PITCH_POS / 1000;  // decrease position gradually
+      pitch_motor->SetOutput(tmp_pos, 1, 115, 0.5, 0);
+      pitch_motor->TransmitOutput(pitch_motor);
     }
 
     pitch_reset = true;
-    pitch_motor->Unintialize4310(pitch_motor);
+    pitch_motor->MotorDisable(pitch_motor);
 
     yaw_motor->SetOutput(0);
     control::MotorCANBase::TransmitOutput(motors_can2_gimbal, 1);

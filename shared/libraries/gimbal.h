@@ -48,6 +48,7 @@ typedef struct {
  * @brief structure used when gimbal instance is initialized
  */
 typedef struct {
+  Motor4310* pitch_motor_4310_;    /* 4310 pitch motor instance */
   MotorCANBase* pitch_motor; /* pitch motor instance */
   MotorCANBase* yaw_motor;   /* yaw motor instance   */
   gimbal_model_t model;      /* gimbal model         */
@@ -137,6 +138,7 @@ class Gimbal {
 
  private:
   // acquired from user
+  Motor4310* pitch_motor_4310_ = nullptr;
   MotorCANBase* pitch_motor_ = nullptr;
   MotorCANBase* yaw_motor_ = nullptr;
   gimbal_model_t model_;

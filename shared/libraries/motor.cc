@@ -540,7 +540,7 @@ void SteeringMotor::UpdateData(const uint8_t data[]) {
 }
 
 
-Motor4310::Motor4310(bsp::CAN* can, uint16_t rx_id, uint16_t tx_id, uint8_t mode) : MotorCANBase(can, rx_id, 4310) {
+Motor4310::Motor4310(bsp::CAN* can, uint16_t rx_id, uint16_t tx_id, uint8_t mode) : can_(can), rx_id_(rx_id) {
   can->RegisterRxCallback(rx_id, can_motor_callback, this);
   /* following the CAN id format from the document */
   mode_ = mode;
@@ -555,7 +555,7 @@ Motor4310::Motor4310(bsp::CAN* can, uint16_t rx_id, uint16_t tx_id, uint8_t mode
   }
 }
 
-void Motor4310::Initialize4310(Motor4310* motor) {
+void Motor4310::MotorEnable(Motor4310* motor) {
   uint8_t data[8] = {0};
   data[0] = 0xff;
   data[1] = 0xff;
@@ -568,7 +568,7 @@ void Motor4310::Initialize4310(Motor4310* motor) {
   motor->can_->Transmit(motor->tx_id_, data, 8);
 }
 
-void Motor4310::Unintialize4310(control::Motor4310* motor) {
+void Motor4310::MotorDisable(control::Motor4310* motor) {
   uint8_t data[8] = {0};
   data[0] = 0xff;
   data[1] = 0xff;
@@ -581,7 +581,7 @@ void Motor4310::Unintialize4310(control::Motor4310* motor) {
   motor->can_->Transmit(motor->tx_id_, data, 8);
 }
 
-void Motor4310::SetZeroPos4310(control::Motor4310* motor) {
+void Motor4310::SetZeroPos(control::Motor4310* motor) {
   uint8_t data[8] = {0};
   data[0] = 0xff;
   data[1] = 0xff;
@@ -594,7 +594,7 @@ void Motor4310::SetZeroPos4310(control::Motor4310* motor) {
   motor->can_->Transmit(motor->tx_id_, data, 8);
 }
 
-void Motor4310::SetOutput4310(float position, float velocity, float kp, float kd, float torque) {
+void Motor4310::SetOutput(float position, float velocity, float kp, float kd, float torque) {
   kp_set_ = kp;
   kd_set_ = kd;
   pos_set_ = position;
@@ -602,18 +602,20 @@ void Motor4310::SetOutput4310(float position, float velocity, float kp, float kd
   torque_set_ = torque;
 }
 
-void Motor4310::SetOutput4310(float position, float velocity) {
+void Motor4310::SetOutput(float position, float velocity) {
   pos_set_ = position;
   vel_set_ = velocity;  // TODO check type
 }
 
-void Motor4310::SetOutput4310(float velocity) {
+void Motor4310::SetOutput(float velocity) {
   vel_set_ = velocity;
 }
 
-void Motor4310::TransmitOutput4310(Motor4310* motor) {
+void Motor4310::TransmitOutput(Motor4310* motor) {
   uint8_t data[8] = {0};
   int16_t kp_tmp, kd_tmp, pos_tmp, vel_tmp, torque_tmp;
+
+  // converting float to unsigned int; see DAMIAO document V1.2 for detail
   kp_tmp = float_to_uint(kp_set_, 0.0, 500.0, 12);
   kd_tmp = float_to_uint(kd_set_, 0, 5, 12);
   pos_tmp = float_to_uint(pos_set_, -12.5, 12.5, 16);
@@ -668,7 +670,7 @@ void Motor4310::UpdateData(const uint8_t data[]) {
   connection_flag_ = true;
 }
 
-void Motor4310::PrintData() const {
+void Motor4310::PrintData() {
   set_cursor(0, 0);
   clear_screen();
   print("Position: % .4f \r\n", raw_pos_);

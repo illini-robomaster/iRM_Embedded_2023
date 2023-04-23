@@ -134,7 +134,7 @@ class MotorCANBase : public MotorBase {
    *        many of the private parameters of MotorCANBase.
    */
   friend class ServoMotor;
-  friend class Motor4310;
+//  friend class Motor4310;
 
   volatile bool connection_flag_ = false;
 
@@ -608,7 +608,8 @@ class SteeringMotor {
 /**
  * @brief m4310 motor class
  */
-class Motor4310 : public MotorCANBase {
+//class Motor4310 : public MotorCANBase {
+class Motor4310 {
  public:
   /** constructor wrapper over MotorCANBase
    *  CAN frame id for different modes:
@@ -625,14 +626,14 @@ class Motor4310 : public MotorCANBase {
   Motor4310(bsp::CAN* can, uint16_t rx_id, uint16_t tx_id, uint8_t mode);
 
   /* implements data update callback */
-  void UpdateData(const uint8_t data[]) override final;
+  void UpdateData(const uint8_t data[]);
 
   /* initialize m4310 */
-  void Initialize4310(Motor4310* motor);
+  void MotorEnable(Motor4310* motor);
   /* uninitialize m4310 */
-  void Unintialize4310(Motor4310* motor);
+  void MotorDisable(Motor4310* motor);
   /* set zero position */
-  void SetZeroPos4310(Motor4310* motor);
+  void SetZeroPos(Motor4310* motor);
 
   /**
    * implements transmit output specifically for 4310
@@ -642,19 +643,19 @@ class Motor4310 : public MotorCANBase {
    *                1: position-velocity
    *                2: velocity
    */
-  void TransmitOutput4310(control::Motor4310* motor);
+  void TransmitOutput(control::Motor4310* motor);
 
   /* implements data printout */
-  void PrintData() const override final;
+  void PrintData();
 
   /* set output parameters for m4310 using MIT mode */
-  void SetOutput4310(float position, float velocity, float kp, float kd, float torque);
+  void SetOutput(float position, float velocity, float kp, float kd, float torque);
 
   /* set output parameters for m4310 using position-velocity mode */
-  void SetOutput4310(float position, float velocity);
+  void SetOutput(float position, float velocity);
 
   /* set output parameters for m4310 using velocity mode */
-  void SetOutput4310(float velocity);
+  void SetOutput(float velocity);
 
   /**
  * @brief Converts a float to an unsigned int, given range and number of bits
@@ -666,9 +667,14 @@ class Motor4310 : public MotorCANBase {
    */
   static int16_t float_to_uint(float x, float x_min, float x_max, int bits);
 
- private:
-  volatile uint8_t mode_;  // current motor mode
+  volatile bool connection_flag_ = false;
 
+ private:
+  bsp::CAN* can_;
+  uint16_t rx_id_;
+  uint16_t tx_id_;
+
+  volatile uint8_t mode_;  // current motor mode
   volatile float kp_set_ = 0;   // defined kp value
   volatile float kd_set_ = 0;   // defined kd value
   volatile float vel_set_ = 0;  // defined velocity
