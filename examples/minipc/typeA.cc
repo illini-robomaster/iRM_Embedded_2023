@@ -27,7 +27,7 @@
 #include "bsp_print.h"
 #include "bsp_uart.h"
 #include "cmsis_os.h"
-#include "minipc.h"
+#include "autoaim_protocol.h"
 
 #define RX_SIGNAL (1 << 0)
 
@@ -57,7 +57,7 @@ void RM_RTOS_Default_Task(const void* argument) {
   gpio_red = new bsp::GPIO(LED_RED_GPIO_Port, LED_RED_Pin);
   gpio_green = new bsp::GPIO(LED_GREEN_GPIO_Port, LED_GREEN_Pin);
 
-  auto miniPCreceiver = communication::MiniPCProtocol();
+  auto miniPCreceiver = communication::AutoaimProtocol();
 
   while (true) {
     /* wait until rx data is available */

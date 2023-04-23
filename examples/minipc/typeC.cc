@@ -27,7 +27,7 @@
 #include "bsp_print.h"
 #include "bsp_uart.h"
 #include "cmsis_os.h"
-#include "minipc.h"
+#include "autoaim_protocol.h"
 #include "rgb.h"
 
 #define RX_SIGNAL (1 << 0)
@@ -59,7 +59,7 @@ void RM_RTOS_Default_Task(const void* argument) {
   uart->SetupRx(50);
   uart->SetupTx(50);
 
-  auto miniPCreceiver = communication::MiniPCProtocol();
+  auto miniPCreceiver = communication::AutoaimProtocol();
   int total_processed_bytes = 0;
 
   while (true) {
