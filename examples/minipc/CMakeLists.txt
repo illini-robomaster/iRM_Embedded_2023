@@ -22,10 +22,9 @@ project(example_minipc ASM C CXX)
 
 irm_add_arm_executable(${PROJECT_NAME}
     TARGET DJI_Board_TypeA
-    SOURCES main.cc)
-target_compile_definitions(${PROJECT_NAME}.elf PRIVATE UART_HANDLE=huart8)
+    SOURCES typeA.cc)
 
-irm_add_arm_executable(${PROJECT_NAME}_class
-    TARGET DJI_Board_TypeA
-    SOURCES test.cc)
-target_compile_definitions(${PROJECT_NAME}.elf PRIVATE UART_HANDLE=huart8)
+irm_add_arm_executable(${PROJECT_NAME}_typeC
+    TARGET DJI_Board_TypeC
+    SOURCES typeC.cc)
+

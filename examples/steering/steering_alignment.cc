@@ -18,36 +18,27 @@
  *                                                                          *
  ****************************************************************************/
 
-#include "main.h"
-
-#include <cmath>
-
 #include "bsp_gpio.h"
 #include "bsp_os.h"
 #include "bsp_print.h"
 #include "cmsis_os.h"
-#include "dbus.h"
-#include "steering.h"
+#include "controller.h"
+#include "main.h"
 #include "motor.h"
+#include "steering.h"
+#include "utils.h"
 
 bsp::CAN* can1 = nullptr;
 bsp::CAN* can2 = nullptr;
 
-constexpr float RUN_SPEED = (4 * PI);
+constexpr float RUN_SPEED = (10 * PI) / 32;
 constexpr float ALIGN_SPEED = (PI);
 constexpr float ACCELERATION = (100 * PI);
-constexpr float WHEEL_SPEED = 200;
 
 constexpr float OFFSET_MOTOR1 = 0;
 constexpr float OFFSET_MOTOR2 = 0;
 constexpr float OFFSET_MOTOR3 = 0;
 constexpr float OFFSET_MOTOR4 = 0;
-
-/* Usage:
- * Working Steering Chassis Example
- * Left stick for translation, right stick for rotation
- * Right switch UP is to start an alignment (calibration)
-**/
 
 control::MotorCANBase* motor1 = nullptr;
 control::MotorCANBase* motor2 = nullptr;
@@ -63,6 +54,9 @@ control::MotorCANBase* motor5 = nullptr;
 control::MotorCANBase* motor6 = nullptr;
 control::MotorCANBase* motor7 = nullptr;
 control::MotorCANBase* motor8 = nullptr;
+
+bsp::GPIO* key1 = nullptr;
+BoolEdgeDetector key_detector(false);
 
 bsp::GPIO* pe1 = nullptr;
 bsp::GPIO* pe2 = nullptr;
@@ -88,12 +82,21 @@ bool steering_align_detect4() {
 control::steering_chassis_t* steering_chassis;
 
 control::SteeringChassis* chassis;
-remote::DBUS* dbus = nullptr;
 
 void RM_RTOS_Init() {
   print_use_uart(&huart1);
   bsp::SetHighresClockTimer(&htim5);
 
+  // button on typeC. 1 if not pressed 0 otherwise
+  key1 = new bsp::GPIO(GPIOA, GPIO_PIN_0);
+
+  /* Usage:
+   *   The 'key' is the button on TypeC board.
+   *   The goal of this example is to measure the offset (position of photoelectric sensors to real alignment position)
+   *   Press key to start alignment, you should see four wheels turning to align.
+   *   When alignment finishes, press key again to turn off motors' power.
+   *   Now you can turn the motor manually. Align motors by hand to measure the offset of each motor.
+  **/
   pe1 = new bsp::GPIO(IN1_GPIO_Port, IN1_Pin);
   pe2 = new bsp::GPIO(IN2_GPIO_Port, IN2_Pin);
   pe3 = new bsp::GPIO(IN3_GPIO_Port, IN3_Pin);
@@ -143,6 +146,7 @@ void RM_RTOS_Init() {
   steering_chassis->br_steer_motor = steering2;
 
   // init wheels
+  // Need to init because steering chassis rejects nullptr
   motor5 = new control::Motor3508(can2, 0x205);
   motor6 = new control::Motor3508(can2, 0x206);
   motor7 = new control::Motor3508(can2, 0x207);
@@ -154,87 +158,50 @@ void RM_RTOS_Init() {
   steering_chassis->br_wheel_motor = motor6;
 
   chassis = new control::SteeringChassis(steering_chassis);
-
-  dbus = new remote::DBUS(&huart3);
 }
 
 void RM_RTOS_Default_Task(const void* args) {
   UNUSED(args);
-
   control::MotorCANBase* steer_motors[] = {motor1, motor2, motor3, motor4};
 
-  control::MotorCANBase* wheel_motors[] = {motor5, motor6, motor7, motor8};
-  control::PIDController pid5(120, 15, 30);
-  control::PIDController pid6(120, 15, 30);
-  control::PIDController pid7(120, 15, 30);
-  control::PIDController pid8(120, 15, 30);
+  osDelay(500);
 
-  osDelay(500);  // DBUS initialization needs time
+  // Press Key to start aligning. Else sudden current change when power is switched on might break
+  // the board.
+  while(key1->Read());
 
-  double vx = 0.0;
-  double vy = 0.0;
-  double vw = 0.0;
+  // wait for release because align_detect also is key press here
+  while(!key1->Read());
 
-  float v5 = 0;
-  float v6 = 0;
-  float v7 = 0;
-  float v8 = 0;
+  print("Alignment Begin\r\n");
 
-  bool alignment = false;
+  chassis->SteerSetMaxSpeed(ALIGN_SPEED);
 
-  while (true) {
-    vx = -static_cast<double>(dbus->ch3) / 660;
-    vy = static_cast<double>(dbus->ch2) / 660;
-    vw = static_cast<double>(dbus->ch0) / 660;
-
-    // Kill switch
-    if (dbus->swl == remote::UP || dbus->swl == remote::DOWN) {
-      RM_ASSERT_TRUE(false, "Operation killed");
-    }
-
-    // Only Calibrate once per Switch change
-    if (dbus->swr != remote::UP) {
-      alignment = false;
-    }
-    // Right Switch Up to start a calibration
-    if (dbus->swr == remote::UP && alignment == false) {
-      chassis->SteerSetMaxSpeed(ALIGN_SPEED);
-      bool alignment_complete = false;
-      while (!alignment_complete) {
-        chassis->SteerCalcOutput();
-        control::MotorCANBase::TransmitOutput(steer_motors, 4);
-        alignment_complete = chassis->Calibrate();
-        osDelay(1);
-      }
-      chassis->ReAlign();
-      alignment = true;
-      chassis->SteerSetMaxSpeed(RUN_SPEED);
-      chassis->SteerThetaReset();
-
-      v5 = 0;
-      v6 = 0;
-      v7 = 0;
-      v8 = 0;
-      chassis->SetWheelSpeed(0,0,0,0);
-    } else {
-      chassis->SetSpeed(vx, vy, vw);
-      chassis->SteerUpdateTarget();
-      chassis->WheelUpdateSpeed(WHEEL_SPEED);
-      v5 = chassis->v_bl_;
-      v6 = chassis->v_br_;
-      v7 = chassis->v_fr_;
-      v8 = chassis->v_fl_;
-    }
-
+  bool alignment_complete = false;
+  while (!alignment_complete) {
     chassis->SteerCalcOutput();
-
-    motor5->SetOutput(pid5.ComputeConstrainedOutput(motor5->GetOmegaDelta(v5)));
-    motor6->SetOutput(pid6.ComputeConstrainedOutput(motor6->GetOmegaDelta(v6)));
-    motor7->SetOutput(pid7.ComputeConstrainedOutput(motor7->GetOmegaDelta(v7)));
-    motor8->SetOutput(pid8.ComputeConstrainedOutput(motor8->GetOmegaDelta(v8)));
-
     control::MotorCANBase::TransmitOutput(steer_motors, 4);
-    control::MotorCANBase::TransmitOutput(wheel_motors, 4);
-    osDelay(2);
+    alignment_complete = chassis->Calibrate();
+    osDelay(1);
   }
+
+  chassis->ReAlign();
+  chassis->PrintData();
+
+  print("\r\nAlignment End\r\n");
+
+  while(1) {
+    chassis->SteerCalcOutput();
+    control::MotorCANBase::TransmitOutput(steer_motors, 4);
+    osDelay(2);
+    if (!key1->Read()) {
+      break;
+    }
+  }
+
+  while(1) {
+    chassis->PrintData();
+    osDelay(1000);
+  }
+
 }

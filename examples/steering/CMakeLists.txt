@@ -20,10 +20,10 @@
 
 project(example_steering ASM C CXX)
 
-irm_add_arm_executable(${PROJECT_NAME}_one
-    TARGET DJI_Board_TypeA
-    SOURCES steering_test.cc)
-
-irm_add_arm_executable(${PROJECT_NAME}_chassis
+irm_add_arm_executable(${PROJECT_NAME}
     TARGET DJI_Board_TypeC
-    SOURCES steering_chassis.cc)
+    SOURCES main.cc)
+
+irm_add_arm_executable(${PROJECT_NAME}_alignment
+    TARGET DJI_Board_TypeC
+    SOURCES steering_alignment.cc)

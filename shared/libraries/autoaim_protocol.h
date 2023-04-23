@@ -18,64 +18,56 @@
  *                                                                          *
  ****************************************************************************/
 
-#include "main.h"
+#pragma once
 
-#include <cstring>
-#include <memory>
-
-#include "bsp_gpio.h"
 #include "bsp_print.h"
 #include "bsp_uart.h"
 #include "cmsis_os.h"
-#include "minipc.h"
+#include "crc8.h"
 
-#define RX_SIGNAL (1 << 0)
+namespace communication {
 
-extern osThreadId_t defaultTaskHandle;
-
-static bsp::GPIO *gpio_red, *gpio_green;
-
-class CustomUART : public bsp::UART {
- public:
-  using bsp::UART::UART;
-
- protected:
-  /* notify application when rx data is pending read */
-  void RxCompleteCallback() override final { osThreadFlagsSet(defaultTaskHandle, RX_SIGNAL); }
+struct STMToJetsonData {
+  char header[2];
+  uint8_t my_color; // RED is 0; BLUE is one
+  uint8_t crc8_checksum;
+  char tail[2];
 };
 
-void RM_RTOS_Default_Task(const void* argument) {
-  UNUSED(argument);
+// WARNING: THIS CLASS IS NOT THREAD SAFE!!!
 
-  uint32_t length;
-  uint8_t* data;
+class AutoaimProtocol {
+ public:
+  AutoaimProtocol();
+  void Receive(const uint8_t* data, uint8_t len);
+  // dummy send
+  void Send(STMToJetsonData* packet, uint8_t color);
+  uint8_t get_valid_flag(void);
+  float get_relative_yaw(void);
+  float get_relative_pitch(void);
+  uint32_t get_seqnum(void);
+  uint32_t get_valid_packet_cnt(void);
 
-  auto uart = std::make_unique<CustomUART>(&huart8);  // see cmake for which uart
-  uart->SetupRx(50);
-  uart->SetupTx(50);
+ private:
+  // For definitions of constants, check out the documentation at either
+  // https://github.com/illini-robomaster/iRM_Vision_2023/blob/roger/crc_comm/docs/comm_protocol.md
+  // or https://github.com/illini-robomaster/iRM_Vision_2023/tree/docs/comm_protocol.md
+  static constexpr uint8_t PKG_LEN = 17;
+  static constexpr int32_t INT_FP_SCALE = 1000000;
+  static constexpr uint8_t SEQNUM_OFFSET = 2;
+  static constexpr uint8_t REL_YAW_OFFSET = SEQNUM_OFFSET + 4;
+  static constexpr uint8_t REL_PITCH_OFFSET = REL_YAW_OFFSET + 4;
 
-  gpio_red = new bsp::GPIO(LED_RED_GPIO_Port, LED_RED_Pin);
-  gpio_green = new bsp::GPIO(LED_GREEN_GPIO_Port, LED_GREEN_Pin);
+  int index;
+  uint8_t flag;
+  uint8_t host_command[PKG_LEN];
+  void handle();
+  void process_data();
 
-  auto miniPCreceiver = communication::MiniPCProtocol();
+  float relative_yaw;
+  float relative_pitch;
+  uint32_t seqnum;
+  uint32_t valid_packet_cnt = 0;
+}; /* class AutoaimProtocol */
 
-  while (true) {
-    /* wait until rx data is available */
-    uint32_t flags = osThreadFlagsWait(RX_SIGNAL, osFlagsWaitAll, osWaitForever);
-    if (flags & RX_SIGNAL) {  // unnecessary check
-      /* time the non-blocking rx / tx calls (should be <= 1 osTick) */
-      length = uart->Read(&data);
-
-      // if read anything, flash red
-      gpio_red->High();
-
-      miniPCreceiver.Receive(data, length);
-      if (miniPCreceiver.get() == 1) {
-        gpio_green->High();
-      }
-      osDelay(200);
-      gpio_green->Low();
-      gpio_red->Low();
-    }
-  }
-}
+} /* namespace communication */

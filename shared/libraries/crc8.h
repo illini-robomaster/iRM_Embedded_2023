@@ -1,6 +1,6 @@
 /****************************************************************************
  *                                                                          *
- *  Copyright (C) 2022 RoboMaster.                                          *
+ *  Copyright (C) 2023 RoboMaster.                                          *
  *  Illini RoboMaster @ University of Illinois at Urbana-Champaign          *
  *                                                                          *
  *  This program is free software: you can redistribute it and/or modify    *
@@ -20,26 +20,32 @@
 
 #pragma once
 
-#include "bsp_print.h"
-#include "bsp_uart.h"
-#include "cmsis_os.h"
+#include <stdint.h>
+#include <string.h>
 
-namespace communication {
+/**
+ * CRC8 checksum calculation
+ *
+ * @param  pchMessage Message to check
+ * @param  dwLength   Length of the message
+ * @param  ucCRC8     Initialized checksum
+ * @return            CRC checksum
+ */
+uint8_t get_crc8_check_sum(uint8_t* pchMessage, uint16_t dwLength, uint8_t ucCRC8);
 
-class MiniPCProtocol {
- public:
-  MiniPCProtocol();
-  void Receive(const uint8_t* data, uint8_t len);
-  // dummy send
-  void Send();
-  uint8_t get(void);
+/**
+ * Verify CRC8
+ *
+ * @param  pchMessage Message to verify
+ * @param  dwLength   Length = Data + Checksum
+ * @return            1 for true, 0 for false
+ */
+uint8_t verify_crc8_check_sum(uint8_t* pchMessage, uint16_t dwLength);
 
- private:
-  int index;
-  static constexpr uint8_t PKG_LEN = 16;
-  uint8_t flag;
-  uint8_t host_command[PKG_LEN];
-  void handle();
-}; /* class MiniPCProtocol */
-
-} /* namespace communication */
+/**
+ * Append CRC8 to the end of message
+ *
+ * @param  pchMessage Message to calculate CRC and append
+ * @param  dwLength   Length = Data + Checksum
+ */
+void append_crc8_check_sum(uint8_t* pchMessage, uint16_t dwLength);

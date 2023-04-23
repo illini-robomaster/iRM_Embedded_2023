@@ -18,6 +18,8 @@
  *                                                                          *
  ****************************************************************************/
 
+#include "main.h"
+
 #include <cstring>
 #include <memory>
 
@@ -25,11 +27,9 @@
 #include "bsp_print.h"
 #include "bsp_uart.h"
 #include "cmsis_os.h"
-#include "main.h"
+#include "autoaim_protocol.h"
 
 #define RX_SIGNAL (1 << 0)
-
-using std::min;
 
 extern osThreadId_t defaultTaskHandle;
 
@@ -57,12 +57,7 @@ void RM_RTOS_Default_Task(const void* argument) {
   gpio_red = new bsp::GPIO(LED_RED_GPIO_Port, LED_RED_Pin);
   gpio_green = new bsp::GPIO(LED_GREEN_GPIO_Port, LED_GREEN_Pin);
 
-  // constant length pkg
-
-  // const uint8_t PAYLOAD_SIZE = 8;
-  const uint8_t PKG_LEN = 16;
-  uint8_t host_command[PKG_LEN];
-  int index = -1;
+  auto miniPCreceiver = communication::AutoaimProtocol();
 
   while (true) {
     /* wait until rx data is available */
@@ -74,41 +69,10 @@ void RM_RTOS_Default_Task(const void* argument) {
       // if read anything, flash red
       gpio_red->High();
 
-      if (index >= 0) {
-        // already found header
-        int remain = min((int)PKG_LEN - index, (int)length);
-        memcpy(host_command + index, data, remain);
-        index += remain;
-
-        if (index == PKG_LEN - 1) {
-          // done package reading
-          index = -1;
-          // package handling here!TODO:
-          goto handle;
-        }
-      } else
-
-        for (int32_t i = 0; i < (int32_t)length; i++) {
-          if ((data[i] == 'S' && data[i + 1] == 'T') || (data[i] == 'M' && data[i + 1] == 'Y')) {
-            index = 0;
-
-            memcpy(host_command, data + i, index = min((int)PKG_LEN, (int)(length - i)));
-            if (index == PKG_LEN) {
-              // handling here! TODO:
-              index = -1;
-              goto handle;
-              break;
-            }
-          }
-        }
-
-      if (false) {
-      handle:
-
+      miniPCreceiver.Receive(data, length);
+      if (miniPCreceiver.get_valid_flag() == 1) {
         gpio_green->High();
-        uart->Write((uint8_t*)host_command, 16);
       }
-
       osDelay(200);
       gpio_green->Low();
       gpio_red->Low();

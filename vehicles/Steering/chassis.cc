@@ -30,6 +30,7 @@
 #include "protocol.h"
 #include "rgb.h"
 #include "steering.h"
+#include <cmath>
 
 static bsp::CAN* can1 = nullptr;
 static bsp::CAN* can2 = nullptr;
@@ -45,6 +46,15 @@ static bsp::CanBridge* receive = nullptr;
 static const int KILLALL_DELAY = 100;
 static const int DEFAULT_TASK_DELAY = 100;
 static const int CHASSIS_TASK_DELAY = 2;
+
+// speed for steering motors (rad/s)
+constexpr float RUN_SPEED = (4 * PI);
+constexpr float ALIGN_SPEED = (PI);
+constexpr float ACCELERATION = (100 * PI);
+
+// speed for chassis rotation (no unit)
+constexpr float SPIN_SPEED = 80;
+constexpr float FOLLOW_SPEED = 40;
 
 //==================================================================================================
 // Referee
@@ -112,23 +122,28 @@ static control::MotorCANBase* motor6 = nullptr;
 static control::MotorCANBase* motor7 = nullptr;
 static control::MotorCANBase* motor8 = nullptr;
 
-static bsp::GPIO* key1 = nullptr;
-static bsp::GPIO* key2 = nullptr;
-static bsp::GPIO* key3 = nullptr;
-static bsp::GPIO* key4 = nullptr;
+static control::SteeringMotor* steering_motor1 = nullptr;
+static control::SteeringMotor* steering_motor2 = nullptr;
+static control::SteeringMotor* steering_motor3 = nullptr;
+static control::SteeringMotor* steering_motor4 = nullptr;
+
+static bsp::GPIO* pe1 = nullptr;
+static bsp::GPIO* pe2 = nullptr;
+static bsp::GPIO* pe3 = nullptr;
+static bsp::GPIO* pe4 = nullptr;
 
 static control::steering_chassis_t* chassis_data;
 static control::SteeringChassis* chassis;
 
 static const float CHASSIS_DEADZONE = 0.04;
 
-bool steering_align_detect1() { return !key1->Read(); }
+bool steering_align_detect1() { return pe1->Read() == 0; }
 
-bool steering_align_detect2() { return !key2->Read(); }
+bool steering_align_detect2() { return pe2->Read() == 0; }
 
-bool steering_align_detect3() { return !key3->Read(); }
+bool steering_align_detect3() { return pe3->Read() == 0; }
 
-bool steering_align_detect4() { return !key4->Read(); }
+bool steering_align_detect4() { return pe4->Read() == 0; }
 
 void chassisTask(void* arg) {
   UNUSED(arg);
@@ -136,44 +151,74 @@ void chassisTask(void* arg) {
   control::MotorCANBase* steer_motors[] = {motor1, motor2, motor3, motor4};
   control::MotorCANBase* wheel_motors[] = {motor5, motor6, motor7, motor8};
 
-  float spin_speed = 10;
-  float follow_speed = 10;
+  control::PIDController pid5(120, 15, 0);
+  control::PIDController pid6(120, 15, 0);
+  control::PIDController pid7(120, 15, 0);
+  control::PIDController pid8(120, 15, 0);
 
   while (!receive->start) osDelay(100);
 
   while (receive->start < 0.5) osDelay(100);
 
+  // Alignment
+  chassis->SteerSetMaxSpeed(ALIGN_SPEED);
+  bool alignment_complete = false;
+  while (!alignment_complete) {
+    chassis->SteerCalcOutput();
+    control::MotorCANBase::TransmitOutput(steer_motors, 4);
+    alignment_complete = chassis->Calibrate();
+    osDelay(1);
+  }
+  chassis->ReAlign();
+  chassis->SteerCalcOutput();
+  chassis->SteerSetMaxSpeed(RUN_SPEED);
+  chassis->SteerThetaReset();
+  chassis->SetWheelSpeed(0,0,0,0);
+
   while (true) {
     float relative_angle = receive->relative_angle;
-    float sin_yaw, cos_yaw, vx_set, vy_set, wz_set;
-    UNUSED(wz_set);
+    float sin_yaw, cos_yaw, vx_set, vy_set;
+    float vx, vy, wz;
 
-    vx_set = receive->vx;
-    vy_set = receive->vy;
+    // TODO need to change the channels in gimbal.cc
+    vx_set = -receive->vy;
+    vy_set = receive->vx;
 
     if (receive->mode == 1) {  // spin mode
-      sin_yaw = arm_sin_f32(relative_angle);
-      cos_yaw = arm_cos_f32(relative_angle);
-      vx_set = cos_yaw * vx_set + sin_yaw * vy_set;
-      vy_set = -sin_yaw * vx_set + cos_yaw * vy_set;
-      wz_set = spin_speed;
+      // delay compensation
+      // based on rule-of-thumb formula SPIN_SPEED = 80 = ~30 degree of error
+      relative_angle = relative_angle - PI * 30.0 / 180.0 / 80.0 * SPIN_SPEED;
+
+      chassis->SteerSetMaxSpeed(RUN_SPEED * 2);
+      sin_yaw = sin(relative_angle);
+      cos_yaw = cos(relative_angle);
+      vx = cos_yaw * vx_set + sin_yaw * vy_set;
+      vy = -sin_yaw * vx_set + cos_yaw * vy_set;
+      wz = SPIN_SPEED;
     } else {
-      sin_yaw = arm_sin_f32(relative_angle);
-      cos_yaw = arm_cos_f32(relative_angle);
-      vx_set = cos_yaw * vx_set + sin_yaw * vy_set;
-      vy_set = -sin_yaw * vx_set + cos_yaw * vy_set;
-      wz_set = std::min(follow_speed, follow_speed * relative_angle);
-      if (-CHASSIS_DEADZONE < relative_angle && relative_angle < CHASSIS_DEADZONE) wz_set = 0;
+      chassis->SteerSetMaxSpeed(RUN_SPEED);
+      sin_yaw = sin(relative_angle);
+      cos_yaw = cos(relative_angle);
+      vx = cos_yaw * vx_set + sin_yaw * vy_set;
+      vy = -sin_yaw * vx_set + cos_yaw * vy_set;
+      wz = std::min(FOLLOW_SPEED, FOLLOW_SPEED * relative_angle);
+      if (-CHASSIS_DEADZONE < relative_angle && relative_angle < CHASSIS_DEADZONE) wz = 0;
     }
 
-    chassis->SetYSpeed(-vx_set / 10);
-    chassis->SetXSpeed(-vy_set / 10);
-    chassis->SetWSpeed(wz_set);
-    chassis->Update((float)referee->game_robot_status.chassis_power_limit,
-                    referee->power_heat_data.chassis_power,
-                    (float)referee->power_heat_data.chassis_power_buffer);
+    chassis->SetSpeed(vx / 10, vy / 10, wz);
+    chassis->SteerUpdateTarget();
+    constexpr float WHEEL_SPEED_FACTOR = 4;
+    chassis->WheelUpdateSpeed(WHEEL_SPEED_FACTOR);
+
+    chassis->SteerCalcOutput();
+
+    motor5->SetOutput(pid5.ComputeConstrainedOutput(motor5->GetOmegaDelta(chassis->v_bl_)));
+    motor6->SetOutput(pid6.ComputeConstrainedOutput(motor6->GetOmegaDelta(chassis->v_br_)));
+    motor7->SetOutput(pid7.ComputeConstrainedOutput(motor7->GetOmegaDelta(chassis->v_fr_)));
+    motor8->SetOutput(pid8.ComputeConstrainedOutput(motor8->GetOmegaDelta(chassis->v_fl_)));
 
     if (Dead) {
+      chassis->SetSpeed(0,0,0);
       motor5->SetOutput(0);
       motor6->SetOutput(0);
       motor7->SetOutput(0);
@@ -233,24 +278,43 @@ void RM_RTOS_Init() {
   motor7 = new control::Motor3508(can2, 0x207);
   motor8 = new control::Motor3508(can2, 0x208);
 
-  key1 = new bsp::GPIO(IN1_GPIO_Port, IN1_Pin);
-  key2 = new bsp::GPIO(IN2_GPIO_Port, IN2_Pin);
-  key3 = new bsp::GPIO(IN3_GPIO_Port, IN3_Pin);
-  key4 = new bsp::GPIO(IN4_GPIO_Port, IN4_Pin);
+  pe1 = new bsp::GPIO(IN1_GPIO_Port, IN1_Pin);
+  pe2 = new bsp::GPIO(IN2_GPIO_Port, IN2_Pin);
+  pe3 = new bsp::GPIO(IN3_GPIO_Port, IN3_Pin);
+  pe4 = new bsp::GPIO(IN4_GPIO_Port, IN4_Pin);
 
   chassis_data = new control::steering_chassis_t();
 
-  chassis_data->fl_steer_motor = motor4;
-  chassis_data->fr_steer_motor = motor3;
-  chassis_data->bl_steer_motor = motor1;
-  chassis_data->br_steer_motor = motor2;
+  control::steering_t steering_motor_data;
+  steering_motor_data.motor = motor1;
+  steering_motor_data.max_speed = RUN_SPEED;
+  steering_motor_data.max_acceleration = ACCELERATION;
+  steering_motor_data.transmission_ratio = 8;
+  steering_motor_data.omega_pid_param = new float[3]{140, 1.2, 0};
+  steering_motor_data.max_iout = 1000;
+  steering_motor_data.max_out = 13000;
+  steering_motor_data.calibrate_offset = 0;
 
-  chassis_data->fl_steer_motor_detect_func = steering_align_detect4;
-  chassis_data->fr_steer_motor_detect_func = steering_align_detect3;
-  chassis_data->bl_steer_motor_detect_func = steering_align_detect1;
-  chassis_data->br_steer_motor_detect_func = steering_align_detect2;
+  steering_motor_data.align_detect_func = steering_align_detect1;
+  steering_motor1 = new control::SteeringMotor(steering_motor_data);
 
-  // TODO init wheels
+  steering_motor_data.motor = motor2;
+  steering_motor_data.align_detect_func = steering_align_detect2;
+  steering_motor2 = new control::SteeringMotor(steering_motor_data);
+  steering_motor_data.motor = motor3;
+  steering_motor_data.align_detect_func = steering_align_detect3;
+  steering_motor3 = new control::SteeringMotor(steering_motor_data);
+  steering_motor_data.motor = motor4;
+  steering_motor_data.align_detect_func = steering_align_detect4;
+  steering_motor4 = new control::SteeringMotor(steering_motor_data);
+
+  chassis_data = new control::steering_chassis_t();
+
+  chassis_data->fl_steer_motor = steering_motor4;
+  chassis_data->fr_steer_motor = steering_motor3;
+  chassis_data->bl_steer_motor = steering_motor1;
+  chassis_data->br_steer_motor = steering_motor2;
+
   chassis_data->fl_wheel_motor = motor8;
   chassis_data->fr_wheel_motor = motor7;
   chassis_data->bl_wheel_motor = motor5;
