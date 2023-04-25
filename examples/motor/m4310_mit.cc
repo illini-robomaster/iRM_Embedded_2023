@@ -30,48 +30,41 @@ static control::Motor4310* motor = nullptr;
 remote::DBUS* dbus = nullptr;
 
 void RM_RTOS_Init() {
-//  print_use_uart(&huart1);
+  print_use_uart(&huart1);
   can = new bsp::CAN(&hcan1, 0x01, true);
 
   /* rx_id = Master id
    * tx_id = CAN id
    * mode:
-   *  0: MIT mode
-   *  1: position-velocity mode
-   *  2: velocity mode  */
-  motor = new control::Motor4310(can, 0x02, 0x01, 0);
+   *  MIT: MIT mode
+   *  POS_VEL: position-velocity mode
+   *  VEL: velocity mode  */
+  motor = new control::Motor4310(can, 0x02, 0x01, control::MIT);
   dbus = new remote::DBUS(&huart3);
 }
 
 void RM_RTOS_Default_Task(const void* args) {
   // need to press reset to begin
   UNUSED(args);
-  while(dbus->swr != remote::DOWN){}
-  motor->SetZeroPos(motor);  // for setting the zero position
+  while(dbus->swr != remote::DOWN){}  // flip swr to start
+  motor->SetZeroPos(motor);  // set zero position on startup;
   motor->MotorEnable(motor);
 
+  float pos = 0;
+  float min_pos = -PI/8;
+  float max_pos = PI/6;
   while (true) {
-//    motor->SetOutput(0, 0, 0.4, 0.05, 0); // MIT pos mode
-motor->SetOutput(PI / 8, 0.1, 0, 1, 0);   // MIT vel mode
-//    motor->SetOutput(2*PI, 10);   // pos-vel mode
-//    motor->SetOutput(2);  // vel mode
-motor->TransmitOutput(motor);
+    float vel;
+    vel = clip<float>(dbus->ch1 / 660.0 * 15.0, -15, 15);
+    pos += vel / 200;
+    pos = clip<float>(pos, min_pos, max_pos);   // clipping position within a range
+
+    set_cursor(0, 0);
+    clear_screen();
+    print("Vel Set: %f  Pos Set: %f\n", vel, pos);
+
+    motor->SetOutput(pos, vel, 95, 0.5, 0);
+    motor->TransmitOutput(motor);
     osDelay(10);
   }
-
-//  float pos = 0;
-//  while (true) {
-//    float vel;
-//    vel = clip<float>(dbus->ch1 / 660.0 * 15.0, -15, 15);
-//    pos += vel / 200;
-//    pos = clip<float>(pos, -PI/8, PI/6);
-//
-//    set_cursor(0, 0);
-//    clear_screen();
-//    print("Vel Set: %f  Pos Set: %f\n", vel, pos);
-//
-//    motor->SetOutput(pos, vel, 95, 0.5, 0);
-//    motor->TransmitOutput(motor);
-//    osDelay(10);
-//  }
 }

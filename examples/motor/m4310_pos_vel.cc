@@ -31,7 +31,14 @@ remote::DBUS* dbus = nullptr;
 void RM_RTOS_Init() {
   print_use_uart(&huart1);
   can = new bsp::CAN(&hcan1, 0x01, true);
-  motor = new control::Motor4310(can, 0x02, 0x01, 1);
+
+  /* rx_id = Master id
+   * tx_id = CAN id
+   * mode:
+   *  MIT: MIT mode
+   *  POS_VEL: position-velocity mode
+   *  VEL: velocity mode  */
+  motor = new control::Motor4310(can, 0x02, 0x01, control::POS_VEL);
   dbus = new remote::DBUS(&huart3);
 }
 

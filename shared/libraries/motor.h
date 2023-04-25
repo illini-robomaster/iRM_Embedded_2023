@@ -38,6 +38,12 @@ enum GetThetaMode {absolute_mode, relative_mode};
 
 int16_t ClipMotorRange(float output);
 
+typedef enum {
+  MIT = 0,
+  POS_VEL = 1,
+  VEL = 2,
+} mode_t;
+
 /**
  * @brief base class for motor representation
  */
@@ -608,7 +614,6 @@ class SteeringMotor {
 /**
  * @brief m4310 motor class
  */
-//class Motor4310 : public MotorCANBase {
 class Motor4310 {
  public:
   /** constructor wrapper over MotorCANBase
@@ -623,14 +628,14 @@ class Motor4310 {
    *                1: position-velocity
    *                2: velocity
    */
-  Motor4310(bsp::CAN* can, uint16_t rx_id, uint16_t tx_id, uint8_t mode);
+  Motor4310(bsp::CAN* can, uint16_t rx_id, uint16_t tx_id, mode_t mode);
 
   /* implements data update callback */
   void UpdateData(const uint8_t data[]);
 
-  /* initialize m4310 */
+  /* enable m4310 */
   void MotorEnable(Motor4310* motor);
-  /* uninitialize m4310 */
+  /* disable m4310 */
   void MotorDisable(Motor4310* motor);
   /* set zero position */
   void SetZeroPos(Motor4310* motor);
@@ -658,7 +663,8 @@ class Motor4310 {
   void SetOutput(float velocity);
 
   /**
- * @brief Converts a float to an unsigned int, given range and number of bits
+ * @brief Converts a float to an unsigned int, given range and number of bits;
+   *      see m4310 V1.2 document for detail
  * @param x value to be converted
  * @param x_min minimum value of the current parameter
  * @param x_max maximum value of the current parameter
@@ -674,7 +680,7 @@ class Motor4310 {
   uint16_t rx_id_;
   uint16_t tx_id_;
 
-  volatile uint8_t mode_;  // current motor mode
+  volatile mode_t mode_;  // current motor mode
   volatile float kp_set_ = 0;   // defined kp value
   volatile float kd_set_ = 0;   // defined kd value
   volatile float vel_set_ = 0;  // defined velocity

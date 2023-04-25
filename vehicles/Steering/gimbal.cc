@@ -595,8 +595,7 @@ void RM_RTOS_Init(void) {
   imu = new IMU(imu_init, false);
 
   laser = new bsp::Laser(LASER_GPIO_Port, LASER_Pin);
-//  pitch_motor = new control::Motor6020(can1, 0x205);
-  pitch_motor = new control::Motor4310(can1, 0x02, 0x01, 0);
+  pitch_motor = new control::Motor4310(can1, 0x02, 0x01, control::MIT);
   yaw_motor = new control::Motor6020(can1, 0x206);
   control::gimbal_t gimbal_data;
   gimbal_data.pitch_motor_4310_ = pitch_motor;

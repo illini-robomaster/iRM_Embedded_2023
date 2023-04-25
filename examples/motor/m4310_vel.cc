@@ -29,24 +29,31 @@ control::Motor4310* motor = nullptr;
 remote::DBUS* dbus = nullptr;
 
 void RM_RTOS_Init() {
-//  print_use_uart(&huart8);
+  print_use_uart(&huart1);
   can = new bsp::CAN(&hcan1, 0x01, true);
-  motor = new control::Motor4310(can, 0x02, 0x01, 2);
+
+  /* rx_id = Master id
+   * tx_id = CAN id
+   * mode:
+   *  MIT: MIT mode
+   *  POS_VEL: position-velocity mode
+   *  VEL: velocity mode  */
+  motor = new control::Motor4310(can, 0x02, 0x01, control::VEL);
   dbus = new remote::DBUS(&huart3);
 }
 
 void RM_RTOS_Default_Task(const void* args) {
   // need to press reset to begin
   UNUSED(args);
-  motor->SetZeroPos4310(motor);
-  motor->Initialize4310(motor);
+  motor->SetZeroPos(motor);
+  motor->MotorEnable(motor);
 
   while (true) {
     float vel;
     vel = clip<float>(dbus->ch1 / 660.0 * 30.0, -30, 30);
     print("Vel: %f \n", vel);
-    motor->SetOutput4310(vel);
-    motor->TransmitOutput4310(motor);
+    motor->SetOutput(vel);
+    motor->TransmitOutput(motor);
     osDelay(10);
   }
 }

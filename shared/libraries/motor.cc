@@ -540,15 +540,15 @@ void SteeringMotor::UpdateData(const uint8_t data[]) {
 }
 
 
-Motor4310::Motor4310(bsp::CAN* can, uint16_t rx_id, uint16_t tx_id, uint8_t mode) : can_(can), rx_id_(rx_id) {
+Motor4310::Motor4310(bsp::CAN* can, uint16_t rx_id, uint16_t tx_id, mode_t mode) : can_(can), rx_id_(rx_id) {
   can->RegisterRxCallback(rx_id, can_motor_callback, this);
-  /* following the CAN id format from the document */
+  /* following the CAN id format from the m4310 V2.1 document */
   mode_ = mode;
-  if (mode == 0) {
+  if (mode == MIT) {
     tx_id_ = tx_id;
-  } else if (mode == 1) {
+  } else if (mode == POS_VEL) {
     tx_id_ = tx_id + 0x100;
-  } else if (mode == 2) {
+  } else if (mode == VEL) {
     tx_id_ = tx_id + 0x200;
   } else {
     RM_EXPECT_TRUE(false, "Invalid mode number!");
@@ -604,7 +604,7 @@ void Motor4310::SetOutput(float position, float velocity, float kp, float kd, fl
 
 void Motor4310::SetOutput(float position, float velocity) {
   pos_set_ = position;
-  vel_set_ = velocity;  // TODO check type
+  vel_set_ = velocity;
 }
 
 void Motor4310::SetOutput(float velocity) {
@@ -615,14 +615,14 @@ void Motor4310::TransmitOutput(Motor4310* motor) {
   uint8_t data[8] = {0};
   int16_t kp_tmp, kd_tmp, pos_tmp, vel_tmp, torque_tmp;
 
-  // converting float to unsigned int; see DAMIAO document V1.2 for detail
+  // converting float to unsigned int before transmitting
   kp_tmp = float_to_uint(kp_set_, 0.0, 500.0, 12);
   kd_tmp = float_to_uint(kd_set_, 0, 5, 12);
   pos_tmp = float_to_uint(pos_set_, -12.5, 12.5, 16);
   vel_tmp = float_to_uint(vel_set_, -45.0, 45.0, 12);
   torque_tmp = float_to_uint(torque_set_, -18, 18, 12);
 
-  if (mode_ == 0){
+  if (mode_ == MIT){
     data[0] = pos_tmp >> 8;
     data[1] = pos_tmp & 0x00ff;
     data[2] = (vel_tmp >> 4) & 0x00ff;
@@ -631,7 +631,7 @@ void Motor4310::TransmitOutput(Motor4310* motor) {
     data[5] = (kd_tmp >> 4) & 0x00ff;
     data[6] = ((kd_tmp & 0x000f) << 4) | ((torque_tmp >> 8) & 0x000f);
     data[7] = torque_tmp & 0x00ff;
-  } else if (mode_ == 1) {
+  } else if (mode_ == POS_VEL) {
     uint8_t *pbuf, *vbuf;
     pbuf = (uint8_t*) &pos_set_;
     vbuf = (uint8_t*) &vel_set_;
@@ -643,7 +643,7 @@ void Motor4310::TransmitOutput(Motor4310* motor) {
     data[5] = *(vbuf + 1);
     data[6] = *(vbuf + 2);
     data[7] = *(vbuf + 3);
-  } else if (mode_ == 2) {
+  } else if (mode_ == VEL) {
     uint8_t  *vbuf;
     vbuf = (uint8_t*) &vel_set_;
     data[0] = *vbuf;
@@ -658,8 +658,7 @@ void Motor4310::TransmitOutput(Motor4310* motor) {
 }
 
 void Motor4310::UpdateData(const uint8_t data[]) {
-  // TODO
-
+  // TODO need test
   raw_pos_ = data[1]<<8 | data[2];
   raw_vel_ = data[3]<<4 | data[4]>>4;
   raw_torque_ = data[4] - ((data[4]>>4)<<4);
