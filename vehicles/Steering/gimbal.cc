@@ -50,6 +50,9 @@ static const int SHOOTER_TASK_DELAY = 10;
 static const int SELFTEST_TASK_DELAY = 100;
 static const int KILLALL_DELAY = 100;
 static const int DEFAULT_TASK_DELAY = 100;
+static const int SOFT_START_CONSTANT = 300;
+static const int SOFT_KILL_CONSTANT = 200;
+static const int MOTOR_DELAY_CONSTANT = 3000;
 static const float START_PITCH_POS = PI/5;
 
 static bsp::CanBridge* send = nullptr;
@@ -162,14 +165,17 @@ void gimbalTask(void* arg) {
   }
 
   pitch_motor->MotorEnable(pitch_motor);
+  osDelay(GIMBAL_TASK_DELAY);
 
   // 4310 soft start
   float tmp_pos = 0;
-  for (int j = 0; j < 1000; j++){
-    tmp_pos += START_PITCH_POS / 1000;  // increase position gradually
+  for (int j = 0; j < SOFT_START_CONSTANT; j++){
+    tmp_pos += START_PITCH_POS / SOFT_START_CONSTANT;  // increase position gradually
     pitch_motor->SetOutput(tmp_pos, 1, 115, 0.5, 0);
     pitch_motor->TransmitOutput(pitch_motor);
+    osDelay(GIMBAL_TASK_DELAY);
   }
+  osDelay(MOTOR_DELAY_CONSTANT);
 
   print("Start Calibration.\r\n");
   RGB->Display(display::color_yellow);
@@ -180,6 +186,8 @@ void gimbalTask(void* arg) {
     gimbal->TargetAbsWOffset(0, 0);
     gimbal->Update();
     control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
+    pitch_motor->SetOutput(tmp_pos, 1, 115, 0.5, 0);
+    pitch_motor->TransmitOutput(pitch_motor);
     osDelay(GIMBAL_TASK_DELAY);
   }
 
@@ -223,10 +231,11 @@ void gimbalTask(void* arg) {
     if (pitch_reset) {
       // 4310 soft start
       tmp_pos = 0;
-      for (int j = 0; j < 1000; j++){
-        tmp_pos += START_PITCH_POS / 1000;  // increase position gradually
+      for (int j = 0; j < SOFT_START_CONSTANT; j++){
+        tmp_pos += START_PITCH_POS / SOFT_START_CONSTANT;  // increase position gradually
         pitch_motor->SetOutput(tmp_pos, 1, 115, 0.5, 0);
         pitch_motor->TransmitOutput(pitch_motor);
+        osDelay(GIMBAL_TASK_DELAY);
       }
       pitch_pos = tmp_pos;
       pitch_reset = false;
@@ -663,10 +672,11 @@ void KillAll() {
 
     // 4310 soft kill
     float tmp_pos = pitch_pos;
-    for (int j = 0; j < 1000; j++){
-      tmp_pos -= START_PITCH_POS / 1000;  // decrease position gradually
+    for (int j = 0; j < SOFT_KILL_CONSTANT; j++){
+      tmp_pos -= START_PITCH_POS / SOFT_KILL_CONSTANT;  // decrease position gradually
       pitch_motor->SetOutput(tmp_pos, 1, 115, 0.5, 0);
       pitch_motor->TransmitOutput(pitch_motor);
+      osDelay(GIMBAL_TASK_DELAY);
     }
 
     pitch_reset = true;
