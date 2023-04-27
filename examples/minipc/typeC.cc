@@ -104,6 +104,6 @@ void RM_RTOS_Default_Task(const void* argument) {
       // blue when nothing is received
       led->Display(0xFF0000FF);
     }
-    osDelay(1);
+    osDelay(2);
   }
 }
