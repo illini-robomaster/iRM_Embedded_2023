@@ -62,14 +62,13 @@ static const int CHASSIS_TASK_DELAY = 2;
 constexpr float RUN_SPEED = (4 * PI);
 constexpr float ALIGN_SPEED = (PI);
 constexpr float ACCELERATION = (100 * PI);
-<<<<<<< HEAD
-=======
+
 
 // speed for chassis rotation (no unit)
 constexpr float SPIN_SPEED = 80;
 constexpr float FOLLOW_SPEED = 40;
 
->>>>>>> main
+
 //==================================================================================================
 // Referee
 //==================================================================================================
@@ -200,6 +199,22 @@ void chassisTask(void* arg) {
   chassis->SetWheelSpeed(0,0,0,0);
 
   while (true) {
+    motor4->connection_flag_ = false;
+    // fr_steer_motor
+    motor3->connection_flag_ = false;
+    // bl_steer_motor
+    motor1->connection_flag_ = false;
+    // br_steer_motor
+    motor2->connection_flag_ = false;
+    // fl_wheel_motor
+    motor8->connection_flag_ = false;
+    // fr_wheel_motor
+    motor7->connection_flag_ = false;
+    // bl_wheel_motor
+    motor6->connection_flag_ = false;
+    // br_wheel_motor
+    motor5->connection_flag_ = false;
+    // fl_steer_motor
     float relative_angle = receive->relative_angle;
     float sin_yaw, cos_yaw, vx_set, vy_set;
     float vx, vy, wz;
@@ -251,6 +266,13 @@ void chassisTask(void* arg) {
 
     control::MotorCANBase::TransmitOutput(wheel_motors, 4);
     control::MotorCANBase::TransmitOutput(steer_motors, 4);
+    fl_wheel_motor_flag = motor8->connection_flag_;
+    fr_wheel_motor_flag = motor7->connection_flag_;
+    bl_wheel_motor_flag = motor6->connection_flag_;
+    br_wheel_motor_flag = motor5->connection_flag_;
+    fl_steer_motor_flag = motor4->connection_flag_;
+    fr_steer_motor_flag = motor3->connection_flag_;
+    br_steer_motor_flag = motor2->connection_flag_;
 
     receive->cmd.id = bsp::SHOOTER_POWER;
     receive->cmd.data_bool = referee->game_robot_status.mains_power_shooter_output;
@@ -355,56 +377,44 @@ void RM_RTOS_Init() {
 }
 void selfTestTask(void* arg) {
   UNUSED(arg);
-
+  selftestStart = true;
+  receive->cmd.id = bsp::SELF_CHECK_FLAG;
+  receive->cmd.data_bool = selftestStart;
+  receive->TransmitOutput();
 
   osDelay(100);
 while(true){
-  motor4->connection_flag_ = false;
-  // fr_steer_motor
-  motor3->connection_flag_ = false;
-  // bl_steer_motor
-  motor1->connection_flag_ = false;
-  // br_steer_motor
-  motor2->connection_flag_ = false;
-  // fl_wheel_motor
-  motor8->connection_flag_ = false;
-  // fr_wheel_motor
-  motor7->connection_flag_ = false;
-  // bl_wheel_motor
-  motor6->connection_flag_ = false;
-  // br_wheel_motor
-  motor5->connection_flag_ = false;
-  // fl_steer_motor
+
   flag_summary = 0;
   bl_steer_motor_flag = motor1->connection_flag_;
   flag_summary += int(bl_steer_motor_flag);
 
   flag_summary = flag_summary << 1;
-  br_steer_motor_flag = motor2->connection_flag_;
+
   flag_summary += int(br_steer_motor_flag);
 
   flag_summary = flag_summary << 1;
-  fr_steer_motor_flag = motor3->connection_flag_;
+
   flag_summary += int(fr_steer_motor_flag);
 
   flag_summary = flag_summary << 1;
-  fl_steer_motor_flag = motor4->connection_flag_;
+
   flag_summary += int(fl_steer_motor_flag);
 
   flag_summary = flag_summary << 1;
-  br_wheel_motor_flag = motor5->connection_flag_;
+
   flag_summary += int(br_wheel_motor_flag);
 
   flag_summary = flag_summary << 1;
-  bl_wheel_motor_flag = motor6->connection_flag_;
+
   flag_summary += int(bl_wheel_motor_flag);
 
   flag_summary = flag_summary << 1;
-  fr_wheel_motor_flag = motor7->connection_flag_;
+
   flag_summary += int(fr_wheel_motor_flag);
 
   flag_summary = flag_summary << 1;
-  fl_wheel_motor_flag = motor8->connection_flag_;
+
   flag_summary += int(fl_wheel_motor_flag);
 
   osDelay(100);
@@ -412,7 +422,7 @@ while(true){
   receive->cmd.data_uint = flag_summary;
   receive->TransmitOutput();
 }
-    selftestStart = true;
+
 }
 void RM_RTOS_Threads_Init(void) {
   refereeTaskHandle = osThreadNew(refereeTask, nullptr, &refereeTaskAttribute);

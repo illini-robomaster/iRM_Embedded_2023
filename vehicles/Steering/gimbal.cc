@@ -561,7 +561,7 @@ void selfTestTask(void* arg) {
 
     OLED->RefreshGram();
 
-    selftestStart = true;
+    selftestStart = send->self_check_flag;
   }
 }
 
