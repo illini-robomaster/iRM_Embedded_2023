@@ -36,6 +36,10 @@ static bsp::CAN* can1 = nullptr;
 static bsp::CAN* can2 = nullptr;
 static display::RGB* RGB = nullptr;
 
+//==================================================================================================
+// SelfTest
+//==================================================================================================
+
 static bool fl_steer_motor_flag = false;
 static bool fr_steer_motor_flag = false;
 static bool bl_steer_motor_flag = false;
@@ -44,6 +48,8 @@ static bool fl_wheel_motor_flag = false;
 static bool fr_wheel_motor_flag = false;
 static bool bl_wheel_motor_flag = false;
 static bool br_wheel_motor_flag = false;
+
+
 
 static volatile bool selftestStart = false;
 
@@ -74,15 +80,7 @@ constexpr float FOLLOW_SPEED = 40;
 //==================================================================================================
 
 #define REFEREE_RX_SIGNAL (1 << 1)
-const osThreadAttr_t selfTestTaskAttribute = {.name = "selfTestTask",
-                                              .attr_bits = osThreadDetached,
-                                              .cb_mem = nullptr,
-                                              .cb_size = 0,
-                                              .stack_mem = nullptr,
-                                              .stack_size = 256 * 4,
-                                              .priority = (osPriority_t)osPriorityBelowNormal,
-                                              .tz_module = 0,
-                                              .reserved = 0};
+
 
 const osThreadAttr_t refereeTaskAttribute = {.name = "refereeTask",
                                              .attr_bits = osThreadDetached,
@@ -93,15 +91,7 @@ const osThreadAttr_t refereeTaskAttribute = {.name = "refereeTask",
                                              .priority = (osPriority_t)osPriorityAboveNormal,
                                              .tz_module = 0,
                                              .reserved = 0};
-const osThreadAttr_t chassisTaskAttribute = {.name = "chassisTask",
-                                             .attr_bits = osThreadDetached,
-                                             .cb_mem = nullptr,
-                                             .cb_size = 0,
-                                             .stack_mem = nullptr,
-                                             .stack_size = 256 * 4,
-                                             .priority = (osPriority_t)osPriorityNormal,
-                                             .tz_module = 0,
-                                             .reserved = 0};
+
 osThreadId_t refereeTaskHandle;
 osThreadId_t chassisTaskHandle;
 osThreadId_t selfTestTaskHandle;
@@ -134,7 +124,15 @@ void refereeTask(void* arg) {
 // Chassis
 //==================================================================================================
 
-
+const osThreadAttr_t chassisTaskAttribute = {.name = "chassisTask",
+                                             .attr_bits = osThreadDetached,
+                                             .cb_mem = nullptr,
+                                             .cb_size = 0,
+                                             .stack_mem = nullptr,
+                                             .stack_size = 256 * 4,
+                                             .priority = (osPriority_t)osPriorityNormal,
+                                             .tz_module = 0,
+                                             .reserved = 0};
 
 static control::MotorCANBase* motor1 = nullptr;
 static control::MotorCANBase* motor2 = nullptr;
@@ -270,6 +268,15 @@ void chassisTask(void* arg) {
       motor7->SetOutput(0);
       motor8->SetOutput(0);
     }
+    flag_summary = 0;
+    flag_summary = bl_steer_motor_flag|
+                   br_steer_motor_flag<<1|
+                   fr_steer_motor_flag<<2|
+                   fl_steer_motor_flag<<3|
+                   br_wheel_motor_flag<<4|
+                   bl_wheel_motor_flag<<5|
+                   fr_wheel_motor_flag<<6|
+                   fl_wheel_motor_flag<<7;
 
     control::MotorCANBase::TransmitOutput(wheel_motors, 4);
     control::MotorCANBase::TransmitOutput(steer_motors, 4);
@@ -303,7 +310,10 @@ void chassisTask(void* arg) {
     receive->cmd.data_float = (float)referee->game_robot_status.shooter_id2_17mm_speed_limit;
     receive->TransmitOutput();
 
-
+    receive->cmd.id = bsp::CHASSIS_FLAG;
+    receive->cmd.data_uint = flag_summary;
+    receive->TransmitOutput();
+    //send bitmap of connection flag
     osDelay(CHASSIS_TASK_DELAY);
   }
 }
@@ -376,36 +386,10 @@ void RM_RTOS_Init() {
   referee = new communication::Referee;
   receive = new bsp::CanBridge(can2, 0x20B, 0x20A);
 }
-void selfTestTask(void* arg) {
-  UNUSED(arg);
-  selftestStart = true;
-  receive->cmd.id = bsp::SELF_CHECK_FLAG;
-  receive->cmd.data_bool = selftestStart;
-  receive->TransmitOutput();
 
-  osDelay(100);
-while(true){
-
-  flag_summary = 0;
-  flag_summary = bl_steer_motor_flag|
-  br_steer_motor_flag<<1|
-  fr_steer_motor_flag<<2|
-  fl_steer_motor_flag<<3|
-  br_wheel_motor_flag<<4|
-  bl_wheel_motor_flag<<5|
-  fr_wheel_motor_flag<<6|
-  fl_wheel_motor_flag<<7;
-  osDelay(100);
-  receive->cmd.id = bsp::CHASSIS_FLAG;
-  receive->cmd.data_uint = flag_summary;
-  receive->TransmitOutput();
-}
-
-}
 void RM_RTOS_Threads_Init(void) {
   refereeTaskHandle = osThreadNew(refereeTask, nullptr, &refereeTaskAttribute);
   chassisTaskHandle = osThreadNew(chassisTask, nullptr, &chassisTaskAttribute);
-  selfTestTaskHandle = osThreadNew(selfTestTask, nullptr, &selfTestTaskAttribute);
 }
 
 void KillAll() {
