@@ -36,14 +36,14 @@ static bsp::CAN* can1 = nullptr;
 static bsp::CAN* can2 = nullptr;
 static display::RGB* RGB = nullptr;
 
-static bool volatile fl_steer_motor_flag = false;
-static bool volatile fr_steer_motor_flag = false;
-static bool volatile bl_steer_motor_flag = false;
-static bool volatile br_steer_motor_flag = false;
-static bool volatile fl_wheel_motor_flag = false;
-static bool volatile fr_wheel_motor_flag = false;
-static bool volatile bl_wheel_motor_flag = false;
-static bool volatile br_wheel_motor_flag = false;
+static bool fl_steer_motor_flag = false;
+static bool fr_steer_motor_flag = false;
+static bool bl_steer_motor_flag = false;
+static bool br_steer_motor_flag = false;
+static bool fl_wheel_motor_flag = false;
+static bool fr_wheel_motor_flag = false;
+static bool bl_wheel_motor_flag = false;
+static bool br_wheel_motor_flag = false;
 
 static volatile bool selftestStart = false;
 
@@ -387,30 +387,14 @@ void selfTestTask(void* arg) {
 while(true){
 
   flag_summary = 0;
-
-  flag_summary += int(bl_steer_motor_flag);
-
-  flag_summary = flag_summary << 1;
-  flag_summary += int(br_steer_motor_flag);
-
-  flag_summary = flag_summary << 1;
-  flag_summary += int(fr_steer_motor_flag);
-
-  flag_summary = flag_summary << 1;
-  flag_summary += int(fl_steer_motor_flag);
-
-  flag_summary = flag_summary << 1;
-  flag_summary += int(br_wheel_motor_flag);
-
-  flag_summary = flag_summary << 1;
-  flag_summary += int(bl_wheel_motor_flag);
-
-  flag_summary = flag_summary << 1;
-  flag_summary += int(fr_wheel_motor_flag);
-
-  flag_summary = flag_summary << 1;
-  flag_summary += int(fl_wheel_motor_flag);
-
+  flag_summary = bl_steer_motor_flag|
+  br_steer_motor_flag<<1|
+  fr_steer_motor_flag<<2|
+  fl_steer_motor_flag<<3|
+  br_wheel_motor_flag<<4|
+  bl_wheel_motor_flag<<5|
+  fr_wheel_motor_flag<<6|
+  fl_wheel_motor_flag<<7;
   osDelay(100);
   receive->cmd.id = bsp::CHASSIS_FLAG;
   receive->cmd.data_uint = flag_summary;

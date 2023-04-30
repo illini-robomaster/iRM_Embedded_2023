@@ -448,14 +448,6 @@ static bsp::BuzzerNoteDelayed Mario[] = {
 
 static bsp::Buzzer* buzzer = nullptr;
 static display::OLED* OLED = nullptr;
-static unsigned createMask(unsigned a, unsigned b)
-{
-  unsigned r = 0;
-  for (unsigned i=a; i<=b; i++)
-    r |= 1 << i;
-
-  return r;
-}
 //simple bitmask function for chassis flag
 void selfTestTask(void* arg) {
   UNUSED(arg);
@@ -494,21 +486,21 @@ void selfTestTask(void* arg) {
   while (true) {
     chassis_flag_bitmap = send->chassis_flag;
 
-    fl_wheel_flag = (createMask(0,0)&chassis_flag_bitmap)>0;
+    fl_wheel_flag = (0x80 & chassis_flag_bitmap);
     //motor 8
-    fr_wheel_flag = (createMask(1,1)&chassis_flag_bitmap)>0;
+    fr_wheel_flag = (0x40 & chassis_flag_bitmap);
     //motor 7
-    bl_wheel_flag = (createMask(2,2)&chassis_flag_bitmap)>0;
+    bl_wheel_flag = (0x20 & chassis_flag_bitmap);
     //motor 6
-    br_wheel_flag = (createMask(3,3)&chassis_flag_bitmap)>0;
+    br_wheel_flag = (0x10 & chassis_flag_bitmap);
     //motor 5
-    fl_steering_flag = (createMask(4,4)&chassis_flag_bitmap)>0;
+    fl_steering_flag = (0x08 & chassis_flag_bitmap);
     //motor 4
-    fr_steering_flag = (createMask(5,5)&chassis_flag_bitmap)>0;
+    fr_steering_flag = (0x04 & chassis_flag_bitmap);
     //motor 3
-    br_steering_flag = (createMask(6,6)&chassis_flag_bitmap)>0;
+    br_steering_flag = (0x02 & chassis_flag_bitmap);
     //motor 2
-    bl_steering_flag = (createMask(7,7)&chassis_flag_bitmap)>0;
+    bl_steering_flag = (0x01 & chassis_flag_bitmap);
     //motor 1
     osDelay(100);
     pitch_motor->connection_flag_ = false;
