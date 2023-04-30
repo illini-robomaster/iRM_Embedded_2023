@@ -255,7 +255,14 @@ void chassisTask(void* arg) {
     motor6->SetOutput(pid6.ComputeConstrainedOutput(motor6->GetOmegaDelta(chassis->v_br_)));
     motor7->SetOutput(pid7.ComputeConstrainedOutput(motor7->GetOmegaDelta(chassis->v_fr_)));
     motor8->SetOutput(pid8.ComputeConstrainedOutput(motor8->GetOmegaDelta(chassis->v_fl_)));
-
+    fl_wheel_motor_flag = motor8->connection_flag_;
+    fr_wheel_motor_flag = motor7->connection_flag_;
+    bl_wheel_motor_flag = motor6->connection_flag_;
+    br_wheel_motor_flag = motor5->connection_flag_;
+    fl_steer_motor_flag = motor4->connection_flag_;
+    fr_steer_motor_flag = motor3->connection_flag_;
+    br_steer_motor_flag = motor2->connection_flag_;
+    bl_steer_motor_flag = motor1->connection_flag_;
     if (Dead) {
       chassis->SetSpeed(0,0,0);
       motor5->SetOutput(0);
@@ -266,13 +273,7 @@ void chassisTask(void* arg) {
 
     control::MotorCANBase::TransmitOutput(wheel_motors, 4);
     control::MotorCANBase::TransmitOutput(steer_motors, 4);
-    fl_wheel_motor_flag = motor8->connection_flag_;
-    fr_wheel_motor_flag = motor7->connection_flag_;
-    bl_wheel_motor_flag = motor6->connection_flag_;
-    br_wheel_motor_flag = motor5->connection_flag_;
-    fl_steer_motor_flag = motor4->connection_flag_;
-    fr_steer_motor_flag = motor3->connection_flag_;
-    br_steer_motor_flag = motor2->connection_flag_;
+
 
     receive->cmd.id = bsp::SHOOTER_POWER;
     receive->cmd.data_bool = referee->game_robot_status.mains_power_shooter_output;
@@ -386,35 +387,28 @@ void selfTestTask(void* arg) {
 while(true){
 
   flag_summary = 0;
-  bl_steer_motor_flag = motor1->connection_flag_;
+
   flag_summary += int(bl_steer_motor_flag);
 
   flag_summary = flag_summary << 1;
-
   flag_summary += int(br_steer_motor_flag);
 
   flag_summary = flag_summary << 1;
-
   flag_summary += int(fr_steer_motor_flag);
 
   flag_summary = flag_summary << 1;
-
   flag_summary += int(fl_steer_motor_flag);
 
   flag_summary = flag_summary << 1;
-
   flag_summary += int(br_wheel_motor_flag);
 
   flag_summary = flag_summary << 1;
-
   flag_summary += int(bl_wheel_motor_flag);
 
   flag_summary = flag_summary << 1;
-
   flag_summary += int(fr_wheel_motor_flag);
 
   flag_summary = flag_summary << 1;
-
   flag_summary += int(fl_wheel_motor_flag);
 
   osDelay(100);
