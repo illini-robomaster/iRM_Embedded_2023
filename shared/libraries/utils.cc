@@ -59,3 +59,9 @@ bool FloatEdgeDetector::edge() { return posEdge_ || negEdge_; }
 bool FloatEdgeDetector::posEdge() { return posEdge_; }
 
 bool FloatEdgeDetector::negEdge() { return negEdge_; }
+
+int16_t float_to_uint(float x, float x_min, float x_max, int bits) {
+  float span = x_max - x_min;
+  float offset = x_min;
+  return (int16_t) ((x-offset) * ((float)((1<<bits)-1))/span);
+}

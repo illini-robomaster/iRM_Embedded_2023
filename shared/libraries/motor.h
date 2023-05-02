@@ -633,7 +633,7 @@ class Motor4310 {
   /* implements data update callback */
   void UpdateData(const uint8_t data[]);
 
-  /* enable m4310 */
+  /* enable m4310; MUST be called after motor is powered up, otherwise SetOutput commands are ignored */
   void MotorEnable(Motor4310* motor);
   /* disable m4310 */
   void MotorDisable(Motor4310* motor);
@@ -653,25 +653,50 @@ class Motor4310 {
   /* implements data printout */
   void PrintData();
 
-  /* set output parameters for m4310 using MIT mode */
+  /**
+   * Sets output parameters for m4310 using the MIT mode
+   *
+   * Several control modes can be derived from the MIT mode:
+   * 1. Velocity mode:
+   *    Rotates the motor at a constant velocity by setting kp to zero, kd to a non-zero
+   *    value, and velocity to the target angular velocity
+   *    e.g. motor->SetOutput(0, 3, 0, 1, 0);
+   * 2. Position mode:
+   *    Rotates the motor to a target position by setting position to a relative target
+   *    position. Note: kd must be set to a NON-ZERO value to avoid oscillation
+   *    e.g. motor->SetOutput(2*PI, 0, 0.4, 0.05, 0);
+   * 3. Torque mode:
+   *    Rotates the motor at a given torque by setting torque to a desired value. kp and kd
+   *    should be set to zero. Note: under no load, a small torque
+   *    e.g. motor->SetOutput(0, 0, 0, 0, 1);
+   *
+   * @param position relative target position in radian (can exceed 2*PI)
+   * @param velocity target angular velocity (rad/s)
+   * @param kp p gain (N/rad)
+   * @param kd d gain (N*s/rad)
+   * @param torque target torque (Nm)
+   */
   void SetOutput(float position, float velocity, float kp, float kd, float torque);
 
-  /* set output parameters for m4310 using position-velocity mode */
+  /**
+   * Sets output parameters for m4310 using position-velocity mode
+   * e.g. motor->SetOutput(2*PI, 1);
+   *
+   * Note: oscillations can be alleviated by tuning the acceleration/deceleration parameters
+   * through the DAMIAO helper tool. The damping factor needs to be a non-zero positive number
+   *
+   * @param position relative target position in radian (can exceed 2*PI)
+   * @param velocity maximum absolute angular velocity (rad/s)
+   */
   void SetOutput(float position, float velocity);
 
-  /* set output parameters for m4310 using velocity mode */
-  void SetOutput(float velocity);
-
   /**
- * @brief Converts a float to an unsigned int, given range and number of bits;
-   *      see m4310 V1.2 document for detail
- * @param x value to be converted
- * @param x_min minimum value of the current parameter
- * @param x_max maximum value of the current parameter
- * @param bits size in bits
- * @return value converted from float to unsigned int
+   * Sets output parameters for m4310 using velocity mode
+   *
+   * e.g. motor->SetOutput(1);
+   * @param velocity target angular velocity (rad/s)
    */
-  static int16_t float_to_uint(float x, float x_min, float x_max, int bits);
+  void SetOutput(float velocity);
 
   volatile bool connection_flag_ = false;
 
