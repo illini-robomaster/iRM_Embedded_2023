@@ -189,4 +189,4 @@ class FloatEdgeDetector {
  * @param bits size in bits
  * @return value converted from float to unsigned int
  */
-int16_t float_to_uint(float x, float x_min, float x_max, int bits);
+uint16_t float_to_uint(float x, float x_min, float x_max, int bits);

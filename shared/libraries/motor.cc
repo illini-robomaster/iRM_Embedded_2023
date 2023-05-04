@@ -613,7 +613,7 @@ void Motor4310::SetOutput(float velocity) {
 
 void Motor4310::TransmitOutput(Motor4310* motor) {
   uint8_t data[8] = {0};
-  int16_t kp_tmp, kd_tmp, pos_tmp, vel_tmp, torque_tmp;
+  uint16_t kp_tmp, kd_tmp, pos_tmp, vel_tmp, torque_tmp;
 
   // converting float to unsigned int before transmitting
   kp_tmp = float_to_uint(kp_set_, 0.0, 500.0, 12);
