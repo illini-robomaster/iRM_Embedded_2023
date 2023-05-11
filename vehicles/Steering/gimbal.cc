@@ -38,7 +38,6 @@
 #include "protocol.h"
 #include "rgb.h"
 #include "shooter.h"
-#include "steering.h"
 #include "stepper.h"
 
 static bsp::CAN* can1 = nullptr;
@@ -517,26 +516,41 @@ void selfTestTask(void* arg) {
   OLED->ShowString(0, 5, (uint8_t*)"GY");
   OLED->ShowString(1, 0, (uint8_t*)"SL");
   OLED->ShowString(1, 5, (uint8_t*)"SR");
-  OLED->ShowString(1, 10, (uint8_t*)"LD");
-
-  OLED->ShowString(2, 0, (uint8_t*)"FLS");
-  OLED->ShowString(2, 5, (uint8_t*)"FRS");
-  OLED->ShowString(2, 10, (uint8_t*)"BLS");
-  OLED->ShowString(2, 15, (uint8_t*)"BRS");
-//
-  OLED->ShowString(0, 10, (uint8_t*)"FLW");
-  OLED->ShowString(0, 16, (uint8_t*)"FRW");
-  OLED->ShowString(1, 15, (uint8_t*)"BLW");
-  OLED->ShowString(4, 10, (uint8_t*)"BRW");
-
-  OLED->ShowString(3, 0, (uint8_t*)"Cali");
-  OLED->ShowString(3, 7, (uint8_t*)"Temp:");
+  OLED->ShowString(2, 0, (uint8_t*)"LD");
+  OLED->ShowString(2, 5, (uint8_t*)"Ldr");
+  OLED->ShowString(3, 0, (uint8_t*)"Cal");
+  OLED->ShowString(3, 6, (uint8_t*)"Dbs");
+  OLED->ShowString(4, 0, (uint8_t*)"Temp:");
   //  OLED->ShowString(4, 0, (uint8_t*)"Ref");
-  OLED->ShowString(4, 0, (uint8_t*)"Dbus");
-  OLED->ShowString(4, 5, (uint8_t*)"Lidar");
+
+  OLED->ShowString(0, 15, (uint8_t*)"S");
+  OLED->ShowString(0, 18, (uint8_t*)"W");
+
+  OLED->ShowString(1, 12, (uint8_t*)"FL");
+  OLED->ShowString(2, 12, (uint8_t*)"FR");
+//
+  OLED->ShowString(3, 12, (uint8_t*)"BL");
+  OLED->ShowString(4, 12, (uint8_t*)"BR");
 
   char temp[6] = "";
   while (true) {
+
+    osDelay(100);
+    pitch_motor->connection_flag_ = false;
+    yaw_motor->connection_flag_ = false;
+    sl_motor->connection_flag_ = false;
+    sr_motor->connection_flag_ = false;
+    ld_motor->connection_flag_ = false;
+
+    referee->connection_flag_ = false;
+    dbus->connection_flag_ = false;
+    osDelay(SELFTEST_TASK_DELAY);
+    pitch_motor_flag = pitch_motor->connection_flag_;
+    yaw_motor_flag = yaw_motor->connection_flag_;
+    sl_motor_flag = sl_motor->connection_flag_;
+    sr_motor_flag = sr_motor->connection_flag_;
+    ld_motor_flag = ld_motor->connection_flag_;
+
     chassis_flag_bitmap = send->chassis_flag;
 
     fl_wheel_flag = (0x80 & chassis_flag_bitmap);
@@ -555,23 +569,8 @@ void selfTestTask(void* arg) {
     //motor 2
     bl_steering_flag = (0x01 & chassis_flag_bitmap);
     //motor 1
-    osDelay(100);
-    pitch_motor->connection_flag_ = false;
-    yaw_motor->connection_flag_ = false;
-    sl_motor->connection_flag_ = false;
-    sr_motor->connection_flag_ = false;
-    ld_motor->connection_flag_ = false;
 
-    referee->connection_flag_ = false;
-    dbus->connection_flag_ = false;
-    osDelay(SELFTEST_TASK_DELAY);
-    pitch_motor_flag = pitch_motor->connection_flag_;
-    yaw_motor_flag = yaw_motor->connection_flag_;
-    sl_motor_flag = sl_motor->connection_flag_;
-    sr_motor_flag = sr_motor->connection_flag_;
-    ld_motor_flag = ld_motor->connection_flag_;
-
-//    fl_wheel_flag = send->selfCheck_flag;
+    //    fl_wheel_flag = send->selfCheck_flag;
     calibration_flag = imu->CaliDone();
     //    referee_flag = referee->connection_flag_;
     dbus_flag = dbus->connection_flag_;
@@ -580,29 +579,29 @@ void selfTestTask(void* arg) {
     OLED->ShowBlock(0, 7, yaw_motor_flag);
     OLED->ShowBlock(1, 2, sl_motor_flag);
     OLED->ShowBlock(1, 7, sr_motor_flag);
-    OLED->ShowBlock(1, 12, ld_motor_flag);
-
-    OLED->ShowBlock(0, 13, fl_wheel_flag);
-
-    OLED->ShowBlock(2,3,fl_steering_flag);
-
-    OLED->ShowBlock(0, 19, fr_wheel_flag);
-
-    OLED->ShowBlock(2,8,fr_steering_flag);
-
-    OLED->ShowBlock(1, 18, bl_wheel_flag);
-
-    OLED->ShowBlock(2,13,bl_steering_flag);
-
-    OLED->ShowBlock(4, 13, br_wheel_flag);
-
-    OLED->ShowBlock(2,18,br_steering_flag);
-
-    OLED->ShowBlock(3, 4, imu->CaliDone());
+    OLED->ShowBlock(2, 2, ld_motor_flag);
+    OLED->ShowBlock(2, 8, lidar_flag);
+    OLED->ShowBlock(3, 3, imu->CaliDone());
+    OLED->ShowBlock(3, 9, dbus_flag);
     snprintf(temp, 6, "%.2f", imu->Temp);
+    OLED->ShowString(4, 6, (uint8_t*)temp);
     //    OLED->ShowBlock(4, 3, referee_flag);
-    OLED->ShowBlock(4, 3, dbus_flag);
-    OLED->ShowBlock(4, 7, lidar_flag);
+
+    OLED->ShowBlock(1, 18, fl_wheel_flag);
+
+    OLED->ShowBlock(1,15,fl_steering_flag);
+
+    OLED->ShowBlock(2, 18, fr_wheel_flag);
+
+    OLED->ShowBlock(2,15,fr_steering_flag);
+
+    OLED->ShowBlock(3, 18, bl_wheel_flag);
+
+    OLED->ShowBlock(3,15,bl_steering_flag);
+
+    OLED->ShowBlock(4, 18, br_wheel_flag);
+
+    OLED->ShowBlock(4,15,br_steering_flag);
 
     OLED->RefreshGram();
 

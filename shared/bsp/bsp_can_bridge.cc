@@ -81,9 +81,6 @@ void CanBridge::UpdateData(const uint8_t* data) {
     case CHASSIS_FLAG:
       chassis_flag = cmd.data_uint;
       break;
-    case SELF_CHECK_FLAG:
-      self_check_flag = cmd.data_bool;
-      break;
     default:;
   }
 }

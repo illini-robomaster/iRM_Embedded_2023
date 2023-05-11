@@ -39,7 +39,6 @@ typedef enum {
   SPEED_LIMIT1,
   SPEED_LIMIT2,
   CHASSIS_FLAG,
-  SELF_CHECK_FLAG,
 } can_bridge_cmd;
 
 typedef struct {

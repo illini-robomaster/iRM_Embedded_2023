@@ -49,9 +49,18 @@ static bool fr_wheel_motor_flag = false;
 static bool bl_wheel_motor_flag = false;
 static bool br_wheel_motor_flag = false;
 
+static bool transmission_flag = true;
+const osThreadAttr_t selfTestingTask = {.name = "selfTestTask",
+                                             .attr_bits = osThreadDetached,
+                                             .cb_mem = nullptr,
+                                             .cb_size = 0,
+                                             .stack_mem = nullptr,
+                                             .stack_size = 256 * 4,
+                                             .priority = (osPriority_t)osPriorityBelowNormal,
+                                             .tz_module = 0,
+                                             .reserved = 0};
+osThreadId_t selfTestTaskHandle;
 
-
-static volatile bool selftestStart = false;
 
 static BoolEdgeDetector FakeDeath(false);
 static volatile bool Dead = false;
@@ -94,7 +103,6 @@ const osThreadAttr_t refereeTaskAttribute = {.name = "refereeTask",
 
 osThreadId_t refereeTaskHandle;
 osThreadId_t chassisTaskHandle;
-osThreadId_t selfTestTaskHandle;
 class RefereeUART : public bsp::UART {
  public:
   using bsp::UART::UART;
@@ -197,29 +205,16 @@ void chassisTask(void* arg) {
   chassis->SetWheelSpeed(0,0,0,0);
 
   while (true) {
-    motor4->connection_flag_ = false;
-    // fr_steer_motor
-    motor3->connection_flag_ = false;
-    // bl_steer_motor
-    motor1->connection_flag_ = false;
-    // br_steer_motor
-    motor2->connection_flag_ = false;
-    // fl_wheel_motor
-    motor8->connection_flag_ = false;
-    // fr_wheel_motor
-    motor7->connection_flag_ = false;
-    // bl_wheel_motor
-    motor6->connection_flag_ = false;
-    // br_wheel_motor
-    motor5->connection_flag_ = false;
-    // fl_steer_motor
     float relative_angle = receive->relative_angle;
     float sin_yaw, cos_yaw, vx_set, vy_set;
     float vx, vy, wz;
 
+
     // TODO need to change the channels in gimbal.cc
     vx_set = -receive->vy;
     vy_set = receive->vx;
+
+
 
     if (receive->mode == 1) {  // spin mode
       // delay compensation
@@ -253,14 +248,7 @@ void chassisTask(void* arg) {
     motor6->SetOutput(pid6.ComputeConstrainedOutput(motor6->GetOmegaDelta(chassis->v_br_)));
     motor7->SetOutput(pid7.ComputeConstrainedOutput(motor7->GetOmegaDelta(chassis->v_fr_)));
     motor8->SetOutput(pid8.ComputeConstrainedOutput(motor8->GetOmegaDelta(chassis->v_fl_)));
-    fl_wheel_motor_flag = motor8->connection_flag_;
-    fr_wheel_motor_flag = motor7->connection_flag_;
-    bl_wheel_motor_flag = motor6->connection_flag_;
-    br_wheel_motor_flag = motor5->connection_flag_;
-    fl_steer_motor_flag = motor4->connection_flag_;
-    fr_steer_motor_flag = motor3->connection_flag_;
-    br_steer_motor_flag = motor2->connection_flag_;
-    bl_steer_motor_flag = motor1->connection_flag_;
+
     if (Dead) {
       chassis->SetSpeed(0,0,0);
       motor5->SetOutput(0);
@@ -268,18 +256,10 @@ void chassisTask(void* arg) {
       motor7->SetOutput(0);
       motor8->SetOutput(0);
     }
-    flag_summary = 0;
-    flag_summary = bl_steer_motor_flag|
-                   br_steer_motor_flag<<1|
-                   fr_steer_motor_flag<<2|
-                   fl_steer_motor_flag<<3|
-                   br_wheel_motor_flag<<4|
-                   bl_wheel_motor_flag<<5|
-                   fr_wheel_motor_flag<<6|
-                   fl_wheel_motor_flag<<7;
 
     control::MotorCANBase::TransmitOutput(wheel_motors, 4);
     control::MotorCANBase::TransmitOutput(steer_motors, 4);
+
 
 
     receive->cmd.id = bsp::SHOOTER_POWER;
@@ -310,14 +290,56 @@ void chassisTask(void* arg) {
     receive->cmd.data_float = (float)referee->game_robot_status.shooter_id2_17mm_speed_limit;
     receive->TransmitOutput();
 
-    receive->cmd.id = bsp::CHASSIS_FLAG;
-    receive->cmd.data_uint = flag_summary;
-    receive->TransmitOutput();
-    //send bitmap of connection flag
+
+
+    //send bitmap of connection flag only once
+
+
+
     osDelay(CHASSIS_TASK_DELAY);
+
+
   }
 }
+void self_Check_Task(void* arg){
+  UNUSED(arg);
 
+  while(true){
+    osDelay(100);
+    motor8->connection_flag_ = false;
+    motor7->connection_flag_ = false;
+    motor6->connection_flag_ = false;
+    motor5->connection_flag_ = false;
+    motor4->connection_flag_ = false;
+    motor3->connection_flag_ = false;
+    motor2->connection_flag_ = false;
+    motor1->connection_flag_ = false;
+    osDelay(100);
+    fl_wheel_motor_flag = motor8->connection_flag_;
+    fr_wheel_motor_flag = motor7->connection_flag_;
+    bl_wheel_motor_flag = motor6->connection_flag_;
+    br_wheel_motor_flag = motor5->connection_flag_;
+    fl_steer_motor_flag = motor4->connection_flag_;
+    fr_steer_motor_flag = motor3->connection_flag_;
+    br_steer_motor_flag = motor2->connection_flag_;
+    bl_steer_motor_flag = motor1->connection_flag_;
+    flag_summary = bl_steer_motor_flag|
+                   br_steer_motor_flag<<1|
+                   fr_steer_motor_flag<<2|
+                   fl_steer_motor_flag<<3|
+                   br_wheel_motor_flag<<4|
+                   bl_wheel_motor_flag<<5|
+                   fr_wheel_motor_flag<<6|
+                   fl_wheel_motor_flag<<7;
+    osDelay(100);
+    if(transmission_flag){
+      receive->cmd.id = bsp::CHASSIS_FLAG;
+      receive->cmd.data_uint = (unsigned int)flag_summary;
+      receive->TransmitOutput();
+    }
+    transmission_flag = !transmission_flag;
+  }
+}
 void RM_RTOS_Init() {
   print_use_uart(&huart1);
   bsp::SetHighresClockTimer(&htim5);
@@ -390,6 +412,7 @@ void RM_RTOS_Init() {
 void RM_RTOS_Threads_Init(void) {
   refereeTaskHandle = osThreadNew(refereeTask, nullptr, &refereeTaskAttribute);
   chassisTaskHandle = osThreadNew(chassisTask, nullptr, &chassisTaskAttribute);
+  selfTestTaskHandle = osThreadNew(self_Check_Task, nullptr, &selfTestingTask);
 }
 
 void KillAll() {
