@@ -52,6 +52,10 @@ static const int SHOOTER_TASK_DELAY = 10;
 static const int SELFTEST_TASK_DELAY = 100;
 static const int KILLALL_DELAY = 100;
 static const int DEFAULT_TASK_DELAY = 100;
+static const int SOFT_START_CONSTANT = 300;
+static const int SOFT_KILL_CONSTANT = 200;
+static const int MOTOR_DELAY_CONSTANT = 3000;
+static const float START_PITCH_POS = PI/5;
 
 static bsp::CanBridge* send = nullptr;
 
@@ -61,7 +65,11 @@ static BoolEdgeDetector ChangeSpinMode(false);
 static volatile bool SpinMode = false;
 
 static volatile float relative_angle = 0;
+
 static unsigned int chassis_flag_bitmap = 0;
+
+static volatile float pitch_pos = START_PITCH_POS;
+
 static bool volatile pitch_motor_flag = false;
 static bool volatile yaw_motor_flag = false;
 static bool volatile sl_motor_flag = false;
@@ -79,6 +87,9 @@ static bool volatile calibration_flag = false;
 // static bool volatile referee_flag = false;
 static bool volatile dbus_flag = false;
 static bool volatile lidar_flag = false;
+static bool volatile pitch_reset = false;
+
+
 static volatile bool selftestStart = false;
 
 //==================================================================================================
@@ -132,7 +143,8 @@ const osThreadAttr_t gimbalTaskAttribute = {.name = "gimbalTask",
                                             .reserved = 0};
 osThreadId_t gimbalTaskHandle;
 
-static control::MotorCANBase* pitch_motor = nullptr;
+//static control::MotorCANBase* pitch_motor = nullptr;
+static control::Motor4310* pitch_motor = nullptr;
 static control::MotorCANBase* yaw_motor = nullptr;
 static control::Gimbal* gimbal = nullptr;
 static control::gimbal_data_t* gimbal_param = nullptr;
@@ -141,7 +153,7 @@ static bsp::Laser* laser = nullptr;
 void gimbalTask(void* arg) {
   UNUSED(arg);
 
-  control::MotorCANBase* motors_can1_gimbal[] = {pitch_motor, yaw_motor};
+  control::MotorCANBase* motors_can1_gimbal[] = {yaw_motor};
 
   print("Wait for beginning signal...\r\n");
   RGB->Display(display::color_red);
@@ -156,10 +168,23 @@ void gimbalTask(void* arg) {
   while (i < 1000 || !imu->DataReady()) {
     gimbal->TargetAbsWOffset(0, 0);
     gimbal->Update();
-    control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 2);
+    control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
     osDelay(GIMBAL_TASK_DELAY);
     ++i;
   }
+
+  pitch_motor->MotorEnable(pitch_motor);
+  osDelay(GIMBAL_TASK_DELAY);
+
+  // 4310 soft start
+  float tmp_pos = 0;
+  for (int j = 0; j < SOFT_START_CONSTANT; j++){
+    tmp_pos += START_PITCH_POS / SOFT_START_CONSTANT;  // increase position gradually
+    pitch_motor->SetOutput(tmp_pos, 1, 115, 0.5, 0);
+    pitch_motor->TransmitOutput(pitch_motor);
+    osDelay(GIMBAL_TASK_DELAY);
+  }
+  osDelay(MOTOR_DELAY_CONSTANT);
 
   print("Start Calibration.\r\n");
   RGB->Display(display::color_yellow);
@@ -169,7 +194,9 @@ void gimbalTask(void* arg) {
   while (!imu->DataReady() || !imu->CaliDone()) {
     gimbal->TargetAbsWOffset(0, 0);
     gimbal->Update();
-    control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 2);
+    control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
+    pitch_motor->SetOutput(tmp_pos, 1, 115, 0.5, 0);
+    pitch_motor->TransmitOutput(pitch_motor);
     osDelay(GIMBAL_TASK_DELAY);
   }
 
@@ -205,10 +232,36 @@ void gimbalTask(void* arg) {
     pitch_diff = clip<float>(pitch_target - pitch_curr, -PI, PI);
     yaw_diff = wrap<float>(yaw_target - yaw_curr, -PI, PI);
 
-    gimbal->TargetRel(-pitch_diff, yaw_diff);
+    float pitch_vel;
+    pitch_vel = -1 * clip<float>(dbus->ch3 / 660.0, -15, 15);
+    pitch_pos += pitch_vel / 200 + dbus->mouse.y / 32767.0;
+    pitch_pos = clip<float>(pitch_pos, 0.1, 1); // measured range
 
+    if (pitch_reset) {
+      // 4310 soft start
+      tmp_pos = 0;
+      for (int j = 0; j < SOFT_START_CONSTANT; j++){
+        tmp_pos += START_PITCH_POS / SOFT_START_CONSTANT;  // increase position gradually
+        pitch_motor->SetOutput(tmp_pos, 1, 115, 0.5, 0);
+        pitch_motor->TransmitOutput(pitch_motor);
+        osDelay(GIMBAL_TASK_DELAY);
+      }
+      pitch_pos = tmp_pos;
+      pitch_reset = false;
+    }
+
+    set_cursor(0, 0);
+    clear_screen();
+    print("pitch ratio: %f\r\n", pitch_ratio);
+    print("pitch_pos: %f\r\n", pitch_pos);
+    print("pitch_vel: %f\r\n", pitch_vel);
+
+    gimbal->TargetRel(-pitch_diff, yaw_diff);
     gimbal->Update();
-    control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 2);
+
+    pitch_motor->SetOutput(pitch_pos, pitch_vel, 115, 0.5, 0);
+    control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
+    pitch_motor->TransmitOutput(pitch_motor);
     osDelay(GIMBAL_TASK_DELAY);
   }
 }
@@ -594,12 +647,12 @@ void RM_RTOS_Init(void) {
   imu = new IMU(imu_init, false);
 
   laser = new bsp::Laser(LASER_GPIO_Port, LASER_Pin);
-  pitch_motor = new control::Motor6020(can1, 0x205);
+  pitch_motor = new control::Motor4310(can1, 0x02, 0x01, control::MIT);
   yaw_motor = new control::Motor6020(can1, 0x206);
   control::gimbal_t gimbal_data;
-  gimbal_data.pitch_motor = pitch_motor;
+  gimbal_data.pitch_motor_4310_ = pitch_motor;
   gimbal_data.yaw_motor = yaw_motor;
-  gimbal_data.model = control::GIMBAL_STEERING;
+  gimbal_data.model = control::GIMBAL_STEERING_4310;
   gimbal = new control::Gimbal(gimbal_data);
   gimbal_param = gimbal->GetData();
 
@@ -638,7 +691,7 @@ void RM_RTOS_Threads_Init(void) {
 void KillAll() {
   RM_EXPECT_TRUE(false, "Operation Killed!\r\n");
 
-  control::MotorCANBase* motors_can1_gimbal[] = {pitch_motor};
+//  control::MotorCANBase* motors_can1_gimbal[] = {pitch_motor};
   control::MotorCANBase* motors_can2_gimbal[] = {yaw_motor};
   control::MotorCANBase* motors_can1_shooter[] = {sl_motor, sr_motor, ld_motor};
 
@@ -656,12 +709,23 @@ void KillAll() {
       Dead = false;
       RGB->Display(display::color_green);
       laser->On();
+      pitch_motor->MotorEnable(pitch_motor);
       break;
     }
 
-    pitch_motor->SetOutput(0);
+    // 4310 soft kill
+    float tmp_pos = pitch_pos;
+    for (int j = 0; j < SOFT_KILL_CONSTANT; j++){
+      tmp_pos -= START_PITCH_POS / SOFT_KILL_CONSTANT;  // decrease position gradually
+      pitch_motor->SetOutput(tmp_pos, 1, 115, 0.5, 0);
+      pitch_motor->TransmitOutput(pitch_motor);
+      osDelay(GIMBAL_TASK_DELAY);
+    }
+
+    pitch_reset = true;
+    pitch_motor->MotorDisable(pitch_motor);
+
     yaw_motor->SetOutput(0);
-    control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
     control::MotorCANBase::TransmitOutput(motors_can2_gimbal, 1);
 
     sl_motor->SetOutput(0);
@@ -673,7 +737,7 @@ void KillAll() {
   }
 }
 
-static bool debug = true;
+static bool debug = false;
 
 void RM_RTOS_Default_Task(const void* arg) {
   UNUSED(arg);
@@ -707,6 +771,7 @@ void RM_RTOS_Default_Task(const void* arg) {
 
       print("CH0: %-4d CH1: %-4d CH2: %-4d CH3: %-4d ", dbus->ch0, dbus->ch1, dbus->ch2, dbus->ch3);
       print("SWL: %d SWR: %d @ %d ms\r\n", dbus->swl, dbus->swr, dbus->timestamp);
+
     }
 
     osDelay(DEFAULT_TASK_DELAY);

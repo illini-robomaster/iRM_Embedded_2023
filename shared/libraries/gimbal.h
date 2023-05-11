@@ -30,7 +30,7 @@ namespace control {
 /**
  * @brief gimbal models
  */
-typedef enum { GIMBAL_FORTRESS, GIMBAL_SENTRY, GIMBAL_STEERING } gimbal_model_t;
+typedef enum { GIMBAL_FORTRESS, GIMBAL_SENTRY, GIMBAL_STEERING, GIMBAL_STEERING_4310 } gimbal_model_t;
 
 /**
  * @brief offset, max, and proximity angles of different gimbals
@@ -48,6 +48,7 @@ typedef struct {
  * @brief structure used when gimbal instance is initialized
  */
 typedef struct {
+  Motor4310* pitch_motor_4310_;    /* 4310 pitch motor instance */
   MotorCANBase* pitch_motor; /* pitch motor instance */
   MotorCANBase* yaw_motor;   /* yaw motor instance   */
   gimbal_model_t model;      /* gimbal model         */
@@ -137,6 +138,7 @@ class Gimbal {
 
  private:
   // acquired from user
+  Motor4310* pitch_motor_4310_ = nullptr;
   MotorCANBase* pitch_motor_ = nullptr;
   MotorCANBase* yaw_motor_ = nullptr;
   gimbal_model_t model_;
