@@ -637,7 +637,9 @@ class Motor4310 {
   void MotorEnable(Motor4310* motor);
   /* disable m4310 */
   void MotorDisable(Motor4310* motor);
-  /* set zero position */
+
+  /** sets current motor position as zero position (when motor is powered). M4310 remembers this position
+   * when powered off. */
   void SetZeroPos(Motor4310* motor);
 
   /**

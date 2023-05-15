@@ -48,7 +48,10 @@ void RM_RTOS_Default_Task(const void* args) {
   /* press reset if no response */
   UNUSED(args);
   while(dbus->swr != remote::DOWN){}  // flip swr to start
-  motor->SetZeroPos(motor);  // set zero position on startup; uncomment after a desired position is set
+
+  /* Use SetZeroPos if you want to set current motor position as zero position. If uncommented, the
+   * zero position is the zero position set before */
+  motor->SetZeroPos(motor);
   motor->MotorEnable(motor);
 
   while (true) {
