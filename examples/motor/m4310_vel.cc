@@ -30,7 +30,7 @@ remote::DBUS* dbus = nullptr;
 
 void RM_RTOS_Init() {
   print_use_uart(&huart1);
-  can = new bsp::CAN(&hcan1, 0x01, true);
+  can = new bsp::CAN(&hcan1, 0x201, true);
 
   /* rx_id = Master id
    * tx_id = CAN id
@@ -38,20 +38,30 @@ void RM_RTOS_Init() {
    *  MIT: MIT mode
    *  POS_VEL: position-velocity mode
    *  VEL: velocity mode  */
+
+  /* Make sure motor is set to the correct mode (in helper tool). Otherwise, motor won't start */
   motor = new control::Motor4310(can, 0x02, 0x01, control::VEL);
   dbus = new remote::DBUS(&huart3);
 }
 
 void RM_RTOS_Default_Task(const void* args) {
-  // need to press reset to begin
+  /* press reset if no response */
   UNUSED(args);
+  while(dbus->swr != remote::DOWN){}  // flip swr to start
+
+  /* Use SetZeroPos if you want to set current motor position as zero position. If uncommented, the
+   * zero position is the zero position set before */
   motor->SetZeroPos(motor);
   motor->MotorEnable(motor);
 
   while (true) {
     float vel;
     vel = clip<float>(dbus->ch1 / 660.0 * 30.0, -30, 30);
+
+    set_cursor(0, 0);
+    clear_screen();
     print("Vel: %f \n", vel);
+
     motor->SetOutput(vel);
     motor->TransmitOutput(motor);
     osDelay(10);
