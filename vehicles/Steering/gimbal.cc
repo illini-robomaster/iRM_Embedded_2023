@@ -33,6 +33,7 @@
 #include "dbus.h"
 #include "i2c.h"
 #include "main.h"
+#include "motor.h"
 #include "oled.h"
 #include "protocol.h"
 #include "rgb.h"
@@ -63,6 +64,9 @@ static BoolEdgeDetector ChangeSpinMode(false);
 static volatile bool SpinMode = false;
 
 static volatile float relative_angle = 0;
+
+static unsigned int chassis_flag_bitmap = 0;
+
 static volatile float pitch_pos = START_PITCH_POS;
 
 static bool volatile pitch_motor_flag = false;
@@ -70,10 +74,14 @@ static bool volatile yaw_motor_flag = false;
 static bool volatile sl_motor_flag = false;
 static bool volatile sr_motor_flag = false;
 static bool volatile ld_motor_flag = false;
-// static bool volatile fl_motor_flag = false;
-// static bool volatile fr_motor_flag = false;
-// static bool volatile bl_motor_flag = false;
-// static bool volatile br_motor_flag = false;
+static bool volatile fl_wheel_flag = false;
+static bool volatile fr_wheel_flag = false;
+static bool volatile bl_wheel_flag = false;
+static bool volatile br_wheel_flag = false;
+static bool volatile fl_steering_flag = false;
+static bool volatile fr_steering_flag = false;
+static bool volatile bl_steering_flag = false;
+static bool volatile br_steering_flag = false;
 static bool volatile calibration_flag = false;
 // static bool volatile referee_flag = false;
 static bool volatile dbus_flag = false;
@@ -488,17 +496,18 @@ osThreadId_t selfTestTaskHandle;
 using Note = bsp::BuzzerNote;
 
 static bsp::BuzzerNoteDelayed Mario[] = {
-    {Note::Mi3M, 80}, {Note::Silent, 80},  {Note::Mi3M, 80}, {Note::Silent, 240},
-    {Note::Mi3M, 80}, {Note::Silent, 240}, {Note::Do1M, 80}, {Note::Silent, 80},
-    {Note::Mi3M, 80}, {Note::Silent, 240}, {Note::So5M, 80}, {Note::Silent, 560},
-    {Note::So5L, 80}, {Note::Silent, 0},   {Note::Finish, 0}};
+    {Note::Mi3M, 80}, {Note::Silent, 80}, {Note::Mi3M, 80}, {Note::Silent, 240}, {Note::Mi3M, 80}, {Note::Silent, 240}, {Note::Do1M, 80}, {Note::Silent, 80}, {Note::Mi3M, 80}, {Note::Silent, 240}, {Note::So5M, 80}, {Note::Silent, 560}, {Note::So5L, 80}, {Note::Silent, 0}, {Note::Finish, 0}};
 
 static bsp::Buzzer* buzzer = nullptr;
 static display::OLED* OLED = nullptr;
-
+//simple bitmask function for chassis flag
 void selfTestTask(void* arg) {
   UNUSED(arg);
+  osDelay(100);
+  //Try to make the chassis Flags initialized at first.
 
+  //Could need more time to test it out.
+  //The self test task for chassis will not update after the first check.
   OLED->ShowIlliniRMLOGO();
   buzzer->SingSong(Mario, [](uint32_t milli) { osDelay(milli); });
   OLED->OperateGram(display::PEN_CLEAR);
@@ -507,28 +516,32 @@ void selfTestTask(void* arg) {
   OLED->ShowString(0, 5, (uint8_t*)"GY");
   OLED->ShowString(1, 0, (uint8_t*)"SL");
   OLED->ShowString(1, 5, (uint8_t*)"SR");
-  OLED->ShowString(1, 10, (uint8_t*)"LD");
-  //  OLED->ShowString(2, 0, (uint8_t*)"FL");
-  //  OLED->ShowString(2, 5, (uint8_t*)"FR");
-  //  OLED->ShowString(2, 10, (uint8_t*)"BL");
-  //  OLED->ShowString(2, 15, (uint8_t*)"BR");
-  OLED->ShowString(3, 0, (uint8_t*)"Cali");
-  OLED->ShowString(3, 7, (uint8_t*)"Temp:");
+  OLED->ShowString(2, 0, (uint8_t*)"LD");
+  OLED->ShowString(2, 5, (uint8_t*)"Ldr");
+  OLED->ShowString(3, 0, (uint8_t*)"Cal");
+  OLED->ShowString(3, 6, (uint8_t*)"Dbs");
+  OLED->ShowString(4, 0, (uint8_t*)"Temp:");
   //  OLED->ShowString(4, 0, (uint8_t*)"Ref");
-  OLED->ShowString(4, 6, (uint8_t*)"Dbus");
-  OLED->ShowString(4, 13, (uint8_t*)"Lidar");
+
+  OLED->ShowString(0, 15, (uint8_t*)"S");
+  OLED->ShowString(0, 18, (uint8_t*)"W");
+
+  OLED->ShowString(1, 12, (uint8_t*)"FL");
+  OLED->ShowString(2, 12, (uint8_t*)"FR");
+//
+  OLED->ShowString(3, 12, (uint8_t*)"BL");
+  OLED->ShowString(4, 12, (uint8_t*)"BR");
 
   char temp[6] = "";
   while (true) {
+
+    osDelay(100);
     pitch_motor->connection_flag_ = false;
     yaw_motor->connection_flag_ = false;
     sl_motor->connection_flag_ = false;
     sr_motor->connection_flag_ = false;
     ld_motor->connection_flag_ = false;
-    //    fl_motor->connection_flag_ = false;
-    //    fr_motor->connection_flag_ = false;
-    //    bl_motor->connection_flag_ = false;
-    //    br_motor->connection_flag_ = false;
+
     referee->connection_flag_ = false;
     dbus->connection_flag_ = false;
     osDelay(SELFTEST_TASK_DELAY);
@@ -537,10 +550,27 @@ void selfTestTask(void* arg) {
     sl_motor_flag = sl_motor->connection_flag_;
     sr_motor_flag = sr_motor->connection_flag_;
     ld_motor_flag = ld_motor->connection_flag_;
-    //    fl_motor_flag = fl_motor->connection_flag_;
-    //    fr_motor_flag = fr_motor->connection_flag_;
-    //    bl_motor_flag = bl_motor->connection_flag_;
-    //    br_motor_flag = br_motor->connection_flag_;
+
+    chassis_flag_bitmap = send->chassis_flag;
+
+    fl_wheel_flag = (0x80 & chassis_flag_bitmap);
+    //motor 8
+    fr_wheel_flag = (0x40 & chassis_flag_bitmap);
+    //motor 7
+    bl_wheel_flag = (0x20 & chassis_flag_bitmap);
+    //motor 6
+    br_wheel_flag = (0x10 & chassis_flag_bitmap);
+    //motor 5
+    fl_steering_flag = (0x08 & chassis_flag_bitmap);
+    //motor 4
+    fr_steering_flag = (0x04 & chassis_flag_bitmap);
+    //motor 3
+    br_steering_flag = (0x02 & chassis_flag_bitmap);
+    //motor 2
+    bl_steering_flag = (0x01 & chassis_flag_bitmap);
+    //motor 1
+
+    //    fl_wheel_flag = send->selfCheck_flag;
     calibration_flag = imu->CaliDone();
     //    referee_flag = referee->connection_flag_;
     dbus_flag = dbus->connection_flag_;
@@ -549,21 +579,33 @@ void selfTestTask(void* arg) {
     OLED->ShowBlock(0, 7, yaw_motor_flag);
     OLED->ShowBlock(1, 2, sl_motor_flag);
     OLED->ShowBlock(1, 7, sr_motor_flag);
-    OLED->ShowBlock(1, 12, ld_motor_flag);
-    //    OLED->ShowBlock(2, 2, fl_motor_flag);
-    //    OLED->ShowBlock(2, 7, fr_motor_flag);
-    //    OLED->ShowBlock(2, 12, bl_motor_flag);
-    //    OLED->ShowBlock(2, 17, br_motor_flag);
-    OLED->ShowBlock(3, 4, imu->CaliDone());
+    OLED->ShowBlock(2, 2, ld_motor_flag);
+    OLED->ShowBlock(2, 8, lidar_flag);
+    OLED->ShowBlock(3, 3, imu->CaliDone());
+    OLED->ShowBlock(3, 9, dbus_flag);
     snprintf(temp, 6, "%.2f", imu->Temp);
-    OLED->ShowString(3, 12, (uint8_t*)temp);
+    OLED->ShowString(4, 6, (uint8_t*)temp);
     //    OLED->ShowBlock(4, 3, referee_flag);
-    OLED->ShowBlock(4, 10, dbus_flag);
-    OLED->ShowBlock(4, 18, lidar_flag);
+
+    OLED->ShowBlock(1, 18, fl_wheel_flag);
+
+    OLED->ShowBlock(1,15,fl_steering_flag);
+
+    OLED->ShowBlock(2, 18, fr_wheel_flag);
+
+    OLED->ShowBlock(2,15,fr_steering_flag);
+
+    OLED->ShowBlock(3, 18, bl_wheel_flag);
+
+    OLED->ShowBlock(3,15,bl_steering_flag);
+
+    OLED->ShowBlock(4, 18, br_wheel_flag);
+
+    OLED->ShowBlock(4,15,br_steering_flag);
 
     OLED->RefreshGram();
 
-    selftestStart = true;
+    selftestStart = send->self_check_flag;
   }
 }
 
