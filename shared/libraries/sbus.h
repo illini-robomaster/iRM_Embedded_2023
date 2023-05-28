@@ -44,9 +44,6 @@ class SBUS : public bsp::UART {
   uint32_t timestamp;
 
   volatile bool connection_flag_ = false;
-
-//  static const int16_t ROCKER_MIN = -660;
-//  static const int16_t ROCKER_MAX = 660;
 };
 
 } /* namespace remote */
