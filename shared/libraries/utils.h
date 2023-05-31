@@ -20,6 +20,8 @@
 
 #pragma once
 
+#include "stdint.h"
+
 /**
  * @brief clip a value to fall into a given range
  *
@@ -38,6 +40,19 @@ T clip(T value, T min, T max) {
 }
 
 /**
+ * @brief absolute value
+ *
+ * @tparam T type of the value
+ * @param val value to be taken absolute value of
+ *
+ * @return absolute value of the value
+ */
+// template <typename T>
+// T abs(T val) {
+//   return val < 0 ? -val : val;
+// }
+
+/**
  * @brief wrap around a value to fall into a given range
  *
  * @tparam T    type of the value
@@ -53,6 +68,45 @@ template <typename T>
 T wrap(T value, T min, T max) {
   const T range = max - min;
   return value < min ? value + range : (value > max ? value - range : value);
+}
+
+/**
+ * @brief clip a value to fall into a given range; can wrap around domain
+ *                        (designed for angle-based control 2*pi!)
+ *
+ * @tparam T        type of the value
+ * @param value     value to the clipped
+ * @param min       clipping range min
+ * @param max       clipping range max
+ * @param range_min domain range min
+ * @param range_max domain range max
+ *
+ * @return clipped value that falls in the range [min, max]
+ *
+ * @note undefined behavior if min > max
+ */
+template <typename T>
+T wrapping_clip(T value, T min, T max, T range_min, T range_max) {
+  value = wrap<T>(value, range_min, range_max);
+  // if mim and max are too close, directly return value for omni
+  if (abs(max - min) < 1e-4) {
+    return value;
+  }
+  if (max >= min) {
+    return value < min ? min : (value > max ? max : value);
+  } else {
+    // min > max; wrap around
+    T middle = (min + max) / 2;
+    if (value <= max && value >= range_min) {
+      return value;
+    } else if (value >= min && value <= range_max) {
+      return value;
+    } else if (value > max && value < middle) {
+      return max;
+    } else {
+      return min;
+    }
+  }
 }
 
 /**
@@ -125,3 +179,14 @@ class FloatEdgeDetector {
   bool posEdge_;
   bool negEdge_;
 };
+
+/**
+ * @brief Converts a float to an unsigned int, given range and number of bits;
+   *      see m4310 V1.2 document for detail
+ * @param x value to be converted
+ * @param x_min minimum value of the current parameter
+ * @param x_max maximum value of the current parameter
+ * @param bits size in bits
+ * @return value converted from float to unsigned int
+ */
+uint16_t float_to_uint(float x, float x_min, float x_max, int bits);
