@@ -89,7 +89,7 @@ int CAN::RegisterRxCallback(uint32_t std_id, can_rx_callback_t callback, void* a
 
   rx_args_[callback_count_] = args;
   rx_callbacks_[callback_count_] = callback;
-  id_to_index_[std_id] = callback_count_;
+  rx_id_[callback_count_] = std_id;
   callback_count_++;
 
   return 0;
@@ -125,11 +125,15 @@ void CAN::RxCallback() {
   CAN_RxHeaderTypeDef header;
   uint8_t data[MAX_CAN_DATA_SIZE];
   HAL_CAN_GetRxMessage(hcan_, CAN_RX_FIFO0, &header, data);
-  uint16_t callback_id = header.StdId;
-  const auto it = id_to_index_.find(callback_id);
-  if (it == id_to_index_.end())
+  int16_t callback_id = -1;
+  for (uint8_t i = 0; i < callback_count_; i++) {
+    if (rx_id_[i] == header.StdId) {
+      callback_id = i;
+      break;
+    }
+  }
+  if (callback_id == -1)
     return;
-  callback_id = it->second;
   // find corresponding callback
   if (rx_callbacks_[callback_id])
     rx_callbacks_[callback_id](data, rx_args_[callback_id]);

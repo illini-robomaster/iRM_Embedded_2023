@@ -91,7 +91,7 @@ class CAN {
   can_rx_callback_t rx_callbacks_[MAX_CAN_DEVICES] = {0};
   void* rx_args_[MAX_CAN_DEVICES] = {NULL};
 
-  std::map<uint16_t, uint8_t> id_to_index_;
+  uint16_t rx_id_[MAX_CAN_DEVICES] = {0};
   uint8_t callback_count_ = 0;
 
   static std::map<CAN_HandleTypeDef*, CAN*> ptr_map;
