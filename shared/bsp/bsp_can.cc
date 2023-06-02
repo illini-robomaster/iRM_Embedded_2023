@@ -36,7 +36,8 @@ std::map<CAN_HandleTypeDef*, CAN*> CAN::ptr_map;
  */
 CAN* CAN::FindInstance(CAN_HandleTypeDef* hcan) {
   const auto it = ptr_map.find(hcan);
-  if (it == ptr_map.end()) return nullptr;
+  if (it == ptr_map.end())
+    return nullptr;
 
   return it->second;
 }
@@ -48,7 +49,9 @@ CAN* CAN::FindInstance(CAN_HandleTypeDef* hcan) {
  *
  * @return true if found, otherwise false
  */
-bool CAN::HandleExists(CAN_HandleTypeDef* hcan) { return FindInstance(hcan) != nullptr; }
+bool CAN::HandleExists(CAN_HandleTypeDef* hcan) {
+  return FindInstance(hcan) != nullptr;
+}
 
 /**
  * @brief callback handler for CAN rx feedback data
@@ -57,7 +60,8 @@ bool CAN::HandleExists(CAN_HandleTypeDef* hcan) { return FindInstance(hcan) != n
  */
 void CAN::RxFIFO0MessagePendingCallback(CAN_HandleTypeDef* hcan) {
   CAN* can = FindInstance(hcan);
-  if (!can) return;
+  if (!can)
+    return;
   can->RxCallback();
 }
 
@@ -78,19 +82,23 @@ CAN::CAN(CAN_HandleTypeDef* hcan, uint32_t start_id, bool is_master)
 }
 
 int CAN::RegisterRxCallback(uint32_t std_id, can_rx_callback_t callback, void* args) {
-  int callback_id = std_id - start_id_;
+  // int callback_id = std_id - start_id_;
 
-  if (callback_id < 0 || callback_id >= MAX_CAN_DEVICES) return -1;
+  if (callback_count_ >= MAX_CAN_DEVICES)
+    return -1;
 
-  rx_args_[callback_id] = args;
-  rx_callbacks_[callback_id] = callback;
+  rx_args_[callback_count_] = args;
+  rx_callbacks_[callback_count_] = callback;
+  rx_id_[callback_count_] = std_id;
+  callback_count_++;
 
   return 0;
 }
 
 int CAN::Transmit(uint16_t id, const uint8_t data[], uint32_t length) {
   RM_EXPECT_TRUE(IS_CAN_DLC(length), "CAN tx data length exceeds limit");
-  if (!IS_CAN_DLC(length)) return -1;
+  if (!IS_CAN_DLC(length))
+    return -1;
 
   CAN_TxHeaderTypeDef header = {
       .StdId = id,
@@ -103,7 +111,8 @@ int CAN::Transmit(uint16_t id, const uint8_t data[], uint32_t length) {
 
   uint32_t mailbox;
 
-  if (HAL_CAN_AddTxMessage(hcan_, &header, (uint8_t*)data, &mailbox) != HAL_OK) return -1;
+  if (HAL_CAN_AddTxMessage(hcan_, &header, (uint8_t*)data, &mailbox) != HAL_OK)
+    return -1;
 
   // poll for can transmission to complete
   while (HAL_CAN_IsTxMessagePending(hcan_, mailbox))
@@ -116,9 +125,17 @@ void CAN::RxCallback() {
   CAN_RxHeaderTypeDef header;
   uint8_t data[MAX_CAN_DATA_SIZE];
   HAL_CAN_GetRxMessage(hcan_, CAN_RX_FIFO0, &header, data);
-  int callback_id = header.StdId - start_id_;
+  int16_t callback_id = -1;
+  for (uint8_t i = 0; i < callback_count_; i++) {
+    if (rx_id_[i] == header.StdId) {
+      callback_id = i;
+      break;
+    }
+  }
+  if (callback_id == -1)
+    return;
   // find corresponding callback
-  if (callback_id >= 0 && callback_id < MAX_CAN_DEVICES && rx_callbacks_[callback_id])
+  if (rx_callbacks_[callback_id])
     rx_callbacks_[callback_id](data, rx_args_[callback_id]);
 }
 
