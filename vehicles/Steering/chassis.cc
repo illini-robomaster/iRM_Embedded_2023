@@ -30,6 +30,7 @@
 #include "protocol.h"
 #include "rgb.h"
 #include "steering.h"
+#include "supercap.h"
 #include <cmath>
 
 static bsp::CAN* can1 = nullptr;
@@ -164,6 +165,8 @@ static bsp::GPIO* pe4 = nullptr;
 static control::steering_chassis_t* chassis_data;
 static control::SteeringChassis* chassis;
 
+static control::SuperCap* supercap = nullptr;
+
 static const float CHASSIS_DEADZONE = 0.04;
 
 bool steering_align_detect1() { return pe1->Read() == 0; }
@@ -242,10 +245,16 @@ void chassisTask(void* arg) {
     chassis->SteerUpdateTarget();
     constexpr float WHEEL_SPEED_FACTOR = 4;
     chassis->WheelUpdateSpeed(WHEEL_SPEED_FACTOR);
-
     chassis->SteerCalcOutput();
+
+
+
+    //power adjustment
+
     float PID_output[4];
     float output[4];
+    float supercap_voltage = supercap->info.voltage;
+    float supercap_energy = supercap->info.energy;
     PID_output[0] = pid5.ComputeConstrainedOutput(motor5->GetOmegaDelta(chassis->v_bl_));
     PID_output[1] = pid6.ComputeConstrainedOutput(motor6->GetOmegaDelta(chassis->v_br_));
     PID_output[2] = pid7.ComputeConstrainedOutput(motor7->GetOmegaDelta(chassis->v_fr_));
@@ -253,15 +262,15 @@ void chassisTask(void* arg) {
     float _power_limit = referee->game_robot_status.chassis_power_limit;
     float _chassis_power = referee->power_heat_data.chassis_power;
     float _chassis_power_buffer = referee->power_heat_data.chassis_power_buffer;
-    control::PowerLimit* power_limit;
+    //fill in the number of motors
+    control::PowerLimit* power_limit = new control::PowerLimit(11);
     control::power_limit_t power_limit_info;
     power_limit_info.power_limit = _power_limit;
     power_limit_info.WARNING_power = _power_limit * 0.9;
     power_limit_info.WARNING_power_buff = 50;
     power_limit_info.buffer_total_current_limit = 3500 * 4;
     power_limit_info.power_total_current_limit = 5000 * 4 / 80.0 * _power_limit;
-    power_limit->Output(true, power_limit_info, _chassis_power, _chassis_power_buffer, PID_output,
-                        output);
+    power_limit->Output(true, power_limit_info, _chassis_power, _chassis_power_buffer, PID_output, output);
     motor5->SetOutput(output[0]);
     motor6->SetOutput(output[1]);
     motor7->SetOutput(output[2]);
@@ -382,6 +391,8 @@ void RM_RTOS_Init() {
   pe4 = new bsp::GPIO(IN4_GPIO_Port, IN4_Pin);
 
   chassis_data = new control::steering_chassis_t();
+
+  supercap = new control::SuperCap(can2, 0x201);
 
   control::steering_t steering_motor_data;
   steering_motor_data.motor = motor1;
