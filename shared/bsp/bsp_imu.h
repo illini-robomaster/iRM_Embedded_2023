@@ -248,14 +248,14 @@
 #define BMI088_GYRO_250_SEN 0.00013315805450396191230191732547673f
 #define BMI088_GYRO_125_SEN 0.000066579027251980956150958662738366f
 
-#define SPI_DMA_GYRO_LENGHT 8
-#define SPI_DMA_ACCEL_LENGHT 9
-#define SPI_DMA_ACCEL_TEMP_LENGHT 4
+#define SPI_DMA_GYRO_LENGTH 8
+#define SPI_DMA_ACCEL_LENGTH 9
+#define SPI_DMA_ACCEL_TEMP_LENGTH 4
 
-#define IMU_DR_SHFITS 0
-#define IMU_SPI_SHFITS 1
-#define IMU_UPDATE_SHFITS 2
-#define IMU_NOTIFY_SHFITS 3
+#define IMU_DR_SHIFTS 0
+#define IMU_SPI_SHIFTS 1
+#define IMU_UPDATE_SHIFTS 2
+#define IMU_NOTIFY_SHIFTS 3
 
 #define BMI088_GYRO_RX_BUF_DATA_OFFSET 1
 #define BMI088_ACCEL_RX_BUF_DATA_OFFSET 2
@@ -561,15 +561,15 @@ class IMU_typeC {
   volatile uint8_t mag_update_flag = 0;
   volatile uint8_t imu_start_dma_flag = 0;
 
-  uint8_t gyro_dma_rx_buf[SPI_DMA_GYRO_LENGHT];
-  uint8_t gyro_dma_tx_buf[SPI_DMA_GYRO_LENGHT] = {0x82, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+  uint8_t gyro_dma_rx_buf[SPI_DMA_GYRO_LENGTH];
+  uint8_t gyro_dma_tx_buf[SPI_DMA_GYRO_LENGTH] = {0x82, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 
-  uint8_t accel_dma_rx_buf[SPI_DMA_ACCEL_LENGHT];
-  uint8_t accel_dma_tx_buf[SPI_DMA_ACCEL_LENGHT] = {0x92, 0xFF, 0xFF, 0xFF, 0xFF,
+  uint8_t accel_dma_rx_buf[SPI_DMA_ACCEL_LENGTH];
+  uint8_t accel_dma_tx_buf[SPI_DMA_ACCEL_LENGTH] = {0x92, 0xFF, 0xFF, 0xFF, 0xFF,
                                                     0xFF, 0xFF, 0xFF, 0xFF};
 
-  uint8_t accel_temp_dma_rx_buf[SPI_DMA_ACCEL_TEMP_LENGHT];
-  uint8_t accel_temp_dma_tx_buf[SPI_DMA_ACCEL_TEMP_LENGHT] = {0xA2, 0xFF, 0xFF, 0xFF};
+  uint8_t accel_temp_dma_rx_buf[SPI_DMA_ACCEL_TEMP_LENGTH];
+  uint8_t accel_temp_dma_tx_buf[SPI_DMA_ACCEL_TEMP_LENGTH] = {0xA2, 0xFF, 0xFF, 0xFF};
 
   void AHRS_init(float quat[4], float accel[3], float mag[3]);
   void AHRS_update(float quat[4], float time, float gyro[3], float accel[3], float mag[3]);

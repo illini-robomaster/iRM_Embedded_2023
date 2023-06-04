@@ -252,11 +252,11 @@ void IST8310::ist8310_read_mag(float mag_[3]) {
 
 void IST8310::IntCallback() {
   if (imu_ && imu_->useMag_) {
-    imu_->mag_update_flag |= 1 << IMU_DR_SHFITS;
+    imu_->mag_update_flag |= 1 << IMU_DR_SHIFTS;
 
-    if (imu_->mag_update_flag &= 1 << IMU_DR_SHFITS) {
-      imu_->mag_update_flag &= ~(1 << IMU_DR_SHFITS);
-      imu_->mag_update_flag |= (1 << IMU_SPI_SHFITS);
+    if (imu_->mag_update_flag &= 1 << IMU_DR_SHIFTS) {
+      imu_->mag_update_flag &= ~(1 << IMU_DR_SHIFTS);
+      imu_->mag_update_flag |= (1 << IMU_SPI_SHIFTS);
 
       ist8310_read_mag(imu_->IST8310_real_data_.mag);
     }
@@ -560,15 +560,15 @@ void BMI088::gyro_read_over(uint8_t* rx_buf, float* gyro) {
 Accel_INT::Accel_INT(uint16_t INT_pin, IMU_typeC* imu) : GPIT(INT_pin) { imu_ = imu; }
 
 void Accel_INT::IntCallback() {
-  imu_->accel_update_flag |= 1 << IMU_DR_SHFITS;
-  imu_->accel_temp_update_flag |= 1 << IMU_DR_SHFITS;
+  imu_->accel_update_flag |= 1 << IMU_DR_SHIFTS;
+  imu_->accel_temp_update_flag |= 1 << IMU_DR_SHIFTS;
   if (imu_->imu_start_dma_flag) imu_->imu_cmd_spi_dma();
 }
 
 Gyro_INT::Gyro_INT(uint16_t INT_pin, IMU_typeC* imu) : GPIT(INT_pin) { imu_ = imu; }
 
 void Gyro_INT::IntCallback() {
-  imu_->gyro_update_flag |= 1 << IMU_DR_SHFITS;
+  imu_->gyro_update_flag |= 1 << IMU_DR_SHIFTS;
   if (imu_->imu_start_dma_flag) imu_->imu_cmd_spi_dma();
 }
 
@@ -592,7 +592,7 @@ IMU_typeC::IMU_typeC(IMU_typeC_init_t init, bool useMag)
   accel_fliter_1[1] = accel_fliter_2[1] = accel_fliter_3[1] = BMI088_real_data_.accel[1];
   accel_fliter_1[2] = accel_fliter_2[2] = accel_fliter_3[2] = BMI088_real_data_.accel[2];
   AHRS_init(INS_quat, BMI088_real_data_.accel, IST8310_real_data_.mag);
-  SPI_DMA_init((uint32_t)gyro_dma_tx_buf, (uint32_t)gyro_dma_rx_buf, SPI_DMA_GYRO_LENGHT);
+  SPI_DMA_init((uint32_t)gyro_dma_tx_buf, (uint32_t)gyro_dma_rx_buf, SPI_DMA_GYRO_LENGTH);
   imu_start_dma_flag = 1;
 }
 
@@ -601,20 +601,20 @@ void IMU_typeC::Calibrate() { calibrate_ = true; }
 bool IMU_typeC::CaliDone() { return calidone_; }
 
 void IMU_typeC::Update() {
-  if (gyro_update_flag & (1 << IMU_NOTIFY_SHFITS)) {
-    gyro_update_flag &= ~(1 << IMU_NOTIFY_SHFITS);
+  if (gyro_update_flag & (1 << IMU_NOTIFY_SHIFTS)) {
+    gyro_update_flag &= ~(1 << IMU_NOTIFY_SHIFTS);
     BMI088_.gyro_read_over(gyro_dma_rx_buf + BMI088_GYRO_RX_BUF_DATA_OFFSET,
                            BMI088_real_data_.gyro);
   }
 
-  if (accel_update_flag & (1 << IMU_UPDATE_SHFITS)) {
-    accel_update_flag &= ~(1 << IMU_UPDATE_SHFITS);
+  if (accel_update_flag & (1 << IMU_UPDATE_SHIFTS)) {
+    accel_update_flag &= ~(1 << IMU_UPDATE_SHIFTS);
     BMI088_.accel_read_over(accel_dma_rx_buf + BMI088_ACCEL_RX_BUF_DATA_OFFSET,
                             BMI088_real_data_.accel, &BMI088_real_data_.time);
   }
 
-  if (accel_temp_update_flag & (1 << IMU_UPDATE_SHFITS)) {
-    accel_temp_update_flag &= ~(1 << IMU_UPDATE_SHFITS);
+  if (accel_temp_update_flag & (1 << IMU_UPDATE_SHIFTS)) {
+    accel_temp_update_flag &= ~(1 << IMU_UPDATE_SHIFTS);
     BMI088_.temperature_read_over(accel_temp_dma_rx_buf + BMI088_ACCEL_RX_BUF_DATA_OFFSET,
                                   &BMI088_real_data_.temp);
     Temp = BMI088_real_data_.temp;
@@ -775,39 +775,39 @@ void IMU_typeC::imu_cmd_spi_dma() {
   UBaseType_t uxSavedInterruptStatus;
   uxSavedInterruptStatus = taskENTER_CRITICAL_FROM_ISR();
 
-  if ((gyro_update_flag & (1 << IMU_DR_SHFITS)) && !(hspi1.hdmatx->Instance->CR & DMA_SxCR_EN) &&
-      !(hspi1.hdmarx->Instance->CR & DMA_SxCR_EN) && !(accel_update_flag & (1 << IMU_SPI_SHFITS)) &&
-      !(accel_temp_update_flag & (1 << IMU_SPI_SHFITS))) {
-    gyro_update_flag &= ~(1 << IMU_DR_SHFITS);
-    gyro_update_flag |= (1 << IMU_SPI_SHFITS);
+  if ((gyro_update_flag & (1 << IMU_DR_SHIFTS)) && !(hspi1.hdmatx->Instance->CR & DMA_SxCR_EN) &&
+      !(hspi1.hdmarx->Instance->CR & DMA_SxCR_EN) && !(accel_update_flag & (1 << IMU_SPI_SHIFTS)) &&
+      !(accel_temp_update_flag & (1 << IMU_SPI_SHIFTS))) {
+    gyro_update_flag &= ~(1 << IMU_DR_SHIFTS);
+    gyro_update_flag |= (1 << IMU_SPI_SHIFTS);
 
     HAL_GPIO_WritePin(BMI088_param_.CS_GYRO_Port, BMI088_param_.CS_GYRO_Pin, GPIO_PIN_RESET);
-    SPI_DMA_enable((uint32_t)gyro_dma_tx_buf, (uint32_t)gyro_dma_rx_buf, SPI_DMA_GYRO_LENGHT);
+    SPI_DMA_enable((uint32_t)gyro_dma_tx_buf, (uint32_t)gyro_dma_rx_buf, SPI_DMA_GYRO_LENGTH);
     taskEXIT_CRITICAL_FROM_ISR(uxSavedInterruptStatus);
     return;
   }
 
-  if ((accel_update_flag & (1 << IMU_DR_SHFITS)) && !(hspi1.hdmatx->Instance->CR & DMA_SxCR_EN) &&
-      !(hspi1.hdmarx->Instance->CR & DMA_SxCR_EN) && !(gyro_update_flag & (1 << IMU_SPI_SHFITS)) &&
-      !(accel_temp_update_flag & (1 << IMU_SPI_SHFITS))) {
-    accel_update_flag &= ~(1 << IMU_DR_SHFITS);
-    accel_update_flag |= (1 << IMU_SPI_SHFITS);
+  if ((accel_update_flag & (1 << IMU_DR_SHIFTS)) && !(hspi1.hdmatx->Instance->CR & DMA_SxCR_EN) &&
+      !(hspi1.hdmarx->Instance->CR & DMA_SxCR_EN) && !(gyro_update_flag & (1 << IMU_SPI_SHIFTS)) &&
+      !(accel_temp_update_flag & (1 << IMU_SPI_SHIFTS))) {
+    accel_update_flag &= ~(1 << IMU_DR_SHIFTS);
+    accel_update_flag |= (1 << IMU_SPI_SHIFTS);
 
     HAL_GPIO_WritePin(BMI088_param_.CS_ACCEL_Port, BMI088_param_.CS_ACCEL_Pin, GPIO_PIN_RESET);
-    SPI_DMA_enable((uint32_t)accel_dma_tx_buf, (uint32_t)accel_dma_rx_buf, SPI_DMA_ACCEL_LENGHT);
+    SPI_DMA_enable((uint32_t)accel_dma_tx_buf, (uint32_t)accel_dma_rx_buf, SPI_DMA_ACCEL_LENGTH);
     taskEXIT_CRITICAL_FROM_ISR(uxSavedInterruptStatus);
     return;
   }
 
-  if ((accel_temp_update_flag & (1 << IMU_DR_SHFITS)) &&
+  if ((accel_temp_update_flag & (1 << IMU_DR_SHIFTS)) &&
       !(hspi1.hdmatx->Instance->CR & DMA_SxCR_EN) && !(hspi1.hdmarx->Instance->CR & DMA_SxCR_EN) &&
-      !(gyro_update_flag & (1 << IMU_SPI_SHFITS)) && !(accel_update_flag & (1 << IMU_SPI_SHFITS))) {
-    accel_temp_update_flag &= ~(1 << IMU_DR_SHFITS);
-    accel_temp_update_flag |= (1 << IMU_SPI_SHFITS);
+      !(gyro_update_flag & (1 << IMU_SPI_SHIFTS)) && !(accel_update_flag & (1 << IMU_SPI_SHIFTS))) {
+    accel_temp_update_flag &= ~(1 << IMU_DR_SHIFTS);
+    accel_temp_update_flag |= (1 << IMU_SPI_SHIFTS);
 
     HAL_GPIO_WritePin(BMI088_param_.CS_ACCEL_Port, BMI088_param_.CS_ACCEL_Pin, GPIO_PIN_RESET);
     SPI_DMA_enable((uint32_t)accel_temp_dma_tx_buf, (uint32_t)accel_temp_dma_rx_buf,
-                   SPI_DMA_ACCEL_TEMP_LENGHT);
+                   SPI_DMA_ACCEL_TEMP_LENGTH);
     taskEXIT_CRITICAL_FROM_ISR(uxSavedInterruptStatus);
     return;
   }
@@ -822,32 +822,32 @@ void DMACallbackWrapper(SPI_HandleTypeDef* hspi) {
     if (!imu) return;
 
     // gyro read over
-    if (imu->gyro_update_flag & (1 << IMU_SPI_SHFITS)) {
-      imu->gyro_update_flag &= ~(1 << IMU_SPI_SHFITS);
-      imu->gyro_update_flag |= (1 << IMU_UPDATE_SHFITS);
+    if (imu->gyro_update_flag & (1 << IMU_SPI_SHIFTS)) {
+      imu->gyro_update_flag &= ~(1 << IMU_SPI_SHIFTS);
+      imu->gyro_update_flag |= (1 << IMU_UPDATE_SHIFTS);
       HAL_GPIO_WritePin(imu->BMI088_param_.CS_GYRO_Port, imu->BMI088_param_.CS_GYRO_Pin,
                         GPIO_PIN_SET);
     }
     // accel read over
-    if (imu->accel_update_flag & (1 << IMU_SPI_SHFITS)) {
-      imu->accel_update_flag &= ~(1 << IMU_SPI_SHFITS);
-      imu->accel_update_flag |= (1 << IMU_UPDATE_SHFITS);
+    if (imu->accel_update_flag & (1 << IMU_SPI_SHIFTS)) {
+      imu->accel_update_flag &= ~(1 << IMU_SPI_SHIFTS);
+      imu->accel_update_flag |= (1 << IMU_UPDATE_SHIFTS);
       HAL_GPIO_WritePin(imu->BMI088_param_.CS_ACCEL_Port, imu->BMI088_param_.CS_ACCEL_Pin,
                         GPIO_PIN_SET);
     }
     // temperature read over
-    if (imu->accel_temp_update_flag & (1 << IMU_SPI_SHFITS)) {
-      imu->accel_temp_update_flag &= ~(1 << IMU_SPI_SHFITS);
-      imu->accel_temp_update_flag |= (1 << IMU_UPDATE_SHFITS);
+    if (imu->accel_temp_update_flag & (1 << IMU_SPI_SHIFTS)) {
+      imu->accel_temp_update_flag &= ~(1 << IMU_SPI_SHIFTS);
+      imu->accel_temp_update_flag |= (1 << IMU_UPDATE_SHIFTS);
       HAL_GPIO_WritePin(imu->BMI088_param_.CS_ACCEL_Port, imu->BMI088_param_.CS_ACCEL_Pin,
                         GPIO_PIN_SET);
     }
 
     imu->imu_cmd_spi_dma();
 
-    if (imu->gyro_update_flag & (1 << IMU_UPDATE_SHFITS)) {
-      imu->gyro_update_flag &= ~(1 << IMU_UPDATE_SHFITS);
-      imu->gyro_update_flag |= (1 << IMU_NOTIFY_SHFITS);
+    if (imu->gyro_update_flag & (1 << IMU_UPDATE_SHIFTS)) {
+      imu->gyro_update_flag &= ~(1 << IMU_UPDATE_SHIFTS);
+      imu->gyro_update_flag |= (1 << IMU_NOTIFY_SHIFTS);
       imu->RxCompleteCallback();
     }
   }
