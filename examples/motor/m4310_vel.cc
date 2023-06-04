@@ -61,7 +61,6 @@ void RM_RTOS_Default_Task(const void* args) {
     set_cursor(0, 0);
     clear_screen();
     print("Vel: %f \n", vel);
-    motor->PrintData();
 
     motor->SetOutput(vel);
     motor->TransmitOutput(motor);

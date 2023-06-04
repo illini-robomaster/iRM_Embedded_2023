@@ -26,7 +26,7 @@
 #include "can.h"
 
 #define MAX_CAN_DATA_SIZE 8
-#define MAX_CAN_DEVICES 24
+#define MAX_CAN_DEVICES 12
 
 namespace bsp {
 
@@ -49,9 +49,7 @@ class CAN {
    *
    * @return true if associated, otherwise false
    */
-  bool Uses(CAN_HandleTypeDef* hcan) {
-    return hcan_ == hcan;
-  }
+  bool Uses(CAN_HandleTypeDef* hcan) { return hcan_ == hcan; }
 
   /**
    * @brief register callback function for a specific ID on this CAN line
@@ -90,9 +88,6 @@ class CAN {
 
   can_rx_callback_t rx_callbacks_[MAX_CAN_DEVICES] = {0};
   void* rx_args_[MAX_CAN_DEVICES] = {NULL};
-
-  uint16_t rx_id_[MAX_CAN_DEVICES] = {0};
-  uint8_t callback_count_ = 0;
 
   static std::map<CAN_HandleTypeDef*, CAN*> ptr_map;
   static CAN* FindInstance(CAN_HandleTypeDef* hcan);

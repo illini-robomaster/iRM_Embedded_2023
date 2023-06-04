@@ -700,58 +700,25 @@ class Motor4310 {
    */
   void SetOutput(float velocity);
 
-  /**
-   * @brief get motor angle, in [rad]
-   *
-   * @return radian angle
-   */
-  float GetTheta() const;
-  /**
-   * @brief get motor angular velocity, in [rad / s]
-   * @return radian angular velocity
-   */
-  float GetOmega() const;
-
-  /**
-   * @brief get motor torque, in [Nm]
-   * @return motor torque
-   */
-  float GetTorque() const;
-
   volatile bool connection_flag_ = false;
 
  private:
   bsp::CAN* can_;
   uint16_t rx_id_;
   uint16_t tx_id_;
-  uint16_t tx_id_actual_;  // actual CAN id
 
-  volatile mode_t mode_;           // current motor mode
-  volatile float kp_set_ = 0;      // defined kp value
-  volatile float kd_set_ = 0;      // defined kd value
-  volatile float vel_set_ = 0;     // defined velocity
-  volatile float pos_set_ = 0;     // defined position
+  volatile mode_t mode_;  // current motor mode
+  volatile float kp_set_ = 0;   // defined kp value
+  volatile float kd_set_ = 0;   // defined kd value
+  volatile float vel_set_ = 0;  // defined velocity
+  volatile float pos_set_ = 0;  // defined position
   volatile float torque_set_ = 0;  // defined torque
 
-  volatile int16_t raw_pos_ = 0;        // actual position
-  volatile int16_t raw_vel_ = 0;        // actual velocity
-  volatile int16_t raw_torque_ = 0;     // actual torque
-  volatile int16_t raw_motorTemp_ = 0;  // motor temp
-  volatile int16_t raw_mosTemp_ = 0;    // MOS temp
-  volatile float theta_ = 0;            // actual angular position
-  volatile float omega_ = 0;            // actual angular velocity
-  volatile float torque_ = 0;           // actual torque
-
-  constexpr static float KP_MIN = 0;
-  constexpr static float KP_MAX = 500;
-  constexpr static float KD_MIN = 0;
-  constexpr static float KD_MAX = 5;
-  constexpr static float P_MIN = -12.5;
-  constexpr static float P_MAX = 12.5;
-  constexpr static float V_MIN = -45;
-  constexpr static float V_MAX = 45;
-  constexpr static float T_MIN = -18;
-  constexpr static float T_MAX = 18;
+  volatile int16_t raw_pos_ = 0;  // actual position
+  volatile int16_t raw_vel_ = 0;  // actual velocity
+  volatile int16_t raw_torque_ = 0; // actual torque
+  volatile int16_t raw_rotorTemp_ = 0; // motor temp
+  volatile int16_t raw_mosTemp_ = 0; // MOS temp
 };
 
 
