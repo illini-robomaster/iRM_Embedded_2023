@@ -441,7 +441,7 @@ void KillAll() {
   }
 }
 
-static bool debug = false;
+static bool debug = true;
 
 void RM_RTOS_Default_Task(const void* args) {
   UNUSED(args);
@@ -456,6 +456,8 @@ void RM_RTOS_Default_Task(const void* args) {
       clear_screen();
       print("vx: %f, vy: %f, angle: %f, mode: %f, dead: %f\r\n", receive->vx, receive->vy,
             receive->relative_angle, receive->mode, receive->dead);
+      print("Speed limit: %d\r\n", referee->game_robot_status.shooter_id1_17mm_speed_limit);
+      print("Remain HP: %d\r\n", referee->game_robot_status.remain_HP);
     }
     osDelay(DEFAULT_TASK_DELAY);
   }

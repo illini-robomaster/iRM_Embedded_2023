@@ -249,12 +249,6 @@ void gimbalTask(void* arg) {
       pitch_reset = false;
     }
 
-    set_cursor(0, 0);
-    clear_screen();
-    print("pitch ratio: %f\r\n", pitch_ratio);
-    print("pitch_pos: %f\r\n", pitch_pos);
-    print("pitch_vel: %f\r\n", pitch_vel);
-
     gimbal->TargetRel(-pitch_diff, yaw_diff);
     gimbal->Update();
 
@@ -736,7 +730,7 @@ void KillAll() {
   }
 }
 
-static bool debug = false;
+static bool debug = true;
 
 void RM_RTOS_Default_Task(const void* arg) {
   UNUSED(arg);
