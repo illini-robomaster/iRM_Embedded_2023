@@ -576,7 +576,7 @@ void Motor4310::MotorEnable(Motor4310* motor) {
   data[5] = 0xff;
   data[6] = 0xff;
   data[7] = 0xfc;
-  motor->can_->Transmit(motor->tx_id_, data, 8);
+  motor->can_->Transmit(motor->tx_id_actual_, data, 8);
 }
 
 void Motor4310::MotorDisable(control::Motor4310* motor) {
@@ -589,7 +589,7 @@ void Motor4310::MotorDisable(control::Motor4310* motor) {
   data[5] = 0xff;
   data[6] = 0xff;
   data[7] = 0xfd;
-  motor->can_->Transmit(motor->tx_id_, data, 8);
+  motor->can_->Transmit(motor->tx_id_actual_, data, 8);
 }
 
 void Motor4310::SetZeroPos(control::Motor4310* motor) {
@@ -602,7 +602,7 @@ void Motor4310::SetZeroPos(control::Motor4310* motor) {
   data[5] = 0xff;
   data[6] = 0xff;
   data[7] = 0xfe;
-  motor->can_->Transmit(motor->tx_id_, data, 8);
+  motor->can_->Transmit(motor->tx_id_actual_, data, 8);
 }
 
 void Motor4310::SetOutput(float position, float velocity, float kp, float kd, float torque) {
@@ -663,7 +663,7 @@ void Motor4310::TransmitOutput(Motor4310* motor) {
   } else {
     RM_EXPECT_TRUE(false, "Invalid mode number!");
   }
-  motor->can_->Transmit(motor->tx_id_, data, 8);
+  motor->can_->Transmit(motor->tx_id_actual_, data, 8);
   connection_flag_ = true;  // temp
 }
 
