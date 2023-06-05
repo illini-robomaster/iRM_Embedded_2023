@@ -746,8 +746,8 @@ class Motor4310 {
   constexpr static float KP_MAX = 500;
   constexpr static float KD_MIN = 0;
   constexpr static float KD_MAX = 5;
-  constexpr static float P_MIN = -12.5;
-  constexpr static float P_MAX = 12.5;
+  constexpr static float P_MIN = -PI;
+  constexpr static float P_MAX = PI;
   constexpr static float V_MIN = -45;
   constexpr static float V_MAX = 45;
   constexpr static float T_MIN = -18;
