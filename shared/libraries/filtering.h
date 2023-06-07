@@ -1,6 +1,6 @@
 /****************************************************************************
  *                                                                          *
- *  Copyright (C) 2022 RoboMaster.                                          *
+ *  Copyright (C) 2023 RoboMaster.                                          *
  *  Illini RoboMaster @ University of Illinois at Urbana-Champaign          *
  *                                                                          *
  *  This program is free software: you can redistribute it and/or modify    *
@@ -20,64 +20,34 @@
 
 #pragma once
 
-#include "bsp_can.h"
+class FilterBase {
+public:
+    virtual void register_state(float input, float timestamp) = 0;
 
-namespace bsp {
-
-typedef enum {
-  VX,
-  VY,
-  RELATIVE_ANGLE,
-  START,
-  MODE,
-  DEAD,
-  SHOOTER_POWER,
-  COOLING_HEAT1,
-  COOLING_HEAT2,
-  COOLING_LIMIT1,
-  COOLING_LIMIT2,
-  SPEED_LIMIT1,
-  SPEED_LIMIT2,
-  CHASSIS_FLAG,
-} can_bridge_cmd;
-
-typedef struct {
-  uint8_t id;
-  union {
-    float data_float;
-    int data_int;
-    bool data_bool;
-    unsigned int data_uint;
-  };
-} bridge_data_t;
-
-class CanBridge {
- public:
-  CanBridge(bsp::CAN* can, uint16_t rx_id, uint16_t tx_id);
-  void UpdateData(const uint8_t data[]);
-  void TransmitOutput();
-
-  bridge_data_t cmd;
-  float vx = 0;
-  float vy = 0;
-  float relative_angle = 0;
-  bool start = false;
-  int mode = 0;
-  bool dead = false;
-  bool shooter_power = false;
-  float cooling_heat1 = 0;
-  float cooling_heat2 = 0;
-  float cooling_limit1 = 0;
-  float cooling_limit2 = 0;
-  float speed_limit1 = 0;
-  float speed_limit2 = 0;
-  unsigned int chassis_flag = 0;
-  bool self_check_flag = false;
-  // each bit represents a flag correspond to specific motor e.g.(at index 0, it represents the motor 1's connection flag)
- private:
-  bsp::CAN* can_;
-  uint16_t rx_id_;
-  uint16_t tx_id_;
+    virtual float get_estimation() = 0;
 };
 
-}  // namespace bsp
+class KalmanFilter : public FilterBase {
+public:
+    KalmanFilter(float init_x, float init_t);
+    void register_state(float input, float timestamp);
+    float get_estimation();
+    float iter_and_get_estimation();
+
+private:
+    float xhat = 0;  // a posteriori estimate of x
+    float xhatminus = 0;  // a priori estimate of x
+    float P = 0;  // posteriori error estimate
+    float Pminus = 0;  // a priori error estimate
+
+    float Q = 2; // process noise covariance
+    float H = 1; // measurement function
+
+    float A = 1; // state transition matrix
+    float B = 0; // control matrix
+
+    float R = 2; // measurement noise covariance
+
+    float last_x = 0;
+    float last_t = 0;
+};

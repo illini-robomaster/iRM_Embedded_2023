@@ -20,64 +20,54 @@
 
 #pragma once
 
-#include "bsp_can.h"
+#include "bsp_print.h"
+#include "bsp_uart.h"
+#include "cmsis_os.h"
+#include "crc8.h"
 
-namespace bsp {
+namespace communication {
 
-typedef enum {
-  VX,
-  VY,
-  RELATIVE_ANGLE,
-  START,
-  MODE,
-  DEAD,
-  SHOOTER_POWER,
-  COOLING_HEAT1,
-  COOLING_HEAT2,
-  COOLING_LIMIT1,
-  COOLING_LIMIT2,
-  SPEED_LIMIT1,
-  SPEED_LIMIT2,
-  CHASSIS_FLAG,
-} can_bridge_cmd;
-
-typedef struct {
-  uint8_t id;
-  union {
-    float data_float;
-    int data_int;
-    bool data_bool;
-    unsigned int data_uint;
-  };
-} bridge_data_t;
-
-class CanBridge {
- public:
-  CanBridge(bsp::CAN* can, uint16_t rx_id, uint16_t tx_id);
-  void UpdateData(const uint8_t data[]);
-  void TransmitOutput();
-
-  bridge_data_t cmd;
-  float vx = 0;
-  float vy = 0;
-  float relative_angle = 0;
-  bool start = false;
-  int mode = 0;
-  bool dead = false;
-  bool shooter_power = false;
-  float cooling_heat1 = 0;
-  float cooling_heat2 = 0;
-  float cooling_limit1 = 0;
-  float cooling_limit2 = 0;
-  float speed_limit1 = 0;
-  float speed_limit2 = 0;
-  unsigned int chassis_flag = 0;
-  bool self_check_flag = false;
-  // each bit represents a flag correspond to specific motor e.g.(at index 0, it represents the motor 1's connection flag)
- private:
-  bsp::CAN* can_;
-  uint16_t rx_id_;
-  uint16_t tx_id_;
+struct STMToJetsonData {
+  char header[2];
+  uint8_t my_color; // RED is 0; BLUE is one
+  uint8_t crc8_checksum;
+  char tail[2];
 };
 
-}  // namespace bsp
+// WARNING: THIS CLASS IS NOT THREAD SAFE!!!
+
+class AutoaimProtocol {
+ public:
+  AutoaimProtocol();
+  void Receive(const uint8_t* data, uint8_t len);
+  // dummy send
+  void Send(STMToJetsonData* packet, uint8_t color);
+  uint8_t get_valid_flag(void);
+  float get_relative_yaw(void);
+  float get_relative_pitch(void);
+  uint32_t get_seqnum(void);
+  uint32_t get_valid_packet_cnt(void);
+
+ private:
+  // For definitions of constants, check out the documentation at either
+  // https://github.com/illini-robomaster/iRM_Vision_2023/blob/roger/crc_comm/docs/comm_protocol.md
+  // or https://github.com/illini-robomaster/iRM_Vision_2023/tree/docs/comm_protocol.md
+  static constexpr uint8_t PKG_LEN = 17;
+  static constexpr int32_t INT_FP_SCALE = 1000000;
+  static constexpr uint8_t SEQNUM_OFFSET = 2;
+  static constexpr uint8_t REL_YAW_OFFSET = SEQNUM_OFFSET + 4;
+  static constexpr uint8_t REL_PITCH_OFFSET = REL_YAW_OFFSET + 4;
+
+  int index;
+  uint8_t flag;
+  uint8_t host_command[PKG_LEN];
+  void handle();
+  void process_data();
+
+  float relative_yaw;
+  float relative_pitch;
+  uint32_t seqnum;
+  uint32_t valid_packet_cnt = 0;
+}; /* class AutoaimProtocol */
+
+} /* namespace communication */

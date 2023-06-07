@@ -18,19 +18,19 @@
  *                                                                          *
  ****************************************************************************/
 
-#include "minipc.h"
+#include "autoaim_protocol.h"
 
 #include <cstring>
 #include <memory>
 
 namespace communication {
 
-MiniPCProtocol::MiniPCProtocol() {
+AutoaimProtocol::AutoaimProtocol() {
   index = 0; // current pointer to write
   flag = 0;
 }
 
-void MiniPCProtocol::Send(STMToJetsonData* packet, uint8_t color) {
+void AutoaimProtocol::Send(STMToJetsonData* packet, uint8_t color) {
   packet->header[0] = 'H';
   packet->header[1] = 'D';
   packet->my_color = color;
@@ -44,7 +44,7 @@ void MiniPCProtocol::Send(STMToJetsonData* packet, uint8_t color) {
   packet->tail[1] = 'D';
 }
 
-void MiniPCProtocol::Receive(const uint8_t* data, uint8_t length) {
+void AutoaimProtocol::Receive(const uint8_t* data, uint8_t length) {
   // Four cases
   // Case 1: everything is fresh with complete package(s)
   // Case 2: everything is fresh; package is incomplete
@@ -100,7 +100,7 @@ void MiniPCProtocol::Receive(const uint8_t* data, uint8_t length) {
   }
 }
 
-void MiniPCProtocol::handle(void) {
+void AutoaimProtocol::handle(void) {
   // TODO: implement thread-safe logic here (use a lock to handle changes from interrupt)
   // here we can assume that the package is complete
   // in the host_command buffer
@@ -135,23 +135,23 @@ void MiniPCProtocol::handle(void) {
   }
 }
 
-float MiniPCProtocol::get_relative_yaw(void) {
+float AutoaimProtocol::get_relative_yaw(void) {
   return relative_yaw;
 }
 
-float MiniPCProtocol::get_relative_pitch(void) {
+float AutoaimProtocol::get_relative_pitch(void) {
   return relative_pitch;
 }
 
-uint32_t MiniPCProtocol::get_seqnum(void) {
+uint32_t AutoaimProtocol::get_seqnum(void) {
   return seqnum;
 }
 
-uint32_t MiniPCProtocol::get_valid_packet_cnt(void) {
+uint32_t AutoaimProtocol::get_valid_packet_cnt(void) {
   return valid_packet_cnt;
 }
 
-void MiniPCProtocol::process_data() {
+void AutoaimProtocol::process_data() {
   // Assume that the host_command is a complete and verified message
 
   // char pointer because host_command is a byte array
@@ -164,7 +164,7 @@ void MiniPCProtocol::process_data() {
   relative_pitch = *(int32_t *)rel_pitch_start *1.0f / this->INT_FP_SCALE;
 }
 
-uint8_t MiniPCProtocol::get_valid_flag(void) {
+uint8_t AutoaimProtocol::get_valid_flag(void) {
   uint8_t temp = flag;
   flag = 0;
   return temp;

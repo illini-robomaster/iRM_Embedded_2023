@@ -18,66 +18,31 @@
  *                                                                          *
  ****************************************************************************/
 
-#pragma once
+#include "main.h"
 
-#include "bsp_can.h"
+#include "bsp_print.h"
+#include "cmsis_os.h"
+#include "sbus.h"
 
-namespace bsp {
+static remote::SBUS* sbus;
 
-typedef enum {
-  VX,
-  VY,
-  RELATIVE_ANGLE,
-  START,
-  MODE,
-  DEAD,
-  SHOOTER_POWER,
-  COOLING_HEAT1,
-  COOLING_HEAT2,
-  COOLING_LIMIT1,
-  COOLING_LIMIT2,
-  SPEED_LIMIT1,
-  SPEED_LIMIT2,
-  CHASSIS_FLAG,
-} can_bridge_cmd;
+void RM_RTOS_Init(void) {
+  print_use_uart(&huart1);
+  sbus = new remote::SBUS(&huart3);
+}
 
-typedef struct {
-  uint8_t id;
-  union {
-    float data_float;
-    int data_int;
-    bool data_bool;
-    unsigned int data_uint;
-  };
-} bridge_data_t;
+void RM_RTOS_Default_Task(const void* arguments) {
+  UNUSED(arguments);
 
-class CanBridge {
- public:
-  CanBridge(bsp::CAN* can, uint16_t rx_id, uint16_t tx_id);
-  void UpdateData(const uint8_t data[]);
-  void TransmitOutput();
-
-  bridge_data_t cmd;
-  float vx = 0;
-  float vy = 0;
-  float relative_angle = 0;
-  bool start = false;
-  int mode = 0;
-  bool dead = false;
-  bool shooter_power = false;
-  float cooling_heat1 = 0;
-  float cooling_heat2 = 0;
-  float cooling_limit1 = 0;
-  float cooling_limit2 = 0;
-  float speed_limit1 = 0;
-  float speed_limit2 = 0;
-  unsigned int chassis_flag = 0;
-  bool self_check_flag = false;
-  // each bit represents a flag correspond to specific motor e.g.(at index 0, it represents the motor 1's connection flag)
- private:
-  bsp::CAN* can_;
-  uint16_t rx_id_;
-  uint16_t tx_id_;
-};
-
-}  // namespace bsp
+  // NOTE(alvin): print is split because of stack usage is almost reaching limits
+  while (true) {
+    set_cursor(0, 0);
+    clear_screen();
+    print("CH0: %-4d CH1: %-4d CH2: %-4d CH3: %-4d ", sbus->ch[0], sbus->ch[1], sbus->ch[2], sbus->ch[3]);
+    print("CH4: %-4d CH5: %-4d CH6: %-4d CH7: %-4d ", sbus->ch[4], sbus->ch[5], sbus->ch[6], sbus->ch[7]);
+    print("CH8: %-4d CH9: %-4d CH10: %-4d CH11: %-4d ", sbus->ch[8], sbus->ch[9], sbus->ch[10], sbus->ch[11]);
+    print("CH12: %-4d CH13: %-4d CH14: %-4d CH15: %-4d ", sbus->ch[12], sbus->ch[13], sbus->ch[14], sbus->ch[15]);
+    print("@ %d ms\r\n", sbus->timestamp);
+    osDelay(100);
+  }
+}

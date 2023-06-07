@@ -38,6 +38,12 @@ enum GetThetaMode {absolute_mode, relative_mode};
 
 int16_t ClipMotorRange(float output);
 
+typedef enum {
+  MIT = 0,
+  POS_VEL = 1,
+  VEL = 2,
+} mode_t;
+
 /**
  * @brief base class for motor representation
  */
@@ -64,6 +70,14 @@ class MotorCANBase : public MotorBase {
    * @param rx_id  CAN rx id
    */
   MotorCANBase(bsp::CAN* can, uint16_t rx_id);
+
+  /**
+   * @brief base constructor for non-DJI motors
+   * @param can     CAN instance
+   * @param rx_id   CAN rx id
+   * @param type    motor type
+   */
+  MotorCANBase(bsp::CAN* can, uint16_t rx_id, uint16_t type);
 
   /**
    * @brief update motor feedback data
@@ -121,12 +135,12 @@ class MotorCANBase : public MotorBase {
    * @param num_motors  number of motors to transmit
    */
   static void TransmitOutput(MotorCANBase* motors[], uint8_t num_motors);
-
   /**
    * @brief set ServoMotor as friend of MotorCANBase since they need to use
    *        many of the private parameters of MotorCANBase.
    */
   friend class ServoMotor;
+//  friend class Motor4310;
 
   volatile bool connection_flag_ = false;
 
@@ -596,5 +610,116 @@ class SteeringMotor {
   float align_angle_;               /* store calibration angle                                                              */
   bool align_complete_;             /* if calibration is previously done, use the align_angle_                              */
 };
+
+/**
+ * @brief m4310 motor class
+ */
+class Motor4310 {
+ public:
+  /** constructor wrapper over MotorCANBase
+   *  CAN frame id for different modes:
+   *      MIT:                  actual CAN id.
+   *      position-velocity:    CAN id + 0x100.
+   *      velocity:             CAN id + 0x200.
+   *  @param can    CAN object
+   *  @param rx_id  Master id
+   *  @param tx_id  CAN id *** NOT the actual CAN id but the id configured in software ***
+   *  @param mode   0: MIT
+   *                1: position-velocity
+   *                2: velocity
+   */
+  Motor4310(bsp::CAN* can, uint16_t rx_id, uint16_t tx_id, mode_t mode);
+
+  /* implements data update callback */
+  void UpdateData(const uint8_t data[]);
+
+  /* enable m4310; MUST be called after motor is powered up, otherwise SetOutput commands are ignored */
+  void MotorEnable(Motor4310* motor);
+  /* disable m4310 */
+  void MotorDisable(Motor4310* motor);
+
+  /** sets current motor position as zero position (when motor is powered). M4310 remembers this position
+   * when powered off. */
+  void SetZeroPos(Motor4310* motor);
+
+  /**
+   * implements transmit output specifically for 4310
+   * @param motor m4310 motor object
+   * @param mode operation modes:
+   *                0: MIT
+   *                1: position-velocity
+   *                2: velocity
+   */
+  void TransmitOutput(control::Motor4310* motor);
+
+  /* implements data printout */
+  void PrintData();
+
+  /**
+   * Sets output parameters for m4310 using the MIT mode
+   *
+   * Several control modes can be derived from the MIT mode:
+   * 1. Velocity mode:
+   *    Rotates the motor at a constant velocity by setting kp to zero, kd to a non-zero
+   *    value, and velocity to the target angular velocity
+   *    e.g. motor->SetOutput(0, 3, 0, 1, 0);
+   * 2. Position mode:
+   *    Rotates the motor to a target position by setting position to a relative target
+   *    position. Note: kd must be set to a NON-ZERO value to avoid oscillation
+   *    e.g. motor->SetOutput(2*PI, 0, 0.4, 0.05, 0);
+   * 3. Torque mode:
+   *    Rotates the motor at a given torque by setting torque to a desired value. kp and kd
+   *    should be set to zero. Note: under no load, a small torque
+   *    e.g. motor->SetOutput(0, 0, 0, 0, 1);
+   *
+   * @param position relative target position in radian (can exceed 2*PI)
+   * @param velocity target angular velocity (rad/s)
+   * @param kp p gain (N/rad)
+   * @param kd d gain (N*s/rad)
+   * @param torque target torque (Nm)
+   */
+  void SetOutput(float position, float velocity, float kp, float kd, float torque);
+
+  /**
+   * Sets output parameters for m4310 using position-velocity mode
+   * e.g. motor->SetOutput(2*PI, 1);
+   *
+   * Note: oscillations can be alleviated by tuning the acceleration/deceleration parameters
+   * through the DAMIAO helper tool. The damping factor needs to be a non-zero positive number
+   *
+   * @param position relative target position in radian (can exceed 2*PI)
+   * @param velocity maximum absolute angular velocity (rad/s)
+   */
+  void SetOutput(float position, float velocity);
+
+  /**
+   * Sets output parameters for m4310 using velocity mode
+   *
+   * e.g. motor->SetOutput(1);
+   * @param velocity target angular velocity (rad/s)
+   */
+  void SetOutput(float velocity);
+
+  volatile bool connection_flag_ = false;
+
+ private:
+  bsp::CAN* can_;
+  uint16_t rx_id_;
+  uint16_t tx_id_;
+
+  volatile mode_t mode_;  // current motor mode
+  volatile float kp_set_ = 0;   // defined kp value
+  volatile float kd_set_ = 0;   // defined kd value
+  volatile float vel_set_ = 0;  // defined velocity
+  volatile float pos_set_ = 0;  // defined position
+  volatile float torque_set_ = 0;  // defined torque
+
+  volatile int16_t raw_pos_ = 0;  // actual position
+  volatile int16_t raw_vel_ = 0;  // actual velocity
+  volatile int16_t raw_torque_ = 0; // actual torque
+  volatile int16_t raw_rotorTemp_ = 0; // motor temp
+  volatile int16_t raw_mosTemp_ = 0; // MOS temp
+};
+
 
 } /* namespace control */

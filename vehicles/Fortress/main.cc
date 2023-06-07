@@ -162,7 +162,7 @@ void gimbalTask(void* arg) {
 
   int i = 0;
   while (i < 1000 || !imu->DataReady()) {
-    gimbal->TargetAbs(0, 0);
+    gimbal->TargetAbsWOffset(0, 0);
     gimbal->Update();
     control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 2);
     osDelay(GIMBAL_TASK_DELAY);
@@ -175,7 +175,7 @@ void gimbalTask(void* arg) {
   imu->Calibrate();
 
   while (!imu->DataReady() || !imu->CaliDone()) {
-    gimbal->TargetAbs(0, 0);
+    gimbal->TargetAbsWOffset(0, 0);
     gimbal->Update();
     control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 2);
     osDelay(GIMBAL_TASK_DELAY);

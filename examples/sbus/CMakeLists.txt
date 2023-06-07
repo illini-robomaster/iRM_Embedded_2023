@@ -18,18 +18,9 @@
 #                                                                        #
 # ---------------------------------------------------------------------- #
 
-cmake_minimum_required(VERSION 3.8)
+project(example_sbus ASM C CXX)
 
-include(cmake/arm_toolchain.cmake)
-include(cmake/build_helper.cmake)
-include(cmake/clang_format.cmake)
-include(cmake/doxygen.cmake)
+irm_add_arm_executable(${PROJECT_NAME}
+    TARGET DJI_Board_TypeC
+    SOURCES main.cc)
 
-project(iRM_Embedded_2023)
-
-set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
-
-add_subdirectory(boards)
-add_subdirectory(shared)
-add_subdirectory(vehicles)
-add_subdirectory(examples)

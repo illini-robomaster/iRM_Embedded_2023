@@ -1,6 +1,6 @@
 /****************************************************************************
  *                                                                          *
- *  Copyright (C) 2022 RoboMaster.                                          *
+ *  Copyright (C) 2023 RoboMaster.                                          *
  *  Illini RoboMaster @ University of Illinois at Urbana-Champaign          *
  *                                                                          *
  *  This program is free software: you can redistribute it and/or modify    *
@@ -30,11 +30,38 @@
 #include "protocol.h"
 #include "rgb.h"
 #include "steering.h"
+#include "supercap.h"
 #include <cmath>
 
 static bsp::CAN* can1 = nullptr;
 static bsp::CAN* can2 = nullptr;
 static display::RGB* RGB = nullptr;
+
+//==================================================================================================
+// SelfTest
+//==================================================================================================
+
+static bool fl_steer_motor_flag = false;
+static bool fr_steer_motor_flag = false;
+static bool bl_steer_motor_flag = false;
+static bool br_steer_motor_flag = false;
+static bool fl_wheel_motor_flag = false;
+static bool fr_wheel_motor_flag = false;
+static bool bl_wheel_motor_flag = false;
+static bool br_wheel_motor_flag = false;
+
+static bool transmission_flag = true;
+const osThreadAttr_t selfTestingTask = {.name = "selfTestTask",
+                                             .attr_bits = osThreadDetached,
+                                             .cb_mem = nullptr,
+                                             .cb_size = 0,
+                                             .stack_mem = nullptr,
+                                             .stack_size = 256 * 4,
+                                             .priority = (osPriority_t)osPriorityBelowNormal,
+                                             .tz_module = 0,
+                                             .reserved = 0};
+osThreadId_t selfTestTaskHandle;
+
 
 static BoolEdgeDetector FakeDeath(false);
 static volatile bool Dead = false;
@@ -42,7 +69,7 @@ static BoolEdgeDetector ChangeSpinMode(false);
 static volatile bool SpinMode = false;
 
 static bsp::CanBridge* receive = nullptr;
-
+static unsigned int flag_summary = 0;
 static const int KILLALL_DELAY = 100;
 static const int DEFAULT_TASK_DELAY = 100;
 static const int CHASSIS_TASK_DELAY = 2;
@@ -52,15 +79,18 @@ constexpr float RUN_SPEED = (4 * PI);
 constexpr float ALIGN_SPEED = (PI);
 constexpr float ACCELERATION = (100 * PI);
 
+
 // speed for chassis rotation (no unit)
 constexpr float SPIN_SPEED = 80;
 constexpr float FOLLOW_SPEED = 40;
+
 
 //==================================================================================================
 // Referee
 //==================================================================================================
 
 #define REFEREE_RX_SIGNAL (1 << 1)
+
 
 const osThreadAttr_t refereeTaskAttribute = {.name = "refereeTask",
                                              .attr_bits = osThreadDetached,
@@ -71,8 +101,9 @@ const osThreadAttr_t refereeTaskAttribute = {.name = "refereeTask",
                                              .priority = (osPriority_t)osPriorityAboveNormal,
                                              .tz_module = 0,
                                              .reserved = 0};
-osThreadId_t refereeTaskHandle;
 
+osThreadId_t refereeTaskHandle;
+osThreadId_t chassisTaskHandle;
 class RefereeUART : public bsp::UART {
  public:
   using bsp::UART::UART;
@@ -111,7 +142,6 @@ const osThreadAttr_t chassisTaskAttribute = {.name = "chassisTask",
                                              .priority = (osPriority_t)osPriorityNormal,
                                              .tz_module = 0,
                                              .reserved = 0};
-osThreadId_t chassisTaskHandle;
 
 static control::MotorCANBase* motor1 = nullptr;
 static control::MotorCANBase* motor2 = nullptr;
@@ -134,6 +164,8 @@ static bsp::GPIO* pe4 = nullptr;
 
 static control::steering_chassis_t* chassis_data;
 static control::SteeringChassis* chassis;
+
+static control::SuperCap* supercap = nullptr;
 
 static const float CHASSIS_DEADZONE = 0.04;
 
@@ -180,9 +212,12 @@ void chassisTask(void* arg) {
     float sin_yaw, cos_yaw, vx_set, vy_set;
     float vx, vy, wz;
 
+
     // TODO need to change the channels in gimbal.cc
     vx_set = -receive->vy;
     vy_set = receive->vx;
+
+
 
     if (receive->mode == 1) {  // spin mode
       // delay compensation
@@ -210,34 +245,29 @@ void chassisTask(void* arg) {
     chassis->SteerUpdateTarget();
     constexpr float WHEEL_SPEED_FACTOR = 4;
     chassis->WheelUpdateSpeed(WHEEL_SPEED_FACTOR);
-
     chassis->SteerCalcOutput();
-    
-    chassis->Update((float)referee->game_robot_status.chassis_power_limit,
-                referee->power_heat_data.chassis_power,
-                (float)referee->power_heat_data.chassis_power_buffer);
-    // float PID_output[4];
-    // float output[4];
-    // PID_output[0] = pid5.ComputeConstrainedOutput(motor5->GetOmegaDelta(chassis->v_bl_));
-    // PID_output[1] = pid6.ComputeConstrainedOutput(motor6->GetOmegaDelta(chassis->v_br_));
-    // PID_output[2] = pid7.ComputeConstrainedOutput(motor7->GetOmegaDelta(chassis->v_fr_));
-    // PID_output[3] = pid8.ComputeConstrainedOutput(motor8->GetOmegaDelta(chassis->v_fl_));
-    // float _power_limit = referee->game_robot_status.chassis_power_limit;
-    // float _chassis_power = referee->power_heat_data.chassis_power;
-    // float _chassis_power_buffer = referee->power_heat_data.chassis_power_buffer;
-    // control::PowerLimit* power_limit;
-    // control::power_limit_t power_limit_info;
-    // power_limit_info.power_limit = _power_limit;
-    // power_limit_info.WARNING_power = _power_limit * 0.9;
-    // power_limit_info.WARNING_power_buff = 50;
-    // power_limit_info.buffer_total_current_limit = 3500 * 4;
-    // power_limit_info.power_total_current_limit = 5000 * 4 / 80.0 * _power_limit;
-    // power_limit->Output(true, power_limit_info, _chassis_power, _chassis_power_buffer, PID_output,
-    //                     output);
-    // motor5->SetOutput(output[0]);
-    // motor6->SetOutput(output[1]);
-    // motor7->SetOutput(output[2]);
-    // motor8->SetOutput(output[3]);
+    float PID_output[4];
+    float output[4];
+    PID_output[0] = pid5.ComputeConstrainedOutput(motor5->GetOmegaDelta(chassis->v_bl_));
+    PID_output[1] = pid6.ComputeConstrainedOutput(motor6->GetOmegaDelta(chassis->v_br_));
+    PID_output[2] = pid7.ComputeConstrainedOutput(motor7->GetOmegaDelta(chassis->v_fr_));
+    PID_output[3] = pid8.ComputeConstrainedOutput(motor8->GetOmegaDelta(chassis->v_fl_));
+    float _power_limit = referee->game_robot_status.chassis_power_limit;
+    float _chassis_power = referee->power_heat_data.chassis_power;
+    float _chassis_power_buffer = referee->power_heat_data.chassis_power_buffer;
+    control::PowerLimit* power_limit;
+    control::power_limit_t power_limit_info;
+    power_limit_info.power_limit = _power_limit;
+    power_limit_info.WARNING_power = _power_limit * 0.9;
+    power_limit_info.WARNING_power_buff = 50;
+    power_limit_info.buffer_total_current_limit = 3500 * 4;
+    power_limit_info.power_total_current_limit = 5000 * 4 / 80.0 * _power_limit;
+    power_limit->Output(true, power_limit_info, _chassis_power, _chassis_power_buffer, PID_output,
+                        output);
+    motor5->SetOutput(output[0]);
+    motor6->SetOutput(output[1]);
+    motor7->SetOutput(output[2]);
+    motor8->SetOutput(output[3]);
     
     if (Dead) {
       chassis->SetSpeed(0,0,0);
@@ -249,6 +279,8 @@ void chassisTask(void* arg) {
 
     control::MotorCANBase::TransmitOutput(wheel_motors, 4);
     control::MotorCANBase::TransmitOutput(steer_motors, 4);
+
+
 
     receive->cmd.id = bsp::SHOOTER_POWER;
     receive->cmd.data_bool = referee->game_robot_status.mains_power_shooter_output;
@@ -278,10 +310,56 @@ void chassisTask(void* arg) {
     receive->cmd.data_float = (float)referee->game_robot_status.shooter_id2_17mm_speed_limit;
     receive->TransmitOutput();
 
+
+
+    //send bitmap of connection flag only once
+
+
+
     osDelay(CHASSIS_TASK_DELAY);
+
+
   }
 }
+void self_Check_Task(void* arg){
+  UNUSED(arg);
 
+  while(true){
+    osDelay(100);
+    motor8->connection_flag_ = false;
+    motor7->connection_flag_ = false;
+    motor6->connection_flag_ = false;
+    motor5->connection_flag_ = false;
+    motor4->connection_flag_ = false;
+    motor3->connection_flag_ = false;
+    motor2->connection_flag_ = false;
+    motor1->connection_flag_ = false;
+    osDelay(100);
+    fl_wheel_motor_flag = motor8->connection_flag_;
+    fr_wheel_motor_flag = motor7->connection_flag_;
+    bl_wheel_motor_flag = motor6->connection_flag_;
+    br_wheel_motor_flag = motor5->connection_flag_;
+    fl_steer_motor_flag = motor4->connection_flag_;
+    fr_steer_motor_flag = motor3->connection_flag_;
+    br_steer_motor_flag = motor2->connection_flag_;
+    bl_steer_motor_flag = motor1->connection_flag_;
+    flag_summary = bl_steer_motor_flag|
+                   br_steer_motor_flag<<1|
+                   fr_steer_motor_flag<<2|
+                   fl_steer_motor_flag<<3|
+                   br_wheel_motor_flag<<4|
+                   bl_wheel_motor_flag<<5|
+                   fr_wheel_motor_flag<<6|
+                   fl_wheel_motor_flag<<7;
+    osDelay(100);
+    if(transmission_flag){
+      receive->cmd.id = bsp::CHASSIS_FLAG;
+      receive->cmd.data_uint = (unsigned int)flag_summary;
+      receive->TransmitOutput();
+    }
+    transmission_flag = !transmission_flag;
+  }
+}
 void RM_RTOS_Init() {
   print_use_uart(&huart1);
   bsp::SetHighresClockTimer(&htim5);
@@ -306,6 +384,8 @@ void RM_RTOS_Init() {
   pe4 = new bsp::GPIO(IN4_GPIO_Port, IN4_Pin);
 
   chassis_data = new control::steering_chassis_t();
+
+  supercap = new control::SuperCap(can2, 0x201);
 
   control::steering_t steering_motor_data;
   steering_motor_data.motor = motor1;
@@ -348,13 +428,13 @@ void RM_RTOS_Init() {
   referee_uart->SetupRx(300);
   referee_uart->SetupTx(300);
   referee = new communication::Referee;
-
   receive = new bsp::CanBridge(can2, 0x20B, 0x20A);
 }
 
 void RM_RTOS_Threads_Init(void) {
   refereeTaskHandle = osThreadNew(refereeTask, nullptr, &refereeTaskAttribute);
   chassisTaskHandle = osThreadNew(chassisTask, nullptr, &chassisTaskAttribute);
+  selfTestTaskHandle = osThreadNew(self_Check_Task, nullptr, &selfTestingTask);
 }
 
 void KillAll() {
