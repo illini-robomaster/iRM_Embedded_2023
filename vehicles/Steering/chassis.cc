@@ -234,10 +234,10 @@ void chassisTask(void* arg) {
     // power_limit_info.power_total_current_limit = 5000 * 4 / 80.0 * _power_limit;
     // power_limit->Output(true, power_limit_info, _chassis_power, _chassis_power_buffer, PID_output,
     //                     output);
-    motor5->SetOutput(output[0]);
-    motor6->SetOutput(output[1]);
-    motor7->SetOutput(output[2]);
-    motor8->SetOutput(output[3]);
+    // motor5->SetOutput(output[0]);
+    // motor6->SetOutput(output[1]);
+    // motor7->SetOutput(output[2]);
+    // motor8->SetOutput(output[3]);
     
     if (Dead) {
       chassis->SetSpeed(0,0,0);
