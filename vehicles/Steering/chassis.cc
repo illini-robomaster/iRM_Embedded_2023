@@ -248,7 +248,7 @@ void chassisTask(void* arg) {
     chassis->SteerCalcOutput();
     chassis->Update((float)referee->game_robot_status.chassis_power_limit,
                     referee->power_heat_data.chassis_power,
-                    (float)referee->power_heat_data.chassis_power_buffer)
+                    (float)referee->power_heat_data.chassis_power_buffer);
     // float PID_output[4];
     // float output[4];
     // PID_output[0] = pid5.ComputeConstrainedOutput(motor5->GetOmegaDelta(chassis->v_bl_));
