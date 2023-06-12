@@ -55,6 +55,7 @@ static const int SOFT_START_CONSTANT = 300;
 static const int SOFT_KILL_CONSTANT = 200;
 static const int MOTOR_DELAY_CONSTANT = 3000;
 static const float START_PITCH_POS = PI/5;
+static const int INFANTRY_INITIAL_HP = 100;
 
 static bsp::CanBridge* send = nullptr;
 
@@ -69,27 +70,30 @@ static unsigned int chassis_flag_bitmap = 0;
 
 static volatile float pitch_pos = START_PITCH_POS;
 
-static bool volatile pitch_motor_flag = false;
-static bool volatile yaw_motor_flag = false;
-static bool volatile sl_motor_flag = false;
-static bool volatile sr_motor_flag = false;
-static bool volatile ld_motor_flag = false;
-static bool volatile fl_wheel_flag = false;
-static bool volatile fr_wheel_flag = false;
-static bool volatile bl_wheel_flag = false;
-static bool volatile br_wheel_flag = false;
-static bool volatile fl_steering_flag = false;
-static bool volatile fr_steering_flag = false;
-static bool volatile bl_steering_flag = false;
-static bool volatile br_steering_flag = false;
-static bool volatile calibration_flag = false;
-// static bool volatile referee_flag = false;
-static bool volatile dbus_flag = false;
-static bool volatile lidar_flag = false;
-static bool volatile pitch_reset = false;
+static volatile unsigned int current_hp = 0;
 
+static volatile bool pitch_motor_flag = false;
+static volatile bool yaw_motor_flag = false;
+static volatile bool sl_motor_flag = false;
+static volatile bool sr_motor_flag = false;
+static volatile bool ld_motor_flag = false;
+static volatile bool fl_wheel_flag = false;
+static volatile bool fr_wheel_flag = false;
+static volatile bool bl_wheel_flag = false;
+static volatile bool br_wheel_flag = false;
+static volatile bool fl_steering_flag = false;
+static volatile bool fr_steering_flag = false;
+static volatile bool bl_steering_flag = false;
+static volatile bool br_steering_flag = false;
+static volatile bool calibration_flag = false;
+// static volatile bool referee_flag = false;
+static volatile bool dbus_flag = false;
+static volatile bool lidar_flag = false;
+static volatile bool pitch_reset = false;
 
 static volatile bool selftestStart = false;
+
+static volatile bool robot_hp_begin = false;
 
 //==================================================================================================
 // IMU
@@ -697,7 +701,7 @@ void KillAll() {
     send->TransmitOutput();
 
     FakeDeath.input(dbus->keyboard.bit.B || dbus->swl == remote::DOWN);
-    if (FakeDeath.posEdge()) {
+    if (FakeDeath.posEdge() || send->remain_hp > 0) {
       SpinMode = false;
       Dead = false;
       RGB->Display(display::color_green);
@@ -730,14 +734,17 @@ void KillAll() {
   }
 }
 
-static bool debug = true;
+static bool debug = false;
 
 void RM_RTOS_Default_Task(const void* arg) {
   UNUSED(arg);
 
   while (true) {
+    if (send->remain_hp == INFANTRY_INITIAL_HP) robot_hp_begin = true;
+    current_hp = robot_hp_begin ? send->remain_hp : INFANTRY_INITIAL_HP;
+
     FakeDeath.input(dbus->keyboard.bit.B || dbus->swl == remote::DOWN);
-    if (FakeDeath.posEdge()) {
+    if (FakeDeath.posEdge() || current_hp == 0) {
       Dead = true;
       KillAll();
     }

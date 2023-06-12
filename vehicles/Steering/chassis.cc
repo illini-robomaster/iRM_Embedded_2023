@@ -260,8 +260,6 @@ void chassisTask(void* arg) {
     control::MotorCANBase::TransmitOutput(wheel_motors, 4);
     control::MotorCANBase::TransmitOutput(steer_motors, 4);
 
-
-
     receive->cmd.id = bsp::SHOOTER_POWER;
     receive->cmd.data_bool = referee->game_robot_status.mains_power_shooter_output;
     receive->TransmitOutput();
@@ -290,14 +288,11 @@ void chassisTask(void* arg) {
     receive->cmd.data_float = (float)referee->game_robot_status.shooter_id2_17mm_speed_limit;
     receive->TransmitOutput();
 
-
-
-    //send bitmap of connection flag only once
-
-
+    receive->cmd.id = bsp::REMAIN_HP;
+    receive->cmd.data_int = referee->game_robot_status.remain_HP;
+    receive->TransmitOutput();
 
     osDelay(CHASSIS_TASK_DELAY);
-
 
   }
 }
@@ -441,7 +436,7 @@ void KillAll() {
   }
 }
 
-static bool debug = true;
+static bool debug = false;
 
 void RM_RTOS_Default_Task(const void* args) {
   UNUSED(args);
@@ -456,8 +451,6 @@ void RM_RTOS_Default_Task(const void* args) {
       clear_screen();
       print("vx: %f, vy: %f, angle: %f, mode: %f, dead: %f\r\n", receive->vx, receive->vy,
             receive->relative_angle, receive->mode, receive->dead);
-      print("Speed limit: %d\r\n", referee->game_robot_status.shooter_id1_17mm_speed_limit);
-      print("Remain HP: %d\r\n", referee->game_robot_status.remain_HP);
     }
     osDelay(DEFAULT_TASK_DELAY);
   }
