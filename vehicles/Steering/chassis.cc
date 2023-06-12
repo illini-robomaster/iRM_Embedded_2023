@@ -240,15 +240,24 @@ void chassisTask(void* arg) {
       if (-CHASSIS_DEADZONE < relative_angle && relative_angle < CHASSIS_DEADZONE) wz = 0;
     }
 
+    float supercap_voltage = supercap->info.voltage;
 
     chassis->SetSpeed(vx / 10, vy / 10, wz);
     chassis->SteerUpdateTarget();
     constexpr float WHEEL_SPEED_FACTOR = 4;
     chassis->WheelUpdateSpeed(WHEEL_SPEED_FACTOR);
     chassis->SteerCalcOutput();
-    chassis->Update((float)referee->game_robot_status.chassis_power_limit,
-                    referee->power_heat_data.chassis_power,
-                    (float)referee->power_heat_data.chassis_power_buffer);
+    if (supercap_voltage < 5.0 | supercap_voltage == 5.0){
+      chassis->Update((float)referee->game_robot_status.chassis_power_limit,
+                      referee->power_heat_data.chassis_power,
+                      (float)referee->power_heat_data.chassis_power_buffer);
+    }
+    else{
+        chassis->Update(((float)referee->game_robot_status.chassis_power_limit)*3.0,
+                            referee->power_heat_data.chassis_power,
+                            (float)referee->power_heat_data.chassis_power_buffer);
+    }
+
     // float PID_output[4];
     // float output[4];
     // PID_output[0] = pid5.ComputeConstrainedOutput(motor5->GetOmegaDelta(chassis->v_bl_));
