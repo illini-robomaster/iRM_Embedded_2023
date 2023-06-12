@@ -111,6 +111,10 @@ void SteeringChassis::SetWSpeed(float _vw) { vw = _vw; }
 void SteeringChassis::Update(float _power_limit, float _chassis_power,
                              float _chassis_power_buffer) {
 
+  constexpr float WHEEL_SPEED_FACTOR = 16;
+  SteerUpdateTarget();
+  WheelUpdateSpeed(WHEEL_SPEED_FACTOR);
+
   // Update Wheels
   float PID_output[MOTOR_NUM];
   float output[MOTOR_NUM];
