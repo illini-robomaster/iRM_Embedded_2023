@@ -101,7 +101,7 @@ void RM_RTOS_Default_Task(const void* arguments) {
     set_cursor(0, 0);
     clear_screen();
     print("Motor ID: %c\r\n", A1->recv.motor_id);
-    print("Mode    : %c\r\n", A1.recv.mode);
+    print("Mode    : %c\r\n", A1->recv.mode);
     print("Temp    : %d\r\n", A1->recv.Temp);
     print("MError  : %c\r\n", A1->recv.MError);
     print("Torque  : %.3f\r\n", A1->recv.T);
