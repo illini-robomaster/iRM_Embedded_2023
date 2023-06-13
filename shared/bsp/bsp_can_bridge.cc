@@ -81,6 +81,9 @@ void CanBridge::UpdateData(const uint8_t* data) {
     case CHASSIS_FLAG:
       chassis_flag = cmd.data_uint;
       break;
+    case REMAIN_HP:
+      remain_hp = cmd.data_uint;
+      break;
     default:;
   }
 }

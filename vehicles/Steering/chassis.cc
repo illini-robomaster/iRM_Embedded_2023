@@ -260,8 +260,6 @@ void chassisTask(void* arg) {
     control::MotorCANBase::TransmitOutput(wheel_motors, 4);
     control::MotorCANBase::TransmitOutput(steer_motors, 4);
 
-
-
     receive->cmd.id = bsp::SHOOTER_POWER;
     receive->cmd.data_bool = referee->game_robot_status.mains_power_shooter_output;
     receive->TransmitOutput();
@@ -290,14 +288,11 @@ void chassisTask(void* arg) {
     receive->cmd.data_float = (float)referee->game_robot_status.shooter_id2_17mm_speed_limit;
     receive->TransmitOutput();
 
-
-
-    //send bitmap of connection flag only once
-
-
+    receive->cmd.id = bsp::REMAIN_HP;
+    receive->cmd.data_int = referee->game_robot_status.remain_HP;
+    receive->TransmitOutput();
 
     osDelay(CHASSIS_TASK_DELAY);
-
 
   }
 }
