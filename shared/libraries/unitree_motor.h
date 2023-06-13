@@ -126,10 +126,10 @@ typedef struct{
 typedef struct {
   ServoComdData_t data;
   bool            correct;
-  unsigned char   motor_id;
-  unsigned char   mode;
+  int             motor_id;
+  int             mode;
   int             Temp;
-  unsigned char   MError;
+  int             MError;
   float           T;
   float           W;
   float           LW;

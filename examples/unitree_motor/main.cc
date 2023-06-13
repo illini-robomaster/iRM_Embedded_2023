@@ -87,12 +87,12 @@ void RM_RTOS_Default_Task(const void* arguments) {
   UNUSED(arguments);
 
   A1->send.id = 0;
-  A1->send.mode = 5;
-  A1->send.T = 0;
-  A1->send.W = 0;
-  A1->send.Pos = 0;
-  A1->send.K_P = 0;
-  A1->send.K_W = 0;
+  A1->send.mode = 10;
+  A1->send.T = 0.0;
+  A1->send.W = 1.0 * 9.1;
+  A1->send.Pos = 0.0;
+  A1->send.K_P = 0.0;
+  A1->send.K_W = 3.0;
   A1->ModifyData();
 
   while (true) {
@@ -100,10 +100,10 @@ void RM_RTOS_Default_Task(const void* arguments) {
 
     set_cursor(0, 0);
     clear_screen();
-    print("Motor ID: %c\r\n", A1->recv.motor_id);
-    print("Mode    : %c\r\n", A1->recv.mode);
+    print("Motor ID: %d\r\n", A1->recv.motor_id);
+    print("Mode    : %d\r\n", A1->recv.mode);
     print("Temp    : %d\r\n", A1->recv.Temp);
-    print("MError  : %c\r\n", A1->recv.MError);
+    print("MError  : %d\r\n", A1->recv.MError);
     print("Torque  : %.3f\r\n", A1->recv.T);
     print("Speed   : %.3f\r\n", A1->recv.W);
     print("Accel   : %d\r\n", A1->recv.Acc);
