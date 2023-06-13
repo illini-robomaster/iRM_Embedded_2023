@@ -18,40 +18,41 @@
  *                                                                          *
  ****************************************************************************/
 
-#include "bsp_gpio.h"
+#include "main.h"
+
+#include "unitree_motor.h"
 #include "bsp_print.h"
 #include "bsp_uart.h"
 #include "cmsis_os.h"
-#include "main.h"
-#include "protocol.h"
+
+static control::UnitreeMotor* A1 = nullptr;
 
 #define RX_SIGNAL (1 << 0)
 
-const osThreadAttr_t clientTaskAttribute = {.name = "clientTask",
-                                            .attr_bits = osThreadDetached,
-                                            .cb_mem = nullptr,
-                                            .cb_size = 0,
-                                            .stack_mem = nullptr,
-                                            .stack_size = 128 * 4,
-                                            .priority = (osPriority_t)osPriorityNormal,
-                                            .tz_module = 0,
-                                            .reserved = 0};
-osThreadId_t clientTaskHandle;
+const osThreadAttr_t A1TaskAttribute = {.name = "A1Task",
+                                        .attr_bits = osThreadDetached,
+                                        .cb_mem = nullptr,
+                                        .cb_size = 0,
+                                        .stack_mem = nullptr,
+                                        .stack_size = 128 * 4,
+                                        .priority = (osPriority_t)osPriorityNormal,
+                                        .tz_module = 0,
+                                        .reserved = 0};
 
-class CustomUART : public bsp::UART {
+osThreadId_t A1TaskHandle;
+
+class CustomUART: public bsp::UART {
  public:
   using bsp::UART::UART;
 
  protected:
   /* notify application when rx data is pending read */
-  void RxCompleteCallback() final { osThreadFlagsSet(clientTaskHandle, RX_SIGNAL); }
+  void RxCompleteCallback() override final { osThreadFlagsSet(A1TaskHandle, RX_SIGNAL); }
 };
 
-static communication::Host* host = nullptr;
-static CustomUART* host_uart = nullptr;
-static bsp::GPIO *gpio_red, *gpio_green;
+static CustomUART* A1_uart = nullptr;
 
-void clientTask(void* arg) {
+void A1Task(void* arg) {
   UNUSED(arg);
   uint32_t length;
   uint8_t* data;
@@ -61,41 +62,52 @@ void clientTask(void* arg) {
     uint32_t flags = osThreadFlagsWait(RX_SIGNAL, osFlagsWaitAll, osWaitForever);
     if (flags & RX_SIGNAL) {  // unnecessary check
       /* time the non-blocking rx / tx calls (should be <= 1 osTick) */
-      length = host_uart->Read(&data);
-      host->Receive(communication::package_t{data, (int)length});
-      gpio_green->Low();
-      osDelay(200);
-      gpio_green->High();
+      length = A1_uart->Read(&data);
+      if ((int)length == A1->recv_length)
+        A1->ExtractData(communication::package_t{data, (int)length});
     }
   }
 }
 
 void RM_RTOS_Init(void) {
-  print_use_uart(&huart8);
+  print_use_uart(&huart6);
 
-  host_uart = new CustomUART(&huart6);
-  host_uart->SetupRx(300);
-  host_uart->SetupTx(300);
+  A1_uart = new CustomUART(&huart1);
+  A1_uart->SetupRx(300);
+  A1_uart->SetupTx(300);
 
-  host = new communication::Host;
-
-  gpio_red = new bsp::GPIO(LED_RED_GPIO_Port, LED_RED_Pin);
-  gpio_green = new bsp::GPIO(LED_GREEN_GPIO_Port, LED_GREEN_Pin);
-  gpio_red->High();
-  gpio_green->High();
+  A1 = new control::UnitreeMotor();
 }
 
 void RM_RTOS_Threads_Init(void) {
-  clientTaskHandle = osThreadNew(clientTask, nullptr, &clientTaskAttribute);
+  A1TaskHandle = osThreadNew(A1Task, nullptr, &A1TaskAttribute);
 }
 
-void RM_RTOS_Default_Task(const void* argument) {
-  UNUSED(argument);
+void RM_RTOS_Default_Task(const void* arguments) {
+  UNUSED(arguments);
+
+  A1->send.id = 0;
+  A1->send.mode = 5;
+  A1->send.T = 0;
+  A1->send.W = 0;
+  A1->send.Pos = 0;
+  A1->send.K_P = 0;
+  A1->send.K_W = 0;
+  A1->ModifyData();
 
   while (true) {
+    A1_uart->Write((uint8_t*)(&(A1->send.data)), A1->send_length);
+
     set_cursor(0, 0);
     clear_screen();
-    print("%s", host->pack.chars);
+    print("Motor ID: %c\r\n", A1->recv.motor_id);
+    print("Mode    : %c\r\n", A1.recv.mode);
+    print("Temp    : %d\r\n", A1->recv.Temp);
+    print("MError  : %c\r\n", A1->recv.MError);
+    print("Torque  : %.3f\r\n", A1->recv.T);
+    print("Speed   : %.3f\r\n", A1->recv.W);
+    print("Accel   : %d\r\n", A1->recv.Acc);
+    print("Position: %.3f\r\n", A1->recv.Pos);
     osDelay(100);
   }
 }
