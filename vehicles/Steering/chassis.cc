@@ -249,29 +249,6 @@ void chassisTask(void* arg) {
     chassis->Update((float)referee->game_robot_status.chassis_power_limit,
                     referee->power_heat_data.chassis_power,
                     (float)referee->power_heat_data.chassis_power_buffer);
-    // float PID_output[4];
-    // float output[4];
-    // PID_output[0] = pid5.ComputeConstrainedOutput(motor5->GetOmegaDelta(chassis->v_bl_));
-    // PID_output[1] = pid6.ComputeConstrainedOutput(motor6->GetOmegaDelta(chassis->v_br_));
-    // PID_output[2] = pid7.ComputeConstrainedOutput(motor7->GetOmegaDelta(chassis->v_fr_));
-    // PID_output[3] = pid8.ComputeConstrainedOutput(motor8->GetOmegaDelta(chassis->v_fl_));
-    // float _power_limit = referee->game_robot_status.chassis_power_limit;
-    // float _chassis_power = referee->power_heat_data.chassis_power;
-    // float _chassis_power_buffer = referee->power_heat_data.chassis_power_buffer;
-    // control::PowerLimit* power_limit;
-    // control::power_limit_t power_limit_info;
-    // power_limit_info.power_limit = _power_limit;
-    // power_limit_info.WARNING_power = _power_limit * 0.9;
-    // power_limit_info.WARNING_power_buff = 50;
-    // power_limit_info.buffer_total_current_limit = 3500 * 4;
-    // power_limit_info.power_total_current_limit = 5000 * 4 / 80.0 * _power_limit;
-    // power_limit->Output(true, power_limit_info, _chassis_power, _chassis_power_buffer, PID_output,
-    //                     output);
-    // motor5->SetOutput(output[0]);
-    // motor6->SetOutput(output[1]);
-    // motor7->SetOutput(output[2]);
-    // motor8->SetOutput(output[3]);
-    
     if (Dead) {
       chassis->SetSpeed(0,0,0);
       motor5->SetOutput(0);
