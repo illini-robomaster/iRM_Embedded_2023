@@ -30,6 +30,7 @@
 #include "protocol.h"
 #include "rgb.h"
 #include "steering.h"
+#include "supercap.h"
 #include <cmath>
 
 static bsp::CAN* can1 = nullptr;
@@ -164,6 +165,8 @@ static bsp::GPIO* pe4 = nullptr;
 static control::steering_chassis_t* chassis_data;
 static control::SteeringChassis* chassis;
 
+static control::SuperCap* supercap = nullptr;
+
 static const float CHASSIS_DEADZONE = 0.04;
 
 bool steering_align_detect1() { return pe1->Read() == 0; }
@@ -237,18 +240,15 @@ void chassisTask(void* arg) {
       if (-CHASSIS_DEADZONE < relative_angle && relative_angle < CHASSIS_DEADZONE) wz = 0;
     }
 
+
     chassis->SetSpeed(vx / 10, vy / 10, wz);
     chassis->SteerUpdateTarget();
     constexpr float WHEEL_SPEED_FACTOR = 4;
     chassis->WheelUpdateSpeed(WHEEL_SPEED_FACTOR);
-
     chassis->SteerCalcOutput();
-
-    motor5->SetOutput(pid5.ComputeConstrainedOutput(motor5->GetOmegaDelta(chassis->v_bl_)));
-    motor6->SetOutput(pid6.ComputeConstrainedOutput(motor6->GetOmegaDelta(chassis->v_br_)));
-    motor7->SetOutput(pid7.ComputeConstrainedOutput(motor7->GetOmegaDelta(chassis->v_fr_)));
-    motor8->SetOutput(pid8.ComputeConstrainedOutput(motor8->GetOmegaDelta(chassis->v_fl_)));
-
+    chassis->Update((float)referee->game_robot_status.chassis_power_limit,
+                    referee->power_heat_data.chassis_power,
+                    (float)referee->power_heat_data.chassis_power_buffer);
     if (Dead) {
       chassis->SetSpeed(0,0,0);
       motor5->SetOutput(0);
@@ -359,6 +359,8 @@ void RM_RTOS_Init() {
   pe4 = new bsp::GPIO(IN4_GPIO_Port, IN4_Pin);
 
   chassis_data = new control::steering_chassis_t();
+
+  supercap = new control::SuperCap(can2, 0x201);
 
   control::steering_t steering_motor_data;
   steering_motor_data.motor = motor1;
