@@ -195,7 +195,7 @@ private:
    */
   uint32_t crc32_core(uint32_t* ptr, uint32_t len);
 
-  const float gear_ratio = 9.1;
+  const float gear_ratio = 9.1; // A1 Gear Ratio
 };
 
 }
