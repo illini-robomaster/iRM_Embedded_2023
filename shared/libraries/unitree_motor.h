@@ -126,7 +126,7 @@ typedef struct {
   ServoComdData_t data;    // recv data package
   bool            correct; // completeness of data package
   int             id;      // motor ID: 0, 1, or 2
-  int             mode;    // 0 for stop running; 5 for slowly running with open-loop control; 10 for closed-loop control
+  int             mode;    // 0 for stop running; 5 for slowly running with open-loop control; 10 for FOC closed-loop control
   int             Temp;    // motor temperature
   int             MError;  // error message
   float           T;       // Current Torque
