@@ -86,21 +86,36 @@ void RM_RTOS_Threads_Init(void) {
 void RM_RTOS_Default_Task(const void* arguments) {
   UNUSED(arguments);
 
-  A1->send.id = 0;
-  A1->send.mode = 10;
-  A1->send.T = 0.0;
-  A1->send.W = 1.0 * 9.1;
-  A1->send.Pos = 0.0;
-  A1->send.K_P = 0.0;
-  A1->send.K_W = 3.0;
-  A1->ModifyData();
+  A1->Test(0);
+  A1_uart->Write((uint8_t*)(&(A1->send.data)), A1->send_length);
+  osDelay(3000);
 
-  while (true) {
+  A1->Stop(0);
+  A1_uart->Write((uint8_t*)(&(A1->send.data)), A1->send_length);
+  osDelay(3000);
+
+  A1->Control(0, 0.0, -1.0, 0.0, 0.0, 3.0); // constant speed mode
+  for (int i = 0; i < 30; ++i) {
     A1_uart->Write((uint8_t*)(&(A1->send.data)), A1->send_length);
-
     set_cursor(0, 0);
     clear_screen();
-    print("Motor ID: %d\r\n", A1->recv.motor_id);
+    print("Motor ID: %d\r\n", A1->recv.id);
+    print("Mode    : %d\r\n", A1->recv.mode);
+    print("Temp    : %d\r\n", A1->recv.Temp);
+    print("MError  : %d\r\n", A1->recv.MError);
+    print("Torque  : %.3f\r\n", A1->recv.T);
+    print("Speed   : %.3f\r\n", A1->recv.W);
+    print("Accel   : %d\r\n", A1->recv.Acc);
+    print("Position: %.3f\r\n", A1->recv.Pos);
+    osDelay(100);
+  }
+
+  A1->Control(0, 0.0, 0.0, 0.0, 0.0, 0.0); // zero torque mode
+  while (true) {
+    A1_uart->Write((uint8_t*)(&(A1->send.data)), A1->send_length);
+    set_cursor(0, 0);
+    clear_screen();
+    print("Motor ID: %d\r\n", A1->recv.id);
     print("Mode    : %d\r\n", A1->recv.mode);
     print("Temp    : %d\r\n", A1->recv.Temp);
     print("MError  : %d\r\n", A1->recv.MError);

@@ -44,13 +44,13 @@ void UnitreeMotor::ModifyData() {
     send.data.CRCdata.u32 = crc32_core((uint32_t*)(&(send.data)), 7);
 }
 
-bool UnitreeMotor::ExtractData(communication::package_t package) {
+bool UnitreeMotor::ExtractData(const communication::package_t package) {
     memcpy(&(recv.data), package.data, package.length);
     if (recv.data.CRCdata.u32 != crc32_core((uint32_t*)(&(recv.data)), 18)) {
         recv.correct = false;
         return recv.correct;
     } else {
-        recv.motor_id = recv.data.head.motorID;
+        recv.id = recv.data.head.motorID;
         recv.mode = recv.data.Mdata.mode;
         recv.Temp = recv.data.Mdata.Temp;
         recv.MError = recv.data.Mdata.MError;
@@ -68,6 +68,39 @@ bool UnitreeMotor::ExtractData(communication::package_t package) {
         recv.correct = true;
         return recv.correct;
     }
+}
+
+void UnitreeMotor::Stop(const unsigned short motor_id) {
+    send.id = motor_id;
+    send.mode = 0;
+    send.T = 0.0;
+    send.W = 0.0;
+    send.Pos = 0.0;
+    send.K_P = 0.0;
+    send.K_W = 0.0;
+    ModifyData();
+}
+
+void UnitreeMotor::Test(const unsigned short motor_id) {
+    send.id = motor_id;
+    send.mode = 5;
+    send.T = 0.0;
+    send.W = 0.0;
+    send.Pos = 0.0;
+    send.K_P = 0.0;
+    send.K_W = 0.0;
+    ModifyData();
+}
+
+void UnitreeMotor::Control(const unsigned short motor_id, const float torque, const float speed, const float position, const float Kp, const float Kd) {
+    send.id = motor_id;
+    send.mode = 10;
+    send.T = torque;
+    send.W = speed * gear_ratio;
+    send.Pos = position * gear_ratio;
+    send.K_P = Kp;
+    send.K_W = Kd;
+    ModifyData();
 }
 
 uint32_t UnitreeMotor::crc32_core(uint32_t* ptr, uint32_t len) {
