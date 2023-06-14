@@ -27,8 +27,6 @@
 
 #define RX_SIGNAL (1 << 0)
 
-extern osThreadId_t defaultTaskHandle;
-
 const osThreadAttr_t refereeTaskAttribute = {.name = "refereeTask",
                                              .attr_bits = osThreadDetached,
                                              .cb_mem = nullptr,
@@ -49,8 +47,8 @@ class CustomUART : public bsp::UART {
   void RxCompleteCallback() final { osThreadFlagsSet(refereeTaskHandle, RX_SIGNAL); }
 };
 
-communication::Referee* referee = nullptr;
-CustomUART* referee_uart = nullptr;
+static communication::Referee* referee = nullptr;
+static CustomUART* referee_uart = nullptr;
 
 void refereeTask(void* arg) {
   UNUSED(arg);
