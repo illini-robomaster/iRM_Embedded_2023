@@ -1,0 +1,29 @@
+# ---------------------------------------------------------------------- #
+#                                                                        #
+#  Copyright (C) 2022                                                    #
+#  Illini RoboMaster @ University of Illinois at Urbana-Champaign.       #
+#                                                                        #
+#  This program is free software: you can redistribute it and/or modify  #
+#  it under the terms of the GNU General Public License as published by  #
+#  the Free Software Foundation, either version 3 of the License, or     #
+#  (at your option) any later version.                                   #
+#                                                                        #
+#  This program is distributed in the hope that it will be useful,       #
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of        #
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         #
+#  GNU General Public License for more details.                          #
+#                                                                        #
+#  You should have received a copy of the GNU General Public License     #
+#  along with this program. If not, see <http://www.gnu.org/licenses/>.  #
+#                                                                        #
+# ---------------------------------------------------------------------- #
+
+project(Fortress_DoubleShooter ASM C CXX)
+
+irm_add_arm_executable(Fortress_DoubleShooter_chassis
+    TARGET DJI_Board_TypeC
+    SOURCES chassis.cc)
+
+irm_add_arm_executable(Fortress_DoubleShooter_gimbal
+    TARGET DJI_Board_TypeC
+    SOURCES gimbal.cc)
