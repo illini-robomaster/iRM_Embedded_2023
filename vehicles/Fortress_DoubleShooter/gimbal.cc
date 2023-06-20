@@ -54,6 +54,8 @@ static const int DEFAULT_TASK_DELAY = 100;
 static const int SOFT_START_CONSTANT = 300;
 static const int SOFT_KILL_CONSTANT = 200;
 static const float START_PITCH_POS = PI/5;
+// TODO: the start position of the yaw motor
+// static const float START_YAW_POS = ???;
 static const int INFANTRY_INITIAL_HP = 100;
 
 static bsp::CanBridge* send = nullptr;
@@ -68,6 +70,8 @@ static volatile float relative_angle = 0;
 static unsigned int chassis_flag_bitmap = 0;
 
 static volatile float pitch_pos = START_PITCH_POS;
+// TODO: need to measure the specific angle
+//static volatile float yaw_pos = START_YAW_POS;
 
 static volatile unsigned int current_hp = 0;
 
@@ -89,6 +93,8 @@ static volatile bool calibration_flag = false;
 static volatile bool dbus_flag = false;
 static volatile bool lidar_flag = false;
 static volatile bool pitch_reset = false;
+// TODO:
+// static volatile bool yaw_reset = false;
 
 static volatile bool selftestStart = false;
 
@@ -147,15 +153,16 @@ osThreadId_t gimbalTaskHandle;
 
 //static control::MotorCANBase* pitch_motor = nullptr;
 static control::Motor4310* pitch_motor = nullptr;
-static control::MotorCANBase* yaw_motor = nullptr;
+// TODO: initialize the yaw motor
+// static control::Motor4310* yaw_motor = nullptr;
 static control::Gimbal* gimbal = nullptr;
 static control::gimbal_data_t* gimbal_param = nullptr;
 static bsp::Laser* laser = nullptr;
 
 void gimbalTask(void* arg) {
   UNUSED(arg);
-
-  control::MotorCANBase* motors_can1_gimbal[] = {yaw_motor};
+  // TODO: both are the 4310 whether still need this initialize
+  // control::MotorCANBase* motors_can1_gimbal[] = {yaw_motor};
 
   print("Wait for beginning signal...\r\n");
   RGB->Display(display::color_red);
@@ -167,23 +174,37 @@ void gimbalTask(void* arg) {
   }
 
   int i = 0;
+  // TODO: 
+  // no need for the use the gimbal constructor 
+  // to initialize the gimbal motor
+  // (not sure whether we still need this for loop)
+  // whether repeat below???
   while (i < 1000 || !imu->DataReady()) {
-    gimbal->TargetAbsWOffset(0, 0);
-    gimbal->Update();
-    control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
+    // TODO:
+    // gimbal->TargetAbsWOffset(0, 0);
+    // gimbal->Update();
+    // control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
     osDelay(GIMBAL_TASK_DELAY);
     ++i;
   }
 
+  // the start code for motor 4310
   pitch_motor->MotorEnable(pitch_motor);
+  // TODO:
+  // yaw_motor->MotorEnable(yaw_motor);
   osDelay(GIMBAL_TASK_DELAY);
 
-  // 4310 soft start
+  // 4310 soft start (for pitch)
+  // TODO:
+  // whether the 4310 yaw motor need the soft start
+  // (based on the start position of yaw motor)
   float tmp_pos = 0;
   for (int j = 0; j < SOFT_START_CONSTANT; j++){
-    gimbal->TargetAbsWOffset(0, 0);
-    gimbal->Update();
-    control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
+    // TODO:
+    // (not sure whether the below part still need to keep)
+    // gimbal->TargetAbsWOffset(0, 0);
+    // gimbal->Update();
+    // control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
     tmp_pos += START_PITCH_POS / SOFT_START_CONSTANT;  // increase position gradually
     pitch_motor->SetOutput(tmp_pos, 1, 115, 0.5, 0);
     pitch_motor->TransmitOutput(pitch_motor);
@@ -193,17 +214,26 @@ void gimbalTask(void* arg) {
   print("Start Calibration.\r\n");
   RGB->Display(display::color_yellow);
   laser->Off();
-  gimbal->TargetAbsWOffset(0, 0);
-  gimbal->Update();
-  control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
+  // TODO:
+  // No motorcan base, same reason, whether need the gimbal stuff(both motors are 4310).
+  // gimbal->TargetAbsWOffset(0, 0);
+  // gimbal->Update();
+  // control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
   imu->Calibrate();
 
   while (!imu->DataReady() || !imu->CaliDone()) {
-    gimbal->TargetAbsWOffset(0, 0);
-    gimbal->Update();
-    control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
+    // TODO:
+    // No motorcan base, same reason, whether need the gimbal stuff(both motors are 4310).
+
+    // gimbal->TargetAbsWOffset(0, 0);
+    // gimbal->TargetAbsWOffset(0, 0);
+    // gimbal->Update();
+    // control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
+
     pitch_motor->SetOutput(tmp_pos, 1, 115, 0.5, 0);
     pitch_motor->TransmitOutput(pitch_motor);
+    // TODO:
+    // whether the yaw motor need to set to specific position???
     osDelay(GIMBAL_TASK_DELAY);
   }
 
@@ -238,12 +268,14 @@ void gimbalTask(void* arg) {
 
     pitch_diff = clip<float>(pitch_target - pitch_curr, -PI, PI);
     yaw_diff = wrap<float>(yaw_target - yaw_curr, -PI, PI);
-
+    // TODO:whether this for 4310 pitch motor ???
+    // if this is for 4310, whether we need the same stuff for the 4310 yaw motor.
     float pitch_vel;
     pitch_vel = -1 * clip<float>(dbus->ch3 / 660.0, -15, 15);
     pitch_pos += pitch_vel / 200 + dbus->mouse.y / 32767.0;
     pitch_pos = clip<float>(pitch_pos, 0.1, 1); // measured range
 
+    // TODO: whether we need handle the reset case for yaw stuff ???
     if (pitch_reset) {
       // 4310 soft start
       tmp_pos = 0;
@@ -255,14 +287,20 @@ void gimbalTask(void* arg) {
       }
       pitch_pos = tmp_pos;
       pitch_reset = false;
+      // yaw_reset = false;
     }
-
+    // TODO: whether we need to change the update function for both 4310 motor
+    // the below stuff is for motor can base, not for 4310 base
     gimbal->TargetRel(-pitch_diff, yaw_diff);
     gimbal->Update();
 
+    // TODO: the 4310 yaw motor need to set the new output
     pitch_motor->SetOutput(pitch_pos, pitch_vel, 115, 0.5, 0);
-    control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
+    // TODO: no need for the below part ???
+    // control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
     pitch_motor->TransmitOutput(pitch_motor);
+    // TODO: the new update function
+    // yaw_motor->TransmitOutput(yaw_motor);
     osDelay(GIMBAL_TASK_DELAY);
   }
 }
