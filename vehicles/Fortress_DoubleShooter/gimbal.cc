@@ -137,7 +137,7 @@ void imuTask(void* arg) {
 }
 
 //==================================================================================================
-// Gimbal
+// Gimbal(TODO:)
 //==================================================================================================
 
 const osThreadAttr_t gimbalTaskAttribute = {.name = "gimbalTask",
@@ -724,6 +724,10 @@ void RM_RTOS_Init(void) {
   send = new bsp::CanBridge(can2, 0x20A, 0x20B);
 }
 
+//==================================================================================================
+// RTOS Threads Init
+//==================================================================================================
+
 void RM_RTOS_Threads_Init(void) {
   imuTaskHandle = osThreadNew(imuTask, nullptr, &imuTaskAttribute);
   gimbalTaskHandle = osThreadNew(gimbalTask, nullptr, &gimbalTaskAttribute);
@@ -732,6 +736,10 @@ void RM_RTOS_Threads_Init(void) {
   chassisTaskHandle = osThreadNew(chassisTask, nullptr, &chassisTaskAttribute);
   selfTestTaskHandle = osThreadNew(selfTestTask, nullptr, &selfTestTaskAttribute);
 }
+
+//==================================================================================================
+// Kill All (TODO:)
+//==================================================================================================
 
 void KillAll() {
   RM_EXPECT_TRUE(false, "Operation Killed!\r\n");
@@ -788,6 +796,10 @@ void KillAll() {
 }
 
 static bool debug = false;
+
+//==================================================================================================
+// RTOS Default Task (TODO???)
+//==================================================================================================
 
 void RM_RTOS_Default_Task(const void* arg) {
   UNUSED(arg);
