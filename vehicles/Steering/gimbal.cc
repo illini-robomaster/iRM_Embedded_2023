@@ -705,7 +705,48 @@ void KillAll() {
     send->TransmitOutput();
 
     FakeDeath.input(dbus->keyboard.bit.B || dbus->swl == remote::DOWN);
-    if (FakeDeath.posEdge() || send->remain_hp > 0) {
+    if (FakeDeath.posEdge()) {
+      SpinMode = false;
+      Dead = false;
+      RGB->Display(display::color_green);
+      laser->On();
+      pitch_motor->MotorEnable(pitch_motor);
+      break;
+    }
+
+    // 4310 soft kill
+    float tmp_pos = pitch_pos;
+    for (int j = 0; j < SOFT_KILL_CONSTANT; j++){
+      tmp_pos -= START_PITCH_POS / SOFT_KILL_CONSTANT;  // decrease position gradually
+      pitch_motor->SetOutput(tmp_pos, 1, 115, 0.5, 0);
+      pitch_motor->TransmitOutput(pitch_motor);
+      osDelay(GIMBAL_TASK_DELAY);
+    }
+
+    pitch_reset = true;
+    pitch_motor->MotorDisable(pitch_motor);
+
+    yaw_motor->SetOutput(0);
+    control::MotorCANBase::TransmitOutput(motors_can2_gimbal, 1);
+
+    sl_motor->SetOutput(0);
+    sr_motor->SetOutput(0);
+    ld_motor->SetOutput(0);
+    control::MotorCANBase::TransmitOutput(motors_can1_shooter, 3);
+
+    osDelay(KILLALL_DELAY);
+  }
+}
+
+void KillGimbal() {
+  control::MotorCANBase* motors_can2_gimbal[] = {yaw_motor};
+  control::MotorCANBase* motors_can1_shooter[] = {sl_motor, sr_motor, ld_motor};
+
+  RGB->Display(display::color_blue);
+  laser->Off();
+
+  while (true) {
+    if (send->remain_hp > 0) {
       SpinMode = false;
       Dead = false;
       RGB->Display(display::color_green);
@@ -747,8 +788,13 @@ void RM_RTOS_Default_Task(const void* arg) {
     if (send->remain_hp == INFANTRY_INITIAL_HP) robot_hp_begin = true;
     current_hp = robot_hp_begin ? send->remain_hp : INFANTRY_INITIAL_HP;
 
+    if (current_hp == 0) {
+      Dead = true;
+      KillGimbal();
+    }
+
     FakeDeath.input(dbus->keyboard.bit.B || dbus->swl == remote::DOWN);
-    if (FakeDeath.posEdge() || current_hp == 0) {
+    if (FakeDeath.posEdge()) {
       Dead = true;
       KillAll();
     }
