@@ -348,7 +348,7 @@ void refereeTask(void* arg) {
 }
 
 //==================================================================================================
-// Shooter
+// Shooter(TODO:)
 //==================================================================================================
 
 const osThreadAttr_t shooterTaskAttribute = {.name = "shooterTask",
@@ -442,7 +442,7 @@ void shooterTask(void* arg) {
 }
 
 //==================================================================================================
-// Chassis
+// Chassis(TODO:)
 //==================================================================================================
 
 const osThreadAttr_t chassisTaskAttribute = {.name = "chassisTask",
@@ -649,6 +649,10 @@ void selfTestTask(void* arg) {
   }
 }
 
+//==================================================================================================
+// RTOS Init(TODO:)
+//==================================================================================================
+
 void RM_RTOS_Init(void) {
   print_use_uart(&huart1);
   bsp::SetHighresClockTimer(&htim5);
@@ -687,11 +691,13 @@ void RM_RTOS_Init(void) {
 
   laser = new bsp::Laser(LASER_GPIO_Port, LASER_Pin);
   pitch_motor = new control::Motor4310(can1, 0x02, 0x01, control::MIT);
-  yaw_motor = new control::Motor6020(can1, 0x206);
+  // TODO: initialize the yaw motor
+  // yaw_motor = new control::Motor6020(can1, 0x206); // (old)
+  // yaw_motor = new control::Motor4310(can1,???, control::MIT); // (new)
   control::gimbal_t gimbal_data;
   gimbal_data.pitch_motor_4310_ = pitch_motor;
-  gimbal_data.yaw_motor = yaw_motor;
-  gimbal_data.model = control::GIMBAL_STEERING_4310;
+  // gimbal_data.yaw_motor = yaw_motor;
+  // gimbal_data.model = control::GIMBAL_FORTRESS_4310;
   gimbal = new control::Gimbal(gimbal_data);
   gimbal_param = gimbal->GetData();
 
@@ -729,7 +735,7 @@ void RM_RTOS_Threads_Init(void) {
 
 void KillAll() {
   RM_EXPECT_TRUE(false, "Operation Killed!\r\n");
-
+  // TODO: change kill all for 4310 yaw motor
 //  control::MotorCANBase* motors_can1_gimbal[] = {pitch_motor};
   control::MotorCANBase* motors_can2_gimbal[] = {yaw_motor};
   control::MotorCANBase* motors_can1_shooter[] = {sl_motor, sr_motor, ld_motor};
@@ -749,9 +755,12 @@ void KillAll() {
       RGB->Display(display::color_green);
       laser->On();
       pitch_motor->MotorEnable(pitch_motor);
+      // TODO: whether the 4310 yaw motor need to enable ???
+      // yaw_motor->MotorEnable(yaw_motor);
       break;
     }
 
+    // TODO: whether yaw motor need soft kill
     // 4310 soft kill
     float tmp_pos = pitch_pos;
     for (int j = 0; j < SOFT_KILL_CONSTANT; j++){
@@ -763,9 +772,11 @@ void KillAll() {
 
     pitch_reset = true;
     pitch_motor->MotorDisable(pitch_motor);
+    // TODO:
+    // yaw_motor->MotorDisable(yaw_motor);
 
-    yaw_motor->SetOutput(0);
-    control::MotorCANBase::TransmitOutput(motors_can2_gimbal, 1);
+    // yaw_motor->SetOutput(0);
+    // control::MotorCANBase::TransmitOutput(motors_can2_gimbal, 1);
 
     sl_motor->SetOutput(0);
     sr_motor->SetOutput(0);
