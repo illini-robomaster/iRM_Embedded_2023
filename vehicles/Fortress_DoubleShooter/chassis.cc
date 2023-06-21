@@ -38,7 +38,7 @@ static bsp::CAN* can2 = nullptr;
 static display::RGB* RGB = nullptr;
 
 //==================================================================================================
-// SelfTest
+// SelfTest(??? change postion????)
 //==================================================================================================
 
 static bool fl_steer_motor_flag = false;
@@ -62,7 +62,6 @@ const osThreadAttr_t selfTestingTask = {.name = "selfTestTask",
                                              .reserved = 0};
 osThreadId_t selfTestTaskHandle;
 
-
 static BoolEdgeDetector FakeDeath(false);
 static volatile bool Dead = false;
 static BoolEdgeDetector ChangeSpinMode(false);
@@ -74,9 +73,12 @@ static const int KILLALL_DELAY = 100;
 static const int DEFAULT_TASK_DELAY = 100;
 static const int CHASSIS_TASK_DELAY = 2;
 
+
+// TODO: Mecanum wheel need different speed???
 // speed for steering motors (rad/s)
 constexpr float RUN_SPEED = (4 * PI);
-constexpr float ALIGN_SPEED = (PI);
+// TODO：
+// constexpr float ALIGN_SPEED = (PI);
 constexpr float ACCELERATION = (100 * PI);
 
 
@@ -296,6 +298,8 @@ void chassisTask(void* arg) {
 
   }
 }
+
+
 void self_Check_Task(void* arg){
   UNUSED(arg);
 
