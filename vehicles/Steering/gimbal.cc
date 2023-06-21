@@ -704,7 +704,7 @@ void KillAll() {
     send->cmd.data_bool = true;
     send->TransmitOutput();
 
-    FakeDeath.input(dbus->keyboard.bit.B || dbus->swl == remote::DOWN);
+    FakeDeath.input(dbus->swl == remote::DOWN);
     if (FakeDeath.posEdge() || send->remain_hp > 0) {
       SpinMode = false;
       Dead = false;
@@ -747,7 +747,7 @@ void RM_RTOS_Default_Task(const void* arg) {
     if (send->remain_hp == INFANTRY_INITIAL_HP) robot_hp_begin = true;
     current_hp = robot_hp_begin ? send->remain_hp : INFANTRY_INITIAL_HP;
 
-    FakeDeath.input(dbus->keyboard.bit.B || dbus->swl == remote::DOWN);
+    FakeDeath.input(dbus->swl == remote::DOWN);
     if (FakeDeath.posEdge() || current_hp == 0) {
       Dead = true;
       KillAll();
