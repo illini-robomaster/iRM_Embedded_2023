@@ -36,6 +36,8 @@
 static bsp::CAN* can1 = nullptr;
 static bsp::CAN* can2 = nullptr;
 static display::RGB* RGB = nullptr;
+static BoolEdgeDetector ReCali(false);
+static BoolEdgeDetector Revival(false);
 
 //==================================================================================================
 // SelfTest
@@ -212,12 +214,30 @@ void chassisTask(void* arg) {
     float sin_yaw, cos_yaw, vx_set, vy_set;
     float vx, vy, wz;
 
-
     // TODO need to change the channels in gimbal.cc
     vx_set = -receive->vy;
     vy_set = receive->vx;
 
+    ReCali.input(receive->recalibrate);
+    Revival.input(receive->dead);
 
+    if (ReCali.posEdge()) chassis->SteerAlignFalse();
+
+    if (ReCali.posEdge() || (!chassis->SteerAlignCheck() && Revival.negEdge())) {
+      chassis->SteerSetMaxSpeed(ALIGN_SPEED);
+      bool realignment_complete = false;
+      while (!realignment_complete) {
+        chassis->SteerCalcOutput();
+        control::MotorCANBase::TransmitOutput(steer_motors, 4);
+        realignment_complete = chassis->Calibrate();
+        osDelay(1);
+      }
+      chassis->ReAlign();
+      chassis->SteerCalcOutput();
+      chassis->SteerSetMaxSpeed(RUN_SPEED);
+      chassis->SteerThetaReset();
+      chassis->SetWheelSpeed(0,0,0,0);
+    }
 
     if (receive->mode == 1) {  // spin mode
       // delay compensation
@@ -433,6 +453,8 @@ void KillAll() {
     motor8->SetOutput(0);
 
     control::MotorCANBase::TransmitOutput(wheel_motors, 4);
+
+    chassis->SteerAlignFalse();
 
     osDelay(KILLALL_DELAY);
   }

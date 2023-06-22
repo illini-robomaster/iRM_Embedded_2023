@@ -62,6 +62,7 @@ static BoolEdgeDetector FakeDeath(false);
 static volatile bool Dead = false;
 static BoolEdgeDetector ChangeSpinMode(false);
 static volatile bool SpinMode = false;
+//static volatile bool Revival = false;
 
 static volatile float relative_angle = 0;
 
@@ -162,7 +163,7 @@ void gimbalTask(void* arg) {
   laser->On();
 
   while (true) {
-    if (dbus->keyboard.bit.V || dbus->swr == remote::DOWN) break;
+    if (dbus->keyboard.bit.B || dbus->swr == remote::DOWN) break;
     osDelay(100);
   }
 
@@ -343,7 +344,7 @@ void shooterTask(void* arg) {
   control::MotorCANBase* motors_can1_shooter[] = {sl_motor, sr_motor, ld_motor};
 
   while (true) {
-    if (dbus->keyboard.bit.V || dbus->swr == remote::DOWN) break;
+    if (dbus->keyboard.bit.B || dbus->swr == remote::DOWN) break;
     osDelay(100);
   }
 
@@ -381,7 +382,7 @@ void shooterTask(void* arg) {
     if (send->shooter_power && send->cooling_heat1 < send->cooling_limit1 - 20 &&
         (dbus->mouse.l || dbus->swr == remote::UP))
       shooter->LoadNext();
-    if (!send->shooter_power || dbus->keyboard.bit.Q || dbus->swr == remote::DOWN) {
+    if (!send->shooter_power || dbus->swr == remote::DOWN) {
       flywheelFlag = false;
       shooter->SetFlywheelSpeed(0);
     } else {
@@ -422,7 +423,7 @@ void chassisTask(void* arg) {
   UNUSED(arg);
 
   while (true) {
-    if (dbus->keyboard.bit.V || dbus->swr == remote::DOWN) break;
+    if (dbus->keyboard.bit.B || dbus->swr == remote::DOWN) break;
     osDelay(100);
   }
 
@@ -438,6 +439,10 @@ void chassisTask(void* arg) {
 
     send->cmd.id = bsp::MODE;
     send->cmd.data_int = SpinMode ? 1 : 0;
+    send->TransmitOutput();
+
+    send->cmd.id = bsp::RECALIBRATE;
+    send->cmd.data_bool = dbus->keyboard.bit.R;
     send->TransmitOutput();
 
     if (dbus->keyboard.bit.A) vx_keyboard -= 61.5;
@@ -692,12 +697,15 @@ void RM_RTOS_Threads_Init(void) {
 void KillAll() {
   RM_EXPECT_TRUE(false, "Operation Killed!\r\n");
 
-//  control::MotorCANBase* motors_can1_gimbal[] = {pitch_motor};
   control::MotorCANBase* motors_can2_gimbal[] = {yaw_motor};
   control::MotorCANBase* motors_can1_shooter[] = {sl_motor, sr_motor, ld_motor};
 
   RGB->Display(display::color_blue);
   laser->Off();
+
+  send->cmd.id = bsp::REVIVAL;
+  send->cmd.data_bool = false;
+  send->TransmitOutput();
 
   while (true) {
     send->cmd.id = bsp::DEAD;
@@ -711,6 +719,10 @@ void KillAll() {
       RGB->Display(display::color_green);
       laser->On();
       pitch_motor->MotorEnable(pitch_motor);
+      send->cmd.id = bsp::REVIVAL;
+      send->cmd.data_bool = true;
+      send->TransmitOutput();
+
       break;
     }
 

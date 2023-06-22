@@ -600,6 +600,10 @@ class SteeringMotor {
    */
   void UpdateData(const uint8_t data[]);
 
+  void SetAlignFalse();
+
+  bool CheckAlignment();
+
  private:
   ServoMotor* servo_;
 

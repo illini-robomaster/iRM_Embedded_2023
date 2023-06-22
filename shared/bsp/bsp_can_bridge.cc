@@ -84,6 +84,11 @@ void CanBridge::UpdateData(const uint8_t* data) {
     case REMAIN_HP:
       remain_hp = cmd.data_uint;
       break;
+    case RECALIBRATE:
+      recalibrate = cmd.data_bool;
+      break;
+    case REVIVAL:
+      revival = cmd.data_bool;
     default:;
   }
 }

@@ -132,6 +132,10 @@ class SteeringChassis {
    */
   void PrintData();
 
+  void SteerAlignFalse();
+
+  bool SteerAlignCheck();
+
   // speed of four wheels
   float v_fl_;
   float v_fr_;
