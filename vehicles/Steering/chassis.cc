@@ -218,11 +218,12 @@ void chassisTask(void* arg) {
     vx_set = -receive->vy;
     vy_set = receive->vx;
 
-    ReCali.input(receive->recalibrate);
-    Revival.input(receive->dead);
+    ReCali.input(receive->recalibrate);   // detect force recalibration
+    Revival.input(receive->dead);         // detect robot revival
 
     if (ReCali.posEdge()) chassis->SteerAlignFalse();
 
+    // realign on revival OR when key 'R' is pressed
     if (ReCali.posEdge() || (!chassis->SteerAlignCheck() && Revival.negEdge())) {
       chassis->SteerSetMaxSpeed(ALIGN_SPEED);
       bool realignment_complete = false;
@@ -454,7 +455,7 @@ void KillAll() {
 
     control::MotorCANBase::TransmitOutput(wheel_motors, 4);
 
-    chassis->SteerAlignFalse();
+    chassis->SteerAlignFalse();   // set alignment status of each wheel to false
 
     osDelay(KILLALL_DELAY);
   }

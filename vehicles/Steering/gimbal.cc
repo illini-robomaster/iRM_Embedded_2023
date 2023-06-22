@@ -703,10 +703,6 @@ void KillAll() {
   RGB->Display(display::color_blue);
   laser->Off();
 
-  send->cmd.id = bsp::REVIVAL;
-  send->cmd.data_bool = false;
-  send->TransmitOutput();
-
   while (true) {
     send->cmd.id = bsp::DEAD;
     send->cmd.data_bool = true;
@@ -719,10 +715,6 @@ void KillAll() {
       RGB->Display(display::color_green);
       laser->On();
       pitch_motor->MotorEnable(pitch_motor);
-      send->cmd.id = bsp::REVIVAL;
-      send->cmd.data_bool = true;
-      send->TransmitOutput();
-
       break;
     }
 

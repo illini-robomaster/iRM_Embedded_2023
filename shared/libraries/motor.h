@@ -600,8 +600,15 @@ class SteeringMotor {
    */
   void UpdateData(const uint8_t data[]);
 
+  /**
+   * @brief Set align_complete_ of the motor to False
+   */
   void SetAlignFalse();
 
+  /**
+   * @brief Check the motor's align_complete_ flag
+   * @return True if motor's align_complete_ flag is true, false otherwise
+   */
   bool CheckAlignment();
 
  private:

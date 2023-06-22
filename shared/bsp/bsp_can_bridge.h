@@ -78,7 +78,6 @@ class CanBridge {
   bool self_check_flag = false;
   unsigned int remain_hp = 0;
   bool recalibrate = false;
-  bool revival = false;
   // each bit represents a flag correspond to specific motor e.g.(at index 0, it represents the motor 1's connection flag)
  private:
   bsp::CAN* can_;

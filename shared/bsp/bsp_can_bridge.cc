@@ -87,8 +87,6 @@ void CanBridge::UpdateData(const uint8_t* data) {
     case RECALIBRATE:
       recalibrate = cmd.data_bool;
       break;
-    case REVIVAL:
-      revival = cmd.data_bool;
     default:;
   }
 }
