@@ -476,9 +476,10 @@ float SteeringMotor::GetTheta(GetThetaMode mode) const {
 }
 
 void SteeringMotor::PrintData() const {
-  print("current_target: %10.4f ", current_target_);
-  print("current_theta: %10.4f ", this->GetTheta(relative_mode));
-  print("align_angle: %10.4f \r\n", align_angle_);
+  print("current_target: %10.4  ", current_target_);
+  print("current_theta: %10.4f  ", this->GetTheta(relative_mode));
+  print("align_angle: %10.4f  ", align_angle_);
+  print("align_complete: %d\r\n", align_complete_);
 }
 
 int SteeringMotor::TurnRelative(float angle, bool override) {
@@ -537,6 +538,14 @@ void SteeringMotor::CalcOutput() {
 
 void SteeringMotor::UpdateData(const uint8_t data[]) {
   servo_->UpdateData(data);
+}
+
+void SteeringMotor::SetAlignFalse() {
+  align_complete_ = false;
+}
+
+bool SteeringMotor::CheckAlignment() {
+  return align_complete_;
 }
 
 
