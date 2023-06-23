@@ -62,7 +62,6 @@ static BoolEdgeDetector FakeDeath(false);
 static volatile bool Dead = false;
 static BoolEdgeDetector ChangeSpinMode(false);
 static volatile bool SpinMode = false;
-//static volatile bool Revival = false;
 
 static volatile float relative_angle = 0;
 

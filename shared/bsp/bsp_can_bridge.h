@@ -41,7 +41,6 @@ typedef enum {
   CHASSIS_FLAG,
   REMAIN_HP,
   RECALIBRATE,
-  REVIVAL,
 } can_bridge_cmd;
 
 typedef struct {
