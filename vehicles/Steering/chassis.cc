@@ -253,7 +253,7 @@ void chassisTask(void* arg) {
                       (float)referee->power_heat_data.chassis_power_buffer);
     }
     else{
-        chassis->Update((float)referee->game_robot_status.chassis_power_limit,
+        chassis->Update(((float)30+((float)supercap_voltage-5.0)*2.0),
                             referee->power_heat_data.chassis_power,
                             (float)referee->power_heat_data.chassis_power_buffer);
     }
