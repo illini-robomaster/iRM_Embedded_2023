@@ -248,12 +248,12 @@ void chassisTask(void* arg) {
     chassis->WheelUpdateSpeed(WHEEL_SPEED_FACTOR);
     chassis->SteerCalcOutput();
     if (supercap_voltage < 5.0 | supercap_voltage == 5.0){
-      chassis->Update((float)referee->game_robot_status.chassis_power_limit,
+      chassis->Update(30,
                       referee->power_heat_data.chassis_power,
                       (float)referee->power_heat_data.chassis_power_buffer);
     }
     else{
-        chassis->Update(((float)referee->game_robot_status.chassis_power_limit)*3.0,
+        chassis->Update((float)referee->game_robot_status.chassis_power_limit,
                             referee->power_heat_data.chassis_power,
                             (float)referee->power_heat_data.chassis_power_buffer);
     }
