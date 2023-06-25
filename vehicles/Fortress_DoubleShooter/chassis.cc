@@ -37,31 +37,6 @@ static bsp::CAN* can1 = nullptr;
 static bsp::CAN* can2 = nullptr;
 static display::RGB* RGB = nullptr;
 
-//==================================================================================================
-// SelfTest(??? change postion????)
-//==================================================================================================
-
-static bool fl_steer_motor_flag = false;
-static bool fr_steer_motor_flag = false;
-static bool bl_steer_motor_flag = false;
-static bool br_steer_motor_flag = false;
-static bool fl_wheel_motor_flag = false;
-static bool fr_wheel_motor_flag = false;
-static bool bl_wheel_motor_flag = false;
-static bool br_wheel_motor_flag = false;
-
-static bool transmission_flag = true;
-const osThreadAttr_t selfTestingTask = {.name = "selfTestTask",
-                                             .attr_bits = osThreadDetached,
-                                             .cb_mem = nullptr,
-                                             .cb_size = 0,
-                                             .stack_mem = nullptr,
-                                             .stack_size = 256 * 4,
-                                             .priority = (osPriority_t)osPriorityBelowNormal,
-                                             .tz_module = 0,
-                                             .reserved = 0};
-osThreadId_t selfTestTaskHandle;
-
 static BoolEdgeDetector FakeDeath(false);
 static volatile bool Dead = false;
 static BoolEdgeDetector ChangeSpinMode(false);
@@ -73,7 +48,6 @@ static const int KILLALL_DELAY = 100;
 static const int DEFAULT_TASK_DELAY = 100;
 static const int CHASSIS_TASK_DELAY = 2;
 
-
 // TODO: Mecanum wheel need different speed???
 // speed for steering motors (rad/s)
 constexpr float RUN_SPEED = (4 * PI);
@@ -81,18 +55,15 @@ constexpr float RUN_SPEED = (4 * PI);
 // constexpr float ALIGN_SPEED = (PI);
 constexpr float ACCELERATION = (100 * PI);
 
-
 // speed for chassis rotation (no unit)
 constexpr float SPIN_SPEED = 80;
 constexpr float FOLLOW_SPEED = 40;
-
 
 //==================================================================================================
 // Referee
 //==================================================================================================
 
 #define REFEREE_RX_SIGNAL (1 << 1)
-
 
 const osThreadAttr_t refereeTaskAttribute = {.name = "refereeTask",
                                              .attr_bits = osThreadDetached,
@@ -299,6 +270,30 @@ void chassisTask(void* arg) {
   }
 }
 
+//==================================================================================================
+// SelfTest
+//==================================================================================================
+
+static bool fl_steer_motor_flag = false;
+static bool fr_steer_motor_flag = false;
+static bool bl_steer_motor_flag = false;
+static bool br_steer_motor_flag = false;
+static bool fl_wheel_motor_flag = false;
+static bool fr_wheel_motor_flag = false;
+static bool bl_wheel_motor_flag = false;
+static bool br_wheel_motor_flag = false;
+
+static bool transmission_flag = true;
+const osThreadAttr_t selfTestingTask = {.name = "selfTestTask",
+                                             .attr_bits = osThreadDetached,
+                                             .cb_mem = nullptr,
+                                             .cb_size = 0,
+                                             .stack_mem = nullptr,
+                                             .stack_size = 256 * 4,
+                                             .priority = (osPriority_t)osPriorityBelowNormal,
+                                             .tz_module = 0,
+                                             .reserved = 0};
+osThreadId_t selfTestTaskHandle;
 
 void self_Check_Task(void* arg){
   UNUSED(arg);
@@ -339,6 +334,7 @@ void self_Check_Task(void* arg){
     transmission_flag = !transmission_flag;
   }
 }
+
 void RM_RTOS_Init() {
   print_use_uart(&huart1);
   bsp::SetHighresClockTimer(&htim5);

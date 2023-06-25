@@ -37,8 +37,6 @@ static bsp::CAN* can1 = nullptr;
 static bsp::CAN* can2 = nullptr;
 static display::RGB* RGB = nullptr;
 
-
-
 static BoolEdgeDetector FakeDeath(false);
 static volatile bool Dead = false;
 static BoolEdgeDetector ChangeSpinMode(false);
@@ -55,18 +53,15 @@ constexpr float RUN_SPEED = (4 * PI);
 constexpr float ALIGN_SPEED = (PI);
 constexpr float ACCELERATION = (100 * PI);
 
-
 // speed for chassis rotation (no unit)
 constexpr float SPIN_SPEED = 80;
 constexpr float FOLLOW_SPEED = 40;
-
 
 //==================================================================================================
 // Referee
 //==================================================================================================
 
 #define REFEREE_RX_SIGNAL (1 << 1)
-
 
 const osThreadAttr_t refereeTaskAttribute = {.name = "refereeTask",
                                              .attr_bits = osThreadDetached,
@@ -273,6 +268,71 @@ void chassisTask(void* arg) {
   }
 }
 
+//==================================================================================================
+// SelfTest
+//==================================================================================================
+
+static bool fl_steer_motor_flag = false;
+static bool fr_steer_motor_flag = false;
+static bool bl_steer_motor_flag = false;
+static bool br_steer_motor_flag = false;
+static bool fl_wheel_motor_flag = false;
+static bool fr_wheel_motor_flag = false;
+static bool bl_wheel_motor_flag = false;
+static bool br_wheel_motor_flag = false;
+
+static bool transmission_flag = true;
+const osThreadAttr_t chassisTestingTask = {.name = "chassisTestTask",
+                                        .attr_bits = osThreadDetached,
+                                        .cb_mem = nullptr,
+                                        .cb_size = 0,
+                                        .stack_mem = nullptr,
+                                        .stack_size = 256 * 4,
+                                        .priority = (osPriority_t)osPriorityBelowNormal,
+                                        .tz_module = 0,
+                                        .reserved = 0};
+osThreadId_t chassisTestTaskHandle;
+
+void chassisTestTask(void* arg){
+  UNUSED(arg);
+
+  while(true){
+    osDelay(100);
+    motor8->connection_flag_ = false;
+    motor7->connection_flag_ = false;
+    motor6->connection_flag_ = false;
+    motor5->connection_flag_ = false;
+    motor4->connection_flag_ = false;
+    motor3->connection_flag_ = false;
+    motor2->connection_flag_ = false;
+    motor1->connection_flag_ = false;
+    osDelay(100);
+    fl_wheel_motor_flag = motor8->connection_flag_;
+    fr_wheel_motor_flag = motor7->connection_flag_;
+    bl_wheel_motor_flag = motor6->connection_flag_;
+    br_wheel_motor_flag = motor5->connection_flag_;
+    fl_steer_motor_flag = motor4->connection_flag_;
+    fr_steer_motor_flag = motor3->connection_flag_;
+    br_steer_motor_flag = motor2->connection_flag_;
+    bl_steer_motor_flag = motor1->connection_flag_;
+    flag_summary = bl_steer_motor_flag|
+                   br_steer_motor_flag<<1|
+                   fr_steer_motor_flag<<2|
+                   fl_steer_motor_flag<<3|
+                   br_wheel_motor_flag<<4|
+                   bl_wheel_motor_flag<<5|
+                   fr_wheel_motor_flag<<6|
+                   fl_wheel_motor_flag<<7;
+    osDelay(100);
+    if(transmission_flag){
+      receive->cmd.id = bsp::CHASSIS_FLAG;
+      receive->cmd.data_uint = (unsigned int)flag_summary;
+      receive->TransmitOutput();
+    }
+    transmission_flag = !transmission_flag;
+  }
+}
+
 void RM_RTOS_Init() {
   print_use_uart(&huart1);
   bsp::SetHighresClockTimer(&htim5);
@@ -342,71 +402,6 @@ void RM_RTOS_Init() {
   referee_uart->SetupTx(300);
   referee = new communication::Referee;
   receive = new bsp::CanBridge(can2, 0x20B, 0x20A);
-}
-
-//==================================================================================================
-// SelfTest
-//==================================================================================================
-
-static bool fl_steer_motor_flag = false;
-static bool fr_steer_motor_flag = false;
-static bool bl_steer_motor_flag = false;
-static bool br_steer_motor_flag = false;
-static bool fl_wheel_motor_flag = false;
-static bool fr_wheel_motor_flag = false;
-static bool bl_wheel_motor_flag = false;
-static bool br_wheel_motor_flag = false;
-
-static bool transmission_flag = true;
-const osThreadAttr_t chassisTestingTask = {.name = "chassisTestTask",
-                                        .attr_bits = osThreadDetached,
-                                        .cb_mem = nullptr,
-                                        .cb_size = 0,
-                                        .stack_mem = nullptr,
-                                        .stack_size = 256 * 4,
-                                        .priority = (osPriority_t)osPriorityBelowNormal,
-                                        .tz_module = 0,
-                                        .reserved = 0};
-osThreadId_t chassisTestTaskHandle;
-
-void chassisTestTask(void* arg){
-  UNUSED(arg);
-
-  while(true){
-    osDelay(100);
-    motor8->connection_flag_ = false;
-    motor7->connection_flag_ = false;
-    motor6->connection_flag_ = false;
-    motor5->connection_flag_ = false;
-    motor4->connection_flag_ = false;
-    motor3->connection_flag_ = false;
-    motor2->connection_flag_ = false;
-    motor1->connection_flag_ = false;
-    osDelay(100);
-    fl_wheel_motor_flag = motor8->connection_flag_;
-    fr_wheel_motor_flag = motor7->connection_flag_;
-    bl_wheel_motor_flag = motor6->connection_flag_;
-    br_wheel_motor_flag = motor5->connection_flag_;
-    fl_steer_motor_flag = motor4->connection_flag_;
-    fr_steer_motor_flag = motor3->connection_flag_;
-    br_steer_motor_flag = motor2->connection_flag_;
-    bl_steer_motor_flag = motor1->connection_flag_;
-    flag_summary = bl_steer_motor_flag|
-                   br_steer_motor_flag<<1|
-                   fr_steer_motor_flag<<2|
-                   fl_steer_motor_flag<<3|
-                   br_wheel_motor_flag<<4|
-                   bl_wheel_motor_flag<<5|
-                   fr_wheel_motor_flag<<6|
-                   fl_wheel_motor_flag<<7;
-    osDelay(100);
-    if(transmission_flag){
-      receive->cmd.id = bsp::CHASSIS_FLAG;
-      receive->cmd.data_uint = (unsigned int)flag_summary;
-      receive->TransmitOutput();
-    }
-    transmission_flag = !transmission_flag;
-  }
 }
 
 void RM_RTOS_Threads_Init(void) {
