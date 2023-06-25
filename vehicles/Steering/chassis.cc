@@ -74,7 +74,7 @@ const osThreadAttr_t refereeTaskAttribute = {.name = "refereeTask",
                                              .reserved = 0};
 
 osThreadId_t refereeTaskHandle;
-osThreadId_t chassisTaskHandle;
+
 class RefereeUART : public bsp::UART {
  public:
   using bsp::UART::UART;
@@ -113,6 +113,7 @@ const osThreadAttr_t chassisTaskAttribute = {.name = "chassisTask",
                                              .priority = (osPriority_t)osPriorityNormal,
                                              .tz_module = 0,
                                              .reserved = 0};
+osThreadId_t chassisTaskHandle;
 
 static control::MotorCANBase* motor1 = nullptr;
 static control::MotorCANBase* motor2 = nullptr;

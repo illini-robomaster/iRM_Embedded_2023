@@ -465,7 +465,7 @@ void chassisTask(void* arg) {
   }
 
   while (!imu->CaliDone()) osDelay(100);
-
+  
   float vx_keyboard = 0, vy_keyboard = 0;
   float vx_remote, vy_remote;
   float vx_set, vy_set;
@@ -513,12 +513,17 @@ void chassisTask(void* arg) {
     send->cmd.data_float = Dead ? 0 : vy_set;
     send->TransmitOutput();
 
+    relative_angle = yaw_motor->GetThetaDelta(gimbal_param->yaw_offset_);
+    send->cmd.id = bsp::RELATIVE_ANGLE;
+    send->cmd.data_float = relative_angle;
+    send->TransmitOutput();
+
     osDelay(CHASSIS_TASK_DELAY);
   }
 }
 
 //==================================================================================================
-// SelfTest
+// SelfTest(TODO)
 //==================================================================================================
 
 const osThreadAttr_t selfTestTaskAttribute = {.name = "selfTestTask",
@@ -815,11 +820,6 @@ void RM_RTOS_Default_Task(const void* arg) {
     }
     send->cmd.id = bsp::DEAD;
     send->cmd.data_bool = false;
-    send->TransmitOutput();
-
-    relative_angle = yaw_motor->GetThetaDelta(gimbal_param->yaw_offset_);
-    send->cmd.id = bsp::RELATIVE_ANGLE;
-    send->cmd.data_float = relative_angle;
     send->TransmitOutput();
 
     if (debug) {
