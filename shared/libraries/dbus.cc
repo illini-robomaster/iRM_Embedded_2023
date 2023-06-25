@@ -25,7 +25,7 @@
 
 #include "bsp_error_handler.h"
 
-/* rocker range and deadzones */
+/* rocker range and dead-zones */
 #define RC_ROCKER_MID 1024
 #define RC_ROCKER_ZERO_DRIFT 10  // Range of possible drift around initial position
 // Range of possible drift around min or max position

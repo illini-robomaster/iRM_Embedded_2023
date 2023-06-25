@@ -38,6 +38,9 @@ typedef enum {
   COOLING_LIMIT2,
   SPEED_LIMIT1,
   SPEED_LIMIT2,
+  CHASSIS_FLAG,
+  REMAIN_HP,
+  RECALIBRATE,
 } can_bridge_cmd;
 
 typedef struct {
@@ -46,6 +49,7 @@ typedef struct {
     float data_float;
     int data_int;
     bool data_bool;
+    unsigned int data_uint;
   };
 } bridge_data_t;
 
@@ -69,7 +73,11 @@ class CanBridge {
   float cooling_limit2 = 0;
   float speed_limit1 = 0;
   float speed_limit2 = 0;
-
+  unsigned int chassis_flag = 0;
+  bool self_check_flag = false;
+  unsigned int remain_hp = 0;
+  bool recalibrate = false;
+  // each bit represents a flag correspond to specific motor e.g.(at index 0, it represents the motor 1's connection flag)
  private:
   bsp::CAN* can_;
   uint16_t rx_id_;

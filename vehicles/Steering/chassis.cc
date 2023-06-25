@@ -1,6 +1,6 @@
 /****************************************************************************
  *                                                                          *
- *  Copyright (C) 2022 RoboMaster.                                          *
+ *  Copyright (C) 2023 RoboMaster.                                          *
  *  Illini RoboMaster @ University of Illinois at Urbana-Champaign          *
  *                                                                          *
  *  This program is free software: you can redistribute it and/or modify    *
@@ -30,10 +30,40 @@
 #include "protocol.h"
 #include "rgb.h"
 #include "steering.h"
+#include "supercap.h"
+#include <cmath>
 
 static bsp::CAN* can1 = nullptr;
 static bsp::CAN* can2 = nullptr;
 static display::RGB* RGB = nullptr;
+static BoolEdgeDetector ReCali(false);
+static BoolEdgeDetector Revival(false);
+
+//==================================================================================================
+// SelfTest
+//==================================================================================================
+
+static bool fl_steer_motor_flag = false;
+static bool fr_steer_motor_flag = false;
+static bool bl_steer_motor_flag = false;
+static bool br_steer_motor_flag = false;
+static bool fl_wheel_motor_flag = false;
+static bool fr_wheel_motor_flag = false;
+static bool bl_wheel_motor_flag = false;
+static bool br_wheel_motor_flag = false;
+
+static bool transmission_flag = true;
+const osThreadAttr_t selfTestingTask = {.name = "selfTestTask",
+                                             .attr_bits = osThreadDetached,
+                                             .cb_mem = nullptr,
+                                             .cb_size = 0,
+                                             .stack_mem = nullptr,
+                                             .stack_size = 256 * 4,
+                                             .priority = (osPriority_t)osPriorityBelowNormal,
+                                             .tz_module = 0,
+                                             .reserved = 0};
+osThreadId_t selfTestTaskHandle;
+
 
 static BoolEdgeDetector FakeDeath(false);
 static volatile bool Dead = false;
@@ -41,16 +71,28 @@ static BoolEdgeDetector ChangeSpinMode(false);
 static volatile bool SpinMode = false;
 
 static bsp::CanBridge* receive = nullptr;
-
+static unsigned int flag_summary = 0;
 static const int KILLALL_DELAY = 100;
 static const int DEFAULT_TASK_DELAY = 100;
 static const int CHASSIS_TASK_DELAY = 2;
+
+// speed for steering motors (rad/s)
+constexpr float RUN_SPEED = (4 * PI);
+constexpr float ALIGN_SPEED = (PI);
+constexpr float ACCELERATION = (100 * PI);
+
+
+// speed for chassis rotation (no unit)
+constexpr float SPIN_SPEED = 80;
+constexpr float FOLLOW_SPEED = 40;
+
 
 //==================================================================================================
 // Referee
 //==================================================================================================
 
 #define REFEREE_RX_SIGNAL (1 << 1)
+
 
 const osThreadAttr_t refereeTaskAttribute = {.name = "refereeTask",
                                              .attr_bits = osThreadDetached,
@@ -61,8 +103,9 @@ const osThreadAttr_t refereeTaskAttribute = {.name = "refereeTask",
                                              .priority = (osPriority_t)osPriorityAboveNormal,
                                              .tz_module = 0,
                                              .reserved = 0};
-osThreadId_t refereeTaskHandle;
 
+osThreadId_t refereeTaskHandle;
+osThreadId_t chassisTaskHandle;
 class RefereeUART : public bsp::UART {
  public:
   using bsp::UART::UART;
@@ -101,7 +144,6 @@ const osThreadAttr_t chassisTaskAttribute = {.name = "chassisTask",
                                              .priority = (osPriority_t)osPriorityNormal,
                                              .tz_module = 0,
                                              .reserved = 0};
-osThreadId_t chassisTaskHandle;
 
 static control::MotorCANBase* motor1 = nullptr;
 static control::MotorCANBase* motor2 = nullptr;
@@ -112,23 +154,30 @@ static control::MotorCANBase* motor6 = nullptr;
 static control::MotorCANBase* motor7 = nullptr;
 static control::MotorCANBase* motor8 = nullptr;
 
-static bsp::GPIO* key1 = nullptr;
-static bsp::GPIO* key2 = nullptr;
-static bsp::GPIO* key3 = nullptr;
-static bsp::GPIO* key4 = nullptr;
+static control::SteeringMotor* steering_motor1 = nullptr;
+static control::SteeringMotor* steering_motor2 = nullptr;
+static control::SteeringMotor* steering_motor3 = nullptr;
+static control::SteeringMotor* steering_motor4 = nullptr;
+
+static bsp::GPIO* pe1 = nullptr;
+static bsp::GPIO* pe2 = nullptr;
+static bsp::GPIO* pe3 = nullptr;
+static bsp::GPIO* pe4 = nullptr;
 
 static control::steering_chassis_t* chassis_data;
 static control::SteeringChassis* chassis;
 
+static control::SuperCap* supercap = nullptr;
+
 static const float CHASSIS_DEADZONE = 0.04;
 
-bool steering_align_detect1() { return !key1->Read(); }
+bool steering_align_detect1() { return pe1->Read() == 0; }
 
-bool steering_align_detect2() { return !key2->Read(); }
+bool steering_align_detect2() { return pe2->Read() == 0; }
 
-bool steering_align_detect3() { return !key3->Read(); }
+bool steering_align_detect3() { return pe3->Read() == 0; }
 
-bool steering_align_detect4() { return !key4->Read(); }
+bool steering_align_detect4() { return pe4->Read() == 0; }
 
 void chassisTask(void* arg) {
   UNUSED(arg);
@@ -136,44 +185,92 @@ void chassisTask(void* arg) {
   control::MotorCANBase* steer_motors[] = {motor1, motor2, motor3, motor4};
   control::MotorCANBase* wheel_motors[] = {motor5, motor6, motor7, motor8};
 
-  float spin_speed = 10;
-  float follow_speed = 10;
+  control::PIDController pid5(120, 15, 0);
+  control::PIDController pid6(120, 15, 0);
+  control::PIDController pid7(120, 15, 0);
+  control::PIDController pid8(120, 15, 0);
 
   while (!receive->start) osDelay(100);
 
   while (receive->start < 0.5) osDelay(100);
 
+  // Alignment
+  chassis->SteerSetMaxSpeed(ALIGN_SPEED);
+  bool alignment_complete = false;
+  while (!alignment_complete) {
+    chassis->SteerCalcOutput();
+    control::MotorCANBase::TransmitOutput(steer_motors, 4);
+    alignment_complete = chassis->Calibrate();
+    osDelay(1);
+  }
+  chassis->ReAlign();
+  chassis->SteerCalcOutput();
+  chassis->SteerSetMaxSpeed(RUN_SPEED);
+  chassis->SteerThetaReset();
+  chassis->SetWheelSpeed(0,0,0,0);
+
   while (true) {
     float relative_angle = receive->relative_angle;
-    float sin_yaw, cos_yaw, vx_set, vy_set, wz_set;
-    UNUSED(wz_set);
+    float sin_yaw, cos_yaw, vx_set, vy_set;
+    float vx, vy, wz;
 
-    vx_set = receive->vx;
-    vy_set = receive->vy;
+    // TODO need to change the channels in gimbal.cc
+    vx_set = -receive->vy;
+    vy_set = receive->vx;
 
-    if (receive->mode == 1) {  // spin mode
-      sin_yaw = arm_sin_f32(relative_angle);
-      cos_yaw = arm_cos_f32(relative_angle);
-      vx_set = cos_yaw * vx_set + sin_yaw * vy_set;
-      vy_set = -sin_yaw * vx_set + cos_yaw * vy_set;
-      wz_set = spin_speed;
-    } else {
-      sin_yaw = arm_sin_f32(relative_angle);
-      cos_yaw = arm_cos_f32(relative_angle);
-      vx_set = cos_yaw * vx_set + sin_yaw * vy_set;
-      vy_set = -sin_yaw * vx_set + cos_yaw * vy_set;
-      wz_set = std::min(follow_speed, follow_speed * relative_angle);
-      if (-CHASSIS_DEADZONE < relative_angle && relative_angle < CHASSIS_DEADZONE) wz_set = 0;
+    ReCali.input(receive->recalibrate);   // detect force recalibration
+    Revival.input(receive->dead);         // detect robot revival
+
+    // realign on revival OR when key 'R' is pressed
+    if (Revival.negEdge() || ReCali.posEdge()) {
+      chassis->SteerAlignFalse();
+      chassis->SteerSetMaxSpeed(ALIGN_SPEED);
+      bool realignment_complete = false;
+      while (!realignment_complete) {
+        chassis->SteerCalcOutput();
+        control::MotorCANBase::TransmitOutput(steer_motors, 4);
+        realignment_complete = chassis->Calibrate();
+        osDelay(1);
+      }
+      chassis->ReAlign();
+      chassis->SteerCalcOutput();
+      chassis->SteerSetMaxSpeed(RUN_SPEED);
+      chassis->SteerThetaReset();
+      chassis->SetWheelSpeed(0,0,0,0);
     }
 
-    chassis->SetYSpeed(-vx_set / 10);
-    chassis->SetXSpeed(-vy_set / 10);
-    chassis->SetWSpeed(wz_set);
+    if (receive->mode == 1) {  // spin mode
+      // delay compensation
+      // based on rule-of-thumb formula SPIN_SPEED = 80 = ~30 degree of error
+      relative_angle = relative_angle - PI * 30.0 / 180.0 / 80.0 * SPIN_SPEED;
+
+      chassis->SteerSetMaxSpeed(RUN_SPEED * 2);
+      sin_yaw = sin(relative_angle);
+      cos_yaw = cos(relative_angle);
+      vx = cos_yaw * vx_set + sin_yaw * vy_set;
+      vy = -sin_yaw * vx_set + cos_yaw * vy_set;
+      wz = SPIN_SPEED;
+    } else {
+      chassis->SteerSetMaxSpeed(RUN_SPEED);
+      sin_yaw = sin(relative_angle);
+      cos_yaw = cos(relative_angle);
+      vx = cos_yaw * vx_set + sin_yaw * vy_set;
+      vy = -sin_yaw * vx_set + cos_yaw * vy_set;
+      wz = std::min(FOLLOW_SPEED, FOLLOW_SPEED * relative_angle);
+      if (-CHASSIS_DEADZONE < relative_angle && relative_angle < CHASSIS_DEADZONE) wz = 0;
+    }
+
+
+    chassis->SetSpeed(vx / 10, vy / 10, wz);
+    chassis->SteerUpdateTarget();
+    constexpr float WHEEL_SPEED_FACTOR = 4;
+    chassis->WheelUpdateSpeed(WHEEL_SPEED_FACTOR);
+    chassis->SteerCalcOutput();
     chassis->Update((float)referee->game_robot_status.chassis_power_limit,
                     referee->power_heat_data.chassis_power,
                     (float)referee->power_heat_data.chassis_power_buffer);
-
     if (Dead) {
+      chassis->SetSpeed(0,0,0);
       motor5->SetOutput(0);
       motor6->SetOutput(0);
       motor7->SetOutput(0);
@@ -211,10 +308,53 @@ void chassisTask(void* arg) {
     receive->cmd.data_float = (float)referee->game_robot_status.shooter_id2_17mm_speed_limit;
     receive->TransmitOutput();
 
+    receive->cmd.id = bsp::REMAIN_HP;
+    receive->cmd.data_int = referee->game_robot_status.remain_HP;
+    receive->TransmitOutput();
+
     osDelay(CHASSIS_TASK_DELAY);
+
   }
 }
+void self_Check_Task(void* arg){
+  UNUSED(arg);
 
+  while(true){
+    osDelay(100);
+    motor8->connection_flag_ = false;
+    motor7->connection_flag_ = false;
+    motor6->connection_flag_ = false;
+    motor5->connection_flag_ = false;
+    motor4->connection_flag_ = false;
+    motor3->connection_flag_ = false;
+    motor2->connection_flag_ = false;
+    motor1->connection_flag_ = false;
+    osDelay(100);
+    fl_wheel_motor_flag = motor8->connection_flag_;
+    fr_wheel_motor_flag = motor7->connection_flag_;
+    bl_wheel_motor_flag = motor6->connection_flag_;
+    br_wheel_motor_flag = motor5->connection_flag_;
+    fl_steer_motor_flag = motor4->connection_flag_;
+    fr_steer_motor_flag = motor3->connection_flag_;
+    br_steer_motor_flag = motor2->connection_flag_;
+    bl_steer_motor_flag = motor1->connection_flag_;
+    flag_summary = bl_steer_motor_flag|
+                   br_steer_motor_flag<<1|
+                   fr_steer_motor_flag<<2|
+                   fl_steer_motor_flag<<3|
+                   br_wheel_motor_flag<<4|
+                   bl_wheel_motor_flag<<5|
+                   fr_wheel_motor_flag<<6|
+                   fl_wheel_motor_flag<<7;
+    osDelay(100);
+    if(transmission_flag){
+      receive->cmd.id = bsp::CHASSIS_FLAG;
+      receive->cmd.data_uint = (unsigned int)flag_summary;
+      receive->TransmitOutput();
+    }
+    transmission_flag = !transmission_flag;
+  }
+}
 void RM_RTOS_Init() {
   print_use_uart(&huart1);
   bsp::SetHighresClockTimer(&htim5);
@@ -233,24 +373,45 @@ void RM_RTOS_Init() {
   motor7 = new control::Motor3508(can2, 0x207);
   motor8 = new control::Motor3508(can2, 0x208);
 
-  key1 = new bsp::GPIO(IN1_GPIO_Port, IN1_Pin);
-  key2 = new bsp::GPIO(IN2_GPIO_Port, IN2_Pin);
-  key3 = new bsp::GPIO(IN3_GPIO_Port, IN3_Pin);
-  key4 = new bsp::GPIO(IN4_GPIO_Port, IN4_Pin);
+  pe1 = new bsp::GPIO(IN1_GPIO_Port, IN1_Pin);
+  pe2 = new bsp::GPIO(IN2_GPIO_Port, IN2_Pin);
+  pe3 = new bsp::GPIO(IN3_GPIO_Port, IN3_Pin);
+  pe4 = new bsp::GPIO(IN4_GPIO_Port, IN4_Pin);
 
   chassis_data = new control::steering_chassis_t();
 
-  chassis_data->fl_steer_motor = motor4;
-  chassis_data->fr_steer_motor = motor3;
-  chassis_data->bl_steer_motor = motor1;
-  chassis_data->br_steer_motor = motor2;
+  supercap = new control::SuperCap(can2, 0x201);
 
-  chassis_data->fl_steer_motor_detect_func = steering_align_detect4;
-  chassis_data->fr_steer_motor_detect_func = steering_align_detect3;
-  chassis_data->bl_steer_motor_detect_func = steering_align_detect1;
-  chassis_data->br_steer_motor_detect_func = steering_align_detect2;
+  control::steering_t steering_motor_data;
+  steering_motor_data.motor = motor1;
+  steering_motor_data.max_speed = RUN_SPEED;
+  steering_motor_data.max_acceleration = ACCELERATION;
+  steering_motor_data.transmission_ratio = 8;
+  steering_motor_data.omega_pid_param = new float[3]{140, 1.2, 0};
+  steering_motor_data.max_iout = 1000;
+  steering_motor_data.max_out = 13000;
+  steering_motor_data.calibrate_offset = 0;
 
-  // TODO init wheels
+  steering_motor_data.align_detect_func = steering_align_detect1;
+  steering_motor1 = new control::SteeringMotor(steering_motor_data);
+
+  steering_motor_data.motor = motor2;
+  steering_motor_data.align_detect_func = steering_align_detect2;
+  steering_motor2 = new control::SteeringMotor(steering_motor_data);
+  steering_motor_data.motor = motor3;
+  steering_motor_data.align_detect_func = steering_align_detect3;
+  steering_motor3 = new control::SteeringMotor(steering_motor_data);
+  steering_motor_data.motor = motor4;
+  steering_motor_data.align_detect_func = steering_align_detect4;
+  steering_motor4 = new control::SteeringMotor(steering_motor_data);
+
+  chassis_data = new control::steering_chassis_t();
+
+  chassis_data->fl_steer_motor = steering_motor4;
+  chassis_data->fr_steer_motor = steering_motor3;
+  chassis_data->bl_steer_motor = steering_motor1;
+  chassis_data->br_steer_motor = steering_motor2;
+
   chassis_data->fl_wheel_motor = motor8;
   chassis_data->fr_wheel_motor = motor7;
   chassis_data->bl_wheel_motor = motor5;
@@ -262,13 +423,13 @@ void RM_RTOS_Init() {
   referee_uart->SetupRx(300);
   referee_uart->SetupTx(300);
   referee = new communication::Referee;
-
   receive = new bsp::CanBridge(can2, 0x20B, 0x20A);
 }
 
 void RM_RTOS_Threads_Init(void) {
   refereeTaskHandle = osThreadNew(refereeTask, nullptr, &refereeTaskAttribute);
   chassisTaskHandle = osThreadNew(chassisTask, nullptr, &chassisTaskAttribute);
+  selfTestTaskHandle = osThreadNew(self_Check_Task, nullptr, &selfTestingTask);
 }
 
 void KillAll() {
@@ -277,6 +438,8 @@ void KillAll() {
   control::MotorCANBase* wheel_motors[] = {motor5, motor6, motor7, motor8};
 
   RGB->Display(display::color_blue);
+
+  chassis->SteerAlignFalse();   // set alignment status of each wheel to false
 
   while (true) {
     if (!receive->dead) {

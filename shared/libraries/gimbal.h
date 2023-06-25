@@ -30,7 +30,7 @@ namespace control {
 /**
  * @brief gimbal models
  */
-typedef enum { GIMBAL_FORTRESS, GIMBAL_SENTRY, GIMBAL_STEERING } gimbal_model_t;
+typedef enum { GIMBAL_FORTRESS, GIMBAL_SENTRY, GIMBAL_STEERING, GIMBAL_STEERING_4310 } gimbal_model_t;
 
 /**
  * @brief offset, max, and proximity angles of different gimbals
@@ -48,6 +48,7 @@ typedef struct {
  * @brief structure used when gimbal instance is initialized
  */
 typedef struct {
+  Motor4310* pitch_motor_4310_;    /* 4310 pitch motor instance */
   MotorCANBase* pitch_motor; /* pitch motor instance */
   MotorCANBase* yaw_motor;   /* yaw motor instance   */
   gimbal_model_t model;      /* gimbal model         */
@@ -84,12 +85,20 @@ class Gimbal {
   void Update();
 
   /**
+   * @brief set motors to point to a new orientation with no offset
+   *
+   * @param new_pitch new pitch angled
+   * @param new_yaw   new yaw angled
+   */
+  void TargetAbsNoOffset(float new_pitch, float new_yaw);
+
+  /**
    * @brief set motors to point to a new orientation
    *
    * @param new_pitch new pitch angled
    * @param new_yaw   new yaw angled
    */
-  void TargetAbs(float new_pitch, float new_yaw);
+  void TargetAbsWOffset(float new_pitch, float new_yaw);
 
   /**
    * @brief set motors to point to a new orientation
@@ -99,8 +108,37 @@ class Gimbal {
    */
   void TargetRel(float new_pitch, float new_yaw);
 
+  /**
+   * @brief Get pitch angle target
+   * 
+   * @return float 
+   */
+  float GetTargetPitchAngle();
+
+  /**
+   * @brief Get yaw angle target
+   * 
+   * @return float 
+   */
+  float GetTargetYawAngle();
+
+  /**
+   * @brief Get absolute pitch angle with wrapping and clipping
+   * 
+   * @return float 
+   */
+  float ComputePitchRel(float new_pitch, float pitch_ref);
+
+  /**
+   * @brief Get absolute yaw angle with wrapping and clipping
+   * 
+   * @return float 
+   */
+  float ComputeYawRel(float new_yaw, float yaw_ref);
+
  private:
   // acquired from user
+  Motor4310* pitch_motor_4310_ = nullptr;
   MotorCANBase* pitch_motor_ = nullptr;
   MotorCANBase* yaw_motor_ = nullptr;
   gimbal_model_t model_;
@@ -121,8 +159,13 @@ class Gimbal {
   ConstrainedPID* yaw_omega_pid_ = nullptr;   /* yaw omega pid   */
 
   // pitch and yaw angle
-  float pitch_angle_; /* current gimbal pitch angle */
-  float yaw_angle_;   /* current gimbal yaw angle   */
+  float pitch_angle_; /* current TARGET gimbal pitch angle */
+  float yaw_angle_;   /* current TARGET gimbal yaw angle   */
+
+  float pitch_lower_limit_; /* lower limit of pitch angle */
+  float pitch_upper_limit_; /* upper limit of pitch angle */
+  float yaw_lower_limit_;   /* lower limit of yaw angle   */
+  float yaw_upper_limit_;   /* upper limit of yaw angle   */
 
   // state detectors
   BoolEdgeDetector pitch_detector_; /* pitch pid mode toggle detector */

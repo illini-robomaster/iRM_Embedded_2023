@@ -1,6 +1,6 @@
 /****************************************************************************
  *                                                                          *
- *  Copyright (C) 2022 RoboMaster.                                          *
+ *  Copyright (C) 2023 RoboMaster.                                          *
  *  Illini RoboMaster @ University of Illinois at Urbana-Champaign          *
  *                                                                          *
  *  This program is free software: you can redistribute it and/or modify    *
@@ -33,6 +33,7 @@
 #include "dbus.h"
 #include "i2c.h"
 #include "main.h"
+#include "motor.h"
 #include "oled.h"
 #include "protocol.h"
 #include "rgb.h"
@@ -50,6 +51,10 @@ static const int SHOOTER_TASK_DELAY = 10;
 static const int SELFTEST_TASK_DELAY = 100;
 static const int KILLALL_DELAY = 100;
 static const int DEFAULT_TASK_DELAY = 100;
+static const int SOFT_START_CONSTANT = 300;
+static const int SOFT_KILL_CONSTANT = 200;
+static const float START_PITCH_POS = PI/5;
+static const int INFANTRY_INITIAL_HP = 100;
 static const int SHOOTER_MODE_DELAY = 5e5;
 
 static bsp::CanBridge* send = nullptr;
@@ -61,21 +66,34 @@ static volatile bool SpinMode = false;
 
 static volatile float relative_angle = 0;
 
-static bool volatile pitch_motor_flag = false;
-static bool volatile yaw_motor_flag = false;
-static bool volatile sl_motor_flag = false;
-static bool volatile sr_motor_flag = false;
-static bool volatile ld_motor_flag = false;
-// static bool volatile fl_motor_flag = false;
-// static bool volatile fr_motor_flag = false;
-// static bool volatile bl_motor_flag = false;
-// static bool volatile br_motor_flag = false;
-static bool volatile calibration_flag = false;
-// static bool volatile referee_flag = false;
-static bool volatile dbus_flag = false;
-static bool volatile lidar_flag = false;
+static unsigned int chassis_flag_bitmap = 0;
+
+static volatile float pitch_pos = START_PITCH_POS;
+
+static volatile unsigned int current_hp = 0;
+
+static volatile bool pitch_motor_flag = false;
+static volatile bool yaw_motor_flag = false;
+static volatile bool sl_motor_flag = false;
+static volatile bool sr_motor_flag = false;
+static volatile bool ld_motor_flag = false;
+static volatile bool fl_wheel_flag = false;
+static volatile bool fr_wheel_flag = false;
+static volatile bool bl_wheel_flag = false;
+static volatile bool br_wheel_flag = false;
+static volatile bool fl_steering_flag = false;
+static volatile bool fr_steering_flag = false;
+static volatile bool bl_steering_flag = false;
+static volatile bool br_steering_flag = false;
+static volatile bool calibration_flag = false;
+// static volatile bool referee_flag = false;
+static volatile bool dbus_flag = false;
+static volatile bool lidar_flag = false;
+static volatile bool pitch_reset = false;
 
 static volatile bool selftestStart = false;
+
+static volatile bool robot_hp_begin = false;
 
 //==================================================================================================
 // IMU
@@ -128,7 +146,8 @@ const osThreadAttr_t gimbalTaskAttribute = {.name = "gimbalTask",
                                             .reserved = 0};
 osThreadId_t gimbalTaskHandle;
 
-static control::MotorCANBase* pitch_motor = nullptr;
+//static control::MotorCANBase* pitch_motor = nullptr;
+static control::Motor4310* pitch_motor = nullptr;
 static control::MotorCANBase* yaw_motor = nullptr;
 static control::Gimbal* gimbal = nullptr;
 static control::gimbal_data_t* gimbal_param = nullptr;
@@ -137,35 +156,55 @@ static bsp::Laser* laser = nullptr;
 void gimbalTask(void* arg) {
   UNUSED(arg);
 
-  control::MotorCANBase* motors_can1_gimbal[] = {pitch_motor, yaw_motor};
+  control::MotorCANBase* motors_can1_gimbal[] = {yaw_motor};
 
   print("Wait for beginning signal...\r\n");
   RGB->Display(display::color_red);
   laser->On();
 
   while (true) {
-    if (dbus->keyboard.bit.V || dbus->swr == remote::DOWN) break;
+    if (dbus->keyboard.bit.B || dbus->swr == remote::DOWN) break;
     osDelay(100);
   }
 
   int i = 0;
   while (i < 1000 || !imu->DataReady()) {
-    gimbal->TargetAbs(0, 0);
+    gimbal->TargetAbsWOffset(0, 0);
     gimbal->Update();
-    control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 2);
+    control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
     osDelay(GIMBAL_TASK_DELAY);
     ++i;
+  }
+
+  pitch_motor->MotorEnable(pitch_motor);
+  osDelay(GIMBAL_TASK_DELAY);
+
+  // 4310 soft start
+  float tmp_pos = 0;
+  for (int j = 0; j < SOFT_START_CONSTANT; j++){
+    gimbal->TargetAbsWOffset(0, 0);
+    gimbal->Update();
+    control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
+    tmp_pos += START_PITCH_POS / SOFT_START_CONSTANT;  // increase position gradually
+    pitch_motor->SetOutput(tmp_pos, 1, 115, 0.5, 0);
+    pitch_motor->TransmitOutput(pitch_motor);
+    osDelay(GIMBAL_TASK_DELAY);
   }
 
   print("Start Calibration.\r\n");
   RGB->Display(display::color_yellow);
   laser->Off();
+  gimbal->TargetAbsWOffset(0, 0);
+  gimbal->Update();
+  control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
   imu->Calibrate();
 
   while (!imu->DataReady() || !imu->CaliDone()) {
-    gimbal->TargetAbs(0, 0);
+    gimbal->TargetAbsWOffset(0, 0);
     gimbal->Update();
-    control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 2);
+    control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
+    pitch_motor->SetOutput(tmp_pos, 1, 115, 0.5, 0);
+    pitch_motor->TransmitOutput(pitch_motor);
     osDelay(GIMBAL_TASK_DELAY);
   }
 
@@ -201,10 +240,30 @@ void gimbalTask(void* arg) {
     pitch_diff = clip<float>(pitch_target - pitch_curr, -PI, PI);
     yaw_diff = wrap<float>(yaw_target - yaw_curr, -PI, PI);
 
-    gimbal->TargetRel(-pitch_diff, yaw_diff);
+    float pitch_vel;
+    pitch_vel = -1 * clip<float>(dbus->ch3 / 660.0, -15, 15);
+    pitch_pos += pitch_vel / 200 + dbus->mouse.y / 32767.0;
+    pitch_pos = clip<float>(pitch_pos, 0.1, 1); // measured range
 
+    if (pitch_reset) {
+      // 4310 soft start
+      tmp_pos = 0;
+      for (int j = 0; j < SOFT_START_CONSTANT; j++){
+        tmp_pos += START_PITCH_POS / SOFT_START_CONSTANT;  // increase position gradually
+        pitch_motor->SetOutput(tmp_pos, 1, 115, 0.5, 0);
+        pitch_motor->TransmitOutput(pitch_motor);
+        osDelay(GIMBAL_TASK_DELAY);
+      }
+      pitch_pos = tmp_pos;
+      pitch_reset = false;
+    }
+
+    gimbal->TargetRel(-pitch_diff, yaw_diff);
     gimbal->Update();
-    control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 2);
+
+    pitch_motor->SetOutput(pitch_pos, pitch_vel, 115, 0.5, 0);
+    control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
+    pitch_motor->TransmitOutput(pitch_motor);
     osDelay(GIMBAL_TASK_DELAY);
   }
 }
@@ -288,7 +347,7 @@ void shooterTask(void* arg) {
   control::MotorCANBase* motors_can1_shooter[] = {sl_motor, sr_motor, ld_motor};
 
   while (true) {
-    if (dbus->keyboard.bit.V || dbus->swr == remote::DOWN) break;
+    if (dbus->keyboard.bit.B || dbus->swr == remote::DOWN) break;
     osDelay(100);
   }
 
@@ -383,7 +442,7 @@ void chassisTask(void* arg) {
   UNUSED(arg);
 
   while (true) {
-    if (dbus->keyboard.bit.V || dbus->swr == remote::DOWN) break;
+    if (dbus->keyboard.bit.B || dbus->swr == remote::DOWN) break;
     osDelay(100);
   }
 
@@ -399,6 +458,10 @@ void chassisTask(void* arg) {
 
     send->cmd.id = bsp::MODE;
     send->cmd.data_int = SpinMode ? 1 : 0;
+    send->TransmitOutput();
+
+    send->cmd.id = bsp::RECALIBRATE;
+    send->cmd.data_bool = dbus->keyboard.bit.R;
     send->TransmitOutput();
 
     if (dbus->keyboard.bit.A) vx_keyboard -= 61.5;
@@ -459,17 +522,18 @@ osThreadId_t selfTestTaskHandle;
 using Note = bsp::BuzzerNote;
 
 static bsp::BuzzerNoteDelayed Mario[] = {
-    {Note::Mi3M, 80}, {Note::Silent, 80},  {Note::Mi3M, 80}, {Note::Silent, 240},
-    {Note::Mi3M, 80}, {Note::Silent, 240}, {Note::Do1M, 80}, {Note::Silent, 80},
-    {Note::Mi3M, 80}, {Note::Silent, 240}, {Note::So5M, 80}, {Note::Silent, 560},
-    {Note::So5L, 80}, {Note::Silent, 0},   {Note::Finish, 0}};
+    {Note::Mi3M, 80}, {Note::Silent, 80}, {Note::Mi3M, 80}, {Note::Silent, 240}, {Note::Mi3M, 80}, {Note::Silent, 240}, {Note::Do1M, 80}, {Note::Silent, 80}, {Note::Mi3M, 80}, {Note::Silent, 240}, {Note::So5M, 80}, {Note::Silent, 560}, {Note::So5L, 80}, {Note::Silent, 0}, {Note::Finish, 0}};
 
 static bsp::Buzzer* buzzer = nullptr;
 static display::OLED* OLED = nullptr;
-
+//simple bitmask function for chassis flag
 void selfTestTask(void* arg) {
   UNUSED(arg);
+  osDelay(100);
+  //Try to make the chassis Flags initialized at first.
 
+  //Could need more time to test it out.
+  //The self test task for chassis will not update after the first check.
   OLED->ShowIlliniRMLOGO();
   buzzer->SingSong(Mario, [](uint32_t milli) { osDelay(milli); });
   OLED->OperateGram(display::PEN_CLEAR);
@@ -478,28 +542,32 @@ void selfTestTask(void* arg) {
   OLED->ShowString(0, 5, (uint8_t*)"GY");
   OLED->ShowString(1, 0, (uint8_t*)"SL");
   OLED->ShowString(1, 5, (uint8_t*)"SR");
-  OLED->ShowString(1, 10, (uint8_t*)"LD");
-  //  OLED->ShowString(2, 0, (uint8_t*)"FL");
-  //  OLED->ShowString(2, 5, (uint8_t*)"FR");
-  //  OLED->ShowString(2, 10, (uint8_t*)"BL");
-  //  OLED->ShowString(2, 15, (uint8_t*)"BR");
-  OLED->ShowString(3, 0, (uint8_t*)"Cali");
-  OLED->ShowString(3, 7, (uint8_t*)"Temp:");
+  OLED->ShowString(2, 0, (uint8_t*)"LD");
+  OLED->ShowString(2, 5, (uint8_t*)"Ldr");
+  OLED->ShowString(3, 0, (uint8_t*)"Cal");
+  OLED->ShowString(3, 6, (uint8_t*)"Dbs");
+  OLED->ShowString(4, 0, (uint8_t*)"Temp:");
   //  OLED->ShowString(4, 0, (uint8_t*)"Ref");
-  OLED->ShowString(4, 6, (uint8_t*)"Dbus");
-  OLED->ShowString(4, 13, (uint8_t*)"Lidar");
+
+  OLED->ShowString(0, 15, (uint8_t*)"S");
+  OLED->ShowString(0, 18, (uint8_t*)"W");
+
+  OLED->ShowString(1, 12, (uint8_t*)"FL");
+  OLED->ShowString(2, 12, (uint8_t*)"FR");
+//
+  OLED->ShowString(3, 12, (uint8_t*)"BL");
+  OLED->ShowString(4, 12, (uint8_t*)"BR");
 
   char temp[6] = "";
   while (true) {
+
+    osDelay(100);
     pitch_motor->connection_flag_ = false;
     yaw_motor->connection_flag_ = false;
     sl_motor->connection_flag_ = false;
     sr_motor->connection_flag_ = false;
     ld_motor->connection_flag_ = false;
-    //    fl_motor->connection_flag_ = false;
-    //    fr_motor->connection_flag_ = false;
-    //    bl_motor->connection_flag_ = false;
-    //    br_motor->connection_flag_ = false;
+
     referee->connection_flag_ = false;
     dbus->connection_flag_ = false;
     osDelay(SELFTEST_TASK_DELAY);
@@ -508,10 +576,27 @@ void selfTestTask(void* arg) {
     sl_motor_flag = sl_motor->connection_flag_;
     sr_motor_flag = sr_motor->connection_flag_;
     ld_motor_flag = ld_motor->connection_flag_;
-    //    fl_motor_flag = fl_motor->connection_flag_;
-    //    fr_motor_flag = fr_motor->connection_flag_;
-    //    bl_motor_flag = bl_motor->connection_flag_;
-    //    br_motor_flag = br_motor->connection_flag_;
+
+    chassis_flag_bitmap = send->chassis_flag;
+
+    fl_wheel_flag = (0x80 & chassis_flag_bitmap);
+    //motor 8
+    fr_wheel_flag = (0x40 & chassis_flag_bitmap);
+    //motor 7
+    bl_wheel_flag = (0x20 & chassis_flag_bitmap);
+    //motor 6
+    br_wheel_flag = (0x10 & chassis_flag_bitmap);
+    //motor 5
+    fl_steering_flag = (0x08 & chassis_flag_bitmap);
+    //motor 4
+    fr_steering_flag = (0x04 & chassis_flag_bitmap);
+    //motor 3
+    br_steering_flag = (0x02 & chassis_flag_bitmap);
+    //motor 2
+    bl_steering_flag = (0x01 & chassis_flag_bitmap);
+    //motor 1
+
+    //    fl_wheel_flag = send->selfCheck_flag;
     calibration_flag = imu->CaliDone();
     //    referee_flag = referee->connection_flag_;
     dbus_flag = dbus->connection_flag_;
@@ -520,21 +605,33 @@ void selfTestTask(void* arg) {
     OLED->ShowBlock(0, 7, yaw_motor_flag);
     OLED->ShowBlock(1, 2, sl_motor_flag);
     OLED->ShowBlock(1, 7, sr_motor_flag);
-    OLED->ShowBlock(1, 12, ld_motor_flag);
-    //    OLED->ShowBlock(2, 2, fl_motor_flag);
-    //    OLED->ShowBlock(2, 7, fr_motor_flag);
-    //    OLED->ShowBlock(2, 12, bl_motor_flag);
-    //    OLED->ShowBlock(2, 17, br_motor_flag);
-    OLED->ShowBlock(3, 4, imu->CaliDone());
+    OLED->ShowBlock(2, 2, ld_motor_flag);
+    OLED->ShowBlock(2, 8, lidar_flag);
+    OLED->ShowBlock(3, 3, imu->CaliDone());
+    OLED->ShowBlock(3, 9, dbus_flag);
     snprintf(temp, 6, "%.2f", imu->Temp);
-    OLED->ShowString(3, 12, (uint8_t*)temp);
+    OLED->ShowString(4, 6, (uint8_t*)temp);
     //    OLED->ShowBlock(4, 3, referee_flag);
-    OLED->ShowBlock(4, 10, dbus_flag);
-    OLED->ShowBlock(4, 18, lidar_flag);
+
+    OLED->ShowBlock(1, 18, fl_wheel_flag);
+
+    OLED->ShowBlock(1,15,fl_steering_flag);
+
+    OLED->ShowBlock(2, 18, fr_wheel_flag);
+
+    OLED->ShowBlock(2,15,fr_steering_flag);
+
+    OLED->ShowBlock(3, 18, bl_wheel_flag);
+
+    OLED->ShowBlock(3,15,bl_steering_flag);
+
+    OLED->ShowBlock(4, 18, br_wheel_flag);
+
+    OLED->ShowBlock(4,15,br_steering_flag);
 
     OLED->RefreshGram();
 
-    selftestStart = true;
+    selftestStart = send->self_check_flag;
   }
 }
 
@@ -575,12 +672,12 @@ void RM_RTOS_Init(void) {
   imu = new IMU(imu_init, false);
 
   laser = new bsp::Laser(LASER_GPIO_Port, LASER_Pin);
-  pitch_motor = new control::Motor6020(can1, 0x205);
+  pitch_motor = new control::Motor4310(can1, 0x02, 0x01, control::MIT);
   yaw_motor = new control::Motor6020(can1, 0x206);
   control::gimbal_t gimbal_data;
-  gimbal_data.pitch_motor = pitch_motor;
+  gimbal_data.pitch_motor_4310_ = pitch_motor;
   gimbal_data.yaw_motor = yaw_motor;
-  gimbal_data.model = control::GIMBAL_STEERING;
+  gimbal_data.model = control::GIMBAL_STEERING_4310;
   gimbal = new control::Gimbal(gimbal_data);
   gimbal_param = gimbal->GetData();
 
@@ -619,7 +716,6 @@ void RM_RTOS_Threads_Init(void) {
 void KillAll() {
   RM_EXPECT_TRUE(false, "Operation Killed!\r\n");
 
-  control::MotorCANBase* motors_can1_gimbal[] = {pitch_motor};
   control::MotorCANBase* motors_can2_gimbal[] = {yaw_motor};
   control::MotorCANBase* motors_can1_shooter[] = {sl_motor, sr_motor, ld_motor};
 
@@ -631,18 +727,29 @@ void KillAll() {
     send->cmd.data_bool = true;
     send->TransmitOutput();
 
-    FakeDeath.input(dbus->keyboard.bit.B || dbus->swl == remote::DOWN);
-    if (FakeDeath.posEdge()) {
+    FakeDeath.input(dbus->swl == remote::DOWN);
+    if (FakeDeath.posEdge() || send->remain_hp > 0) {
       SpinMode = false;
       Dead = false;
       RGB->Display(display::color_green);
       laser->On();
+      pitch_motor->MotorEnable(pitch_motor);
       break;
     }
 
-    pitch_motor->SetOutput(0);
+    // 4310 soft kill
+    float tmp_pos = pitch_pos;
+    for (int j = 0; j < SOFT_KILL_CONSTANT; j++){
+      tmp_pos -= START_PITCH_POS / SOFT_KILL_CONSTANT;  // decrease position gradually
+      pitch_motor->SetOutput(tmp_pos, 1, 115, 0.5, 0);
+      pitch_motor->TransmitOutput(pitch_motor);
+      osDelay(GIMBAL_TASK_DELAY);
+    }
+
+    pitch_reset = true;
+    pitch_motor->MotorDisable(pitch_motor);
+
     yaw_motor->SetOutput(0);
-    control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
     control::MotorCANBase::TransmitOutput(motors_can2_gimbal, 1);
 
     sl_motor->SetOutput(0);
@@ -654,14 +761,17 @@ void KillAll() {
   }
 }
 
-static bool debug = true;
+static bool debug = false;
 
 void RM_RTOS_Default_Task(const void* arg) {
   UNUSED(arg);
 
   while (true) {
-    FakeDeath.input(dbus->keyboard.bit.B || dbus->swl == remote::DOWN);
-    if (FakeDeath.posEdge()) {
+    if (send->remain_hp == INFANTRY_INITIAL_HP) robot_hp_begin = true;
+    current_hp = robot_hp_begin ? send->remain_hp : INFANTRY_INITIAL_HP;
+
+    FakeDeath.input(dbus->swl == remote::DOWN);
+    if (FakeDeath.posEdge() || current_hp == 0) {
       Dead = true;
       KillAll();
     }
@@ -688,6 +798,7 @@ void RM_RTOS_Default_Task(const void* arg) {
 
       print("CH0: %-4d CH1: %-4d CH2: %-4d CH3: %-4d ", dbus->ch0, dbus->ch1, dbus->ch2, dbus->ch3);
       print("SWL: %d SWR: %d @ %d ms\r\n", dbus->swl, dbus->swr, dbus->timestamp);
+
     }
 
     osDelay(DEFAULT_TASK_DELAY);

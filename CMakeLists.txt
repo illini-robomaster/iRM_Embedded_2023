@@ -25,7 +25,7 @@ include(cmake/build_helper.cmake)
 include(cmake/clang_format.cmake)
 include(cmake/doxygen.cmake)
 
-project(iRM_Embedded_2022)
+project(iRM_Embedded_2023)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
 

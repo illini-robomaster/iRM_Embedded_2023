@@ -27,7 +27,7 @@
 #include "bsp_print.h"
 #include "bsp_uart.h"
 #include "cmsis_os.h"
-#include "minipc.h"
+#include "autoaim_protocol.h"
 #include "rgb.h"
 
 #define RX_SIGNAL (1 << 0)
@@ -59,7 +59,7 @@ void RM_RTOS_Default_Task(const void* argument) {
   uart->SetupRx(50);
   uart->SetupTx(50);
 
-  auto miniPCreceiver = communication::MiniPCProtocol();
+  auto miniPCreceiver = communication::AutoaimProtocol();
   int total_processed_bytes = 0;
 
   while (true) {
@@ -73,22 +73,33 @@ void RM_RTOS_Default_Task(const void* argument) {
       length = uart->Read(&data);
       total_processed_bytes += length;
 
-      // if read anything, flash red
-      led->Display(0xFFFF0000);
-
       miniPCreceiver.Receive(data, length);
       uint32_t valid_packet_cnt = miniPCreceiver.get_valid_packet_cnt();
 
       // Jetson / PC sends 200Hz valid packets for stress testing
       // For testing script, please see iRM_Vision_2023/Communication/communicator.py
       // For comm protocol details, please see iRM_Vision_2023/docs/comm_protocol.md
-      if (valid_packet_cnt > 998) {
-        // If at least 99.9% packets are valid, pass
+      if (valid_packet_cnt == 1000) {
+        // Jetson test cases write 1000 packets. Pass
         led->Display(0xFF00FF00);
         osDelay(10000);
+        // after 10 seconds, write 1000 alternating packets to Jetson
+        communication::STMToJetsonData packet_to_send;
+        uint8_t my_color = 1; // blue
+        for (int i = 0; i < 1000; ++i) {
+          if (i % 2 == 0) {
+            my_color = 1; // blue
+          } else {
+            my_color = 0; // red
+          }
+          miniPCreceiver.Send(&packet_to_send, my_color);
+          uart->Write((uint8_t*)&packet_to_send, sizeof(communication::STMToJetsonData));
+          osDelay(1);
+        }
       }
       // blue when nothing is received
       led->Display(0xFF0000FF);
     }
+    osDelay(1);
   }
 }
