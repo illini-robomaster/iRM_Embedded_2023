@@ -274,16 +274,6 @@ void chassisTask(void* arg) {
 // SelfTest
 //==================================================================================================
 
-static bool fl_steer_motor_flag = false;
-static bool fr_steer_motor_flag = false;
-static bool bl_steer_motor_flag = false;
-static bool br_steer_motor_flag = false;
-static bool fl_wheel_motor_flag = false;
-static bool fr_wheel_motor_flag = false;
-static bool bl_wheel_motor_flag = false;
-static bool br_wheel_motor_flag = false;
-
-static bool transmission_flag = true;
 const osThreadAttr_t selfTestingTask = {.name = "selfTestTask",
                                              .attr_bits = osThreadDetached,
                                              .cb_mem = nullptr,
@@ -294,6 +284,17 @@ const osThreadAttr_t selfTestingTask = {.name = "selfTestTask",
                                              .tz_module = 0,
                                              .reserved = 0};
 osThreadId_t selfTestTaskHandle;
+
+static bool fl_steer_motor_flag = false;
+static bool fr_steer_motor_flag = false;
+static bool bl_steer_motor_flag = false;
+static bool br_steer_motor_flag = false;
+static bool fl_wheel_motor_flag = false;
+static bool fr_wheel_motor_flag = false;
+static bool bl_wheel_motor_flag = false;
+static bool br_wheel_motor_flag = false;
+
+static bool transmission_flag = true;
 
 void self_Check_Task(void* arg){
   UNUSED(arg);
