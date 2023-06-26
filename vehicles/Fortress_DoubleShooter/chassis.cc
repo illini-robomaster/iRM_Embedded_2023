@@ -53,6 +53,7 @@ static unsigned int flag_summary = 0;
 static const int KILLALL_DELAY = 100;
 static const int DEFAULT_TASK_DELAY = 100;
 static const int CHASSIS_TASK_DELAY = 2;
+static const int FORTRESS_TASK_DELAY = 2;
 
 // TODO: Mecanum wheel need different speed???
 // speed for steering motors (rad/s)
@@ -204,6 +205,7 @@ void chassisTask(void* arg) {
     float vx, vy, wz;
 
     // TODO need to change the channels in gimbal.cc
+    // change direction
     vx_set = -receive->vy;
     vy_set = receive->vx;
 
@@ -295,6 +297,113 @@ void chassisTask(void* arg) {
 }
 
 //==================================================================================================
+// Fortress
+//==================================================================================================
+
+const osThreadAttr_t fortressTaskAttribute = {.name = "fortressTask",
+                                              .attr_bits = osThreadDetached,
+                                              .cb_mem = nullptr,
+                                              .cb_size = 0,
+                                              .stack_mem = nullptr,
+                                              .stack_size = 256 * 4,
+                                              .priority = (osPriority_t)osPriorityNormal,
+                                              .tz_module = 0,
+                                              .reserved = 0};
+
+osThreadId_t fortressTaskHandle;
+
+static bsp::GPIO* left = nullptr;
+static bsp::GPIO* right = nullptr;
+
+static control::MotorCANBase* elevator_left_motor = nullptr;
+static control::MotorCANBase* elevator_right_motor = nullptr;
+static control::MotorCANBase* fortress_motor = nullptr;
+static control::Fortress* fortress = nullptr;
+
+void fortressTask(void* arg) {
+  UNUSED(arg);
+
+  control::MotorCANBase* motors_can2_fortress[] = {elevator_left_motor, elevator_right_motor,
+                                                   fortress_motor};
+  // while (true) {
+  //   if (dbus->keyboard.bit.V || dbus->swr == remote::DOWN) break;
+  //   osDelay(100);
+  // }
+
+  // while (!imu->CaliDone()) osDelay(100);
+
+  // TODO: wait for IMU
+  while (!receive->start) osDelay(100);
+
+  while (!fortress->Calibrate()) {
+    while (Dead) osDelay(100);
+    if (fortress->Error()) {
+      while (true) {
+        fortress->Stop(control::ELEVATOR);
+        fortress->Stop(control::SPINNER);
+        control::MotorCANBase::TransmitOutput(motors_can2_fortress, 3);
+        osDelay(100);
+      }
+    }
+    fortress->Stop(control::SPINNER);
+    // Calibrate use elevator motors
+    control::MotorCANBase::TransmitOutput(motors_can2_fortress, 3);
+    osDelay(FORTRESS_TASK_DELAY);
+  }
+
+  // finish fortress calibration
+  receive->cmd.id = bsp::FORTRESS_CALIBRATED;
+  receive->cmd.data_bool = true;
+  receive->TransmitOutput();
+
+  while (true) {
+    // TODO: need to change to for the dual board communication
+    // ChangeFortressMode.input(dbus->keyboard.bit.X);
+    // if (ChangeFortressMode.posEdge()) FortressMode = !FortressMode;
+
+    if (receive->fortress_mode) {
+      int i = 0;
+      while (true) {
+        // let the code run at least 0.1s
+        if (++i > 100 / FORTRESS_TASK_DELAY && fortress->Finished()) break;
+        if (fortress->Error()) {
+          while (true) {
+            fortress->Stop(control::ELEVATOR);
+            fortress->Stop(control::SPINNER);
+            control::MotorCANBase::TransmitOutput(motors_can2_fortress, 3);
+            osDelay(100);
+          }
+        }
+        fortress->Transform(true);
+        fortress->Spin(true, (float)referee->game_robot_status.chassis_power_limit,
+                       referee->power_heat_data.chassis_power,
+                       (float)referee->power_heat_data.chassis_power_buffer);
+        control::MotorCANBase::TransmitOutput(motors_can2_fortress, 3);
+        osDelay(FORTRESS_TASK_DELAY);
+      }
+    } else {
+      int i = 0;
+      while (true) {
+        // let the code run at least 0.1s
+        if (++i > 100 / FORTRESS_TASK_DELAY && fortress->Finished()) break;
+        if (fortress->Error()) {
+          while (true) {
+            fortress->Stop(control::ELEVATOR);
+            fortress->Stop(control::SPINNER);
+            control::MotorCANBase::TransmitOutput(motors_can2_fortress, 3);
+            osDelay(100);
+          }
+        }
+        fortress->Transform(false);
+        fortress->Stop(control::SPINNER);
+        control::MotorCANBase::TransmitOutput(motors_can2_fortress, 3);
+        osDelay(FORTRESS_TASK_DELAY);
+      }
+    }
+  }
+}
+
+//==================================================================================================
 // SelfTest(TODO)
 //==================================================================================================
 
@@ -330,7 +439,9 @@ void self_Check_Task(void* arg){
     fr_motor->connection_flag_ = false;
     bl_motor->connection_flag_ = false;
     br_motor->connection_flag_ = false;
-    //need 3  motors more for fortress mode.
+    elevator_left_motor->connection_flag_ = false;
+    elevator_right_motor->connection_flag_ = false;
+    fortress_motor->connection_flag_ = false;
 
     // motor8->connection_flag_ = false;
     // motor7->connection_flag_ = false;
@@ -342,10 +453,10 @@ void self_Check_Task(void* arg){
     // motor1->connection_flag_ = false;
     osDelay(100);
 
-    fl_wheel_motor_flag = motor8->connection_flag_;
-    fr_wheel_motor_flag = motor7->connection_flag_;
-    bl_wheel_motor_flag = motor6->connection_flag_;
-    br_wheel_motor_flag = motor5->connection_flag_;
+    // fl_wheel_motor_flag = motor8->connection_flag_;
+    // fr_wheel_motor_flag = motor7->connection_flag_;
+    // bl_wheel_motor_flag = motor6->connection_flag_;
+    // br_wheel_motor_flag = motor5->connection_flag_;
     // fl_steer_motor_flag = motor4->connection_flag_;
     // fr_steer_motor_flag = motor3->connection_flag_;
     // br_steer_motor_flag = motor2->connection_flag_;
@@ -381,6 +492,7 @@ void RM_RTOS_Init() {
   RGB = new display::RGB(&htim5, 3, 2, 1, 1000000);
 
   // TODO: fortress chassis initilize(need fortress mode)
+  // Chassis motor
   // fl_motor = new control::Motor3508(can2, 0x201);
   // fr_motor = new control::Motor3508(can2, 0x202);
   // bl_motor = new control::Motor3508(can2, 0x203);
@@ -394,6 +506,20 @@ void RM_RTOS_Init() {
   // chassis_data.motors = motors;
   // chassis_data.model = control::CHASSIS_MECANUM_WHEEL;
   // chassis = new control::Chassis(chassis_data);
+
+  // Fortress motor
+  // left = new bsp::GPIO(IN1_GPIO_Port, IN1_Pin);
+  // right = new bsp::GPIO(IN2_GPIO_Port, IN2_Pin);
+  // elevator_left_motor = new control::Motor3508(can2, 0x205);
+  // elevator_right_motor = new control::Motor3508(can2, 0x208);
+  // fortress_motor = new control::Motor3508(can2, 0x207);
+  // control::fortress_t fortress_data;
+  // fortress_data.leftSwitch = left;
+  // fortress_data.rightSwitch = right;
+  // fortress_data.leftElevatorMotor = elevator_left_motor;
+  // fortress_data.rightElevatorMotor = elevator_right_motor;
+  // fortress_data.fortressMotor = fortress_motor;
+  // fortress = new control::Fortress(fortress_data);
 
 
 
@@ -469,10 +595,11 @@ void RM_RTOS_Init() {
 //==================================================================================================
 
 void RM_RTOS_Threads_Init(void) {
-  // TODO: need to add the fortress thread
+  // TODO: need to add the fortress thread(do we need UI?)
   refereeTaskHandle = osThreadNew(refereeTask, nullptr, &refereeTaskAttribute);
   chassisTaskHandle = osThreadNew(chassisTask, nullptr, &chassisTaskAttribute);
   selfTestTaskHandle = osThreadNew(self_Check_Task, nullptr, &selfTestingTask);
+  fortressTaskHandle = osThreadNew(fortressTask, nullptr, &fortressTaskAttribute);
 }
 
 //==================================================================================================
@@ -485,10 +612,12 @@ void KillAll() {
   // TODO: need the fortress mode motor
   // control::MotorCANBase* wheel_motors[] = {motor5, motor6, motor7, motor8};
   control::MotorCANBase* motors_can2_chassis[] = {fl_motor, fr_motor, bl_motor, br_motor};
+  control::MotorCANBase* motors_can2_elevator[] = {elevator_left_motor, elevator_right_motor};
+  control::MotorCANBase* motors_can2_fortress[] = {fortress_motor};
 
   RGB->Display(display::color_blue);
 
-  // TODO: do we need fake death here(I think no need)
+  // TODO: do we need fake death here(I think no need, fortress dead?)
   while (true) {
     if (!receive->dead) {
       SpinMode = false;
@@ -501,6 +630,12 @@ void KillAll() {
     fr_motor->SetOutput(0);
     br_motor->SetOutput(0);
     control::MotorCANBase::TransmitOutput(motors_can2_chassis, 4);
+
+    elevator_left_motor->SetOutput(0);
+    elevator_right_motor->SetOutput(0);
+    fortress_motor->SetOutput(0);
+    control::MotorCANBase::TransmitOutput(motors_can2_elevator, 2);
+    control::MotorCANBase::TransmitOutput(motors_can2_fortress, 1);
 
     osDelay(KILLALL_DELAY);
   }

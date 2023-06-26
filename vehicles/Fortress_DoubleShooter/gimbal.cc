@@ -64,6 +64,9 @@ static BoolEdgeDetector FakeDeath(false);
 static volatile bool Dead = false;
 static BoolEdgeDetector ChangeSpinMode(false);
 static volatile bool SpinMode = false;
+// TODO: Fortress mode
+static BoolEdgeDetector ChangeFortressMode(false);
+static volatile bool FortressMode = false;
 
 static volatile float relative_angle = 0;
 
@@ -523,6 +526,45 @@ void chassisTask(void* arg) {
 }
 
 //==================================================================================================
+// Fortress(TODO)
+//==================================================================================================
+
+const osThreadAttr_t fortressTaskAttribute = {.name = "fortressTask",
+                                              .attr_bits = osThreadDetached,
+                                              .cb_mem = nullptr,
+                                              .cb_size = 0,
+                                              .stack_mem = nullptr,
+                                              .stack_size = 256 * 4,
+                                              .priority = (osPriority_t)osPriorityNormal,
+                                              .tz_module = 0,
+                                              .reserved = 0};
+
+osThreadId_t fortressTaskHandle;
+
+void fortressTask(void* arg) {
+  UNUSED(arg);
+
+  while (true) {
+    if (dbus->keyboard.bit.V || dbus->swr == remote::DOWN) break;
+    osDelay(100);
+  }
+
+  while (!imu->CaliDone()) osDelay(100);
+
+  // wait for fortress calibrated
+  while (!send->fortress_calibrated) osDelay(100);
+
+  while (true) {
+    ChangeFortressMode.input(dbus->keyboard.bit.X);
+    if (ChangeFortressMode.posEdge()) FortressMode = !FortressMode;
+    
+    send->cmd.id = bsp::FORTRESS_MODE;
+    send->fortress_mode = FortressMode ? 1 : 0;
+    send->TransmitOutput();
+  }
+}
+
+//==================================================================================================
 // SelfTest(TODO)
 //==================================================================================================
 
@@ -740,6 +782,7 @@ void RM_RTOS_Threads_Init(void) {
   shooterTaskHandle = osThreadNew(shooterTask, nullptr, &shooterTaskAttribute);
   chassisTaskHandle = osThreadNew(chassisTask, nullptr, &chassisTaskAttribute);
   selfTestTaskHandle = osThreadNew(selfTestTask, nullptr, &selfTestTaskAttribute);
+  fortressTaskHandle = osThreadNew(fortressTask, nullptr, &fortressTaskAttribute);
 }
 
 //==================================================================================================

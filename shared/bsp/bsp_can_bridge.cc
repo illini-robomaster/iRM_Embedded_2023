@@ -84,6 +84,12 @@ void CanBridge::UpdateData(const uint8_t* data) {
     case REMAIN_HP:
       remain_hp = cmd.data_uint;
       break;
+    case FORTRESS_MODE:
+      fortress_mode = cmd.data_bool;
+      break;
+    case FORTRESS_CALIBRATED:
+      fortress_calibrated = cmd.data_bool;
+      break;
     default:;
   }
 }
