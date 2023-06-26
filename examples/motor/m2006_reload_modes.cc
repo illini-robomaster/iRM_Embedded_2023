@@ -37,18 +37,14 @@
 #include "utils.h"
 #include "dbus.h"
 
-
-#define KEY_GPIO_GROUP GPIOB
-#define KEY_GPIO_PIN GPIO_PIN_2
-
-#define NOTCH (2 * PI / 8)
-#define LOAD_ANGLE_CONTINUE (2 * PI / 8)
-#define LOAD_ANGLE_DOUBLE (2 * PI / 4)
-#define SPEED (6 * PI)
-#define ACCELERATION_DOUBLE (100 * PI)
-#define ACCELERATION_CONTINUE (200 * PI)
-#define ACCELERATION_CONTINUE_SLOWLY (20 * PI)
-#define DELAY (5e5)
+static const float NOTCH = (2 * PI / 8);
+static const float LOAD_ANGLE_CONTINUE = (2 * PI / 8);
+static const float LOAD_ANGLE_DOUBLE = (2 * PI / 4);
+static const float SPEED = (6 * PI);
+static const float ACCELERATION_DOUBLE = (100 * PI);
+static const float ACCELERATION_CONTINUE = (200 * PI);
+static const float ACCELERATION_CONTINUE_SLOWLY = (20 * PI);
+static const int DELAY = 300;
 
 bsp::CAN* can1 = nullptr;
 control::MotorCANBase* motor = nullptr;
@@ -59,13 +55,12 @@ remote::DBUS* dbus = nullptr;
 void jam_callback(control::ServoMotor* servo, const control::servo_jam_t data) {
   UNUSED(data);
   float servo_target = servo->GetTarget();
-  if (servo_target < servo->GetTheta()) {
-    print("Antijam in operation\r\n");
-  } else {
-    servo->SetTarget(servo->GetTheta(), true);
-    float prev_target = servo->GetTarget() - NOTCH;
+  if (servo_target >= servo->GetTheta()) {
+    float prev_target = servo->GetTheta() - NOTCH;
     servo->SetTarget(prev_target, true);
-    print("Antijam engage\r\n");
+    // print("Antijam engage\r\n");
+  } else {
+    // print("Antijam in operation\r\n");
   }
 }
 
@@ -95,7 +90,7 @@ void RM_RTOS_Default_Task(const void* args) {
 
   control::MotorCANBase* motors[] = {motor};
   uint32_t start_time = 0;
-  int slow_shoot_detect = 0;
+  bool slow_shoot_detect = false;
 
   while (true) {
     if (dbus->swr == remote::UP || dbus->mouse.r) {
@@ -103,13 +98,13 @@ void RM_RTOS_Default_Task(const void* args) {
       servo->SetMaxSpeed(SPEED);
       servo->SetMaxAcceleration(ACCELERATION_CONTINUE);
     } else if (dbus->swr == remote::DOWN || dbus->mouse.l){
-      if (bsp::GetHighresTickMicroSec() - start_time > DELAY) {
+      if ((bsp::GetHighresTickMicroSec() - start_time) / 1000 > DELAY) {
         servo->SetTarget(servo->GetTarget() + LOAD_ANGLE_CONTINUE, false);
         servo->SetMaxSpeed(SPEED);
         servo->SetMaxAcceleration(ACCELERATION_CONTINUE_SLOWLY);
       } else {
-        if (slow_shoot_detect == 0) {
-          slow_shoot_detect = 1;
+        if (slow_shoot_detect == false) {
+          slow_shoot_detect = true;
           servo->SetTarget(servo->GetTarget() + LOAD_ANGLE_DOUBLE);
           servo->SetMaxSpeed(SPEED);
           servo->SetMaxAcceleration(ACCELERATION_DOUBLE);
@@ -118,7 +113,7 @@ void RM_RTOS_Default_Task(const void* args) {
     } else {
       servo->SetMaxSpeed(0);
       start_time = bsp::GetHighresTickMicroSec();
-      slow_shoot_detect = 0;
+      slow_shoot_detect = false;
     }
     servo->CalcOutput();
     control::MotorCANBase::TransmitOutput(motors, 1);

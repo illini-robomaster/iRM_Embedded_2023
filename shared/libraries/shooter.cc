@@ -29,12 +29,12 @@ static auto step_angles_ = std::unordered_map<ServoMotor*, float>();
 void jam_callback(control::ServoMotor* servo, const control::servo_jam_t data) {
   UNUSED(data);
   float servo_target = servo->GetTarget();
-  if (servo_target < servo->GetTheta()) {
-    print("Antijam in operation\r\n");
-  } else {
+  if (servo_target >= servo->GetTheta()) {
     float prev_target = servo->GetTheta() - (2 * PI/6);
     servo->SetTarget(prev_target, true);
-    print("Antijam engage\r\n");
+    // print("Antijam engage\r\n");
+  } else {
+    // print("Antijam in operation\r\n");
   }
 }
 

@@ -30,8 +30,8 @@
 // #define LASER_Pin GPIO_PIN_13
 // #define LASER_GPIO_Port GPIOG
 
-#define DELAY (5e5)
-#define TARGET_SPEED_FLYWHEELS 50
+static const float DELAY = 300;  // ms
+static const float TARGET_SPEED_FLYWHEELS = 50;
 
 bsp::CAN* can = nullptr;
 control::MotorCANBase* left_flywheel_motor = nullptr;
@@ -69,7 +69,7 @@ void RM_RTOS_Default_Task(const void* args) {
   // bsp::GPIO laser(LASER_GPIO_Port, LASER_Pin);
   // laser.High();
   uint32_t start_time = 0;
-  int slow_shoot_detect = 0;
+  bool slow_shoot_detect = false;
 
   while (true) {
     if (dbus->swr != remote::DOWN) {
@@ -83,15 +83,15 @@ void RM_RTOS_Default_Task(const void* args) {
       if (bsp::GetHighresTickMicroSec() - start_time > DELAY) {
         shooter->SlowContinueShoot();
       } else {
-        if (slow_shoot_detect == 0) {
-          slow_shoot_detect = 1;
+        if (slow_shoot_detect == false) {
+          slow_shoot_detect = true;
           shooter->DoubleShoot();
         }
       }
     } else {
       shooter->DialStop();
       start_time = bsp::GetHighresTickMicroSec();
-      slow_shoot_detect = 0;
+      slow_shoot_detect = false;
     }
 
     shooter->Update();
