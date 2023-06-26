@@ -44,9 +44,6 @@ static BoolEdgeDetector FakeDeath(false);
 static volatile bool Dead = false;
 static BoolEdgeDetector ChangeSpinMode(false);
 static volatile bool SpinMode = false;
-// TODO: Fortress mode
-static BoolEdgeDetector ChangeFortressMode(false);
-static volatile bool FortressMode = false;
 
 static bsp::CanBridge* receive = nullptr;
 static unsigned int flag_summary = 0;
@@ -243,7 +240,7 @@ void chassisTask(void* arg) {
                     (float)referee->power_heat_data.chassis_power_buffer);
     
     // TODO: for fortress mode and dead
-    if (Dead || FortressMode) {
+    if (Dead || receive->fortress_mode) {
       fl_motor->SetOutput(0);
       fr_motor->SetOutput(0);
       bl_motor->SetOutput(0);
