@@ -338,8 +338,8 @@ static unsigned stepper_length = 700;
 static unsigned stepper_speed = 1000;
 static bool stepper_direction = true;
 
-uint32_t start_time = 0;
-int slow_shoot_detect = 0;
+static uint32_t start_time = 0;
+static bool slow_shoot_detect = false;
 
 void shooterTask(void* arg) {
   UNUSED(arg);
@@ -386,18 +386,16 @@ void shooterTask(void* arg) {
       if (dbus->mouse.l || dbus->swr == remote::UP) {
         if (bsp::GetHighresTickMicroSec() - start_time > SHOOTER_MODE_DELAY) {
           shooter->SlowContinueShoot();
-        } else {
-          if (slow_shoot_detect == 0) {
-            slow_shoot_detect = 1;
+        } else if (slow_shoot_detect == false) {
+            slow_shoot_detect = true;
             shooter->DoubleShoot();
-          }
         }
       } else if (dbus->mouse.r) {
         shooter->FastContinueShoot();
       } else {
         shooter->DialStop();
         start_time = bsp::GetHighresTickMicroSec();
-        slow_shoot_detect = 0;
+        slow_shoot_detect = false;
       }
     }
       
