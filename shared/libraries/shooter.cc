@@ -88,6 +88,7 @@ Shooter::Shooter(shooter_t shooter) {
   }
   // Initialize servomotor instance using data provided and register default jam callback
   load_servo_ = new control::ServoMotor(servo_data);
+  // the callback function is at the start of the shooter.cc file.
   load_servo_->RegisterJamCallback(jam_callback, 0.304);
 
   // Register in step_angles_ so callback function can find step angle corresponding to
