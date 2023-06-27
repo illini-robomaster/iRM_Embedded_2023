@@ -42,6 +42,7 @@ class Fortress {
   Fortress(const fortress_t fortress);
   bool Calibrate();
   void Transform(const bool fortress_mode);
+  void Transform(const bool fortress_mode, const bool fortress_calibrating);
   void Spin(bool power_limit_on, float power_limit, float chassis_power,
             float chassis_power_buffer);
   bool Error();

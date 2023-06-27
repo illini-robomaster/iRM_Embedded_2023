@@ -99,6 +99,29 @@ void Fortress::Transform(const bool fortress_mode) {
   servo_right_->CalcOutput();
 }
 
+void Fortress::Transform(const bool fortress_mode, const bool fortress_calibrating) {
+  if (fortress_mode != fortress_mode_) {
+    fortress_mode_ = fortress_mode;
+
+    target_left_ += fortress_mode ? MAX_LEN : -MAX_LEN;
+    target_right_ += fortress_mode ? MAX_LEN : -MAX_LEN;
+
+    servo_left_->SetTarget(target_left_, true);
+    servo_right_->SetTarget(target_right_, true);
+
+  } else if (fortress_calibrating) {
+    fortress_mode_ = false;
+
+    target_left_ += fortress_mode ? MAX_LEN : -MAX_LEN;
+    target_right_ += fortress_mode ? MAX_LEN : -MAX_LEN;
+
+    servo_left_->SetTarget(target_left_, true);
+    servo_right_->SetTarget(target_right_, true);
+  }
+  servo_left_->CalcOutput();
+  servo_right_->CalcOutput();
+}
+
 void Fortress::Spin(bool power_limit_on, float power_limit, float chassis_power,
                     float chassis_power_buffer) {
   if (!fortress_mode_) return;
