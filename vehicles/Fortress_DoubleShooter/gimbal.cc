@@ -78,19 +78,27 @@ static volatile float pitch_pos = START_PITCH_POS;
 
 static volatile unsigned int current_hp = 0;
 
+// do we need to move this below? just self test use.
 static volatile bool pitch_motor_flag = false;
 static volatile bool yaw_motor_flag = false;
 static volatile bool sl_motor_flag = false;
 static volatile bool sr_motor_flag = false;
 static volatile bool ld_motor_flag = false;
-static volatile bool fl_wheel_flag = false;
-static volatile bool fr_wheel_flag = false;
-static volatile bool bl_wheel_flag = false;
-static volatile bool br_wheel_flag = false;
-static volatile bool fl_steering_flag = false;
-static volatile bool fr_steering_flag = false;
-static volatile bool bl_steering_flag = false;
-static volatile bool br_steering_flag = false;
+static volatile bool fl_motor_flag = false;
+static volatile bool fr_motor_flag = false;
+static volatile bool bl_motor_flag = false;
+static volatile bool br_motor_flag = false;
+static volatile bool elevator_left_motor_flag = false;
+static volatile bool elevator_right_motor_flag = false;
+static volatile bool fortress_motor_flag = false;
+// static volatile bool fl_wheel_flag = false;
+// static volatile bool fr_wheel_flag = false;
+// static volatile bool bl_wheel_flag = false;
+// static volatile bool br_wheel_flag = false;
+// static volatile bool fl_steering_flag = false;
+// static volatile bool fr_steering_flag = false;
+// static volatile bool bl_steering_flag = false;
+// static volatile bool br_steering_flag = false;
 static volatile bool calibration_flag = false;
 // static volatile bool referee_flag = false;
 static volatile bool dbus_flag = false;
@@ -618,6 +626,7 @@ void selfTestTask(void* arg) {
 //
   OLED->ShowString(3, 12, (uint8_t*)"BL");
   OLED->ShowString(4, 12, (uint8_t*)"BR");
+  // need for the fortress 3 motor
 
   char temp[6] = "";
   while (true) {
@@ -640,21 +649,29 @@ void selfTestTask(void* arg) {
 
     chassis_flag_bitmap = send->chassis_flag;
 
-    fl_wheel_flag = (0x80 & chassis_flag_bitmap);
-    //motor 8
-    fr_wheel_flag = (0x40 & chassis_flag_bitmap);
-    //motor 7
-    bl_wheel_flag = (0x20 & chassis_flag_bitmap);
-    //motor 6
-    br_wheel_flag = (0x10 & chassis_flag_bitmap);
-    //motor 5
-    fl_steering_flag = (0x08 & chassis_flag_bitmap);
-    //motor 4
-    fr_steering_flag = (0x04 & chassis_flag_bitmap);
-    //motor 3
-    br_steering_flag = (0x02 & chassis_flag_bitmap);
-    //motor 2
-    bl_steering_flag = (0x01 & chassis_flag_bitmap);
+    fl_motor_flag = (0x01 & chassis_flag_bitmap);
+    fr_motor_flag = (0x02 & chassis_flag_bitmap);
+    bl_motor_flag = (0x04 & chassis_flag_bitmap);
+    br_motor_flag = (0x08 & chassis_flag_bitmap);
+    elevator_left_motor_flag = (0x10 & chassis_flag_bitmap);
+    elevator_right_motor_flag = (0x20 & chassis_flag_bitmap);
+    fortress_motor_flag = (0x40 & chassis_flag_bitmap);
+
+    // fl_wheel_flag = (0x80 & chassis_flag_bitmap);
+    // //motor 8
+    // fr_wheel_flag = (0x40 & chassis_flag_bitmap);
+    // //motor 7
+    // bl_wheel_flag = (0x20 & chassis_flag_bitmap);
+    // //motor 6
+    // br_wheel_flag = (0x10 & chassis_flag_bitmap);
+    // //motor 5
+    // fl_steering_flag = (0x08 & chassis_flag_bitmap);
+    // //motor 4
+    // fr_steering_flag = (0x04 & chassis_flag_bitmap);
+    // //motor 3
+    // br_steering_flag = (0x02 & chassis_flag_bitmap);
+    // //motor 2
+    // bl_steering_flag = (0x01 & chassis_flag_bitmap);
     //motor 1
 
     //    fl_wheel_flag = send->selfCheck_flag;
@@ -674,21 +691,21 @@ void selfTestTask(void* arg) {
     OLED->ShowString(4, 6, (uint8_t*)temp);
     //    OLED->ShowBlock(4, 3, referee_flag);
 
-    OLED->ShowBlock(1, 18, fl_wheel_flag);
+    // OLED->ShowBlock(1, 18, fl_wheel_flag);
 
-    OLED->ShowBlock(1,15,fl_steering_flag);
+    // OLED->ShowBlock(1,15,fl_steering_flag);
 
-    OLED->ShowBlock(2, 18, fr_wheel_flag);
+    // OLED->ShowBlock(2, 18, fr_wheel_flag);
 
-    OLED->ShowBlock(2,15,fr_steering_flag);
+    // OLED->ShowBlock(2,15,fr_steering_flag);
 
-    OLED->ShowBlock(3, 18, bl_wheel_flag);
+    // OLED->ShowBlock(3, 18, bl_wheel_flag);
 
-    OLED->ShowBlock(3,15,bl_steering_flag);
+    // OLED->ShowBlock(3,15,bl_steering_flag);
 
-    OLED->ShowBlock(4, 18, br_wheel_flag);
+    // OLED->ShowBlock(4, 18, br_wheel_flag);
 
-    OLED->ShowBlock(4,15,br_steering_flag);
+    // OLED->ShowBlock(4,15,br_steering_flag);
 
     OLED->RefreshGram();
 

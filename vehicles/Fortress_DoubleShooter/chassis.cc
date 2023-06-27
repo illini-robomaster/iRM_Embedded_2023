@@ -415,14 +415,17 @@ const osThreadAttr_t selfTestingTask = {.name = "selfTestTask",
                                              .reserved = 0};
 osThreadId_t selfTestTaskHandle;
 
-static bool fl_steer_motor_flag = false;
-static bool fr_steer_motor_flag = false;
-static bool bl_steer_motor_flag = false;
-static bool br_steer_motor_flag = false;
-static bool fl_wheel_motor_flag = false;
-static bool fr_wheel_motor_flag = false;
-static bool bl_wheel_motor_flag = false;
-static bool br_wheel_motor_flag = false;
+static bool fl_motor_flag = false;
+static bool fr_motor_flag = false;
+static bool bl_motor_flag = false;
+static bool br_motor_flag = false;
+static bool elevator_left_motor_flag = false;
+static bool elevator_right_motor_flag = false;
+static bool fortress_motor_flag = false;
+// static bool fl_wheel_motor_flag = false;
+// static bool fr_wheel_motor_flag = false;
+// static bool bl_wheel_motor_flag = false;
+// static bool br_wheel_motor_flag = false;
 
 static bool transmission_flag = true;
 
@@ -458,14 +461,30 @@ void self_Check_Task(void* arg){
     // fr_steer_motor_flag = motor3->connection_flag_;
     // br_steer_motor_flag = motor2->connection_flag_;
     // bl_steer_motor_flag = motor1->connection_flag_;
-    flag_summary = bl_steer_motor_flag|
-                   br_steer_motor_flag<<1|
-                   fr_steer_motor_flag<<2|
-                   fl_steer_motor_flag<<3|
-                   br_wheel_motor_flag<<4|
-                   bl_wheel_motor_flag<<5|
-                   fr_wheel_motor_flag<<6|
-                   fl_wheel_motor_flag<<7;
+    // flag_summary = bl_steer_motor_flag|
+    //                br_steer_motor_flag<<1|
+    //                fr_steer_motor_flag<<2|
+    //                fl_steer_motor_flag<<3|
+    //                br_wheel_motor_flag<<4|
+    //                bl_wheel_motor_flag<<5|
+    //                fr_wheel_motor_flag<<6|
+    //                fl_wheel_motor_flag<<7;
+    fl_motor_flag = fl_motor->connection_flag_;
+    fr_motor_flag = fr_motor->connection_flag_;
+    bl_motor_flag = bl_motor->connection_flag_;
+    br_motor_flag = br_motor->connection_flag_;
+    elevator_left_motor_flag = elevator_left_motor->connection_flag_;
+    elevator_right_motor_flag = elevator_right_motor->connection_flag_;
+    fortress_motor_flag = fortress_motor->connection_flag_;
+
+    flag_summary = fl_motor_flag |
+                   fr_motor_flag << 1 |
+                   bl_motor_flag << 2 |
+                   br_motor_flag << 3 |
+                   elevator_left_motor_flag << 4 |
+                   elevator_right_motor_flag << 5 |
+                   fortress_motor_flag << 6;
+
     osDelay(100);
     if(transmission_flag){
       receive->cmd.id = bsp::CHASSIS_FLAG;
