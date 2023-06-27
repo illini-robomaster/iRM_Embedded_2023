@@ -598,116 +598,99 @@ static bsp::Buzzer* buzzer = nullptr;
 static display::OLED* OLED = nullptr;
 //simple bitmask function for chassis flag
 void selfTestTask(void* arg) {
- UNUSED(arg);
- osDelay(100);
- //Try to make the chassis Flags initialized at first.
+  UNUSED(arg);
+  osDelay(100);
+  //Try to make the chassis Flags initialized at first.
 
- //Could need more time to test it out.
- //The self test task for chassis will not update after the first check.
- OLED->ShowIlliniRMLOGO();
- buzzer->SingSong(Mario, [](uint32_t milli) { osDelay(milli); });
- OLED->OperateGram(display::PEN_CLEAR);
+  //Could need more time to test it out.
+  //The self test task for chassis will not update after the first check.
+  OLED->ShowIlliniRMLOGO();
+  buzzer->SingSong(Mario, [](uint32_t milli) { osDelay(milli); });
+  OLED->OperateGram(display::PEN_CLEAR);
 
- OLED->ShowString(0, 0, (uint8_t*)"GP");
- OLED->ShowString(0, 5, (uint8_t*)"GY");
- OLED->ShowString(1, 0, (uint8_t*)"SL");
- OLED->ShowString(1, 5, (uint8_t*)"SR");
- OLED->ShowString(2, 0, (uint8_t*)"LD");
- OLED->ShowString(2, 5, (uint8_t*)"Ldr");
- OLED->ShowString(3, 0, (uint8_t*)"Cal");
- OLED->ShowString(3, 6, (uint8_t*)"Dbs");
- OLED->ShowString(4, 0, (uint8_t*)"Temp:");
- //  OLED->ShowString(4, 0, (uint8_t*)"Ref");
+  OLED->ShowString(0, 0, (uint8_t*)"GP");
+  OLED->ShowString(0, 5, (uint8_t*)"GY");
+  OLED->ShowString(1, 0, (uint8_t*)"SL");
+  OLED->ShowString(1, 5, (uint8_t*)"SR");
+  OLED->ShowString(2, 0, (uint8_t*)"LD");
+  OLED->ShowString(2, 5, (uint8_t*)"Ldr");
+  OLED->ShowString(3, 0, (uint8_t*)"Cal");
+  OLED->ShowString(3, 6, (uint8_t*)"Dbs");
+  OLED->ShowString(4, 0, (uint8_t*)"Temp:");
+  //  OLED->ShowString(4, 0, (uint8_t*)"Ref");
 
+  OLED->ShowString(0,12, (uint8_t*)"EL");
+  OLED->ShowString(0, 17, (uint8_t*)"ER");
+  OLED->ShowString(1,17, (uint8_t*)"FM");
+  //
+  OLED->ShowString(1, 12, (uint8_t*)"FL");
+  OLED->ShowString(2, 12, (uint8_t*)"FR");
+  OLED->ShowString(3, 12, (uint8_t*)"BL");
+  OLED->ShowString(4, 12, (uint8_t*)"BR");
+  // need for the fortress 3 motor
 
- OLED->ShowString(0,12, (uint8_t*)"EL");
- OLED->ShowString(0, 17, (uint8_t*)"ER");
- OLED->ShowString(1, 12, (uint8_t*)"FL");
- OLED->ShowString(2, 12, (uint8_t*)"FR");
- OLED->ShowString(1,17, (uint8_t*)"FM");
- //
- OLED->ShowString(3, 12, (uint8_t*)"BL");
- OLED->ShowString(4, 12, (uint8_t*)"BR");
- // need for the fortress 3 motor
+  char temp[6] = "";
+  while (true) {
+    osDelay(100);
 
- char temp[6] = "";
- while (true) {
+    pitch_motor->connection_flag_ = false;
+    yaw_motor->connection_flag_ = false;
+    sl_motor->connection_flag_ = false;
+    sr_motor->connection_flag_ = false;
+    ld_motor->connection_flag_ = false;
 
-   osDelay(100);
-   pitch_motor->connection_flag_ = false;
-   yaw_motor->connection_flag_ = false;
-   sl_motor->connection_flag_ = false;
-   sr_motor->connection_flag_ = false;
-   ld_motor->connection_flag_ = false;
+    referee->connection_flag_ = false;
+    dbus->connection_flag_ = false;
+    osDelay(SELFTEST_TASK_DELAY);
+    pitch_motor_flag = pitch_motor->connection_flag_;
+    yaw_motor_flag = yaw_motor->connection_flag_;
+    sl_motor_flag = sl_motor->connection_flag_;
+    sr_motor_flag = sr_motor->connection_flag_;
+    ld_motor_flag = ld_motor->connection_flag_;
 
-   referee->connection_flag_ = false;
-   dbus->connection_flag_ = false;
-   osDelay(SELFTEST_TASK_DELAY);
-   pitch_motor_flag = pitch_motor->connection_flag_;
-   yaw_motor_flag = yaw_motor->connection_flag_;
-   sl_motor_flag = sl_motor->connection_flag_;
-   sr_motor_flag = sr_motor->connection_flag_;
-   ld_motor_flag = ld_motor->connection_flag_;
+    chassis_flag_bitmap = send->chassis_flag;
 
-   chassis_flag_bitmap = send->chassis_flag;
+    fl_motor_flag = (0x01 & chassis_flag_bitmap);
+    fr_motor_flag = (0x02 & chassis_flag_bitmap);
+    bl_motor_flag = (0x04 & chassis_flag_bitmap);
+    br_motor_flag = (0x08 & chassis_flag_bitmap);
+    elevator_left_motor_flag = (0x10 & chassis_flag_bitmap);
+    elevator_right_motor_flag = (0x20 & chassis_flag_bitmap);
+    fortress_motor_flag = (0x40 & chassis_flag_bitmap);
 
-   fl_motor_flag = (0x01 & chassis_flag_bitmap);
-   fr_motor_flag = (0x02 & chassis_flag_bitmap);
-   bl_motor_flag = (0x04 & chassis_flag_bitmap);
-   br_motor_flag = (0x08 & chassis_flag_bitmap);
-   elevator_left_motor_flag = (0x10 & chassis_flag_bitmap);
-   elevator_right_motor_flag = (0x20 & chassis_flag_bitmap);
-   fortress_motor_flag = (0x40 & chassis_flag_bitmap);
+    OLED->ShowBlock(1,15,fl_motor_flag);
 
-   OLED->ShowBlock(1,15,fl_motor_flag);
+    OLED->ShowBlock(2,15,fr_motor_flag);
 
-   OLED->ShowBlock(2,15,fr_motor_flag);
+    OLED->ShowBlock(3,15,bl_motor_flag);
 
-   OLED->ShowBlock(3,15,bl_motor_flag);
+    OLED->ShowBlock(4,15,br_motor_flag);
 
-   OLED->ShowBlock(4,15,br_motor_flag);
+    OLED->ShowBlock(0,15,elevator_left_motor_flag);
 
-   OLED->ShowBlock(0,15,elevator_left_motor_flag);
+    OLED->ShowBlock(0,20,elevator_right_motor_flag);
 
-   OLED->ShowBlock(0,20,elevator_right_motor_flag);
+    OLED->ShowBlock(1,20,fortress_motor_flag);
 
-   OLED->ShowBlock(1,20,fortress_motor_flag);
-   // fl_wheel_flag = (0x80 & chassis_flag_bitmap);
-   // //motor 8
-   // fr_wheel_flag = (0x40 & chassis_flag_bitmap);
-   // //motor 7
-   // bl_wheel_flag = (0x20 & chassis_flag_bitmap);
-   // //motor 6
-   // br_wheel_flag = (0x10 & chassis_flag_bitmap);
-   // //motor 5
-   // fl_steering_flag = (0x08 & chassis_flag_bitmap);
-   // //motor 4
-   // fr_steering_flag = (0x04 & chassis_flag_bitmap);
-   // //motor 3
-   // br_steering_flag = (0x02 & chassis_flag_bitmap);
-   // //motor 2
-   // bl_steering_flag = (0x01 & chassis_flag_bitmap);
-   //motor 1
+    //    fl_wheel_flag = send->selfCheck_flag;
+    calibration_flag = imu->CaliDone();
+    //    referee_flag = referee->connection_flag_;
+    dbus_flag = dbus->connection_flag_;
 
-   //    fl_wheel_flag = send->selfCheck_flag;
-   calibration_flag = imu->CaliDone();
-   //    referee_flag = referee->connection_flag_;
-   dbus_flag = dbus->connection_flag_;
+    OLED->ShowBlock(0, 2, pitch_motor_flag);
+    OLED->ShowBlock(0, 7, yaw_motor_flag);
+    OLED->ShowBlock(1, 2, sl_motor_flag);
+    OLED->ShowBlock(1, 7, sr_motor_flag);
+    OLED->ShowBlock(2, 2, ld_motor_flag);
+    OLED->ShowBlock(2, 8, lidar_flag);
+    OLED->ShowBlock(3, 3, imu->CaliDone());
+    OLED->ShowBlock(3, 9, dbus_flag);
+    snprintf(temp, 6, "%.2f", imu->Temp);
+    OLED->ShowString(4, 6, (uint8_t*)temp);
+    OLED->RefreshGram();
 
-   OLED->ShowBlock(0, 2, pitch_motor_flag);
-   OLED->ShowBlock(0, 7, yaw_motor_flag);
-   OLED->ShowBlock(1, 2, sl_motor_flag);
-   OLED->ShowBlock(1, 7, sr_motor_flag);
-   OLED->ShowBlock(2, 2, ld_motor_flag);
-   OLED->ShowBlock(2, 8, lidar_flag);
-   OLED->ShowBlock(3, 3, imu->CaliDone());
-   OLED->ShowBlock(3, 9, dbus_flag);
-   snprintf(temp, 6, "%.2f", imu->Temp);
-   OLED->ShowString(4, 6, (uint8_t*)temp);
-   OLED->RefreshGram();
-
-   selftestStart = send->self_check_flag;
- }
+    selftestStart = send->self_check_flag;
+  }
 }
 
 //==================================================================================================
