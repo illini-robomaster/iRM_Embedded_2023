@@ -619,15 +619,16 @@ void selfTestTask(void* arg) {
   OLED->ShowString(4, 0, (uint8_t*)"Temp:");
   //  OLED->ShowString(4, 0, (uint8_t*)"Ref");
 
+  // Fortress mode motors self test
   OLED->ShowString(0,12, (uint8_t*)"EL");
   OLED->ShowString(0, 17, (uint8_t*)"ER");
   OLED->ShowString(1,17, (uint8_t*)"FM");
-  //
+
+  // chassis motors self test
   OLED->ShowString(1, 12, (uint8_t*)"FL");
   OLED->ShowString(2, 12, (uint8_t*)"FR");
   OLED->ShowString(3, 12, (uint8_t*)"BL");
   OLED->ShowString(4, 12, (uint8_t*)"BR");
-  // need for the fortress 3 motor
 
   char temp[6] = "";
   while (true) {

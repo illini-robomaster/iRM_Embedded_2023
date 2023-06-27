@@ -30,8 +30,6 @@
 #include "fortress.h"
 #include "protocol.h"
 #include "rgb.h"
-// TODO: need include chassis.h
-// #include "steering.h"
 #include "chassis.h"
 #include "supercap.h"
 #include <cmath>
@@ -322,14 +320,7 @@ void fortressTask(void* arg) {
 
   control::MotorCANBase* motors_can2_fortress[] = {elevator_left_motor, elevator_right_motor,
                                                    fortress_motor};
-  // while (true) {
-  //   if (dbus->keyboard.bit.V || dbus->swr == remote::DOWN) break;
-  //   osDelay(100);
-  // }
 
-  // while (!imu->CaliDone()) osDelay(100);
-
-  // TODO: wait for IMU
   while (!receive->start) osDelay(100);
 
   while (!fortress->Calibrate()) {
@@ -354,11 +345,7 @@ void fortressTask(void* arg) {
   receive->TransmitOutput();
 
   while (true) {
-    // TODO: need to change to for the dual board communication
-    // ChangeFortressMode.input(dbus->keyboard.bit.X);
-    // if (ChangeFortressMode.posEdge()) FortressMode = !FortressMode;
-
-    if (receive->fortress_mode) {
+    if (receive->fortress_mode) { // fortress mode
       int i = 0;
       while (true) {
         // let the code run at least 0.1s
