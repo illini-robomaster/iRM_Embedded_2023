@@ -152,7 +152,7 @@ static control::Chassis* chassis = nullptr;
 // static control::steering_chassis_t* chassis_data;
 // static control::SteeringChassis* chassis;
 
-static control::SuperCap* supercap = nullptr;
+// static control::SuperCap* supercap = nullptr;
 
 static const float CHASSIS_DEADZONE = 0.04;
 
@@ -235,7 +235,7 @@ void chassisTask(void* arg) {
     // constexpr float WHEEL_SPEED_FACTOR = 4;
     // chassis->WheelUpdateSpeed(WHEEL_SPEED_FACTOR);
     // chassis->SteerCalcOutput();
-    chassis->Update((float)referee->game_robot_status.chassis_power_limit,
+    chassis->Update(true, (float)referee->game_robot_status.chassis_power_limit,
                     referee->power_heat_data.chassis_power,
                     (float)referee->power_heat_data.chassis_power_buffer);
     
@@ -309,8 +309,8 @@ const osThreadAttr_t fortressTaskAttribute = {.name = "fortressTask",
 
 osThreadId_t fortressTaskHandle;
 
-static bsp::GPIO* left = nullptr;
-static bsp::GPIO* right = nullptr;
+// static bsp::GPIO* left = nullptr;
+// static bsp::GPIO* right = nullptr;
 
 static control::MotorCANBase* elevator_left_motor = nullptr;
 static control::MotorCANBase* elevator_right_motor = nullptr;

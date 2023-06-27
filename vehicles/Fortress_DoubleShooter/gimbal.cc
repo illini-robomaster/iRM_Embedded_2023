@@ -166,6 +166,7 @@ osThreadId_t gimbalTaskHandle;
 static control::Motor4310* pitch_motor = nullptr;
 // TODO: initialize the yaw motor
 // static control::Motor4310* yaw_motor = nullptr;
+static control::Motor6020* yaw_motor = nullptr;
 static control::Gimbal* gimbal = nullptr;
 static control::gimbal_data_t* gimbal_param = nullptr;
 static bsp::Laser* laser = nullptr;
@@ -810,7 +811,7 @@ void KillAll() {
   RM_EXPECT_TRUE(false, "Operation Killed!\r\n");
   // TODO: change kill all for 4310 yaw motor
 //  control::MotorCANBase* motors_can1_gimbal[] = {pitch_motor};
-  control::MotorCANBase* motors_can2_gimbal[] = {yaw_motor};
+  // control::MotorCANBase* motors_can2_gimbal[] = {yaw_motor};
   control::MotorCANBase* motors_can1_shooter[] = {sl_motor, sr_motor, ld_motor};
 
   RGB->Display(display::color_blue);
