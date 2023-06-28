@@ -353,12 +353,12 @@ void ServoMotor::CalcOutput() {
     detect_total_ += command - detect_buf_[detect_head_];
     detect_buf_[detect_head_] = command;
     detect_head_ = detect_head_ + 1 < detect_period_ ? detect_head_ + 1 : 0;
-
     // detect if motor is jammed
     // detect total is used as filter.
-    if (abs(detect_total_) >= jam_threshold_) {
+    if (detect_total_ >= jam_threshold_) {
       servo_jam_t data;
       data.speed = max_speed_;
+      // this function is in shooter.cc called jam_callback.
       jam_callback_(this, data);
     }
   }
@@ -385,6 +385,8 @@ void ServoMotor::RegisterJamCallback(jam_callback_t callback, float effort_thres
   memset(detect_buf_, 0, detect_period);
 
   // calculate callback trigger threshold and triggering facility
+  // the effort_threshold is from shooter.cc constructor for load_servo initialization
+  // the detect_period is the length of the buffer(filter), the default value is 50
   jam_threshold_ = maximum_command * effort_threshold * detect_period;
   jam_detector_ = new BoolEdgeDetector(false);
 }

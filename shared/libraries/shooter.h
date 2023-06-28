@@ -84,6 +84,14 @@ class Shooter {
    */
   void Update();
 
+  void FastContinueShoot();
+
+  void SlowContinueShoot();
+
+  void DoubleShoot();
+
+  void DialStop();
+
  private:
   // acquired from user
   MotorBase* left_flywheel_motor_;
@@ -96,7 +104,12 @@ class Shooter {
 
   BoolEdgeDetector* flywheel_turning_detector_; /* flywheel turning state detector */
   float load_step_angle_;                       /* angle rotated for every bullet loaded */
+  float load_double_angle_;                     /* angle rotated for every double bullet loaded */
   float speed_;                                 /* current turning speed of flywheels */
+  float dial_speed_;                            /* current turning speed of dial */
+  float dial_continue_fast_acceleration;        /* acceleration for fast continue shooting mode */
+  float dial_continue_slowly_acceleration;      /* acceleration for slowly continue shooting mode */
+  float dial_double_acceleration;               /* acceleration for double shooting mode */
 };
 
 }  // namespace control
