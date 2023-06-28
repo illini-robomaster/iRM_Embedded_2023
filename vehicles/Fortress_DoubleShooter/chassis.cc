@@ -83,10 +83,10 @@ const osThreadAttr_t refereeTaskAttribute = {.name = "refereeTask",
 osThreadId_t refereeTaskHandle;
 
 class RefereeUART : public bsp::UART {
- public:
+public:
   using bsp::UART::UART;
 
- protected:
+protected:
   void RxCompleteCallback() final { osThreadFlagsSet(refereeTaskHandle, REFEREE_RX_SIGNAL); }
 };
 
