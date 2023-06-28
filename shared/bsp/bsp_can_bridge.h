@@ -42,6 +42,7 @@ typedef enum {
   REMAIN_HP,
   FORTRESS_MODE,
   FORTRESS_CALIBRATED,
+  RECALIBRATE,
 } can_bridge_cmd;
 
 typedef struct {
@@ -79,6 +80,7 @@ class CanBridge {
   unsigned int remain_hp = 0;
   bool fortress_mode = false;
   bool fortress_calibrated = false;
+  bool recalibrate = false;
   // each bit represents a flag correspond to specific motor e.g.(at index 0, it represents the motor 1's connection flag)
  private:
   bsp::CAN* can_;

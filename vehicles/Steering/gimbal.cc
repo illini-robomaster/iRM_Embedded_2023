@@ -162,7 +162,7 @@ void gimbalTask(void* arg) {
   laser->On();
 
   while (true) {
-    if (dbus->keyboard.bit.V || dbus->swr == remote::DOWN) break;
+    if (dbus->keyboard.bit.B || dbus->swr == remote::DOWN) break;
     osDelay(100);
   }
 
@@ -336,14 +336,18 @@ static volatile bool flywheelFlag = false;
 static unsigned stepper_length = 700;
 static unsigned stepper_speed = 1000;
 static bool stepper_direction = true;
+// The self defined delay for shooter mode
+static const int SHOOTER_MODE_DELAY = 350;
 
 void shooterTask(void* arg) {
   UNUSED(arg);
 
   control::MotorCANBase* motors_can1_shooter[] = {sl_motor, sr_motor, ld_motor};
+  uint32_t start_time = 0;
+  bool slow_shoot_detect = false;
 
   while (true) {
-    if (dbus->keyboard.bit.V || dbus->swr == remote::DOWN) break;
+    if (dbus->keyboard.bit.B || dbus->swr == remote::DOWN) break;
     osDelay(100);
   }
 
@@ -378,9 +382,23 @@ void shooterTask(void* arg) {
       stepper_direction = !stepper_direction;
     }
 
-    if (send->shooter_power && send->cooling_heat1 < send->cooling_limit1 - 20 &&
-        (dbus->mouse.l || dbus->swr == remote::UP))
-      shooter->LoadNext();
+    if (send->shooter_power && send->cooling_heat1 < send->cooling_limit1 - 20) {
+      if (dbus->mouse.l || dbus->swr == remote::UP) {
+        if ((bsp::GetHighresTickMicroSec() - start_time) / 1000 > SHOOTER_MODE_DELAY) {
+          shooter->SlowContinueShoot();
+        } else if (slow_shoot_detect == false) {
+          slow_shoot_detect = true;
+          shooter->DoubleShoot();
+        }
+      } else if (dbus->mouse.r) {
+        shooter->FastContinueShoot();
+      } else {
+        shooter->DialStop();
+        start_time = bsp::GetHighresTickMicroSec();
+        slow_shoot_detect = false;
+      }
+    }
+      
     if (!send->shooter_power || dbus->keyboard.bit.Q || dbus->swr == remote::DOWN) {
       flywheelFlag = false;
       shooter->SetFlywheelSpeed(0);
@@ -422,7 +440,7 @@ void chassisTask(void* arg) {
   UNUSED(arg);
 
   while (true) {
-    if (dbus->keyboard.bit.V || dbus->swr == remote::DOWN) break;
+    if (dbus->keyboard.bit.B || dbus->swr == remote::DOWN) break;
     osDelay(100);
   }
 
@@ -438,6 +456,10 @@ void chassisTask(void* arg) {
 
     send->cmd.id = bsp::MODE;
     send->cmd.data_int = SpinMode ? 1 : 0;
+    send->TransmitOutput();
+
+    send->cmd.id = bsp::RECALIBRATE;
+    send->cmd.data_bool = dbus->keyboard.bit.R;
     send->TransmitOutput();
 
     if (dbus->keyboard.bit.A) vx_keyboard -= 61.5;
@@ -692,7 +714,6 @@ void RM_RTOS_Threads_Init(void) {
 void KillAll() {
   RM_EXPECT_TRUE(false, "Operation Killed!\r\n");
 
-//  control::MotorCANBase* motors_can1_gimbal[] = {pitch_motor};
   control::MotorCANBase* motors_can2_gimbal[] = {yaw_motor};
   control::MotorCANBase* motors_can1_shooter[] = {sl_motor, sr_motor, ld_motor};
 
@@ -704,7 +725,7 @@ void KillAll() {
     send->cmd.data_bool = true;
     send->TransmitOutput();
 
-    FakeDeath.input(dbus->keyboard.bit.B || dbus->swl == remote::DOWN);
+    FakeDeath.input(dbus->swl == remote::DOWN);
     if (FakeDeath.posEdge() || send->remain_hp > 0) {
       SpinMode = false;
       Dead = false;
@@ -747,7 +768,7 @@ void RM_RTOS_Default_Task(const void* arg) {
     if (send->remain_hp == INFANTRY_INITIAL_HP) robot_hp_begin = true;
     current_hp = robot_hp_begin ? send->remain_hp : INFANTRY_INITIAL_HP;
 
-    FakeDeath.input(dbus->keyboard.bit.B || dbus->swl == remote::DOWN);
+    FakeDeath.input(dbus->swl == remote::DOWN);
     if (FakeDeath.posEdge() || current_hp == 0) {
       Dead = true;
       KillAll();

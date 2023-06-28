@@ -295,10 +295,29 @@ void SteeringChassis::SteerSetMaxSpeed(const float max_speed) {
 }
 
 void SteeringChassis::PrintData() {
+  clear_screen();
+  set_cursor(0, 0);
+
+  print("fl_steer_motor: \r\n");
   fl_steer_motor->PrintData();
+  print("fr_steer_motor: \r\n");
   fr_steer_motor->PrintData();
+  print("bl_steer_motor: \r\n");
   bl_steer_motor->PrintData();
+  print("br_steer_motor: \r\n");
   br_steer_motor->PrintData();
+}
+
+void SteeringChassis::SteerAlignFalse() {
+  fl_steer_motor->SetAlignFalse();
+  fr_steer_motor->SetAlignFalse();
+  bl_steer_motor->SetAlignFalse();
+  br_steer_motor->SetAlignFalse();
+}
+
+bool SteeringChassis::SteerAlignCheck() {
+  return (fl_steer_motor->CheckAlignment() && fr_steer_motor->CheckAlignment()
+          && bl_steer_motor->CheckAlignment() && br_steer_motor->CheckAlignment());
 }
 
 }  // namespace control
