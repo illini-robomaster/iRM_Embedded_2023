@@ -181,7 +181,7 @@ void gimbalTask(void* arg) {
   laser->On();
 
   while (true) {
-    if (dbus->keyboard.bit.V || dbus->swr == remote::DOWN) break;
+    if (dbus->keyboard.bit.B || dbus->swr == remote::DOWN) break;
     osDelay(100);
   }
 
@@ -393,7 +393,7 @@ void shooterTask(void* arg) {
   control::MotorCANBase* motors_can1_shooter[] = {left_top_flywheel, left_bottom_flywheel, left_dial};
 
   while (true) {
-    if (dbus->keyboard.bit.V || dbus->swr == remote::DOWN) break;
+    if (dbus->keyboard.bit.B || dbus->swr == remote::DOWN) break;
     osDelay(100);
   }
 
@@ -472,7 +472,7 @@ void chassisTask(void* arg) {
   UNUSED(arg);
 
   while (true) {
-    if (dbus->keyboard.bit.V || dbus->swr == remote::DOWN) break;
+    if (dbus->keyboard.bit.B || dbus->swr == remote::DOWN) break;
     osDelay(100);
   }
 
@@ -805,7 +805,7 @@ void KillAll() {
     send->cmd.data_bool = true;
     send->TransmitOutput();
 
-    FakeDeath.input(dbus->keyboard.bit.B || dbus->swl == remote::DOWN);
+    FakeDeath.input(dbus->swl == remote::DOWN);
     if (FakeDeath.posEdge() || send->remain_hp > 0) {
       SpinMode = false;
       Dead = false;
@@ -857,7 +857,7 @@ void RM_RTOS_Default_Task(const void* arg) {
     if (send->remain_hp == INFANTRY_INITIAL_HP) robot_hp_begin = true;
     current_hp = robot_hp_begin ? send->remain_hp : INFANTRY_INITIAL_HP;
 
-    FakeDeath.input(dbus->keyboard.bit.B || dbus->swl == remote::DOWN);
+    FakeDeath.input(dbus->swl == remote::DOWN);
     if (FakeDeath.posEdge() || current_hp == 0) {
       Dead = true;
       KillAll();
