@@ -630,7 +630,7 @@ void Motor4310::TransmitOutput(Motor4310* motor) {
     // converting float to unsigned int before transmitting
     kp_tmp = float_to_uint(kp_set_, KP_MIN, KP_MAX, 12);
     kd_tmp = float_to_uint(kd_set_, KD_MIN, KD_MAX, 12);
-    pos_tmp = float_to_uint(pos_set_, P_MIN, V_MAX, 16);
+    pos_tmp = float_to_uint(pos_set_, P_MIN, P_MAX, 16);
     vel_tmp = float_to_uint(vel_set_, V_MIN, V_MAX, 12);
     torque_tmp = float_to_uint(torque_set_, T_MIN, T_MAX, 12);
     data[0] = pos_tmp >> 8;
