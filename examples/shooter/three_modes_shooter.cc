@@ -30,8 +30,8 @@
 // #define LASER_Pin GPIO_PIN_13
 // #define LASER_GPIO_Port GPIOG
 
-static const float DELAY = 300;  // ms
-static const float TARGET_SPEED_FLYWHEELS = 50;
+static const int DELAY = 350;  // ms
+static const int TARGET_SPEED_FLYWHEELS = 50;
 
 bsp::CAN* can = nullptr;
 control::MotorCANBase* left_flywheel_motor = nullptr;

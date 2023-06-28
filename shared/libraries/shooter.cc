@@ -33,9 +33,10 @@ void jam_callback(control::ServoMotor* servo, const control::servo_jam_t data) {
     float prev_target = servo->GetTheta() - (2 * PI/6);
     servo->SetTarget(prev_target, true);
     // print("Antijam engage\r\n");
-  } else {
-    // print("Antijam in operation\r\n");
-  }
+  } 
+  // else {
+  //   // print("Antijam in operation\r\n");
+  // }
 }
 
 Shooter::Shooter(shooter_t shooter) {

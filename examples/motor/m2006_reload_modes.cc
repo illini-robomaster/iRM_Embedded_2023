@@ -44,7 +44,7 @@ static const float SPEED = (6 * PI);
 static const float ACCELERATION_DOUBLE = (100 * PI);
 static const float ACCELERATION_CONTINUE = (200 * PI);
 static const float ACCELERATION_CONTINUE_SLOWLY = (20 * PI);
-static const int DELAY = 300;
+static const int DELAY = 350;
 
 bsp::CAN* can1 = nullptr;
 control::MotorCANBase* motor = nullptr;
@@ -59,9 +59,10 @@ void jam_callback(control::ServoMotor* servo, const control::servo_jam_t data) {
     float prev_target = servo->GetTheta() - NOTCH;
     servo->SetTarget(prev_target, true);
     // print("Antijam engage\r\n");
-  } else {
-    // print("Antijam in operation\r\n");
-  }
+  } 
+  // else {
+  //   // print("Antijam in operation\r\n");
+  // }
 }
 
 void RM_RTOS_Init() {
