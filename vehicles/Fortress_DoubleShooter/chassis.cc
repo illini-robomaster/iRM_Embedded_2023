@@ -402,7 +402,7 @@ void fortressTask(void* arg) {
 }
 
 //==================================================================================================
-// SelfTest(TODO)
+// SelfTest
 //==================================================================================================
 
 const osThreadAttr_t selfTestingTask = {.name = "selfTestTask",
@@ -598,10 +598,9 @@ void RM_RTOS_Threads_Init(void) {
 void KillAll() {
   RM_EXPECT_TRUE(false, "Operation Killed!\r\n");
 
-  // TODO: need the fortress mode motor
-  // control::MotorCANBase* wheel_motors[] = {motor5, motor6, motor7, motor8};
   control::MotorCANBase* motors_can2_chassis[] = {fl_motor, fr_motor, bl_motor, br_motor};
   control::MotorCANBase* motors_can2_elevator[] = {elevator_left_motor, elevator_right_motor};
+  // same name as above fortress task
   control::MotorCANBase* motors_can2_fortress[] = {fortress_motor};
 
   RGB->Display(display::color_blue);
