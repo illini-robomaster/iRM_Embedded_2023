@@ -385,12 +385,16 @@ static volatile bool flywheelFlag = false;
 
 static unsigned stepper_length = 700;
 static unsigned stepper_speed = 1000;
-static bool stepper_direction = true;
+// static bool stepper_direction = true;
+static const int SHOOTER_MODE_DELAY = 350;
 
 void shooterTask(void* arg) {
   UNUSED(arg);
 
   control::MotorCANBase* motors_can1_shooter[] = {left_top_flywheel, left_bottom_flywheel, left_dial};
+
+  uint32_t start_time = 0;
+  bool slow_shoot_detect = false;
 
   while (true) {
     if (dbus->keyboard.bit.B || dbus->swr == remote::DOWN) break;
@@ -409,28 +413,47 @@ void shooterTask(void* arg) {
 
   while (true) {
     while (Dead) osDelay(100);
-
+    // TODO: need both left and right shooter
     if (send->shooter_power && send->cooling_heat1 > send->cooling_limit1 - 20) {
       left_top_flywheel->SetOutput(0);
       left_bottom_flywheel->SetOutput(0);
       left_dial->SetOutput(0);
       control::MotorCANBase::TransmitOutput(motors_can1_shooter, 3);
       osDelay(100);
-      if (stepper_direction) {
-        stepper->Move(control::FORWARD, stepper_speed);
-        osDelay(stepper_length);
-        stepper->Stop();
-      } else {
-        stepper->Move(control::BACKWARD, stepper_speed);
-        osDelay(stepper_length);
-        stepper->Stop();
-      }
-      stepper_direction = !stepper_direction;
+
+      // No need for stepper change
+      // if (stepper_direction) {
+      //   stepper->Move(control::FORWARD, stepper_speed);
+      //   osDelay(stepper_length);
+      //   stepper->Stop();
+      // } else {
+      //   stepper->Move(control::BACKWARD, stepper_speed);
+      //   osDelay(stepper_length);
+      //   stepper->Stop();
+      // }
+      // stepper_direction = !stepper_direction;
     }
 
-    if (send->shooter_power && send->cooling_heat1 < send->cooling_limit1 - 20 &&
-        (dbus->mouse.l || dbus->swr == remote::UP))
-      shooter->LoadNext();
+    // dial part of shooter
+    // left shooter
+    if (send->shooter_power && send->cooling_heat1 < send->cooling_limit1 - 20) {
+      if (dbus->mouse.l || dbus->swr == remote::UP) {
+        if ((bsp::GetHighresTickMicroSec() - start_time) / 1000 > SHOOTER_MODE_DELAY) {
+          shooter->SlowContinueShoot();
+        } else if (slow_shoot_detect == false) {
+          slow_shoot_detect = true;
+          shooter->DoubleShoot();
+        }
+      } else if (dbus->mouse.r) {
+        shooter->FastContinueShoot();
+      } else {
+        shooter->DialStop();
+        start_time = bsp::GetHighresTickMicroSec();
+        slow_shoot_detect = false;
+      }
+    }
+
+    // flywheel part for shooter
     if (!send->shooter_power || dbus->keyboard.bit.Q || dbus->swr == remote::DOWN) {
       flywheelFlag = false;
       shooter->SetFlywheelSpeed(0);
