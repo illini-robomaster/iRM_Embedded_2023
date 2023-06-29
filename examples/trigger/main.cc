@@ -26,7 +26,7 @@
 #include "bsp_gpio.h"
 
 static bsp::GPIO* trigger = nullptr;
-static const int hz = 60;
+static const int hz = 100;
 
 void RM_RTOS_Init(void) {
   print_use_uart(&huart1);
