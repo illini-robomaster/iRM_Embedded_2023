@@ -30,6 +30,8 @@ namespace communication {
 struct STMToJetsonData {
   char header[2];
   uint8_t my_color; // RED is 0; BLUE is one
+  int32_t IMU_angles[3];
+  uint32_t timestamp;
   uint8_t crc8_checksum;
   char tail[2];
 };
@@ -41,7 +43,7 @@ class AutoaimProtocol {
   AutoaimProtocol();
   void Receive(const uint8_t* data, uint8_t len);
   // dummy send
-  void Send(STMToJetsonData* packet, uint8_t color);
+  void Send(STMToJetsonData* packet, uint8_t color, float IMU_angles[3], unsigned long timestamp);
   uint8_t get_valid_flag(void);
   float get_relative_yaw(void);
   float get_relative_pitch(void);

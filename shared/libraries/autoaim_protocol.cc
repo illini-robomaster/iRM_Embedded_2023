@@ -30,10 +30,14 @@ AutoaimProtocol::AutoaimProtocol() {
   flag = 0;
 }
 
-void AutoaimProtocol::Send(STMToJetsonData* packet, uint8_t color) {
+void AutoaimProtocol::Send(STMToJetsonData* packet, uint8_t color, float IMU_angles[3], unsigned long timestamp) {
   packet->header[0] = 'H';
   packet->header[1] = 'D';
   packet->my_color = color;
+  packet->IMU_angles[0] = (int32_t)(IMU_angles[0] * this->INT_FP_SCALE);
+  packet->IMU_angles[1] = (int32_t)(IMU_angles[1] * this->INT_FP_SCALE);
+  packet->IMU_angles[2] = (int32_t)(IMU_angles[2] * this->INT_FP_SCALE);
+  packet->timestamp = timestamp;
 
   const int tail_offset = 3; // size of data minus uint8_t checksum and 2 uint8_t tail
   packet->crc8_checksum = get_crc8_check_sum((uint8_t*)packet,
@@ -161,7 +165,7 @@ void AutoaimProtocol::process_data() {
 
   seqnum = (*(uint32_t *)seq_num_start);
   relative_yaw = (*(int32_t *)rel_yaw_start) * 1.0f / this->INT_FP_SCALE;
-  relative_pitch = *(int32_t *)rel_pitch_start *1.0f / this->INT_FP_SCALE;
+  relative_pitch = (*(int32_t *)rel_pitch_start) * 1.0f / this->INT_FP_SCALE;
 }
 
 uint8_t AutoaimProtocol::get_valid_flag(void) {
