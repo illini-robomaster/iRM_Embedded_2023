@@ -676,19 +676,13 @@ static display::OLED* OLED = nullptr;
 void selfTestTask(void* arg) {
   UNUSED(arg);
   osDelay(100);
-  //Try to make the chassis Flags initialized at first.
-
-  //Could need more time to test it out.
   //The self test task for chassis will not update after the first check.
   OLED->ShowIlliniRMLOGO();
   buzzer->SingSong(Mario, [](uint32_t milli) { osDelay(milli); });
   OLED->OperateGram(display::PEN_CLEAR);
+  // TODO: position of checkboxes and terms need update
   // TODO: need add the right shooter self test displayment
-  OLED->ShowString(0, 0, (uint8_t*)"GP");
-  OLED->ShowString(0, 5, (uint8_t*)"GY");
-  OLED->ShowString(1, 0, (uint8_t*)"SL");
-  OLED->ShowString(1, 5, (uint8_t*)"SR");
-  OLED->ShowString(2, 0, (uint8_t*)"LD");
+  // Lidar, Calibration, dbus, and temperature
   OLED->ShowString(2, 5, (uint8_t*)"Ldr");
   OLED->ShowString(3, 0, (uint8_t*)"Cal");
   OLED->ShowString(3, 6, (uint8_t*)"Dbs");
@@ -706,6 +700,13 @@ void selfTestTask(void* arg) {
   OLED->ShowString(3, 12, (uint8_t*)"BL");
   OLED->ShowString(4, 12, (uint8_t*)"BR");
 
+  // Shooters
+  OLED->ShowString(0, 0, (uint8_t*)"LT");
+  OLED->ShowString(0, 5, (uint8_t*)"LB");
+  OLED->ShowString(1, 0, (uint8_t*)"LD");
+  OLED->ShowString(1, 5, (uint8_t*)"RT");
+  OLED->ShowString(2, 0, (uint8_t*)"RB");
+  OLED->ShowString(4, 5, (uint8_t*)"RD");
   char temp[6] = "";
   while (true) {
     osDelay(100);
@@ -752,6 +753,8 @@ void selfTestTask(void* arg) {
     elevator_right_motor_flag = (0x20 & chassis_flag_bitmap);
     fortress_motor_flag = (0x40 & chassis_flag_bitmap);
 
+
+    // TODO: position of checkboxes and terms need update
     OLED->ShowBlock(1,15,fl_motor_flag);
 
     OLED->ShowBlock(2,15,fr_motor_flag);
@@ -774,9 +777,14 @@ void selfTestTask(void* arg) {
     // TODO: need to add the show block of right shooter(3 motors)
     OLED->ShowBlock(0, 2, pitch_motor_flag);
     OLED->ShowBlock(0, 7, yaw_motor_flag);
+    // LEFT shooter
     OLED->ShowBlock(1, 2, left_top_flywheel_flag);
     OLED->ShowBlock(1, 7, left_bottom_flywheel_flag);
     OLED->ShowBlock(2, 2, left_dial_flag);
+    // RIGHT shooter (location still need to be updated
+    OLED->ShowBlock(3, 2, right_top_flywheel_flag);
+    OLED->ShowBlock(3, 7, right_bottom_flywheel_flag);
+    OLED->ShowBlock(4, 2, right_dial_flag);
     OLED->ShowBlock(2, 8, lidar_flag);
     OLED->ShowBlock(3, 3, imu->CaliDone());
     OLED->ShowBlock(3, 9, dbus_flag);
