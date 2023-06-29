@@ -118,7 +118,7 @@ void RM_RTOS_Default_Task(const void* arguments) {
 
   while (true) {
     miniPC->Send(&cache,
-                 0,
+                 communication::BLUE,
                  imu->INS_angle,
                  bsp::GetHighresTickMicroSec());
     serial->Write((uint8_t*)&cache, sizeof(communication::STMToJetsonData));

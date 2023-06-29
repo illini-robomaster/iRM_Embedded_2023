@@ -27,6 +27,11 @@
 
 namespace communication {
 
+typedef enum {
+  RED,
+  BLUE,
+} armor_color;
+
 struct STMToJetsonData {
   char header[2];
   uint8_t my_color; // RED is 0; BLUE is one
@@ -34,7 +39,7 @@ struct STMToJetsonData {
   uint32_t timestamp;
   uint8_t crc8_checksum;
   char tail[2];
-};
+} __packed;
 
 // WARNING: THIS CLASS IS NOT THREAD SAFE!!!
 
