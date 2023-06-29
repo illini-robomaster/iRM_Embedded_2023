@@ -81,9 +81,12 @@ static volatile unsigned int current_hp = 0;
 // do we need to move this below? just self test use.
 static volatile bool pitch_motor_flag = false;
 static volatile bool yaw_motor_flag = false;
-static volatile bool sl_motor_flag = false;
-static volatile bool sr_motor_flag = false;
-static volatile bool ld_motor_flag = false;
+static volatile bool left_top_flywheel_flag = false;
+static volatile bool left_bottom_flywheel_flag = false;
+static volatile bool left_dial_flag = false;
+static volatile bool right_top_flywheel_flag = false;
+static volatile bool right_bottom_flywheel_flag = false;
+static volatile bool right_dial_flag = false;
 static volatile bool fl_motor_flag = false;
 static volatile bool fr_motor_flag = false;
 static volatile bool bl_motor_flag = false;
@@ -91,14 +94,6 @@ static volatile bool br_motor_flag = false;
 static volatile bool elevator_left_motor_flag = false;
 static volatile bool elevator_right_motor_flag = false;
 static volatile bool fortress_motor_flag = false;
-// static volatile bool fl_wheel_flag = false;
-// static volatile bool fr_wheel_flag = false;
-// static volatile bool bl_wheel_flag = false;
-// static volatile bool br_wheel_flag = false;
-// static volatile bool fl_steering_flag = false;
-// static volatile bool fr_steering_flag = false;
-// static volatile bool bl_steering_flag = false;
-// static volatile bool br_steering_flag = false;
 static volatile bool calibration_flag = false;
 // static volatile bool referee_flag = false;
 static volatile bool dbus_flag = false;
@@ -387,10 +382,11 @@ static control::Shooter* right_shooter = nullptr;
 
 static control::Stepper* stepper = nullptr;
 
-static volatile bool flywheelFlag = false;
+static volatile bool leftflywheelFlag = false;
+static volatile bool rightflywheelFlag = false;
 
-static unsigned stepper_length = 700;
-static unsigned stepper_speed = 1000;
+// static unsigned stepper_length = 700;
+// static unsigned stepper_speed = 1000;
 // static bool stepper_direction = true;
 static const int SHOOTER_MODE_DELAY = 350;
 
@@ -400,8 +396,15 @@ void shooterTask(void* arg) {
   control::MotorCANBase* motors_can1_shooter[] = {left_top_flywheel, left_bottom_flywheel, left_dial,
                                                   right_top_flywheel, right_bottom_flywheel, right_dial};
 
-  uint32_t start_time = 0;
-  bool slow_shoot_detect = false;
+  control::MotorCANBase* motors_can1_shooter_left[] = {left_top_flywheel, left_bottom_flywheel, left_dial};
+
+  control::MotorCANBase* motors_can1_shooter_right[] = {right_top_flywheel, right_bottom_flywheel, right_dial};
+
+  uint32_t start_time_left = 0;
+  uint32_t start_time_right = 0;
+
+  bool slow_shoot_detect_left = false;
+  bool slow_shoot_detect_right = false;
 
   while (true) {
     if (dbus->keyboard.bit.B || dbus->swr == remote::DOWN) break;
@@ -410,13 +413,13 @@ void shooterTask(void* arg) {
 
   while (!imu->CaliDone()) osDelay(100);
 
-  for (int i = 0; i < 2; ++i) {
-    stepper->Move(control::FORWARD, stepper_speed);
-    osDelay(stepper_length);
-    stepper->Move(control::BACKWARD, stepper_speed);
-    osDelay(stepper_length);
-  }
-  stepper->Stop();
+  // for (int i = 0; i < 2; ++i) {
+  //   stepper->Move(control::FORWARD, stepper_speed);
+  //   osDelay(stepper_length);
+  //   stepper->Move(control::BACKWARD, stepper_speed);
+  //   osDelay(stepper_length);
+  // }
+  // stepper->Stop();
 
   while (true) {
     while (Dead) osDelay(100);
@@ -425,8 +428,7 @@ void shooterTask(void* arg) {
       left_top_flywheel->SetOutput(0);
       left_bottom_flywheel->SetOutput(0);
       left_dial->SetOutput(0);
-      
-      control::MotorCANBase::TransmitOutput(motors_can1_shooter, 3);
+      control::MotorCANBase::TransmitOutput(motors_can1_shooter_left, 3);
       osDelay(100);
 
       // No need for stepper change
@@ -440,46 +442,89 @@ void shooterTask(void* arg) {
       //   stepper->Stop();
       // }
       // stepper_direction = !stepper_direction;
+    } 
+    
+    if (send->shooter_power && send->cooling_heat2 > send->cooling_limit2 - 20) {
+      right_top_flywheel->SetOutput(0);
+      right_bottom_flywheel->SetOutput(0);
+      right_dial->SetOutput(0);
+      control::MotorCANBase::TransmitOutput(motors_can1_shooter_right, 3);
+      osDelay(100);
     }
 
-    // dial part of shooter
-    // left shooter
+    // left shooter(dial part)
     if (send->shooter_power && send->cooling_heat1 < send->cooling_limit1 - 20) {
       if (dbus->mouse.l || dbus->swr == remote::UP) {
-        if ((bsp::GetHighresTickMicroSec() - start_time) / 1000 > SHOOTER_MODE_DELAY) {
+        if ((bsp::GetHighresTickMicroSec() - start_time_left) / 1000 > SHOOTER_MODE_DELAY) {
           left_shooter->SlowContinueShoot();
-        } else if (slow_shoot_detect == false) {
-          slow_shoot_detect = true;
+        } else if (slow_shoot_detect_left == false) {
+          slow_shoot_detect_left = true;
           left_shooter->DoubleShoot();
         }
       } else if (dbus->mouse.r) {
         left_shooter->FastContinueShoot();
       } else {
         left_shooter->DialStop();
-        start_time = bsp::GetHighresTickMicroSec();
-        slow_shoot_detect = false;
+        start_time_left = bsp::GetHighresTickMicroSec();
+        slow_shoot_detect_left = false;
       }
     }
 
-    // flywheel part for shooter
+    // flywheel part for left shooter
     if (!send->shooter_power || dbus->keyboard.bit.Q || dbus->swr == remote::DOWN) {
-      flywheelFlag = false;
+      leftflywheelFlag = false;
       left_shooter->SetFlywheelSpeed(0);
     } else {
       if (14 < send->speed_limit1 && send->speed_limit1 < 16) {
-        flywheelFlag = true;
+        leftflywheelFlag = true;
         left_shooter->SetFlywheelSpeed(437);  // 445 MAX
       } else if (send->speed_limit1 >= 18) {
-        flywheelFlag = true;
+        leftflywheelFlag = true;
         left_shooter->SetFlywheelSpeed(482);  // 490 MAX
       } else {
-        flywheelFlag = false;
+        leftflywheelFlag = false;
         left_shooter->SetFlywheelSpeed(0);
       }
     }
 
+    // right shooter(dial part)
+    if (send->shooter_power && send->cooling_heat2 < send->cooling_limit2 - 20) {
+      if (dbus->mouse.l || dbus->swr == remote::UP) {
+        if ((bsp::GetHighresTickMicroSec() - start_time_right) / 1000 > SHOOTER_MODE_DELAY) {
+          right_shooter->SlowContinueShoot();
+        } else if (slow_shoot_detect_right == false) {
+          slow_shoot_detect_right = true;
+          right_shooter->DoubleShoot();
+        }
+      } else if (dbus->mouse.r) {
+        right_shooter->FastContinueShoot();
+      } else {
+        right_shooter->DialStop();
+        start_time_right = bsp::GetHighresTickMicroSec();
+        slow_shoot_detect_right = false;
+      }
+    }
+
+    // flywheel part for right shooter
+    if (!send->shooter_power || dbus->keyboard.bit.Q || dbus->swr == remote::DOWN) {
+      rightflywheelFlag = false;
+      right_shooter->SetFlywheelSpeed(0);
+    } else {
+      if (14 < send->speed_limit2 && send->speed_limit2 < 16) {
+        rightflywheelFlag = true;
+        right_shooter->SetFlywheelSpeed(437);  // 445 MAX
+      } else if (send->speed_limit1 >= 18) {
+        rightflywheelFlag = true;
+        right_shooter->SetFlywheelSpeed(482);  // 490 MAX
+      } else {
+        rightflywheelFlag = false;
+        right_shooter->SetFlywheelSpeed(0);
+      }
+    }
+
     left_shooter->Update();
-    control::MotorCANBase::TransmitOutput(motors_can1_shooter, 3);
+    right_shooter->Update();
+    control::MotorCANBase::TransmitOutput(motors_can1_shooter, 6);
     osDelay(SHOOTER_TASK_DELAY);
   }
 }
@@ -638,7 +683,7 @@ void selfTestTask(void* arg) {
   OLED->ShowIlliniRMLOGO();
   buzzer->SingSong(Mario, [](uint32_t milli) { osDelay(milli); });
   OLED->OperateGram(display::PEN_CLEAR);
-
+  // TODO: need add the right shooter self test displayment
   OLED->ShowString(0, 0, (uint8_t*)"GP");
   OLED->ShowString(0, 5, (uint8_t*)"GY");
   OLED->ShowString(1, 0, (uint8_t*)"SL");
@@ -665,21 +710,37 @@ void selfTestTask(void* arg) {
   while (true) {
     osDelay(100);
 
+    // gimbal
     pitch_motor->connection_flag_ = false;
     yaw_motor->connection_flag_ = false;
+
+    //left shooter
     left_top_flywheel->connection_flag_ = false;
     left_bottom_flywheel->connection_flag_ = false;
     left_dial->connection_flag_ = false;
 
+    //right shooter
+    right_top_flywheel->connection_flag_ = false;
+    right_bottom_flywheel->connection_flag_ = false;
+    right_dial->connection_flag_ = false;
+
     referee->connection_flag_ = false;
     dbus->connection_flag_ = false;
     osDelay(SELFTEST_TASK_DELAY);
+
+    // gimbal
     pitch_motor_flag = pitch_motor->connection_flag_;
-    // TODO: need add new shooter
     yaw_motor_flag = yaw_motor->connection_flag_;
-    sl_motor_flag = left_top_flywheel->connection_flag_;
-    sr_motor_flag = left_bottom_flywheel->connection_flag_;
-    ld_motor_flag = left_dial->connection_flag_;
+
+    // left shooter
+    left_top_flywheel_flag = left_top_flywheel->connection_flag_;
+    left_bottom_flywheel_flag = left_bottom_flywheel->connection_flag_;
+    left_dial_flag = left_dial->connection_flag_;
+
+    //right shooter
+    right_top_flywheel_flag = right_top_flywheel->connection_flag_;
+    right_bottom_flywheel_flag = right_bottom_flywheel->connection_flag_;
+    right_dial_flag = right_dial->connection_flag_;
 
     chassis_flag_bitmap = send->chassis_flag;
 
@@ -710,11 +771,12 @@ void selfTestTask(void* arg) {
     //    referee_flag = referee->connection_flag_;
     dbus_flag = dbus->connection_flag_;
 
+    // TODO: need to add the show block of right shooter(3 motors)
     OLED->ShowBlock(0, 2, pitch_motor_flag);
     OLED->ShowBlock(0, 7, yaw_motor_flag);
-    OLED->ShowBlock(1, 2, sl_motor_flag);
-    OLED->ShowBlock(1, 7, sr_motor_flag);
-    OLED->ShowBlock(2, 2, ld_motor_flag);
+    OLED->ShowBlock(1, 2, left_top_flywheel_flag);
+    OLED->ShowBlock(1, 7, left_bottom_flywheel_flag);
+    OLED->ShowBlock(2, 2, left_dial_flag);
     OLED->ShowBlock(2, 8, lidar_flag);
     OLED->ShowBlock(3, 3, imu->CaliDone());
     OLED->ShowBlock(3, 9, dbus_flag);
@@ -802,6 +864,7 @@ void RM_RTOS_Init(void) {
   right_shooter_data.left_flywheel_motor = right_top_flywheel;
   right_shooter_data.right_flywheel_motor = right_bottom_flywheel;
   right_shooter_data.load_motor = right_dial;
+  // TODO：need test the -1 direction functionality
   right_shooter_data.dial_direction = -1;
   right_shooter_data.model = control::SHOOTER_STANDARD;
   right_shooter = new control::Shooter(right_shooter_data);
@@ -881,7 +944,10 @@ void KillAll() {
     left_top_flywheel->SetOutput(0);
     left_bottom_flywheel->SetOutput(0);
     left_dial->SetOutput(0);
-    control::MotorCANBase::TransmitOutput(motors_can1_shooter, 3);
+    right_top_flywheel->SetOutput(0);
+    right_bottom_flywheel->SetOutput(0);
+    right_dial->SetOutput(0);
+    control::MotorCANBase::TransmitOutput(motors_can1_shooter, 6);
 
     osDelay(KILLALL_DELAY);
   }
