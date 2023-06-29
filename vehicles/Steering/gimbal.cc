@@ -691,6 +691,7 @@ void RM_RTOS_Init(void) {
   shooter_data.left_flywheel_motor = sl_motor;
   shooter_data.right_flywheel_motor = sr_motor;
   shooter_data.load_motor = ld_motor;
+  shooter_data.dial_direction = 1;
   shooter_data.model = control::SHOOTER_STANDARD;
   shooter = new control::Shooter(shooter_data);
   stepper = new control::Stepper(&htim1, 1, 1000000, DIR_GPIO_Port, DIR_Pin, ENABLE_GPIO_Port,

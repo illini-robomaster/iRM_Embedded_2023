@@ -44,6 +44,7 @@ typedef struct {
   MotorBase* right_flywheel_motor; /* motor instance of right flywheel motor */
   MotorCANBase* load_motor;        /* CAN motor instance of load motor       */
   shooter_model_t model;
+  int dial_direction = 1;          /* CCW is 1(default), CW is -1                     */
 } shooter_t;
 
 /**
@@ -110,6 +111,7 @@ class Shooter {
   float dial_continue_fast_acceleration;        /* acceleration for fast continue shooting mode */
   float dial_continue_slowly_acceleration;      /* acceleration for slowly continue shooting mode */
   float dial_double_acceleration;               /* acceleration for double shooting mode */
+  int dial_direction_;
 };
 
 }  // namespace control

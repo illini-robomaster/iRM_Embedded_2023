@@ -43,6 +43,7 @@ Shooter::Shooter(shooter_t shooter) {
   left_flywheel_motor_ = shooter.left_flywheel_motor;
   right_flywheel_motor_ = shooter.right_flywheel_motor;
   model_ = shooter.model;
+  dial_direction_ = shooter.dial_direction;
 
   servo_t servo_data;
   servo_data.motor = shooter.load_motor;
@@ -55,9 +56,10 @@ Shooter::Shooter(shooter_t shooter) {
       servo_data.omega_pid_param = new float[3]{25, 5, 22};
       servo_data.max_iout = 1000;
       servo_data.max_out = 10000;
-
-      load_step_angle_ = 2 * PI / 8;
-      load_double_angle_ = 2 * PI / 4;
+      
+      // change the direction inside the constructor
+      load_step_angle_ = (2 * PI / 8) * dial_direction_;
+      load_double_angle_ = (2 * PI / 4) * dial_direction_;
       dial_speed_ = 6 * PI;
       dial_continue_fast_acceleration = 200 * PI;
       dial_continue_slowly_acceleration = 20 * PI;
@@ -75,8 +77,10 @@ Shooter::Shooter(shooter_t shooter) {
       left_pid_ = new PIDController(80, 3, 0.1);
       right_pid_ = new PIDController(80, 3, 0.1);
       flywheel_turning_detector_ = new BoolEdgeDetector(false);
-      load_step_angle_ = 2 * PI / 8;
-      load_double_angle_ = 2 * PI / 4;
+      
+      // change the direction inside the constructor
+      load_step_angle_ = (2 * PI / 8) * dial_direction_;
+      load_double_angle_ = (2 * PI / 4) * dial_direction_;
       speed_ = 0;
       dial_speed_ = 20 * PI;
       dial_continue_fast_acceleration = 100 * PI;
@@ -139,8 +143,8 @@ void Shooter::Update() {
 
     case SHOOTER_STANDARD:
       flywheel_turning_detector_->input(speed_ == 0);
-      float left_diff = static_cast<MotorCANBase*>(left_flywheel_motor_)->GetOmegaDelta(speed_);
-      float right_diff = static_cast<MotorCANBase*>(right_flywheel_motor_)->GetOmegaDelta(-speed_);
+      float left_diff = static_cast<MotorCANBase*>(left_flywheel_motor_)->GetOmegaDelta(speed_ * dial_direction_);
+      float right_diff = static_cast<MotorCANBase*>(right_flywheel_motor_)->GetOmegaDelta((-speed_) * dial_direction_);
       left_flywheel_motor_->SetOutput(left_pid_->ComputeConstrainedOutput(left_diff));
       right_flywheel_motor_->SetOutput(right_pid_->ComputeConstrainedOutput(right_diff));
       load_servo_->CalcOutput();

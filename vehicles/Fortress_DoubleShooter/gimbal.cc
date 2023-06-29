@@ -378,7 +378,13 @@ osThreadId_t shooterTaskHandle;
 static control::MotorCANBase* left_top_flywheel = nullptr;
 static control::MotorCANBase* left_bottom_flywheel = nullptr;
 static control::MotorCANBase* left_dial = nullptr;
-static control::Shooter* shooter = nullptr;
+static control::Shooter* left_shooter = nullptr;
+
+static control::MotorCANBase* right_top_flywheel = nullptr;
+static control::MotorCANBase* right_bottom_flywheel = nullptr;
+static control::MotorCANBase* right_dial = nullptr;
+static control::Shooter* right_shooter = nullptr;
+
 static control::Stepper* stepper = nullptr;
 
 static volatile bool flywheelFlag = false;
@@ -391,7 +397,8 @@ static const int SHOOTER_MODE_DELAY = 350;
 void shooterTask(void* arg) {
   UNUSED(arg);
 
-  control::MotorCANBase* motors_can1_shooter[] = {left_top_flywheel, left_bottom_flywheel, left_dial};
+  control::MotorCANBase* motors_can1_shooter[] = {left_top_flywheel, left_bottom_flywheel, left_dial,
+                                                  right_top_flywheel, right_bottom_flywheel, right_dial};
 
   uint32_t start_time = 0;
   bool slow_shoot_detect = false;
@@ -418,6 +425,7 @@ void shooterTask(void* arg) {
       left_top_flywheel->SetOutput(0);
       left_bottom_flywheel->SetOutput(0);
       left_dial->SetOutput(0);
+      
       control::MotorCANBase::TransmitOutput(motors_can1_shooter, 3);
       osDelay(100);
 
@@ -439,15 +447,15 @@ void shooterTask(void* arg) {
     if (send->shooter_power && send->cooling_heat1 < send->cooling_limit1 - 20) {
       if (dbus->mouse.l || dbus->swr == remote::UP) {
         if ((bsp::GetHighresTickMicroSec() - start_time) / 1000 > SHOOTER_MODE_DELAY) {
-          shooter->SlowContinueShoot();
+          left_shooter->SlowContinueShoot();
         } else if (slow_shoot_detect == false) {
           slow_shoot_detect = true;
-          shooter->DoubleShoot();
+          left_shooter->DoubleShoot();
         }
       } else if (dbus->mouse.r) {
-        shooter->FastContinueShoot();
+        left_shooter->FastContinueShoot();
       } else {
-        shooter->DialStop();
+        left_shooter->DialStop();
         start_time = bsp::GetHighresTickMicroSec();
         slow_shoot_detect = false;
       }
@@ -456,21 +464,21 @@ void shooterTask(void* arg) {
     // flywheel part for shooter
     if (!send->shooter_power || dbus->keyboard.bit.Q || dbus->swr == remote::DOWN) {
       flywheelFlag = false;
-      shooter->SetFlywheelSpeed(0);
+      left_shooter->SetFlywheelSpeed(0);
     } else {
       if (14 < send->speed_limit1 && send->speed_limit1 < 16) {
         flywheelFlag = true;
-        shooter->SetFlywheelSpeed(437);  // 445 MAX
+        left_shooter->SetFlywheelSpeed(437);  // 445 MAX
       } else if (send->speed_limit1 >= 18) {
         flywheelFlag = true;
-        shooter->SetFlywheelSpeed(482);  // 490 MAX
+        left_shooter->SetFlywheelSpeed(482);  // 490 MAX
       } else {
         flywheelFlag = false;
-        shooter->SetFlywheelSpeed(0);
+        left_shooter->SetFlywheelSpeed(0);
       }
     }
 
-    shooter->Update();
+    left_shooter->Update();
     control::MotorCANBase::TransmitOutput(motors_can1_shooter, 3);
     osDelay(SHOOTER_TASK_DELAY);
   }
@@ -667,6 +675,7 @@ void selfTestTask(void* arg) {
     dbus->connection_flag_ = false;
     osDelay(SELFTEST_TASK_DELAY);
     pitch_motor_flag = pitch_motor->connection_flag_;
+    // TODO: need add new shooter
     yaw_motor_flag = yaw_motor->connection_flag_;
     sl_motor_flag = left_top_flywheel->connection_flag_;
     sr_motor_flag = left_bottom_flywheel->connection_flag_;
@@ -781,10 +790,21 @@ void RM_RTOS_Init(void) {
   left_shooter_data.left_flywheel_motor = left_top_flywheel;
   left_shooter_data.right_flywheel_motor = left_bottom_flywheel;
   left_shooter_data.load_motor = left_dial;
+  left_shooter_data.dial_direction = 1;
   left_shooter_data.model = control::SHOOTER_STANDARD;
-  shooter = new control::Shooter(left_shooter_data);
+  left_shooter = new control::Shooter(left_shooter_data);
 
   // right shooter
+  right_top_flywheel = new control::Motor3508(can1, 0x204);
+  right_bottom_flywheel = new control::Motor3508(can1, 0x205);
+  right_dial = new control::Motor2006(can1, 0x206);
+  control::shooter_t right_shooter_data;
+  right_shooter_data.left_flywheel_motor = right_top_flywheel;
+  right_shooter_data.right_flywheel_motor = right_bottom_flywheel;
+  right_shooter_data.load_motor = right_dial;
+  right_shooter_data.dial_direction = -1;
+  right_shooter_data.model = control::SHOOTER_STANDARD;
+  right_shooter = new control::Shooter(right_shooter_data);
 
   stepper = new control::Stepper(&htim1, 1, 1000000, DIR_GPIO_Port, DIR_Pin, ENABLE_GPIO_Port,
                                   ENABLE_Pin);
