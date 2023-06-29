@@ -99,8 +99,8 @@ void RM_RTOS_Default_Task(const void *argument);
 #define INT1_GYRO_Pin GPIO_PIN_5
 #define INT1_GYRO_GPIO_Port GPIOC
 #define INT1_GYRO_EXTI_IRQn EXTI9_5_IRQn
-#define PWM1_Pin GPIO_PIN_9
-#define PWM1_GPIO_Port GPIOE
+#define TRIGGER_Pin GPIO_PIN_9
+#define TRIGGER_GPIO_Port GPIOE
 #define PWM2_Pin GPIO_PIN_11
 #define PWM2_GPIO_Port GPIOE
 #define IN4_Pin GPIO_PIN_14
