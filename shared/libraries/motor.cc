@@ -270,6 +270,7 @@ ServoMotor::ServoMotor(servo_t data, float align_angle, float proximity_in, floa
   max_speed_ = data.transmission_ratio * data.max_speed;
   max_acceleration_ = data.transmission_ratio * data.max_acceleration;
   transmission_ratio_ = data.transmission_ratio;
+  servo_direction_ = data.direction;
   proximity_in_ = proximity_in;
   proximity_out_ = proximity_out;
 
@@ -355,7 +356,8 @@ void ServoMotor::CalcOutput() {
     detect_head_ = detect_head_ + 1 < detect_period_ ? detect_head_ + 1 : 0;
     // detect if motor is jammed
     // detect total is used as filter.
-    if (detect_total_ >= jam_threshold_) {
+    // need test the direction of the command
+    if (abs(detect_total_) >= jam_threshold_) {
       servo_jam_t data;
       data.speed = max_speed_;
       // this function is in shooter.cc called jam_callback.
@@ -419,6 +421,8 @@ float ServoMotor::GetTheta(GetThetaMode mode) const {
 float ServoMotor::GetThetaDelta(const float target) const { return target - GetTheta(); }
 
 float ServoMotor::GetOmega() const { return motor_->omega_ / transmission_ratio_; }
+
+int ServoMotor::GetDirection() const { return servo_direction_; }
 
 float ServoMotor::GetOmegaDelta(const float target) const {
   return target - motor_->GetOmega() / transmission_ratio_;

@@ -334,6 +334,7 @@ typedef struct {
   float* omega_pid_param;   /* pid parameter used to control speed of motor      */
   float max_iout;
   float max_out;
+  int direction;
 } servo_t;
 
 /**
@@ -467,6 +468,13 @@ class ServoMotor {
   float GetOmegaDelta(const float target) const;
 
   /**
+   * @brief get the servo direction
+   *
+   * @return servo direction
+   */
+  int GetDirection() const;
+
+  /**
    * @brief update the current theta for the servomotor
    * @note only used in CAN callback, do not call elsewhere
    *
@@ -494,6 +502,7 @@ class ServoMotor {
   float offset_angle_; /* cumulative offset angle of motor shaft, range between [0, 2PI] in [rad] */
   float servo_angle_;  /* current angle of motor shaft, range between [0, 2PI] in [rad]           */
   float cumulated_angle_;
+  int servo_direction_ = 1;
 
   // jam detection
   jam_callback_t jam_callback_; /* callback function that will be invoked if motor jammed */

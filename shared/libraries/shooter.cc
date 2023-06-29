@@ -29,8 +29,9 @@ static auto step_angles_ = std::unordered_map<ServoMotor*, float>();
 void jam_callback(control::ServoMotor* servo, const control::servo_jam_t data) {
   UNUSED(data);
   float servo_target = servo->GetTarget();
-  if (servo_target >= servo->GetTheta()) {
-    float prev_target = servo->GetTheta() - (2 * PI/6);
+  int direction = servo->GetDirection();
+  if (abs(servo_target) >= abs(servo->GetTheta())) {
+    float prev_target = servo->GetTheta() - (2 * PI/6 * direction);
     servo->SetTarget(prev_target, true);
     // print("Antijam engage\r\n");
   } 
@@ -56,7 +57,8 @@ Shooter::Shooter(shooter_t shooter) {
       servo_data.omega_pid_param = new float[3]{25, 5, 22};
       servo_data.max_iout = 1000;
       servo_data.max_out = 10000;
-      
+      servo_data.direction = shooter.dial_direction;
+
       // change the direction inside the constructor
       load_step_angle_ = (2 * PI / 8) * dial_direction_;
       load_double_angle_ = (2 * PI / 4) * dial_direction_;
@@ -73,6 +75,7 @@ Shooter::Shooter(shooter_t shooter) {
       servo_data.omega_pid_param = new float[3]{30, 1, 7};
       servo_data.max_iout = 9000;
       servo_data.max_out = 20000;
+      servo_data.direction = shooter.dial_direction;
 
       left_pid_ = new PIDController(80, 3, 0.1);
       right_pid_ = new PIDController(80, 3, 0.1);
@@ -144,7 +147,7 @@ void Shooter::Update() {
     case SHOOTER_STANDARD:
       flywheel_turning_detector_->input(speed_ == 0);
       float left_diff = static_cast<MotorCANBase*>(left_flywheel_motor_)->GetOmegaDelta(speed_ * dial_direction_);
-      float right_diff = static_cast<MotorCANBase*>(right_flywheel_motor_)->GetOmegaDelta((-speed_) * dial_direction_);
+      float right_diff = static_cast<MotorCANBase*>(right_flywheel_motor_)->GetOmegaDelta(-speed_ * dial_direction_);
       left_flywheel_motor_->SetOutput(left_pid_->ComputeConstrainedOutput(left_diff));
       right_flywheel_motor_->SetOutput(right_pid_->ComputeConstrainedOutput(right_diff));
       load_servo_->CalcOutput();
