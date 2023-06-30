@@ -33,6 +33,8 @@ static control::Motor4310* yaw_motor = nullptr;
 static control::Motor4310* pitch_motor = nullptr;
 static control::Motor3508* flywheel_bl = nullptr;
 static control::Motor3508* flywheel_br = nullptr;
+static control::Motor3508* flywheel_tl = nullptr;
+static control::Motor3508* flywheel_tr = nullptr;
 remote::DBUS* dbus = nullptr;
 
 void RM_RTOS_Init() {
@@ -52,6 +54,8 @@ void RM_RTOS_Init() {
   pitch_motor = new control::Motor4310(can2, 0x02, 0x02, control::MIT);
   flywheel_bl = new control::Motor3508(can1, 0x202);
   flywheel_br = new control::Motor3508(can1, 0x204);
+  flywheel_tl = new control::Motor3508(can1, 0x201);
+  flywheel_tr = new control::Motor3508(can1, 0x203);
   dbus = new remote::DBUS(&huart3);
 }
 
@@ -60,9 +64,11 @@ void RM_RTOS_Default_Task(const void* args) {
   UNUSED(args);
   while(dbus->swr != remote::DOWN){}  // flip swr to start
 
-  control::MotorCANBase* motors[] = {flywheel_bl, flywheel_br};
+  control::MotorCANBase* motors[] = {flywheel_bl, flywheel_br, flywheel_tl, flywheel_tr};
   control::PIDController pid_bl(20, 15, 30);
   control::PIDController pid_br(20, 15, 30);
+  control::PIDController pid_tl(20, 15, 30);
+  control::PIDController pid_tr(20, 15, 30);
 
   /* Use SetZeroPos if you want to set current motor position as zero position. If uncommented, the
    * zero position is the zero position set before */
@@ -81,9 +87,18 @@ void RM_RTOS_Default_Task(const void* args) {
     float diff_bl = flywheel_bl->GetOmegaDelta(TARGET_SPEED);
     int16_t out_bl = pid_bl.ComputeConstrainedOutput(diff_bl);
     flywheel_bl->SetOutput(out_bl);
+
     float diff_br = flywheel_br->GetOmegaDelta(TARGET_SPEED);
     int16_t out_br = pid_br.ComputeConstrainedOutput(diff_br);
     flywheel_br->SetOutput(out_br);
+
+    float diff_tl = flywheel_tl->GetOmegaDelta(TARGET_SPEED);
+    int16_t out_tl = pid_tl.ComputeConstrainedOutput(diff_tl);
+    flywheel_tl->SetOutput(out_tl);
+
+    float diff_tr = flywheel_tr->GetOmegaDelta(TARGET_SPEED);
+    int16_t out_tr = pid_tr.ComputeConstrainedOutput(diff_tr);
+    flywheel_tr->SetOutput(out_tr);
 
     yaw_vel = clip<float>(dbus->ch2 / 660.0 * 15.0, -15, 15);
     yaw_pos += yaw_vel / 200;
@@ -93,9 +108,7 @@ void RM_RTOS_Default_Task(const void* args) {
     pitch_pos += pitch_vel / 200;
     pitch_pos = clip<float>(pitch_pos, min_pos, max_pos);   // clipping position within a range
 
-    set_cursor(0, 0);
-    clear_screen();
-    print("Vel Set: %f  Pos Set: %f\n", yaw_vel, yaw_pos);
+    yaw_motor->PrintData();
 
     yaw_motor->SetOutput(yaw_pos, yaw_vel, 30, 0.5, 0);
     pitch_motor->SetOutput(pitch_pos, pitch_vel, 30, 0.5, 0);
@@ -103,7 +116,7 @@ void RM_RTOS_Default_Task(const void* args) {
     yaw_motor->TransmitOutput(yaw_motor);
     pitch_motor->TransmitOutput(pitch_motor);
 
-    control::MotorCANBase::TransmitOutput(motors, 2);
+    control::MotorCANBase::TransmitOutput(motors, 4);
 
     osDelay(10);
   }
