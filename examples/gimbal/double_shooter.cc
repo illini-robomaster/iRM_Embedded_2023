@@ -50,7 +50,7 @@ void RM_RTOS_Init() {
    *  VEL: velocity mode  */
 
   /* Make sure motor is set to the correct mode (in helper tool). Otherwise, motor won't start */
-  yaw_motor = new control::Motor4310(can2, 0x01, 0x01, control::MIT);
+  yaw_motor = new control::Motor4310(can2, 0x01, 0x01, control::POS_VEL);
   pitch_motor = new control::Motor4310(can2, 0x02, 0x02, control::MIT);
   flywheel_bl = new control::Motor3508(can1, 0x202);
   flywheel_br = new control::Motor3508(can1, 0x204);
@@ -102,15 +102,15 @@ void RM_RTOS_Default_Task(const void* args) {
 
     yaw_vel = clip<float>(dbus->ch2 / 660.0 * 15.0, -15, 15);
     yaw_pos += yaw_vel / 200;
-    yaw_pos = clip<float>(yaw_pos, min_pos, max_pos);   // clipping position within a range
+    // yaw_pos = clip<float>(yaw_pos, min_pos, max_pos);   // clipping position within a range
 
-    pitch_vel = clip<float>(dbus->ch3 / 660.0 * 15.0, -15, 15);
+    pitch_vel = clip<float>(dbus->ch3 / 660.0 * 15.0, -5, 5);
     pitch_pos += pitch_vel / 200;
     pitch_pos = clip<float>(pitch_pos, min_pos, max_pos);   // clipping position within a range
 
     yaw_motor->PrintData();
 
-    yaw_motor->SetOutput(yaw_pos, yaw_vel, 30, 0.5, 0);
+    yaw_motor->SetOutput(yaw_pos, yaw_vel);
     pitch_motor->SetOutput(pitch_pos, pitch_vel, 30, 0.5, 0);
 
     yaw_motor->TransmitOutput(yaw_motor);

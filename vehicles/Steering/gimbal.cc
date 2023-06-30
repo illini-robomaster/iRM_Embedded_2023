@@ -239,6 +239,8 @@ void gimbalTask(void* arg) {
     pitch_diff = clip<float>(pitch_target - pitch_curr, -PI, PI);
     yaw_diff = wrap<float>(yaw_target - yaw_curr, -PI, PI);
 
+    print("yaw target: %.4f  yaw curr: %.4f  yaw diff: %.4f  yaw theta: %.4f\r\n", yaw_target, yaw_curr, yaw_diff, yaw_motor->GetTheta());
+
     float pitch_vel;
     pitch_vel = -1 * clip<float>(dbus->ch3 / 660.0, -15, 15);
     pitch_pos += pitch_vel / 200 + dbus->mouse.y / 32767.0;
