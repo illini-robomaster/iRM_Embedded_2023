@@ -855,7 +855,7 @@ void RM_RTOS_Init(void) {
   // left shooter
   left_top_flywheel = new control::Motor3508(can1, 0x201);
   left_bottom_flywheel = new control::Motor3508(can1, 0x202);
-  left_dial = new control::Motor2006(can1, 0x203);
+  left_dial = new control::Motor2006(can1, 0x205);
   control::shooter_t left_shooter_data;
   left_shooter_data.left_flywheel_motor = left_top_flywheel;
   left_shooter_data.right_flywheel_motor = left_bottom_flywheel;
@@ -865,8 +865,8 @@ void RM_RTOS_Init(void) {
   left_shooter = new control::Shooter(left_shooter_data);
 
   // right shooter
-  right_top_flywheel = new control::Motor3508(can1, 0x204);
-  right_bottom_flywheel = new control::Motor3508(can1, 0x205);
+  right_top_flywheel = new control::Motor3508(can1, 0x203);
+  right_bottom_flywheel = new control::Motor3508(can1, 0x204);
   right_dial = new control::Motor2006(can1, 0x206);
   control::shooter_t right_shooter_data;
   right_shooter_data.left_flywheel_motor = right_top_flywheel;
@@ -909,8 +909,9 @@ void KillAll() {
   // TODO: change kill all for 4310 yaw motor
   //  control::MotorCANBase* motors_can1_gimbal[] = {pitch_motor};
   // control::MotorCANBase* motors_can2_gimbal[] = {yaw_motor};
-  control::MotorCANBase* motors_can1_shooter[] = {left_top_flywheel, left_bottom_flywheel, left_dial};
-
+  control::MotorCANBase* motors_can1_shooter[] = {left_top_flywheel, left_bottom_flywheel, left_dial,
+                                                  right_top_flywheel, right_bottom_flywheel, right_dial};
+                                                
   RGB->Display(display::color_blue);
   laser->Off();
 
