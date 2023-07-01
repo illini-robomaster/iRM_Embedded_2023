@@ -68,7 +68,7 @@ static bsp::GPIO* trigger = nullptr;
 static communication::AutoaimProtocol* miniPC = nullptr;
 static bsp::UART* serial = nullptr;
 
-static const int hz = 2;
+static const int hz = 100;
 
 void RM_RTOS_Init(void) {
   serial = new bsp::UART(&huart1);
