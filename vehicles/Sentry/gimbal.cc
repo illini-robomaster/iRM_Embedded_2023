@@ -60,7 +60,6 @@ static const int KILLALL_DELAY = 100;
 static const int DEFAULT_TASK_DELAY = 100;
 static const int SOFT_START_CONSTANT = 300;
 static const int SOFT_KILL_CONSTANT = 200;
-static const int MOTOR_DELAY_CONSTANT = 3000;
 static const float START_PITCH_POS = PI/5;
 
 static bsp::CanBridge* send = nullptr;
@@ -98,9 +97,12 @@ static bool volatile pitch_reset = false;
 
 static volatile bool selftestStart = false;
 
+// autoaim
 float abs_yaw_jetson = 0;
-float abs_pitch_jetson = 0;
-float last_timestamp = 0;  // in milliseconds
+float abs_pitch_jetson = START_PITCH_POS;
+uint32_t last_timestamp = 100;  // in milliseconds
+const uint32_t AUTOAIM_INTERVAL = 100;  // in milliseconds
+uint32_t last_execution_timestamp = 0;
 
 //==================================================================================================
 // IMU
@@ -194,7 +196,17 @@ void gimbalTask(void* arg) {
     pitch_motor->TransmitOutput(pitch_motor);
     osDelay(GIMBAL_TASK_DELAY);
   }
-  osDelay(MOTOR_DELAY_CONSTANT);
+
+  int new_i = 0;
+  while (i < 1000 || !imu->DataReady()) {
+    gimbal->TargetAbsWOffset(0, 0);
+    gimbal->Update();
+    control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
+    pitch_motor->SetOutput(tmp_pos, 1, 115, 0.5, 0);
+    pitch_motor->TransmitOutput(pitch_motor);
+    osDelay(GIMBAL_TASK_DELAY);
+    ++new_i;
+  }
 
   print("Start Calibration.\r\n");
   RGB->Display(display::color_yellow);
@@ -222,53 +234,69 @@ void gimbalTask(void* arg) {
   KalmanFilter pitch_filter(imu->INS_angle[1], HAL_GetTick() / 1000.0);
 
   float real_yaw_target = 0;
-  float real_pitch_target = 0;
+  float real_pitch_target = START_PITCH_POS;
 
   while (true) {
     while (Dead) osDelay(100);
 
-    const float abs_pitch_buffer = abs_pitch_jetson;
-    const float abs_yaw_buffer = abs_yaw_jetson;
-
-    // clear after read
-    abs_pitch_jetson = 0;
-    abs_yaw_jetson = 0;
-
-    if (abs_pitch_buffer != 0 && abs_yaw_buffer != 0) {
-      // new data comes in
-      // abs_autoaim_pitch = gimbal->ComputePitchRel(0, rel_pitch_buffer);
-      // abs_autoaim_yaw = gimbal->ComputeYawRel(0, rel_yaw_buffer);
-
-      pitch_filter.register_state(abs_pitch_buffer, last_timestamp);
-      yaw_filter.register_state(abs_yaw_buffer, last_timestamp);
-
-      real_yaw_target = abs_yaw_buffer;
-      real_pitch_target = abs_pitch_buffer;
-    }
-
-    // pitch and yaw abs targets
-    float abs_pitch_filtered = pitch_filter.iter_and_get_estimation();
-    float abs_yaw_filtered = yaw_filter.iter_and_get_estimation();
-
-    UNUSED(abs_yaw_filtered);
-    UNUSED(abs_pitch_filtered);
-
-    float pitch_curr = imu->INS_angle[1];
-    float yaw_curr = imu->INS_angle[0];
-
-    float pitch_diff = clip<float>(real_pitch_target - pitch_curr, -PI, PI);
-    float yaw_diff = wrap<float>(real_yaw_target - yaw_curr, -PI, PI);
-
-    // to be merged with autoaim
-    // UNUSED(abs_pitch_filtered);
-
+    float yaw_diff;
     float pitch_vel;
-    // pitch_vel = 0;
-    // pitch_pos += pitch_diff;
-    UNUSED(pitch_diff);
-    pitch_vel = -1 * clip<float>(dbus->ch3 / 660.0, -15, 15);
-    pitch_pos += pitch_vel / 200 + dbus->mouse.y / 32767.0;
-    pitch_pos = clip<float>(pitch_pos, 0.1, 1); // measured range
+
+    if (dbus->swl == remote::UP) {
+      float abs_pitch_buffer = abs_pitch_jetson;
+      float abs_yaw_buffer = abs_yaw_jetson;
+
+      // clear after read
+      abs_pitch_jetson = START_PITCH_POS;
+      abs_yaw_jetson = 0;
+
+      // UNUSED(last_execution_timestamp);
+      // UNUSED(real_pitch_target);
+
+      if (abs_pitch_buffer != START_PITCH_POS || abs_yaw_buffer != 0) {
+        // new data comes in
+        // abs_autoaim_pitch = gimbal->ComputePitchRel(0, rel_pitch_buffer);
+        // abs_autoaim_yaw = gimbal->ComputeYawRel(0, rel_yaw_buffer);
+
+        if ((int)HAL_GetTick() - (int)last_execution_timestamp >= (int)AUTOAIM_INTERVAL) {
+          // enough time passed
+          pitch_filter.register_state(abs_pitch_buffer, last_timestamp / 1000.0);
+          yaw_filter.register_state(abs_yaw_buffer, last_timestamp / 1000.0);
+
+          real_yaw_target = abs_yaw_buffer;
+          real_pitch_target = abs_pitch_buffer;
+
+          last_execution_timestamp = HAL_GetTick();
+        }
+      }
+
+      // pitch and yaw abs targets
+      float abs_pitch_filtered = pitch_filter.iter_and_get_estimation();
+      float abs_yaw_filtered = yaw_filter.iter_and_get_estimation();
+
+      UNUSED(abs_yaw_filtered);
+      UNUSED(abs_pitch_filtered);
+
+      UNUSED(real_pitch_target);
+      UNUSED(real_yaw_target);
+
+      float yaw_curr = imu->INS_angle[0];
+      yaw_diff = wrap<float>(real_yaw_target - yaw_curr, -PI, PI);
+
+      pitch_vel = 0;
+      pitch_pos = real_pitch_target;
+    } else {
+      float yaw_ratio = -dbus->mouse.x / 32767.0;
+      yaw_ratio += -dbus->ch2 / 660.0 / 210.0;
+      real_yaw_target = wrap<float>(real_yaw_target + yaw_ratio, -PI, PI);
+      float yaw_curr = imu->INS_angle[0];
+
+      yaw_diff = wrap<float>(real_yaw_target - yaw_curr, -PI, PI);
+
+      pitch_vel = -1 * clip<float>(dbus->ch3 / 660.0, -15, 15);
+      pitch_pos += pitch_vel / 200 + dbus->mouse.y / 32767.0;
+      pitch_pos = clip<float>(pitch_pos, 0.1, 1); // measured range
+    }
 
     if (pitch_reset) {
       // 4310 soft start
@@ -288,7 +316,6 @@ void gimbalTask(void* arg) {
     print("pitch_pos: %f\r\n", pitch_pos);
     print("pitch_vel: %f\r\n", pitch_vel);
 
-    // UNUSED(yaw_diff);
     gimbal->TargetRel(0, yaw_diff);
     gimbal->Update();
 
@@ -378,11 +405,12 @@ void jetsonCommTask(void* arg) {
   uart->SetupTx(50);
 
   auto miniPCreceiver = communication::AutoaimProtocol();
-  int total_processed_bytes = 0;
 
   while (!imu->CaliDone()) {
-    osDelay(1);
+    osDelay(10);
   }
+
+  int total_receive_count = 0;
 
   while (true) {
     uint32_t flags = osThreadFlagsGet();
@@ -391,7 +419,6 @@ void jetsonCommTask(void* arg) {
 
       // max length of the UART buffer at 150Hz is ~50 bytes
       length = uart->Read(&data);
-      total_processed_bytes += length;
 
       miniPCreceiver.Receive(data, length);
 
@@ -399,15 +426,16 @@ void jetsonCommTask(void* arg) {
         // there is at least one unprocessed valid packet
         abs_yaw_jetson = miniPCreceiver.get_relative_yaw();
         abs_pitch_jetson = miniPCreceiver.get_relative_pitch();
-        last_timestamp = HAL_GetTick() / 1000.0;
+        last_timestamp = HAL_GetTick();
+        total_receive_count++;
       }
     }
     // send IMU data anyway
     communication::STMToJetsonData packet_to_send;
     uint8_t my_color = 1; // blue
-    const float pitch_curr = imu->INS_angle[1];
+    const float pitch_curr = pitch_pos;
     const float yaw_curr = imu->INS_angle[0];
-    miniPCreceiver.Send(&packet_to_send, my_color, yaw_curr, pitch_curr);
+    miniPCreceiver.Send(&packet_to_send, my_color, yaw_curr, pitch_curr, (int)last_execution_timestamp);
     uart->Write((uint8_t*)&packet_to_send, sizeof(communication::STMToJetsonData));
     osDelay(2);
   }
@@ -537,7 +565,7 @@ void chassisTask(void* arg) {
   float vx_set, vy_set;
 
   while (true) {
-    ChangeSpinMode.input(dbus->keyboard.bit.SHIFT || dbus->swl == remote::UP);
+    ChangeSpinMode.input(dbus->keyboard.bit.SHIFT);
     if (ChangeSpinMode.posEdge()) SpinMode = !SpinMode;
 
     send->cmd.id = bsp::MODE;
