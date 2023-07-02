@@ -267,7 +267,7 @@ void chassisTask(void* arg) {
     constexpr float WHEEL_SPEED_FACTOR = 4;
     chassis->WheelUpdateSpeed(WHEEL_SPEED_FACTOR);
     chassis->SteerCalcOutput();
-    if (supercap_voltage < 5.0 | supercap_voltage == 5.0){
+    if (supercap_voltage <= 5.0){
       chassis->Update(30,
                       referee->power_heat_data.chassis_power,
                       (float)referee->power_heat_data.chassis_power_buffer);
