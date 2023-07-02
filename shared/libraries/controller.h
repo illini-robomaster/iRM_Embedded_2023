@@ -171,4 +171,44 @@ class ConstrainedPID {
   float max_out_;
 };
 
+/**
+ * @brief FeedForward controller + PID controller
+ */
+
+class FeedForwardAndPID : public ConstrainedPID{
+  public:
+    /**
+     * @brief FeedForward controller default constructor
+     */
+    FeedForwardAndPID();
+
+    /**
+     * @brief FeedForward controller + PID controller constructor
+     */
+    FeedForwardAndPID(float kp, float ki, float kd, float max_iout, float max_out, 
+                      float motor_rotational_inertia, float motor_friction_coefficient);
+
+    /**
+     * @brief FeedForward controller + PID controller constructor
+     */
+    FeedForwardAndPID(float* param, float max_iout, float max_out, 
+                      float motor_rotational_inertia, float motor_friction_coefficient);
+
+    void Reinit(float kp, float ki, float kd, float max_iout, float max_out,
+                float motor_rotational_inertia, float motor_friction_coefficient);
+
+    void Reinit(float* param, float max_iout, float max_out, 
+                float motor_rotational_inertia, float motor_friction_coefficient);
+
+    // Compute output for Feed forward + PID
+    float ComputeOutput(float error);
+
+    // Compute Constrained output for Feed forward + PID
+    int16_t ComputeConstrainedOutput(float error);
+
+  private:
+    float motor_rotational_inertia_;  // symbol as "I"
+    float motor_friction_coefficient_; //  symbol as "mu"
+};
+
 } /* namespace control */

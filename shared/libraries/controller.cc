@@ -113,9 +113,51 @@ void ConstrainedPID::Reset() {
   cumulated_err_ = 0;
   last_err_ = 0;
 }
+
 void ConstrainedPID::ChangeMax(float max_iout, float max_out) {
   max_iout_ = max_iout;
   max_out_ = max_out;
 }
+
+FeedForwardAndPID::FeedForwardAndPID() : ConstrainedPID() {
+  motor_rotational_inertia_ = 1;
+  motor_friction_coefficient_ = 1;
+}
+
+FeedForwardAndPID::FeedForwardAndPID(float kp, float ki, float kd, float max_iout, float max_out,
+                                     float motor_rotational_inertia, float motor_friction_coefficient)
+                                     : ConstrainedPID(kp, ki, kd, max_iout, max_out) {
+  motor_rotational_inertia_ = motor_rotational_inertia;
+  motor_friction_coefficient_ = motor_friction_coefficient;                                    
+}
+
+FeedForwardAndPID::FeedForwardAndPID(float* param, float max_iout, float max_out,
+                                     float motor_rotational_inertia, float motor_friction_coefficient)
+                                     : ConstrainedPID(param, max_iout, max_out) {
+  motor_rotational_inertia_ = motor_rotational_inertia;
+  motor_friction_coefficient_ = motor_friction_coefficient;                                    
+}
+
+void FeedForwardAndPID::Reinit(float kp, float ki, float kd, float max_iout, float max_out,
+                          float motor_rotational_inertia, float motor_friction_coefficient) {
+  ConstrainedPID::Reinit(kp, ki, kd, max_iout, max_out);
+  motor_rotational_inertia_ = motor_rotational_inertia;
+  motor_friction_coefficient_ = motor_friction_coefficient;
+}
+
+void FeedForwardAndPID::Reinit(float* param, float max_iout, float max_out,
+                               float motor_rotational_inertia, float motor_friction_coefficient) {
+  ConstrainedPID::Reinit(param, max_iout, max_out);
+  motor_rotational_inertia_ = motor_rotational_inertia;
+  motor_friction_coefficient_ = motor_friction_coefficient;
+}
+
+// float FeedForwardAndPID::ComputeOutput(float error) {
+//   // FeedForward output
+
+//   // PID controller output
+//   // float pid_output = ConstrainedPID::ComputeOutput(error);
+//   return 0;
+// }
 
 } /* namespace control */
