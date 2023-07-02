@@ -160,7 +160,7 @@ float FeedForwardAndPID::ComputeOutput(float referee_value, float error) {
                  + motor_friction_coefficient_ * referee_value;
   // Add PID controller output
   output += ConstrainedPID::ComputeOutput(error);
-  // how to get the private variable(not use getter)
+  // TODO: how to get the private variable(not use getter)
   // output = clip<float>(out, -ConstrainedPID::max_out_, ConstrainedPID::max_out_);
   last_referee_value_ = referee_value;
   return output;
