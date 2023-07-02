@@ -53,8 +53,8 @@ static const int KILLALL_DELAY = 100;
 static const int DEFAULT_TASK_DELAY = 100;
 static const int SOFT_START_CONSTANT = 300;
 static const int SOFT_KILL_CONSTANT = 200;
-static const int MOTOR_DELAY_CONSTANT = 3000;
 static const float START_PITCH_POS = PI/5;
+static const int INFANTRY_INITIAL_HP = 100;
 
 static bsp::CanBridge* send = nullptr;
 
@@ -69,27 +69,30 @@ static unsigned int chassis_flag_bitmap = 0;
 
 static volatile float pitch_pos = START_PITCH_POS;
 
-static bool volatile pitch_motor_flag = false;
-static bool volatile yaw_motor_flag = false;
-static bool volatile sl_motor_flag = false;
-static bool volatile sr_motor_flag = false;
-static bool volatile ld_motor_flag = false;
-static bool volatile fl_wheel_flag = false;
-static bool volatile fr_wheel_flag = false;
-static bool volatile bl_wheel_flag = false;
-static bool volatile br_wheel_flag = false;
-static bool volatile fl_steering_flag = false;
-static bool volatile fr_steering_flag = false;
-static bool volatile bl_steering_flag = false;
-static bool volatile br_steering_flag = false;
-static bool volatile calibration_flag = false;
-// static bool volatile referee_flag = false;
-static bool volatile dbus_flag = false;
-static bool volatile lidar_flag = false;
-static bool volatile pitch_reset = false;
+static volatile unsigned int current_hp = 0;
 
+static volatile bool pitch_motor_flag = false;
+static volatile bool yaw_motor_flag = false;
+static volatile bool sl_motor_flag = false;
+static volatile bool sr_motor_flag = false;
+static volatile bool ld_motor_flag = false;
+static volatile bool fl_wheel_flag = false;
+static volatile bool fr_wheel_flag = false;
+static volatile bool bl_wheel_flag = false;
+static volatile bool br_wheel_flag = false;
+static volatile bool fl_steering_flag = false;
+static volatile bool fr_steering_flag = false;
+static volatile bool bl_steering_flag = false;
+static volatile bool br_steering_flag = false;
+static volatile bool calibration_flag = false;
+// static volatile bool referee_flag = false;
+static volatile bool dbus_flag = false;
+static volatile bool lidar_flag = false;
+static volatile bool pitch_reset = false;
 
 static volatile bool selftestStart = false;
+
+static volatile bool robot_hp_begin = false;
 
 //==================================================================================================
 // IMU
@@ -159,7 +162,7 @@ void gimbalTask(void* arg) {
   laser->On();
 
   while (true) {
-    if (dbus->keyboard.bit.V || dbus->swr == remote::DOWN) break;
+    if (dbus->keyboard.bit.B || dbus->swr == remote::DOWN) break;
     osDelay(100);
   }
 
@@ -178,16 +181,21 @@ void gimbalTask(void* arg) {
   // 4310 soft start
   float tmp_pos = 0;
   for (int j = 0; j < SOFT_START_CONSTANT; j++){
+    gimbal->TargetAbsWOffset(0, 0);
+    gimbal->Update();
+    control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
     tmp_pos += START_PITCH_POS / SOFT_START_CONSTANT;  // increase position gradually
     pitch_motor->SetOutput(tmp_pos, 1, 115, 0.5, 0);
     pitch_motor->TransmitOutput(pitch_motor);
     osDelay(GIMBAL_TASK_DELAY);
   }
-  osDelay(MOTOR_DELAY_CONSTANT);
 
   print("Start Calibration.\r\n");
   RGB->Display(display::color_yellow);
   laser->Off();
+  gimbal->TargetAbsWOffset(0, 0);
+  gimbal->Update();
+  control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
   imu->Calibrate();
 
   while (!imu->DataReady() || !imu->CaliDone()) {
@@ -248,12 +256,6 @@ void gimbalTask(void* arg) {
       pitch_pos = tmp_pos;
       pitch_reset = false;
     }
-
-    set_cursor(0, 0);
-    clear_screen();
-    print("pitch ratio: %f\r\n", pitch_ratio);
-    print("pitch_pos: %f\r\n", pitch_pos);
-    print("pitch_vel: %f\r\n", pitch_vel);
 
     gimbal->TargetRel(-pitch_diff, yaw_diff);
     gimbal->Update();
@@ -334,14 +336,18 @@ static volatile bool flywheelFlag = false;
 static unsigned stepper_length = 700;
 static unsigned stepper_speed = 1000;
 static bool stepper_direction = true;
+// The self defined delay for shooter mode
+static const int SHOOTER_MODE_DELAY = 350;
 
 void shooterTask(void* arg) {
   UNUSED(arg);
 
   control::MotorCANBase* motors_can1_shooter[] = {sl_motor, sr_motor, ld_motor};
+  uint32_t start_time = 0;
+  bool slow_shoot_detect = false;
 
   while (true) {
-    if (dbus->keyboard.bit.V || dbus->swr == remote::DOWN) break;
+    if (dbus->keyboard.bit.B || dbus->swr == remote::DOWN) break;
     osDelay(100);
   }
 
@@ -376,9 +382,23 @@ void shooterTask(void* arg) {
       stepper_direction = !stepper_direction;
     }
 
-    if (send->shooter_power && send->cooling_heat1 < send->cooling_limit1 - 20 &&
-        (dbus->mouse.l || dbus->swr == remote::UP))
-      shooter->LoadNext();
+    if (send->shooter_power && send->cooling_heat1 < send->cooling_limit1 - 20) {
+      if (dbus->mouse.l || dbus->swr == remote::UP) {
+        if ((bsp::GetHighresTickMicroSec() - start_time) / 1000 > SHOOTER_MODE_DELAY) {
+          shooter->SlowContinueShoot();
+        } else if (slow_shoot_detect == false) {
+          slow_shoot_detect = true;
+          shooter->DoubleShoot();
+        }
+      } else if (dbus->mouse.r) {
+        shooter->FastContinueShoot();
+      } else {
+        shooter->DialStop();
+        start_time = bsp::GetHighresTickMicroSec();
+        slow_shoot_detect = false;
+      }
+    }
+      
     if (!send->shooter_power || dbus->keyboard.bit.Q || dbus->swr == remote::DOWN) {
       flywheelFlag = false;
       shooter->SetFlywheelSpeed(0);
@@ -420,7 +440,7 @@ void chassisTask(void* arg) {
   UNUSED(arg);
 
   while (true) {
-    if (dbus->keyboard.bit.V || dbus->swr == remote::DOWN) break;
+    if (dbus->keyboard.bit.B || dbus->swr == remote::DOWN) break;
     osDelay(100);
   }
 
@@ -436,6 +456,10 @@ void chassisTask(void* arg) {
 
     send->cmd.id = bsp::MODE;
     send->cmd.data_int = SpinMode ? 1 : 0;
+    send->TransmitOutput();
+
+    send->cmd.id = bsp::RECALIBRATE;
+    send->cmd.data_bool = dbus->keyboard.bit.R;
     send->TransmitOutput();
 
     if (dbus->keyboard.bit.A) vx_keyboard -= 61.5;
@@ -690,7 +714,6 @@ void RM_RTOS_Threads_Init(void) {
 void KillAll() {
   RM_EXPECT_TRUE(false, "Operation Killed!\r\n");
 
-//  control::MotorCANBase* motors_can1_gimbal[] = {pitch_motor};
   control::MotorCANBase* motors_can2_gimbal[] = {yaw_motor};
   control::MotorCANBase* motors_can1_shooter[] = {sl_motor, sr_motor, ld_motor};
 
@@ -702,8 +725,8 @@ void KillAll() {
     send->cmd.data_bool = true;
     send->TransmitOutput();
 
-    FakeDeath.input(dbus->keyboard.bit.B || dbus->swl == remote::DOWN);
-    if (FakeDeath.posEdge()) {
+    FakeDeath.input(dbus->swl == remote::DOWN);
+    if (FakeDeath.posEdge() || send->remain_hp > 0) {
       SpinMode = false;
       Dead = false;
       RGB->Display(display::color_green);
@@ -742,8 +765,11 @@ void RM_RTOS_Default_Task(const void* arg) {
   UNUSED(arg);
 
   while (true) {
-    FakeDeath.input(dbus->keyboard.bit.B || dbus->swl == remote::DOWN);
-    if (FakeDeath.posEdge()) {
+    if (send->remain_hp == INFANTRY_INITIAL_HP) robot_hp_begin = true;
+    current_hp = robot_hp_begin ? send->remain_hp : INFANTRY_INITIAL_HP;
+
+    FakeDeath.input(dbus->swl == remote::DOWN);
+    if (FakeDeath.posEdge() || current_hp == 0) {
       Dead = true;
       KillAll();
     }

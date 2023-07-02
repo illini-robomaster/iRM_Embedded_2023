@@ -36,6 +36,8 @@
 static bsp::CAN* can1 = nullptr;
 static bsp::CAN* can2 = nullptr;
 static display::RGB* RGB = nullptr;
+static BoolEdgeDetector ReCali(false);
+static BoolEdgeDetector Revival(false);
 
 //==================================================================================================
 // SelfTest
@@ -212,12 +214,30 @@ void chassisTask(void* arg) {
     float sin_yaw, cos_yaw, vx_set, vy_set;
     float vx, vy, wz;
 
-
     // TODO need to change the channels in gimbal.cc
     vx_set = -receive->vy;
     vy_set = receive->vx;
 
+    ReCali.input(receive->recalibrate);   // detect force recalibration
+    Revival.input(receive->dead);         // detect robot revival
 
+    // realign on revival OR when key 'R' is pressed
+    if (Revival.negEdge() || ReCali.posEdge()) {
+      chassis->SteerAlignFalse();
+      chassis->SteerSetMaxSpeed(ALIGN_SPEED);
+      bool realignment_complete = false;
+      while (!realignment_complete) {
+        chassis->SteerCalcOutput();
+        control::MotorCANBase::TransmitOutput(steer_motors, 4);
+        realignment_complete = chassis->Calibrate();
+        osDelay(1);
+      }
+      chassis->ReAlign();
+      chassis->SteerCalcOutput();
+      chassis->SteerSetMaxSpeed(RUN_SPEED);
+      chassis->SteerThetaReset();
+      chassis->SetWheelSpeed(0,0,0,0);
+    }
 
     if (receive->mode == 1) {  // spin mode
       // delay compensation
@@ -260,7 +280,6 @@ void chassisTask(void* arg) {
     //consider using uart printing to check the power limit's value
     //log values out as files to obtain its trend
 
-
     if (Dead) {
       chassis->SetSpeed(0,0,0);
       motor5->SetOutput(0);
@@ -271,8 +290,6 @@ void chassisTask(void* arg) {
 
     control::MotorCANBase::TransmitOutput(wheel_motors, 4);
     control::MotorCANBase::TransmitOutput(steer_motors, 4);
-
-
 
     receive->cmd.id = bsp::SHOOTER_POWER;
     receive->cmd.data_bool = referee->game_robot_status.mains_power_shooter_output;
@@ -302,14 +319,11 @@ void chassisTask(void* arg) {
     receive->cmd.data_float = (float)referee->game_robot_status.shooter_id2_17mm_speed_limit;
     receive->TransmitOutput();
 
-
-
-    //send bitmap of connection flag only once
-
-
+    receive->cmd.id = bsp::REMAIN_HP;
+    receive->cmd.data_int = referee->game_robot_status.remain_HP;
+    receive->TransmitOutput();
 
     osDelay(CHASSIS_TASK_DELAY);
-
 
   }
 }
@@ -435,6 +449,8 @@ void KillAll() {
   control::MotorCANBase* wheel_motors[] = {motor5, motor6, motor7, motor8};
 
   RGB->Display(display::color_blue);
+
+  chassis->SteerAlignFalse();   // set alignment status of each wheel to false
 
   while (true) {
     if (!receive->dead) {

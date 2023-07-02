@@ -27,3 +27,7 @@ irm_add_arm_executable(${PROJECT_NAME}_shooter
 irm_add_arm_executable(${PROJECT_NAME}_flywheels
         TARGET DJI_Board_TypeA
         SOURCES flywheels.cc)
+
+irm_add_arm_executable(${PROJECT_NAME}_three_modes_shooter
+        TARGET DJI_Board_TypeC
+        SOURCES three_modes_shooter.cc)

@@ -132,6 +132,17 @@ class SteeringChassis {
    */
   void PrintData();
 
+  /**
+   * @brief Set align_complete_ of all 4 Steering Motor to False
+   */
+  void SteerAlignFalse();
+
+  /**
+   * @brief Check align_complete_ flag for all 4 Steering Motors
+   * @return True if all 4 align_complete_ flags are true; false otherwise
+   */
+  bool SteerAlignCheck();
+
   // speed of four wheels
   float v_fl_;
   float v_fr_;
