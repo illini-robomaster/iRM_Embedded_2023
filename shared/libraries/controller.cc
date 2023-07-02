@@ -152,12 +152,32 @@ void FeedForwardAndPID::Reinit(float* param, float max_iout, float max_out,
   motor_friction_coefficient_ = motor_friction_coefficient;
 }
 
-// float FeedForwardAndPID::ComputeOutput(float error) {
-//   // FeedForward output
+float FeedForwardAndPID::ComputeOutput(float referee_value, float error) {
+  float sampling_time_interval = 0.001;
+  // FeedForward output(Js+B in motor model(laplase))
+  // J: motor_rotational_inertia, B: motor_friction_coefficient
+  float output = motor_rotational_inertia_ * (referee_value - last_referee_value_) / sampling_time_interval
+                 + motor_friction_coefficient_ * referee_value;
+  // Add PID controller output
+  output += ConstrainedPID::ComputeOutput(error);
+  // how to get the private variable(not use getter)
+  // output = clip<float>(out, -ConstrainedPID::max_out_, ConstrainedPID::max_out_);
+  last_referee_value_ = referee_value;
+  return output;
+}
 
-//   // PID controller output
-//   // float pid_output = ConstrainedPID::ComputeOutput(error);
-//   return 0;
-// }
+int16_t FeedForwardAndPID::ComputeConstrainedOutput(float referee_value, float error) {
+  return control::ClipMotorRange(ComputeOutput(referee_value, error));  
+}
+
+void FeedForwardAndPID::Reset() {
+  ConstrainedPID::Reset();
+  last_referee_value_ = 0;
+}
+
+void FeedForwardAndPID::ChangeMax(float max_iout, float max_out) {
+  ConstrainedPID::ChangeMax(max_iout, max_out);
+}
+
 
 } /* namespace control */

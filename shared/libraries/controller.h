@@ -166,7 +166,6 @@ class ConstrainedPID {
 
  private:
   float last_err_;
-
   float max_iout_;
   float max_out_;
 };
@@ -201,14 +200,20 @@ class FeedForwardAndPID : public ConstrainedPID{
                 float motor_rotational_inertia, float motor_friction_coefficient);
 
     // Compute output for Feed forward + PID
-    float ComputeOutput(float error);
+    float ComputeOutput(float referee_value, float error);
 
     // Compute Constrained output for Feed forward + PID
-    int16_t ComputeConstrainedOutput(float error);
+    int16_t ComputeConstrainedOutput(float referee_value, float error);
+
+    void Reset();
+
+    void ChangeMax(float max_iout, float max_out);
+
 
   private:
     float motor_rotational_inertia_;  // symbol as "I"
     float motor_friction_coefficient_; //  symbol as "mu"
+    float last_referee_value_;
 };
 
 } /* namespace control */
