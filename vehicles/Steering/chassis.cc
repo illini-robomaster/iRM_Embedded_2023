@@ -268,7 +268,7 @@ void chassisTask(void* arg) {
     chassis->WheelUpdateSpeed(WHEEL_SPEED_FACTOR);
     chassis->SteerCalcOutput();
     if (supercap_voltage <= 5.0){
-      chassis->Update((supercap_voltage-1)*7.5
+      chassis->Update((supercap_voltage-1)*7.5,
                       referee->power_heat_data.chassis_power,
                       (float)referee->power_heat_data.chassis_power_buffer);
                       //Ensure chassis won't use too much power causing losing hp when revive
