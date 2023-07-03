@@ -552,7 +552,6 @@ void selfTestTask(void* arg) {
 
   OLED->ShowString(1, 12, (uint8_t*)"FL");
   OLED->ShowString(2, 12, (uint8_t*)"FR");
-//
   OLED->ShowString(3, 12, (uint8_t*)"BL");
   OLED->ShowString(4, 12, (uint8_t*)"BR");
 

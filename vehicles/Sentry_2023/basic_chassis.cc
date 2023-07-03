@@ -18,7 +18,7 @@
  *                                                                          *
  ****************************************************************************/
 
-#include "bsp_can_bridge.h"
+#include "bsp_buzzer.h"
 #include "bsp_gpio.h"
 #include "bsp_os.h"
 #include "bsp_print.h"
@@ -29,6 +29,7 @@
 #include "motor.h"
 #include "protocol.h"
 #include "rgb.h"
+#include "oled.h"
 #include "chassis.h"
 #include "supercap.h"
 #include <cmath>
@@ -43,11 +44,10 @@ static volatile bool Dead = false;
 static BoolEdgeDetector ChangeSpinMode(false);
 static volatile bool SpinMode = false;
 
-// static bsp::CanBridge* receive = nullptr;
-// static unsigned int flag_summary = 0;
 static const int KILLALL_DELAY = 100;
 static const int DEFAULT_TASK_DELAY = 100;
 static const int CHASSIS_TASK_DELAY = 2;
+static const int SELFTEST_TASK_DELAY = 100;
 
 // TODO: Mecanum wheel need different speed???
 // speed for steering motors (rad/s)
@@ -229,32 +229,56 @@ const osThreadAttr_t selfTestingTask = {.name = "selfTestTask",
                                              .reserved = 0};
 osThreadId_t selfTestTaskHandle;
 
+using Note = bsp::BuzzerNote;
+
+static bsp::BuzzerNoteDelayed Mario[] = {
+    {Note::Mi3M, 80}, {Note::Silent, 80}, {Note::Mi3M, 80}, {Note::Silent, 240}, {Note::Mi3M, 80}, {Note::Silent, 240}, {Note::Do1M, 80}, {Note::Silent, 80}, {Note::Mi3M, 80}, {Note::Silent, 240}, {Note::So5M, 80}, {Note::Silent, 560}, {Note::So5L, 80}, {Note::Silent, 0}, {Note::Finish, 0}};
+
+static bsp::Buzzer* buzzer = nullptr;
+static display::OLED* OLED = nullptr;
+
 static bool fl_motor_flag = false;
 static bool fr_motor_flag = false;
 static bool bl_motor_flag = false;
 static bool br_motor_flag = false;
+static bool dbus_flag = false;
+
 
 void self_Check_Task(void* arg){
   UNUSED(arg);
+  osDelay(SELFTEST_TASK_DELAY);
+  OLED->ShowIlliniRMLOGO();
+  buzzer->SingSong(Mario, [](uint32_t milli) { osDelay(milli); });
+  OLED->OperateGram(display::PEN_CLEAR);
+
+  OLED->ShowString(1, 12, (uint8_t*)"FL");
+  OLED->ShowString(2, 12, (uint8_t*)"FR");
+  OLED->ShowString(3, 12, (uint8_t*)"BL");
+  OLED->ShowString(4, 12, (uint8_t*)"BR");
 
   while(true){
-    osDelay(100);
-    // TODO：fortress self check(7 motor)
     fl_motor->connection_flag_ = false;
     fr_motor->connection_flag_ = false;
     bl_motor->connection_flag_ = false;
     br_motor->connection_flag_ = false;
 
-    osDelay(100);
+    osDelay(SELFTEST_TASK_DELAY);
 
     fl_motor_flag = fl_motor->connection_flag_;
     fr_motor_flag = fr_motor->connection_flag_;
     bl_motor_flag = bl_motor->connection_flag_;
     br_motor_flag = br_motor->connection_flag_;
+    dbus_flag = dbus->connection_flag_;
 
-    // need self test
+    OLED->ShowBlock(1, 15, fl_motor_flag);
+    OLED->ShowBlock(2, 15, fr_motor_flag);
+    OLED->ShowBlock(3, 15, bl_motor_flag);
+    OLED->ShowBlock(4, 15, br_motor_flag);
+    OLED->ShowBlock(3, 9, dbus_flag);
 
-    osDelay(100);
+    OLED->RefreshGram();
+
+    osDelay(SELFTEST_TASK_DELAY);
   }
 }
 
@@ -295,8 +319,9 @@ void RM_RTOS_Init() {
   referee_uart->SetupRx(300);
   referee_uart->SetupTx(300);
   referee = new communication::Referee;
-  
-  // receive = new bsp::CanBridge(can2, 0x20B, 0x20A);
+
+  buzzer = new bsp::Buzzer(&htim4, 3, 1000000);
+  OLED = new display::OLED(&hi2c2, 0x3C);
 }
 
 //==================================================================================================
