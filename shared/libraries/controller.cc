@@ -161,7 +161,7 @@ float FeedForwardAndPID::ComputeOutput(float referee_value, float error) {
   // Add PID controller output
   output += ConstrainedPID::ComputeOutput(error);
   // TODO: how to get the private variable(not use getter)
-  // output = clip<float>(out, -ConstrainedPID::max_out_, ConstrainedPID::max_out_);
+  output = clip<float>(output, -ConstrainedPID::max_out_, ConstrainedPID::max_out_);
   last_referee_value_ = referee_value;
   return output;
 }
