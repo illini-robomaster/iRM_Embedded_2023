@@ -29,70 +29,43 @@
 #include "motor.h"
 #include "protocol.h"
 #include "rgb.h"
-#include "steering.h"
+#include "chassis.h"
 #include "supercap.h"
 #include <cmath>
 
 static bsp::CAN* can1 = nullptr;
 static bsp::CAN* can2 = nullptr;
+static remote::DBUS* dbus = nullptr;
 static display::RGB* RGB = nullptr;
-static BoolEdgeDetector ReCali(false);
-static BoolEdgeDetector Revival(false);
-
-//==================================================================================================
-// SelfTest
-//==================================================================================================
-
-static bool fl_steer_motor_flag = false;
-static bool fr_steer_motor_flag = false;
-static bool bl_steer_motor_flag = false;
-static bool br_steer_motor_flag = false;
-static bool fl_wheel_motor_flag = false;
-static bool fr_wheel_motor_flag = false;
-static bool bl_wheel_motor_flag = false;
-static bool br_wheel_motor_flag = false;
-
-static bool transmission_flag = true;
-const osThreadAttr_t selfTestingTask = {.name = "selfTestTask",
-                                             .attr_bits = osThreadDetached,
-                                             .cb_mem = nullptr,
-                                             .cb_size = 0,
-                                             .stack_mem = nullptr,
-                                             .stack_size = 256 * 4,
-                                             .priority = (osPriority_t)osPriorityBelowNormal,
-                                             .tz_module = 0,
-                                             .reserved = 0};
-osThreadId_t selfTestTaskHandle;
-
 
 static BoolEdgeDetector FakeDeath(false);
 static volatile bool Dead = false;
 static BoolEdgeDetector ChangeSpinMode(false);
 static volatile bool SpinMode = false;
 
-static bsp::CanBridge* receive = nullptr;
-static unsigned int flag_summary = 0;
+// static bsp::CanBridge* receive = nullptr;
+// static unsigned int flag_summary = 0;
 static const int KILLALL_DELAY = 100;
 static const int DEFAULT_TASK_DELAY = 100;
 static const int CHASSIS_TASK_DELAY = 2;
 
+// TODO: Mecanum wheel need different speed???
 // speed for steering motors (rad/s)
 constexpr float RUN_SPEED = (4 * PI);
-constexpr float ALIGN_SPEED = (PI);
 constexpr float ACCELERATION = (100 * PI);
 
-
 // speed for chassis rotation (no unit)
+// TODO: the speed for the fortress chassis
+// constexpr float SPIN_SPEED = 600;
+// constexpr float FOLLOW_SPEED = 400;
 constexpr float SPIN_SPEED = 80;
 constexpr float FOLLOW_SPEED = 40;
-
 
 //==================================================================================================
 // Referee
 //==================================================================================================
 
 #define REFEREE_RX_SIGNAL (1 << 1)
-
 
 const osThreadAttr_t refereeTaskAttribute = {.name = "refereeTask",
                                              .attr_bits = osThreadDetached,
@@ -105,12 +78,12 @@ const osThreadAttr_t refereeTaskAttribute = {.name = "refereeTask",
                                              .reserved = 0};
 
 osThreadId_t refereeTaskHandle;
-osThreadId_t chassisTaskHandle;
+
 class RefereeUART : public bsp::UART {
- public:
+public:
   using bsp::UART::UART;
 
- protected:
+protected:
   void RxCompleteCallback() final { osThreadFlagsSet(refereeTaskHandle, REFEREE_RX_SIGNAL); }
 };
 
@@ -132,7 +105,7 @@ void refereeTask(void* arg) {
 }
 
 //==================================================================================================
-// Chassis
+// Chassis(TODO)
 //==================================================================================================
 
 const osThreadAttr_t chassisTaskAttribute = {.name = "chassisTask",
@@ -144,287 +117,191 @@ const osThreadAttr_t chassisTaskAttribute = {.name = "chassisTask",
                                              .priority = (osPriority_t)osPriorityNormal,
                                              .tz_module = 0,
                                              .reserved = 0};
+osThreadId_t chassisTaskHandle;
 
-static control::MotorCANBase* motor1 = nullptr;
-static control::MotorCANBase* motor2 = nullptr;
-static control::MotorCANBase* motor3 = nullptr;
-static control::MotorCANBase* motor4 = nullptr;
-static control::MotorCANBase* motor5 = nullptr;
-static control::MotorCANBase* motor6 = nullptr;
-static control::MotorCANBase* motor7 = nullptr;
-static control::MotorCANBase* motor8 = nullptr;
+static control::MotorCANBase* fl_motor = nullptr;
+static control::MotorCANBase* fr_motor = nullptr;
+static control::MotorCANBase* bl_motor = nullptr;
+static control::MotorCANBase* br_motor = nullptr;
+static control::Chassis* chassis = nullptr;
 
-static control::SteeringMotor* steering_motor1 = nullptr;
-static control::SteeringMotor* steering_motor2 = nullptr;
-static control::SteeringMotor* steering_motor3 = nullptr;
-static control::SteeringMotor* steering_motor4 = nullptr;
-
-static bsp::GPIO* pe1 = nullptr;
-static bsp::GPIO* pe2 = nullptr;
-static bsp::GPIO* pe3 = nullptr;
-static bsp::GPIO* pe4 = nullptr;
-
-static control::steering_chassis_t* chassis_data;
-static control::SteeringChassis* chassis;
-
-static control::SuperCap* supercap = nullptr;
+static volatile float relative_angle = 0;
+// static control::SuperCap* supercap = nullptr;
 
 static const float CHASSIS_DEADZONE = 0.04;
 
-bool steering_align_detect1() { return pe1->Read() == 0; }
-
-bool steering_align_detect2() { return pe2->Read() == 0; }
-
-bool steering_align_detect3() { return pe3->Read() == 0; }
-
-bool steering_align_detect4() { return pe4->Read() == 0; }
-
 void chassisTask(void* arg) {
-  UNUSED(arg);
+UNUSED(arg);
 
-  control::MotorCANBase* steer_motors[] = {motor1, motor2, motor3, motor4};
-  control::MotorCANBase* wheel_motors[] = {motor5, motor6, motor7, motor8};
+  control::MotorCANBase* motors[] = {fl_motor, fr_motor, bl_motor, br_motor};
 
-  control::PIDController pid5(120, 15, 0);
-  control::PIDController pid6(120, 15, 0);
-  control::PIDController pid7(120, 15, 0);
-  control::PIDController pid8(120, 15, 0);
+  float sin_yaw, cos_yaw;
+  float vx_keyboard = 0, vy_keyboard = 0;
+  float vx_remote, vy_remote;
+  float vx_set, vy_set, wz_set;
 
-  while (!receive->start) osDelay(100);
-
-  while (receive->start < 0.5) osDelay(100);
-
-  // Alignment
-  chassis->SteerSetMaxSpeed(ALIGN_SPEED);
-  bool alignment_complete = false;
-  while (!alignment_complete) {
-    chassis->SteerCalcOutput();
-    control::MotorCANBase::TransmitOutput(steer_motors, 4);
-    alignment_complete = chassis->Calibrate();
-    osDelay(1);
-  }
-  chassis->ReAlign();
-  chassis->SteerCalcOutput();
-  chassis->SteerSetMaxSpeed(RUN_SPEED);
-  chassis->SteerThetaReset();
-  chassis->SetWheelSpeed(0,0,0,0);
+  float spin_speed = 600;
+  float follow_speed = 400;
 
   while (true) {
-    float relative_angle = receive->relative_angle;
-    float sin_yaw, cos_yaw, vx_set, vy_set;
-    float vx, vy, wz;
+    if (dbus->keyboard.bit.V || dbus->swr == remote::DOWN) break;
+    osDelay(100);
+  }
 
-    // TODO need to change the channels in gimbal.cc
-    vx_set = -receive->vy;
-    vy_set = receive->vx;
+  // while (!imu->CaliDone()) osDelay(100);
 
-    ReCali.input(receive->recalibrate);   // detect force recalibration
-    Revival.input(receive->dead);         // detect robot revival
+  while (true) {
+    while (Dead) osDelay(100);
 
-    // realign on revival OR when key 'R' is pressed
-    if (Revival.negEdge() || ReCali.posEdge()) {
-      chassis->SteerAlignFalse();
-      chassis->SteerSetMaxSpeed(ALIGN_SPEED);
-      bool realignment_complete = false;
-      while (!realignment_complete) {
-        chassis->SteerCalcOutput();
-        control::MotorCANBase::TransmitOutput(steer_motors, 4);
-        realignment_complete = chassis->Calibrate();
-        osDelay(1);
-      }
-      chassis->ReAlign();
-      chassis->SteerCalcOutput();
-      chassis->SteerSetMaxSpeed(RUN_SPEED);
-      chassis->SteerThetaReset();
-      chassis->SetWheelSpeed(0,0,0,0);
-    }
+    ChangeSpinMode.input(dbus->keyboard.bit.SHIFT || dbus->swl == remote::UP);
+    if (ChangeSpinMode.posEdge()) SpinMode = !SpinMode;
 
-    if (receive->mode == 1) {  // spin mode
-      // delay compensation
-      // based on rule-of-thumb formula SPIN_SPEED = 80 = ~30 degree of error
-      relative_angle = relative_angle - PI * 30.0 / 180.0 / 80.0 * SPIN_SPEED;
+    if (dbus->keyboard.bit.A) vx_keyboard -= 61.5;
+    if (dbus->keyboard.bit.D) vx_keyboard += 61.5;
+    if (dbus->keyboard.bit.W) vy_keyboard += 61.5;
+    if (dbus->keyboard.bit.S) vy_keyboard -= 61.5;
 
-      chassis->SteerSetMaxSpeed(RUN_SPEED * 2);
-      sin_yaw = sin(relative_angle);
-      cos_yaw = cos(relative_angle);
-      vx = cos_yaw * vx_set + sin_yaw * vy_set;
-      vy = -sin_yaw * vx_set + cos_yaw * vy_set;
-      wz = SPIN_SPEED;
+    if (-35 <= vx_keyboard && vx_keyboard <= 35) vx_keyboard = 0;
+    if (-35 <= vy_keyboard && vy_keyboard <= 35) vy_keyboard = 0;
+
+    if (vx_keyboard > 0)
+      vx_keyboard -= 60;
+    else if (vx_keyboard < 0)
+      vx_keyboard += 60;
+
+    if (vy_keyboard > 0)
+      vy_keyboard -= 60;
+    else if (vy_keyboard < 0)
+      vy_keyboard += 60;
+
+    vx_keyboard = clip<float>(vx_keyboard, -1200, 1200);
+    vy_keyboard = clip<float>(vy_keyboard, -1200, 1200);
+
+    vx_remote = dbus->ch0;
+    vy_remote = dbus->ch1;
+
+    vx_set = vx_keyboard + vx_remote;
+    vy_set = vy_keyboard + vy_remote;
+
+    // if (yaw_motor_flag)
+    //   relative_angle = yaw_motor->GetThetaDelta(gimbal_param->yaw_offset_);
+    // else
+    //   relative_angle = 0;
+
+    if (SpinMode) {
+      sin_yaw = arm_sin_f32(relative_angle);
+      cos_yaw = arm_cos_f32(relative_angle);
+      vx_set = cos_yaw * vx_set + sin_yaw * vy_set;
+      vy_set = -sin_yaw * vx_set + cos_yaw * vy_set;
+      wz_set = spin_speed;
     } else {
-      chassis->SteerSetMaxSpeed(RUN_SPEED);
-      sin_yaw = sin(relative_angle);
-      cos_yaw = cos(relative_angle);
-      vx = cos_yaw * vx_set + sin_yaw * vy_set;
-      vy = -sin_yaw * vx_set + cos_yaw * vy_set;
-      wz = std::min(FOLLOW_SPEED, FOLLOW_SPEED * relative_angle);
-      if (-CHASSIS_DEADZONE < relative_angle && relative_angle < CHASSIS_DEADZONE) wz = 0;
+      sin_yaw = arm_sin_f32(relative_angle);
+      cos_yaw = arm_cos_f32(relative_angle);
+      vx_set = cos_yaw * vx_set + sin_yaw * vy_set;
+      vy_set = -sin_yaw * vx_set + cos_yaw * vy_set;
+      wz_set = std::min(follow_speed, follow_speed * relative_angle);
+      if (-CHASSIS_DEADZONE < relative_angle && relative_angle < CHASSIS_DEADZONE) wz_set = 0;
     }
 
+    chassis->SetSpeed(vx_set, vy_set, wz_set);
 
-    chassis->SetSpeed(vx / 10, vy / 10, wz);
-    chassis->SteerUpdateTarget();
-    constexpr float WHEEL_SPEED_FACTOR = 4;
-    chassis->WheelUpdateSpeed(WHEEL_SPEED_FACTOR);
-    chassis->SteerCalcOutput();
-    chassis->Update((float)referee->game_robot_status.chassis_power_limit,
+    chassis->Update(true, (float)referee->game_robot_status.chassis_power_limit,
                     referee->power_heat_data.chassis_power,
                     (float)referee->power_heat_data.chassis_power_buffer);
-    if (Dead) {
-      chassis->SetSpeed(0,0,0);
-      motor5->SetOutput(0);
-      motor6->SetOutput(0);
-      motor7->SetOutput(0);
-      motor8->SetOutput(0);
-    }
 
-    control::MotorCANBase::TransmitOutput(wheel_motors, 4);
-    control::MotorCANBase::TransmitOutput(steer_motors, 4);
-
-    receive->cmd.id = bsp::SHOOTER_POWER;
-    receive->cmd.data_bool = referee->game_robot_status.mains_power_shooter_output;
-    receive->TransmitOutput();
-
-    receive->cmd.id = bsp::COOLING_HEAT1;
-    receive->cmd.data_float = (float)referee->power_heat_data.shooter_id1_17mm_cooling_heat;
-    receive->TransmitOutput();
-
-    receive->cmd.id = bsp::COOLING_HEAT2;
-    receive->cmd.data_float = (float)referee->power_heat_data.shooter_id2_17mm_cooling_heat;
-    receive->TransmitOutput();
-
-    receive->cmd.id = bsp::COOLING_LIMIT1;
-    receive->cmd.data_float = (float)referee->game_robot_status.shooter_id1_17mm_cooling_limit;
-    receive->TransmitOutput();
-
-    receive->cmd.id = bsp::COOLING_LIMIT2;
-    receive->cmd.data_float = (float)referee->game_robot_status.shooter_id2_17mm_cooling_limit;
-    receive->TransmitOutput();
-
-    receive->cmd.id = bsp::SPEED_LIMIT1;
-    receive->cmd.data_float = (float)referee->game_robot_status.shooter_id1_17mm_speed_limit;
-    receive->TransmitOutput();
-
-    receive->cmd.id = bsp::SPEED_LIMIT2;
-    receive->cmd.data_float = (float)referee->game_robot_status.shooter_id2_17mm_speed_limit;
-    receive->TransmitOutput();
-
-    receive->cmd.id = bsp::REMAIN_HP;
-    receive->cmd.data_int = referee->game_robot_status.remain_HP;
-    receive->TransmitOutput();
-
+    control::MotorCANBase::TransmitOutput(motors, 4);
     osDelay(CHASSIS_TASK_DELAY);
-
   }
 }
+
+//==================================================================================================
+// SelfTest(TODO)
+//==================================================================================================
+
+const osThreadAttr_t selfTestingTask = {.name = "selfTestTask",
+                                             .attr_bits = osThreadDetached,
+                                             .cb_mem = nullptr,
+                                             .cb_size = 0,
+                                             .stack_mem = nullptr,
+                                             .stack_size = 256 * 4,
+                                             .priority = (osPriority_t)osPriorityBelowNormal,
+                                             .tz_module = 0,
+                                             .reserved = 0};
+osThreadId_t selfTestTaskHandle;
+
+static bool fl_motor_flag = false;
+static bool fr_motor_flag = false;
+static bool bl_motor_flag = false;
+static bool br_motor_flag = false;
+
 void self_Check_Task(void* arg){
   UNUSED(arg);
 
   while(true){
     osDelay(100);
-    motor8->connection_flag_ = false;
-    motor7->connection_flag_ = false;
-    motor6->connection_flag_ = false;
-    motor5->connection_flag_ = false;
-    motor4->connection_flag_ = false;
-    motor3->connection_flag_ = false;
-    motor2->connection_flag_ = false;
-    motor1->connection_flag_ = false;
+    // TODO：fortress self check(7 motor)
+    fl_motor->connection_flag_ = false;
+    fr_motor->connection_flag_ = false;
+    bl_motor->connection_flag_ = false;
+    br_motor->connection_flag_ = false;
+
     osDelay(100);
-    fl_wheel_motor_flag = motor8->connection_flag_;
-    fr_wheel_motor_flag = motor7->connection_flag_;
-    bl_wheel_motor_flag = motor6->connection_flag_;
-    br_wheel_motor_flag = motor5->connection_flag_;
-    fl_steer_motor_flag = motor4->connection_flag_;
-    fr_steer_motor_flag = motor3->connection_flag_;
-    br_steer_motor_flag = motor2->connection_flag_;
-    bl_steer_motor_flag = motor1->connection_flag_;
-    flag_summary = bl_steer_motor_flag|
-                   br_steer_motor_flag<<1|
-                   fr_steer_motor_flag<<2|
-                   fl_steer_motor_flag<<3|
-                   br_wheel_motor_flag<<4|
-                   bl_wheel_motor_flag<<5|
-                   fr_wheel_motor_flag<<6|
-                   fl_wheel_motor_flag<<7;
+
+    fl_motor_flag = fl_motor->connection_flag_;
+    fr_motor_flag = fr_motor->connection_flag_;
+    bl_motor_flag = bl_motor->connection_flag_;
+    br_motor_flag = br_motor->connection_flag_;
+
+    // need self test
+
     osDelay(100);
-    if(transmission_flag){
-      receive->cmd.id = bsp::CHASSIS_FLAG;
-      receive->cmd.data_uint = (unsigned int)flag_summary;
-      receive->TransmitOutput();
-    }
-    transmission_flag = !transmission_flag;
   }
 }
+
+//==================================================================================================
+// RM Init(TODO)
+//==================================================================================================
+
 void RM_RTOS_Init() {
   print_use_uart(&huart1);
   bsp::SetHighresClockTimer(&htim5);
 
   can1 = new bsp::CAN(&hcan1, 0x201, true);
   can2 = new bsp::CAN(&hcan2, 0x201, false);
+  dbus = new remote::DBUS(&huart3);
+
   RGB = new display::RGB(&htim5, 3, 2, 1, 1000000);
 
-  motor1 = new control::Motor3508(can1, 0x201);
-  motor2 = new control::Motor3508(can1, 0x202);
-  motor3 = new control::Motor3508(can1, 0x203);
-  motor4 = new control::Motor3508(can1, 0x204);
+  // TODO: Sentry chassis initilize
+  // Chassis motor
+  fl_motor = new control::Motor3508(can2, 0x201);
+  fr_motor = new control::Motor3508(can2, 0x202);
+  bl_motor = new control::Motor3508(can2, 0x203);
+  br_motor = new control::Motor3508(can2, 0x204);
+  control::MotorCANBase* motors[control::FourWheel::motor_num];
+  motors[control::FourWheel::front_left] = fl_motor;
+  motors[control::FourWheel::front_right] = fr_motor;
+  motors[control::FourWheel::back_left] = bl_motor;
+  motors[control::FourWheel::back_right] = br_motor;
+  control::chassis_t chassis_data;
+  chassis_data.motors = motors;
+  chassis_data.model = control::CHASSIS_MECANUM_WHEEL;
+  chassis = new control::Chassis(chassis_data);
 
-  motor5 = new control::Motor3508(can2, 0x205);
-  motor6 = new control::Motor3508(can2, 0x206);
-  motor7 = new control::Motor3508(can2, 0x207);
-  motor8 = new control::Motor3508(can2, 0x208);
-
-  pe1 = new bsp::GPIO(IN1_GPIO_Port, IN1_Pin);
-  pe2 = new bsp::GPIO(IN2_GPIO_Port, IN2_Pin);
-  pe3 = new bsp::GPIO(IN3_GPIO_Port, IN3_Pin);
-  pe4 = new bsp::GPIO(IN4_GPIO_Port, IN4_Pin);
-
-  chassis_data = new control::steering_chassis_t();
-
-  supercap = new control::SuperCap(can2, 0x201);
-
-  control::steering_t steering_motor_data;
-  steering_motor_data.motor = motor1;
-  steering_motor_data.max_speed = RUN_SPEED;
-  steering_motor_data.max_acceleration = ACCELERATION;
-  steering_motor_data.transmission_ratio = 8;
-  steering_motor_data.omega_pid_param = new float[3]{140, 1.2, 0};
-  steering_motor_data.max_iout = 1000;
-  steering_motor_data.max_out = 13000;
-  steering_motor_data.calibrate_offset = 0;
-
-  steering_motor_data.align_detect_func = steering_align_detect1;
-  steering_motor1 = new control::SteeringMotor(steering_motor_data);
-
-  steering_motor_data.motor = motor2;
-  steering_motor_data.align_detect_func = steering_align_detect2;
-  steering_motor2 = new control::SteeringMotor(steering_motor_data);
-  steering_motor_data.motor = motor3;
-  steering_motor_data.align_detect_func = steering_align_detect3;
-  steering_motor3 = new control::SteeringMotor(steering_motor_data);
-  steering_motor_data.motor = motor4;
-  steering_motor_data.align_detect_func = steering_align_detect4;
-  steering_motor4 = new control::SteeringMotor(steering_motor_data);
-
-  chassis_data = new control::steering_chassis_t();
-
-  chassis_data->fl_steer_motor = steering_motor4;
-  chassis_data->fr_steer_motor = steering_motor3;
-  chassis_data->bl_steer_motor = steering_motor1;
-  chassis_data->br_steer_motor = steering_motor2;
-
-  chassis_data->fl_wheel_motor = motor8;
-  chassis_data->fr_wheel_motor = motor7;
-  chassis_data->bl_wheel_motor = motor5;
-  chassis_data->br_wheel_motor = motor6;
-
-  chassis = new control::SteeringChassis(chassis_data);
+  // supercap initilize
+  // supercap = new control::SuperCap(can2, 0x201);
 
   referee_uart = new RefereeUART(&huart6);
   referee_uart->SetupRx(300);
   referee_uart->SetupTx(300);
   referee = new communication::Referee;
-  receive = new bsp::CanBridge(can2, 0x20B, 0x20A);
+  
+  // receive = new bsp::CanBridge(can2, 0x20B, 0x20A);
 }
+
+//==================================================================================================
+// RTOS Threads Init
+//==================================================================================================
 
 void RM_RTOS_Threads_Init(void) {
   refereeTaskHandle = osThreadNew(refereeTask, nullptr, &refereeTaskAttribute);
@@ -432,33 +309,38 @@ void RM_RTOS_Threads_Init(void) {
   selfTestTaskHandle = osThreadNew(self_Check_Task, nullptr, &selfTestingTask);
 }
 
+//==================================================================================================
+// Kill All (TODO:)
+//==================================================================================================
+
 void KillAll() {
   RM_EXPECT_TRUE(false, "Operation Killed!\r\n");
-
-  control::MotorCANBase* wheel_motors[] = {motor5, motor6, motor7, motor8};
+  control::MotorCANBase* motors_can2_chassis[] = {fl_motor, fr_motor, bl_motor, br_motor};
 
   RGB->Display(display::color_blue);
 
-  chassis->SteerAlignFalse();   // set alignment status of each wheel to false
-
+  // TODO: do we need fake death here(I think no need, fortress dead?)
   while (true) {
-    if (!receive->dead) {
+    FakeDeath.input(dbus->keyboard.bit.B || dbus->swl == remote::DOWN);
+    if (FakeDeath.posEdge()) {
       SpinMode = false;
       Dead = false;
       RGB->Display(display::color_green);
       break;
     }
-
-    motor5->SetOutput(0);
-    motor6->SetOutput(0);
-    motor7->SetOutput(0);
-    motor8->SetOutput(0);
-
-    control::MotorCANBase::TransmitOutput(wheel_motors, 4);
+    fl_motor->SetOutput(0);
+    bl_motor->SetOutput(0);
+    fr_motor->SetOutput(0);
+    br_motor->SetOutput(0);
+    control::MotorCANBase::TransmitOutput(motors_can2_chassis, 4);
 
     osDelay(KILLALL_DELAY);
   }
 }
+
+//==================================================================================================
+// RTOS Default Task (TODO???)
+//==================================================================================================
 
 static bool debug = false;
 
@@ -466,15 +348,16 @@ void RM_RTOS_Default_Task(const void* args) {
   UNUSED(args);
 
   while (true) {
-    if (receive->dead) {
+    FakeDeath.input(dbus->keyboard.bit.B || dbus->swl == remote::DOWN);
+    if (FakeDeath.posEdge()) {
       Dead = true;
       KillAll();
     }
     if (debug) {
       set_cursor(0, 0);
       clear_screen();
-      print("vx: %f, vy: %f, angle: %f, mode: %f, dead: %f\r\n", receive->vx, receive->vy,
-            receive->relative_angle, receive->mode, receive->dead);
+      // print("vx: %f, vy: %f, angle: %f, mode: %f, dead: %f\r\n", receive->vx, receive->vy,
+      //       receive->relative_angle, receive->mode, receive->dead);
     }
     osDelay(DEFAULT_TASK_DELAY);
   }
