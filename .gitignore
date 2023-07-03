@@ -163,3 +163,4 @@ compile_commands.json
 
 # Vim
 *.swp
+.cache

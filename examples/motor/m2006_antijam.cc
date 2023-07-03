@@ -34,10 +34,10 @@
 #define KEY_GPIO_GROUP GPIOB
 #define KEY_GPIO_PIN GPIO_PIN_2
 
-#define NOTCH (2 * PI / 8)
-#define LOAD_ANGLE (2 * PI / 8)
-#define SPEED (6 * PI)
-#define ACCELERATION (200 * PI)
+static const float NOTCH = (2 * PI / 8);
+static const float LOAD_ANGLE = (2 * PI / 8);
+static const float SPEED = (6 * PI);
+static const float ACCELERATION = (200 * PI);
 
 bsp::CAN* can1 = nullptr;
 control::MotorCANBase* motor = nullptr;

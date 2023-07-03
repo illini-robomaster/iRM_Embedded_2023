@@ -1,6 +1,6 @@
 /****************************************************************************
  *                                                                          *
- *  Copyright (C) 2022 RoboMaster.                                          *
+ *  Copyright (C) 2023 RoboMaster.                                          *
  *  Illini RoboMaster @ University of Illinois at Urbana-Champaign          *
  *                                                                          *
  *  This program is free software: you can redistribute it and/or modify    *
@@ -599,6 +599,17 @@ class SteeringMotor {
    * @param data[]  raw data bytes
    */
   void UpdateData(const uint8_t data[]);
+
+  /**
+   * @brief Set align_complete_ of the motor to False
+   */
+  void SetAlignFalse();
+
+  /**
+   * @brief Check the motor's align_complete_ flag
+   * @return True if motor's align_complete_ flag is true, false otherwise
+   */
+  bool CheckAlignment();
 
  private:
   ServoMotor* servo_;

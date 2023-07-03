@@ -372,7 +372,7 @@ typedef struct {
   uint8_t data[30];
 } __packed graphic_character_t;
 
-enum content {
+typedef enum {
   NO_GRAPH,
   DELETE_GRAPH,
   SINGLE_GRAPH,
@@ -380,7 +380,7 @@ enum content {
   FIVE_GRAPH,
   SEVEN_GRAPH,
   CHAR_GRAPH,
-};
+} content;
 
 class Referee : public Protocol {
  public:

@@ -30,11 +30,14 @@
 #include "protocol.h"
 #include "rgb.h"
 #include "steering.h"
+#include "supercap.h"
 #include <cmath>
 
 static bsp::CAN* can1 = nullptr;
 static bsp::CAN* can2 = nullptr;
 static display::RGB* RGB = nullptr;
+static BoolEdgeDetector ReCali(false);
+static BoolEdgeDetector Revival(false);
 
 //==================================================================================================
 // SelfTest
@@ -164,6 +167,8 @@ static bsp::GPIO* pe4 = nullptr;
 static control::steering_chassis_t* chassis_data;
 static control::SteeringChassis* chassis;
 
+static control::SuperCap* supercap = nullptr;
+
 static const float CHASSIS_DEADZONE = 0.04;
 
 bool steering_align_detect1() { return pe1->Read() == 0; }
@@ -209,12 +214,30 @@ void chassisTask(void* arg) {
     float sin_yaw, cos_yaw, vx_set, vy_set;
     float vx, vy, wz;
 
-
     // TODO need to change the channels in gimbal.cc
     vx_set = -receive->vy;
     vy_set = receive->vx;
 
+    ReCali.input(receive->recalibrate);   // detect force recalibration
+    Revival.input(receive->dead);         // detect robot revival
 
+    // realign on revival OR when key 'R' is pressed
+    if (Revival.negEdge() || ReCali.posEdge()) {
+      chassis->SteerAlignFalse();
+      chassis->SteerSetMaxSpeed(ALIGN_SPEED);
+      bool realignment_complete = false;
+      while (!realignment_complete) {
+        chassis->SteerCalcOutput();
+        control::MotorCANBase::TransmitOutput(steer_motors, 4);
+        realignment_complete = chassis->Calibrate();
+        osDelay(1);
+      }
+      chassis->ReAlign();
+      chassis->SteerCalcOutput();
+      chassis->SteerSetMaxSpeed(RUN_SPEED);
+      chassis->SteerThetaReset();
+      chassis->SetWheelSpeed(0,0,0,0);
+    }
 
     if (receive->mode == 1) {  // spin mode
       // delay compensation
@@ -237,18 +260,15 @@ void chassisTask(void* arg) {
       if (-CHASSIS_DEADZONE < relative_angle && relative_angle < CHASSIS_DEADZONE) wz = 0;
     }
 
+
     chassis->SetSpeed(vx / 10, vy / 10, wz);
     chassis->SteerUpdateTarget();
     constexpr float WHEEL_SPEED_FACTOR = 4;
     chassis->WheelUpdateSpeed(WHEEL_SPEED_FACTOR);
-
     chassis->SteerCalcOutput();
-
-    motor5->SetOutput(pid5.ComputeConstrainedOutput(motor5->GetOmegaDelta(chassis->v_bl_)));
-    motor6->SetOutput(pid6.ComputeConstrainedOutput(motor6->GetOmegaDelta(chassis->v_br_)));
-    motor7->SetOutput(pid7.ComputeConstrainedOutput(motor7->GetOmegaDelta(chassis->v_fr_)));
-    motor8->SetOutput(pid8.ComputeConstrainedOutput(motor8->GetOmegaDelta(chassis->v_fl_)));
-
+    chassis->Update((float)referee->game_robot_status.chassis_power_limit,
+                    referee->power_heat_data.chassis_power,
+                    (float)referee->power_heat_data.chassis_power_buffer);
     if (Dead) {
       chassis->SetSpeed(0,0,0);
       motor5->SetOutput(0);
@@ -259,8 +279,6 @@ void chassisTask(void* arg) {
 
     control::MotorCANBase::TransmitOutput(wheel_motors, 4);
     control::MotorCANBase::TransmitOutput(steer_motors, 4);
-
-
 
     receive->cmd.id = bsp::SHOOTER_POWER;
     receive->cmd.data_bool = referee->game_robot_status.mains_power_shooter_output;
@@ -290,14 +308,11 @@ void chassisTask(void* arg) {
     receive->cmd.data_float = (float)referee->game_robot_status.shooter_id2_17mm_speed_limit;
     receive->TransmitOutput();
 
-
-
-    //send bitmap of connection flag only once
-
-
+    receive->cmd.id = bsp::REMAIN_HP;
+    receive->cmd.data_int = referee->game_robot_status.remain_HP;
+    receive->TransmitOutput();
 
     osDelay(CHASSIS_TASK_DELAY);
-
 
   }
 }
@@ -365,6 +380,8 @@ void RM_RTOS_Init() {
 
   chassis_data = new control::steering_chassis_t();
 
+  supercap = new control::SuperCap(can2, 0x201);
+
   control::steering_t steering_motor_data;
   steering_motor_data.motor = motor1;
   steering_motor_data.max_speed = RUN_SPEED;
@@ -421,6 +438,8 @@ void KillAll() {
   control::MotorCANBase* wheel_motors[] = {motor5, motor6, motor7, motor8};
 
   RGB->Display(display::color_blue);
+
+  chassis->SteerAlignFalse();   // set alignment status of each wheel to false
 
   while (true) {
     if (!receive->dead) {

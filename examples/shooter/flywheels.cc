@@ -25,8 +25,6 @@
 #include "motor.h"
 #include "dbus.h"
 
-#define TARGET_SPEED 30
-
 bsp::CAN* can = nullptr;
 control::MotorCANBase* left = nullptr;
 control::MotorCANBase* right = nullptr;
@@ -49,8 +47,8 @@ void RM_RTOS_Default_Task(const void* args) {
 
   while (true) {
     if (dbus->swr == remote::UP){
-      float diff1 = right->GetOmegaDelta(500);
-      float diff2 = left->GetOmegaDelta(-500);
+      float diff1 = right->GetOmegaDelta(100);
+      float diff2 = left->GetOmegaDelta(-100);
       int16_t out1 = pid1.ComputeConstrainedOutput(diff1);
       int16_t out2 = pid2.ComputeConstrainedOutput(diff2);
       right->SetOutput(out1);

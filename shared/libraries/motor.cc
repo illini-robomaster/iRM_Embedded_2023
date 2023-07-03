@@ -1,6 +1,6 @@
 /****************************************************************************
  *                                                                          *
- *  Copyright (C) 2022 RoboMaster.                                          *
+ *  Copyright (C) 2023 RoboMaster.                                          *
  *  Illini RoboMaster @ University of Illinois at Urbana-Champaign          *
  *                                                                          *
  *  This program is free software: you can redistribute it and/or modify    *
@@ -353,12 +353,12 @@ void ServoMotor::CalcOutput() {
     detect_total_ += command - detect_buf_[detect_head_];
     detect_buf_[detect_head_] = command;
     detect_head_ = detect_head_ + 1 < detect_period_ ? detect_head_ + 1 : 0;
-
     // detect if motor is jammed
     // detect total is used as filter.
-    if (abs(detect_total_) >= jam_threshold_) {
+    if (detect_total_ >= jam_threshold_) {
       servo_jam_t data;
       data.speed = max_speed_;
+      // this function is in shooter.cc called jam_callback.
       jam_callback_(this, data);
     }
   }
@@ -385,6 +385,8 @@ void ServoMotor::RegisterJamCallback(jam_callback_t callback, float effort_thres
   memset(detect_buf_, 0, detect_period);
 
   // calculate callback trigger threshold and triggering facility
+  // the effort_threshold is from shooter.cc constructor for load_servo initialization
+  // the detect_period is the length of the buffer(filter), the default value is 50
   jam_threshold_ = maximum_command * effort_threshold * detect_period;
   jam_detector_ = new BoolEdgeDetector(false);
 }
@@ -476,9 +478,10 @@ float SteeringMotor::GetTheta(GetThetaMode mode) const {
 }
 
 void SteeringMotor::PrintData() const {
-  print("current_target: %10.4f ", current_target_);
-  print("current_theta: %10.4f ", this->GetTheta(relative_mode));
-  print("align_angle: %10.4f \r\n", align_angle_);
+  print("current_target: %10.4  ", current_target_);
+  print("current_theta: %10.4f  ", this->GetTheta(relative_mode));
+  print("align_angle: %10.4f  ", align_angle_);
+  print("align_complete: %d\r\n", align_complete_);
 }
 
 int SteeringMotor::TurnRelative(float angle, bool override) {
@@ -538,6 +541,15 @@ void SteeringMotor::CalcOutput() {
 void SteeringMotor::UpdateData(const uint8_t data[]) {
   servo_->UpdateData(data);
 }
+
+void SteeringMotor::SetAlignFalse() {
+  align_complete_ = false;
+}
+
+bool SteeringMotor::CheckAlignment() {
+  return align_complete_;
+}
+
 
 /**
  * @brief standard can motor callback, used to update motor data
@@ -700,5 +712,6 @@ float Motor4310::GetOmega() const {
 float Motor4310::GetTorque() const {
   return torque_;
 }
+
 
 } /* namespace control */

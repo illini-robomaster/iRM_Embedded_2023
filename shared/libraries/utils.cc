@@ -63,7 +63,7 @@ bool FloatEdgeDetector::negEdge() { return negEdge_; }
 uint16_t float_to_uint(float x, float x_min, float x_max, int bits) {
   float span = x_max - x_min;
   float offset = x_min;
-  return (uint16_t)((x - offset) * ((float)((1 << bits) - 1)) / span);
+  return (uint16_t) ((x-offset) * ((float)((1<<bits)-1))/span);
 }
 
 float uint_to_float(int x_int, float x_min, float x_max, int bits) {

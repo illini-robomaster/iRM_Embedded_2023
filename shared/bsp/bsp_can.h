@@ -1,6 +1,6 @@
 /****************************************************************************
  *                                                                          *
- *  Copyright (C) 2022 RoboMaster.                                          *
+ *  Copyright (C) 2023 RoboMaster.                                          *
  *  Illini RoboMaster @ University of Illinois at Urbana-Champaign          *
  *                                                                          *
  *  This program is free software: you can redistribute it and/or modify    *
@@ -26,7 +26,7 @@
 #include "can.h"
 
 #define MAX_CAN_DATA_SIZE 8
-#define MAX_CAN_DEVICES 24
+#define MAX_CAN_DEVICES 12
 
 namespace bsp {
 

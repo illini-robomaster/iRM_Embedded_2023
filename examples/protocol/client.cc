@@ -27,8 +27,6 @@
 
 #define RX_SIGNAL (1 << 0)
 
-extern osThreadId_t defaultTaskHandle;
-
 const osThreadAttr_t clientTaskAttribute = {.name = "clientTask",
                                             .attr_bits = osThreadDetached,
                                             .cb_mem = nullptr,
