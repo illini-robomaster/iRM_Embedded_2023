@@ -683,30 +683,46 @@ void selfTestTask(void* arg) {
   // TODO: position of checkboxes and terms need update
   // TODO: need add the right shooter self test displayment
   // Lidar, Calibration, dbus, and temperature
-  OLED->ShowString(2, 5, (uint8_t*)"Ldr");
+
   OLED->ShowString(3, 0, (uint8_t*)"Cal");
+  //calibration
   OLED->ShowString(3, 6, (uint8_t*)"Dbs");
+  //dbus
   OLED->ShowString(4, 0, (uint8_t*)"Temp:");
+  //temperature
   //  OLED->ShowString(4, 0, (uint8_t*)"Ref");
 
   // Fortress mode motors self test
-  OLED->ShowString(0,12, (uint8_t*)"EL");
-  OLED->ShowString(0, 17, (uint8_t*)"ER");
-  OLED->ShowString(1,17, (uint8_t*)"FM");
+  OLED->ShowString(0,17, (uint8_t*)"EL");
+  //Elevator Left Motor
+  OLED->ShowString(1, 17, (uint8_t*)"ER");
+  //Elevator Right Motor
+  OLED->ShowString(2,17, (uint8_t*)"FM");
+  //Fortress Motor
 
   // chassis motors self test
-  OLED->ShowString(1, 12, (uint8_t*)"FL");
-  OLED->ShowString(2, 12, (uint8_t*)"FR");
-  OLED->ShowString(3, 12, (uint8_t*)"BL");
-  OLED->ShowString(4, 12, (uint8_t*)"BR");
+  OLED->ShowString(0, 12, (uint8_t*)"FL");
+  //Front Left
+  OLED->ShowString(1, 12, (uint8_t*)"FR");
+  //Front Right
+  OLED->ShowString(2, 12, (uint8_t*)"BL");
+  //Back Left
+  OLED->ShowString(3, 12, (uint8_t*)"BR");
+  //Back Right
 
   // Shooters
   OLED->ShowString(0, 0, (uint8_t*)"LT");
-  OLED->ShowString(0, 5, (uint8_t*)"LB");
+  // Left Top Flywheel
+  OLED->ShowString(2, 0, (uint8_t*)"LB");
+  // Left Bottom Flywheel
   OLED->ShowString(1, 0, (uint8_t*)"LD");
-  OLED->ShowString(1, 5, (uint8_t*)"RT");
-  OLED->ShowString(2, 0, (uint8_t*)"RB");
-  OLED->ShowString(4, 5, (uint8_t*)"RD");
+  // Left Dial
+  OLED->ShowString(0, 5, (uint8_t*)"RT");
+  // Right Top Flywheel
+  OLED->ShowString(1, 5, (uint8_t*)"RB");
+  // Right Bottom Flywheel
+  OLED->ShowString(2, 5, (uint8_t*)"RD");
+  // Right Dial
   char temp[6] = "";
   while (true) {
     osDelay(100);
@@ -755,19 +771,19 @@ void selfTestTask(void* arg) {
 
 
     // TODO: position of checkboxes and terms need update
-    OLED->ShowBlock(1,15,fl_motor_flag);
+    OLED->ShowBlock(0,14,fl_motor_flag);
 
-    OLED->ShowBlock(2,15,fr_motor_flag);
+    OLED->ShowBlock(1,14,fr_motor_flag);
 
-    OLED->ShowBlock(3,15,bl_motor_flag);
+    OLED->ShowBlock(2,14,bl_motor_flag);
 
-    OLED->ShowBlock(4,15,br_motor_flag);
+    OLED->ShowBlock(3,14,br_motor_flag);
 
-    OLED->ShowBlock(0,15,elevator_left_motor_flag);
+    OLED->ShowBlock(0,18,elevator_left_motor_flag);
 
-    OLED->ShowBlock(0,20,elevator_right_motor_flag);
+    OLED->ShowBlock(1,18,elevator_right_motor_flag);
 
-    OLED->ShowBlock(1,20,fortress_motor_flag);
+    OLED->ShowBlock(2,18,fortress_motor_flag);
 
     //    fl_wheel_flag = send->selfCheck_flag;
     calibration_flag = imu->CaliDone();
@@ -775,17 +791,14 @@ void selfTestTask(void* arg) {
     dbus_flag = dbus->connection_flag_;
 
     // TODO: need to add the show block of right shooter(3 motors)
-    OLED->ShowBlock(0, 2, pitch_motor_flag);
-    OLED->ShowBlock(0, 7, yaw_motor_flag);
     // LEFT shooter
-    OLED->ShowBlock(1, 2, left_top_flywheel_flag);
-    OLED->ShowBlock(1, 7, left_bottom_flywheel_flag);
+    OLED->ShowBlock(0, 2, left_top_flywheel_flag);
+    OLED->ShowBlock(1, 2, left_bottom_flywheel_flag);
     OLED->ShowBlock(2, 2, left_dial_flag);
     // RIGHT shooter (location still need to be updated
-    OLED->ShowBlock(3, 2, right_top_flywheel_flag);
-    OLED->ShowBlock(3, 7, right_bottom_flywheel_flag);
-    OLED->ShowBlock(4, 2, right_dial_flag);
-    OLED->ShowBlock(2, 8, lidar_flag);
+    OLED->ShowBlock(0, 7, right_top_flywheel_flag);
+    OLED->ShowBlock(1, 7, right_bottom_flywheel_flag);
+    OLED->ShowBlock(2, 7, right_dial_flag);
     OLED->ShowBlock(3, 3, imu->CaliDone());
     OLED->ShowBlock(3, 9, dbus_flag);
     snprintf(temp, 6, "%.2f", imu->Temp);
