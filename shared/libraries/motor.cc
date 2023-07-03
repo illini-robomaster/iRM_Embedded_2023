@@ -35,6 +35,10 @@ int16_t ClipMotorRange(float output) {
   return (int16_t)clip<int>((int)output, MIN, MAX);
 }
 
+//==================================================================================================
+// MotorCanBase(DJI Base)
+//==================================================================================================
+
 /**
  * @brief standard can motor callback, used to update motor data
  *
@@ -102,6 +106,10 @@ int16_t MotorCANBase::GetCurr() const { return 0; }
 
 uint16_t MotorCANBase::GetTemp() const { return 0; }
 
+//==================================================================================================
+// Motor3508
+//==================================================================================================
+
 Motor3508::Motor3508(CAN* can, uint16_t rx_id) : MotorCANBase(can, rx_id) {
   can->RegisterRxCallback(rx_id, can_motor_callback, this);
 }
@@ -136,6 +144,10 @@ int16_t Motor3508::GetCurr() const { return raw_current_get_; }
 
 uint16_t Motor3508::GetTemp() const { return raw_temperature_; }
 
+//==================================================================================================
+// Motor6020
+//==================================================================================================
+
 Motor6020::Motor6020(CAN* can, uint16_t rx_id) : MotorCANBase(can, rx_id) {
   can->RegisterRxCallback(rx_id, can_motor_callback, this);
 }
@@ -169,6 +181,10 @@ void Motor6020::SetOutput(int16_t val) {
 int16_t Motor6020::GetCurr() const { return raw_current_get_; }
 
 uint16_t Motor6020::GetTemp() const { return raw_temperature_; }
+
+//==================================================================================================
+// Motor6623
+//==================================================================================================
 
 Motor6623::Motor6623(CAN* can, uint16_t rx_id) : MotorCANBase(can, rx_id) {
   can->RegisterRxCallback(rx_id, can_motor_callback, this);
@@ -207,6 +223,10 @@ float Motor6623::GetOmegaDelta(const float target) const {
   return 0;
 }
 
+//==================================================================================================
+// Motor2006
+//==================================================================================================
+
 Motor2006::Motor2006(CAN* can, uint16_t rx_id) : MotorCANBase(can, rx_id) {
   can->RegisterRxCallback(rx_id, can_motor_callback, this);
 }
@@ -237,6 +257,10 @@ void Motor2006::SetOutput(int16_t val) {
 
 int16_t Motor2006::GetCurr() const { return raw_current_get_; }
 
+//==================================================================================================
+// MotorPWMBase
+//==================================================================================================
+
 MotorPWMBase::MotorPWMBase(TIM_HandleTypeDef* htim, uint8_t channel, uint32_t clock_freq,
                            uint32_t output_freq, uint32_t idle_throttle)
     : pwm_(htim, channel, clock_freq, output_freq, idle_throttle), idle_throttle_(idle_throttle) {
@@ -248,11 +272,19 @@ void MotorPWMBase::SetOutput(int16_t val) {
   pwm_.SetPulseWidth(val + idle_throttle_);
 }
 
+//==================================================================================================
+// Motor2305
+//==================================================================================================
+
 void Motor2305::SetOutput(int16_t val) {
   constexpr int16_t MIN_OUTPUT = 0;
   constexpr int16_t MAX_OUTPUT = 700;
   MotorPWMBase::SetOutput(clip<int16_t>(val, MIN_OUTPUT, MAX_OUTPUT));
 }
+
+//==================================================================================================
+// ServoMotor
+//==================================================================================================
 
 /**
  * @brief default servomotor callback that overrides the standard can motor callback
@@ -454,6 +486,9 @@ void ServoMotor::UpdateData(const uint8_t data[]) {
   if (hold_ && diff > proximity_out_) hold_ = false;
 }
 
+//==================================================================================================
+// SteeringMotor
+//==================================================================================================
 
 SteeringMotor::SteeringMotor(steering_t data) {
   servo_t servo_data;
@@ -550,6 +585,9 @@ bool SteeringMotor::CheckAlignment() {
   return align_complete_;
 }
 
+//==================================================================================================
+// Motor4310
+//==================================================================================================
 
 /**
  * @brief standard can motor callback, used to update motor data

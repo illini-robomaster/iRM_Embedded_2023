@@ -36,8 +36,7 @@ namespace bsp {
      */
     CAN* CAN::FindInstance(CAN_HandleTypeDef* hcan) {
         const auto it = ptr_map.find(hcan);
-        if (it == ptr_map.end())
-            return nullptr;
+        if (it == ptr_map.end())  return nullptr;
 
         return it->second;
     }
@@ -60,8 +59,8 @@ namespace bsp {
      */
     void CAN::RxFIFO0MessagePendingCallback(CAN_HandleTypeDef* hcan) {
         CAN* can = FindInstance(hcan);
-        if (!can)
-            return;
+        if (!can)  return;
+
         can->RxCallback();
     }
 
@@ -84,8 +83,7 @@ namespace bsp {
     int CAN::RegisterRxCallback(uint32_t std_id, can_rx_callback_t callback, void* args) {
         // int callback_id = std_id - start_id_;
 
-        if (callback_count_ >= MAX_CAN_DEVICES)
-            return -1;
+        if (callback_count_ >= MAX_CAN_DEVICES) return -1;
 
         rx_args_[callback_count_] = args;
         rx_callbacks_[callback_count_] = callback;
@@ -110,13 +108,11 @@ namespace bsp {
         };
 
         uint32_t mailbox;
-
         if (HAL_CAN_AddTxMessage(hcan_, &header, (uint8_t*)data, &mailbox) != HAL_OK)
             return -1;
 
         // poll for can transmission to complete
-        while (HAL_CAN_IsTxMessagePending(hcan_, mailbox))
-            ;
+        while (HAL_CAN_IsTxMessagePending(hcan_, mailbox));
 
         return length;
     }

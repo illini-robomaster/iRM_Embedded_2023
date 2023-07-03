@@ -50,7 +50,7 @@ class CAN {
      * @return true if associated, otherwise false
      */
     bool Uses(CAN_HandleTypeDef* hcan) {
-        return hcan_ == hcan;
+      return hcan_ == hcan;
     }
 
     /**
