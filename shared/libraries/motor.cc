@@ -1,6 +1,6 @@
 /****************************************************************************
  *                                                                          *
- *  Copyright (C) 2022 RoboMaster.                                          *
+ *  Copyright (C) 2023 RoboMaster.                                          *
  *  Illini RoboMaster @ University of Illinois at Urbana-Champaign          *
  *                                                                          *
  *  This program is free software: you can redistribute it and/or modify    *
@@ -34,6 +34,10 @@ int16_t ClipMotorRange(float output) {
   constexpr int MAX = MOTOR_RANGE;  /* Maximum that a 16-bit number can represent */
   return (int16_t)clip<int>((int)output, MIN, MAX);
 }
+
+//==================================================================================================
+// MotorCanBase(DJI Base)
+//==================================================================================================
 
 /**
  * @brief standard can motor callback, used to update motor data
@@ -102,6 +106,10 @@ int16_t MotorCANBase::GetCurr() const { return 0; }
 
 uint16_t MotorCANBase::GetTemp() const { return 0; }
 
+//==================================================================================================
+// Motor3508
+//==================================================================================================
+
 Motor3508::Motor3508(CAN* can, uint16_t rx_id) : MotorCANBase(can, rx_id) {
   can->RegisterRxCallback(rx_id, can_motor_callback, this);
 }
@@ -136,6 +144,10 @@ int16_t Motor3508::GetCurr() const { return raw_current_get_; }
 
 uint16_t Motor3508::GetTemp() const { return raw_temperature_; }
 
+//==================================================================================================
+// Motor6020
+//==================================================================================================
+
 Motor6020::Motor6020(CAN* can, uint16_t rx_id) : MotorCANBase(can, rx_id) {
   can->RegisterRxCallback(rx_id, can_motor_callback, this);
 }
@@ -169,6 +181,10 @@ void Motor6020::SetOutput(int16_t val) {
 int16_t Motor6020::GetCurr() const { return raw_current_get_; }
 
 uint16_t Motor6020::GetTemp() const { return raw_temperature_; }
+
+//==================================================================================================
+// Motor6623
+//==================================================================================================
 
 Motor6623::Motor6623(CAN* can, uint16_t rx_id) : MotorCANBase(can, rx_id) {
   can->RegisterRxCallback(rx_id, can_motor_callback, this);
@@ -207,6 +223,10 @@ float Motor6623::GetOmegaDelta(const float target) const {
   return 0;
 }
 
+//==================================================================================================
+// Motor2006
+//==================================================================================================
+
 Motor2006::Motor2006(CAN* can, uint16_t rx_id) : MotorCANBase(can, rx_id) {
   can->RegisterRxCallback(rx_id, can_motor_callback, this);
 }
@@ -237,6 +257,10 @@ void Motor2006::SetOutput(int16_t val) {
 
 int16_t Motor2006::GetCurr() const { return raw_current_get_; }
 
+//==================================================================================================
+// MotorPWMBase
+//==================================================================================================
+
 MotorPWMBase::MotorPWMBase(TIM_HandleTypeDef* htim, uint8_t channel, uint32_t clock_freq,
                            uint32_t output_freq, uint32_t idle_throttle)
     : pwm_(htim, channel, clock_freq, output_freq, idle_throttle), idle_throttle_(idle_throttle) {
@@ -248,11 +272,19 @@ void MotorPWMBase::SetOutput(int16_t val) {
   pwm_.SetPulseWidth(val + idle_throttle_);
 }
 
+//==================================================================================================
+// Motor2305
+//==================================================================================================
+
 void Motor2305::SetOutput(int16_t val) {
   constexpr int16_t MIN_OUTPUT = 0;
   constexpr int16_t MAX_OUTPUT = 700;
   MotorPWMBase::SetOutput(clip<int16_t>(val, MIN_OUTPUT, MAX_OUTPUT));
 }
+
+//==================================================================================================
+// ServoMotor
+//==================================================================================================
 
 /**
  * @brief default servomotor callback that overrides the standard can motor callback
@@ -454,6 +486,9 @@ void ServoMotor::UpdateData(const uint8_t data[]) {
   if (hold_ && diff > proximity_out_) hold_ = false;
 }
 
+//==================================================================================================
+// SteeringMotor
+//==================================================================================================
 
 SteeringMotor::SteeringMotor(steering_t data) {
   servo_t servo_data;
@@ -550,17 +585,32 @@ bool SteeringMotor::CheckAlignment() {
   return align_complete_;
 }
 
+//==================================================================================================
+// Motor4310
+//==================================================================================================
 
-Motor4310::Motor4310(bsp::CAN* can, uint16_t rx_id, uint16_t tx_id, mode_t mode) : can_(can), rx_id_(rx_id) {
-  can->RegisterRxCallback(rx_id, can_motor_callback, this);
+/**
+ * @brief standard can motor callback, used to update motor data
+ *
+ * @param data data that come from motor
+ * @param args pointer to a MotorCANBase instance
+ */
+static void can_motor_4310_callback(const uint8_t data[], void* args) {
+  Motor4310* motor = reinterpret_cast<Motor4310*>(args);
+  motor->UpdateData(data);
+}
+
+Motor4310::Motor4310(bsp::CAN* can, uint16_t rx_id, uint16_t tx_id, mode_t mode)
+    : can_(can), rx_id_(rx_id), tx_id_(tx_id) {
+  can->RegisterRxCallback(rx_id, can_motor_4310_callback, this);
   /* following the CAN id format from the m4310 V2.1 document */
   mode_ = mode;
   if (mode == MIT) {
-    tx_id_ = tx_id;
+    tx_id_actual_ = tx_id;
   } else if (mode == POS_VEL) {
-    tx_id_ = tx_id + 0x100;
+    tx_id_actual_ = tx_id + 0x100;
   } else if (mode == VEL) {
-    tx_id_ = tx_id + 0x200;
+    tx_id_actual_ = tx_id + 0x200;
   } else {
     RM_EXPECT_TRUE(false, "Invalid mode number!");
   }
@@ -576,7 +626,7 @@ void Motor4310::MotorEnable(Motor4310* motor) {
   data[5] = 0xff;
   data[6] = 0xff;
   data[7] = 0xfc;
-  motor->can_->Transmit(motor->tx_id_, data, 8);
+  motor->can_->Transmit(motor->tx_id_actual_, data, 8);
 }
 
 void Motor4310::MotorDisable(control::Motor4310* motor) {
@@ -589,7 +639,7 @@ void Motor4310::MotorDisable(control::Motor4310* motor) {
   data[5] = 0xff;
   data[6] = 0xff;
   data[7] = 0xfd;
-  motor->can_->Transmit(motor->tx_id_, data, 8);
+  motor->can_->Transmit(motor->tx_id_actual_, data, 8);
 }
 
 void Motor4310::SetZeroPos(control::Motor4310* motor) {
@@ -602,7 +652,7 @@ void Motor4310::SetZeroPos(control::Motor4310* motor) {
   data[5] = 0xff;
   data[6] = 0xff;
   data[7] = 0xfe;
-  motor->can_->Transmit(motor->tx_id_, data, 8);
+  motor->can_->Transmit(motor->tx_id_actual_, data, 8);
 }
 
 void Motor4310::SetOutput(float position, float velocity, float kp, float kd, float torque) {
@@ -626,14 +676,13 @@ void Motor4310::TransmitOutput(Motor4310* motor) {
   uint8_t data[8] = {0};
   uint16_t kp_tmp, kd_tmp, pos_tmp, vel_tmp, torque_tmp;
 
-  // converting float to unsigned int before transmitting
-  kp_tmp = float_to_uint(kp_set_, 0.0, 500.0, 12);
-  kd_tmp = float_to_uint(kd_set_, 0, 5, 12);
-  pos_tmp = float_to_uint(pos_set_, -12.5, 12.5, 16);
-  vel_tmp = float_to_uint(vel_set_, -45.0, 45.0, 12);
-  torque_tmp = float_to_uint(torque_set_, -18, 18, 12);
-
-  if (mode_ == MIT){
+  if (mode_ == MIT) {
+    // converting float to unsigned int before transmitting
+    kp_tmp = float_to_uint(kp_set_, KP_MIN, KP_MAX, 12);
+    kd_tmp = float_to_uint(kd_set_, KD_MIN, KD_MAX, 12);
+    pos_tmp = float_to_uint(pos_set_, P_MIN, P_MAX, 16);
+    vel_tmp = float_to_uint(vel_set_, V_MIN, V_MAX, 12);
+    torque_tmp = float_to_uint(torque_set_, T_MIN, T_MAX, 12);
     data[0] = pos_tmp >> 8;
     data[1] = pos_tmp & 0x00ff;
     data[2] = (vel_tmp >> 4) & 0x00ff;
@@ -644,8 +693,8 @@ void Motor4310::TransmitOutput(Motor4310* motor) {
     data[7] = torque_tmp & 0x00ff;
   } else if (mode_ == POS_VEL) {
     uint8_t *pbuf, *vbuf;
-    pbuf = (uint8_t*) &pos_set_;
-    vbuf = (uint8_t*) &vel_set_;
+    pbuf = (uint8_t*)&pos_set_;
+    vbuf = (uint8_t*)&vel_set_;
     data[0] = *pbuf;
     data[1] = *(pbuf + 1);
     data[2] = *(pbuf + 2);
@@ -655,8 +704,8 @@ void Motor4310::TransmitOutput(Motor4310* motor) {
     data[6] = *(vbuf + 2);
     data[7] = *(vbuf + 3);
   } else if (mode_ == VEL) {
-    uint8_t  *vbuf;
-    vbuf = (uint8_t*) &vel_set_;
+    uint8_t* vbuf;
+    vbuf = (uint8_t*)&vel_set_;
     data[0] = *vbuf;
     data[1] = *(vbuf + 1);
     data[2] = *(vbuf + 2);
@@ -664,18 +713,20 @@ void Motor4310::TransmitOutput(Motor4310* motor) {
   } else {
     RM_EXPECT_TRUE(false, "Invalid mode number!");
   }
-  motor->can_->Transmit(motor->tx_id_, data, 8);
+  motor->can_->Transmit(motor->tx_id_actual_, data, 8);
   connection_flag_ = true;  // temp
 }
 
 void Motor4310::UpdateData(const uint8_t data[]) {
-  // TODO need test
-  raw_pos_ = data[1]<<8 | data[2];
-  raw_vel_ = data[3]<<4 | data[4]>>4;
-  raw_torque_ = data[4] - ((data[4]>>4)<<4);
-  raw_torque_ = raw_torque_<<8 | data[5];
+  raw_pos_ = data[1] << 8 | data[2];
+  raw_vel_ = data[3] << 4 | (data[4] & 0xf0) >> 4;
+  raw_torque_ = data[5] | (data[4] & 0x0f) << 8;
   raw_mosTemp_ = data[6];
-  raw_rotorTemp_ = data[7];
+  raw_motorTemp_ = data[7];
+
+  theta_ = uint_to_float(raw_pos_, P_MIN, P_MAX, 16);
+  omega_ = uint_to_float(raw_vel_, V_MIN, V_MAX, 12);
+  torque_ = uint_to_float(raw_torque_, T_MIN, T_MAX, 12);
 
   connection_flag_ = true;
 }
@@ -683,10 +734,21 @@ void Motor4310::UpdateData(const uint8_t data[]) {
 void Motor4310::PrintData() {
   set_cursor(0, 0);
   clear_screen();
-  print("Position: % .4f \r\n", raw_pos_);
-  print("Velocity: % .4f \r\n", raw_vel_);
-  print("Torque: % .4f \r\n", raw_torque_);
-  print("Rotor temp: % .4f \r\n", raw_rotorTemp_);
+  print("Position: % .4f ", GetTheta());
+  print("Velocity: % .4f ", GetOmega());
+  print("Torque: % .4f ", GetTorque());
+  print("Rotor temp: % .4f \r\n", raw_motorTemp_);
+}
+
+float Motor4310::GetTheta() const {
+  return theta_;
+}
+
+float Motor4310::GetOmega() const {
+  return omega_;
+}
+float Motor4310::GetTorque() const {
+  return torque_;
 }
 
 
