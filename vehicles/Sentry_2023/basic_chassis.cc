@@ -144,16 +144,15 @@ UNUSED(arg);
   float follow_speed = 400;
 
   while (true) {
+    // Dead
     if (dbus->keyboard.bit.V || dbus->swr == remote::DOWN) break;
     osDelay(100);
   }
 
-  // while (!imu->CaliDone()) osDelay(100);
-
   while (true) {
     while (Dead) osDelay(100);
 
-    ChangeSpinMode.input(dbus->keyboard.bit.SHIFT || dbus->swl == remote::UP);
+    ChangeSpinMode.input(dbus->keyboard.bit.SHIFT || dbus->swl == remote::UP || (referee->game_status.game_progress == 0x3));
     if (ChangeSpinMode.posEdge()) SpinMode = !SpinMode;
 
     if (dbus->keyboard.bit.A) vx_keyboard -= 61.5;
@@ -182,11 +181,6 @@ UNUSED(arg);
 
     vx_set = vx_keyboard + vx_remote;
     vy_set = vy_keyboard + vy_remote;
-
-    // if (yaw_motor_flag)
-    //   relative_angle = yaw_motor->GetThetaDelta(gimbal_param->yaw_offset_);
-    // else
-    //   relative_angle = 0;
 
     if (SpinMode) {
       sin_yaw = arm_sin_f32(relative_angle);
