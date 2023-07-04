@@ -43,6 +43,7 @@ static BoolEdgeDetector FakeDeath(false);
 static volatile bool Dead = false;
 static BoolEdgeDetector ChangeSpinMode(false);
 static volatile bool SpinMode = false;
+static volatile bool GameEnd = false;
 
 static const int KILLALL_DELAY = 100;
 static const int DEFAULT_TASK_DELAY = 100;
@@ -143,14 +144,24 @@ UNUSED(arg);
   float spin_speed = 600;
   float follow_speed = 400;
 
-  while (true) {
-    // Dead
-    if (dbus->keyboard.bit.V || dbus->swr == remote::DOWN) break;
-    osDelay(100);
-  }
+  // while (true) {
+  // wait for calibration
+  //   if (dbus->keyboard.bit.V || dbus->swr == remote::DOWN) break;
+  //   osDelay(100);
+  // }
 
   while (true) {
     while (Dead) osDelay(100);
+
+    while (GameEnd) {
+      chassis->SetSpeed(0, 0, 0);
+      fl_motor->SetOutput(0);
+      bl_motor->SetOutput(0);
+      fr_motor->SetOutput(0);
+      br_motor->SetOutput(0);
+      control::MotorCANBase::TransmitOutput(motors, 4);
+      osDelay(100);
+    } 
 
     ChangeSpinMode.input(dbus->keyboard.bit.SHIFT || dbus->swl == remote::UP || (referee->game_status.game_progress == 0x3));
     if (ChangeSpinMode.posEdge()) SpinMode = !SpinMode;
@@ -367,10 +378,13 @@ void RM_RTOS_Default_Task(const void* args) {
   UNUSED(args);
 
   while (true) {
-    FakeDeath.input(dbus->keyboard.bit.B || dbus->swl == remote::DOWN || referee->game_status.game_progress == 0x5);
+    FakeDeath.input(dbus->keyboard.bit.B || dbus->swl == remote::DOWN);
     if (FakeDeath.posEdge()) {
       Dead = true;
       KillAll();
+    }
+    if (referee->game_status.game_progress == 0x5) {
+      GameEnd = true;
     }
     if (debug) {
       set_cursor(0, 0);
