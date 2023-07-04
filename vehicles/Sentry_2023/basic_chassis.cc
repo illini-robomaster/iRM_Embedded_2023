@@ -367,7 +367,7 @@ void RM_RTOS_Default_Task(const void* args) {
   UNUSED(args);
 
   while (true) {
-    FakeDeath.input(dbus->keyboard.bit.B || dbus->swl == remote::DOWN);
+    FakeDeath.input(dbus->keyboard.bit.B || dbus->swl == remote::DOWN || referee->game_status.game_progress == 0x5);
     if (FakeDeath.posEdge()) {
       Dead = true;
       KillAll();
