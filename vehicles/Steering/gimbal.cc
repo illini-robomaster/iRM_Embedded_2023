@@ -175,6 +175,7 @@ void gimbalTask(void* arg) {
     ++i;
   }
 
+  pitch_motor->SetZeroPos(pitch_motor);
   pitch_motor->MotorEnable(pitch_motor);
   osDelay(GIMBAL_TASK_DELAY);
 
