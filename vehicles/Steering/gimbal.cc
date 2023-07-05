@@ -393,7 +393,9 @@ void shooterTask(void* arg) {
         }
       } else if (dbus->mouse.r) {
         shooter->FastContinueShoot();
-      } else {
+      } else if (dbus->keyboard.bit.R) {
+        shooter->Antijam();
+      }else {
         shooter->DialStop();
         start_time = bsp::GetHighresTickMicroSec();
         slow_shoot_detect = false;
