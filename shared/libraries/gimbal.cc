@@ -103,6 +103,13 @@ Gimbal::Gimbal(gimbal_t gimbal)
             new ConstrainedPID(yaw_omega_pid_param_, yaw_omega_max_iout, yaw_omega_max_out);
       }
       break;
+    case GIMBAL_FORTRESS_4310:
+      // TODO
+      data_.pitch_offset_ = 0.0f;
+      data_.yaw_offset_ = 0.0f;
+      data_.pitch_max_ = 0.0f;
+      data_.yaw_max_ = 0.0f;
+      break;
     default:
       RM_ASSERT_TRUE(false, "Not Supported Gimbal Mode\r\n");
   }
@@ -113,6 +120,8 @@ Gimbal::Gimbal(gimbal_t gimbal)
       if (yaw_theta_pid_param_   == nullptr || yaw_omega_pid_param_ == nullptr) {
         RM_ASSERT_TRUE(false, "Not Supported Gimbal Mode\r\n");
       }
+      break;
+    case GIMBAL_FORTRESS_4310:
       break;
     default:
       if (pitch_theta_pid_param_ == nullptr || pitch_omega_pid_param_ == nullptr ||

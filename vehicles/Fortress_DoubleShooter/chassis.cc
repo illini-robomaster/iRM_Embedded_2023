@@ -122,25 +122,6 @@ const osThreadAttr_t chassisTaskAttribute = {.name = "chassisTask",
                                              .reserved = 0};
 osThreadId_t chassisTaskHandle;
 
-// static control::MotorCANBase* motor1 = nullptr;
-// static control::MotorCANBase* motor2 = nullptr;
-// static control::MotorCANBase* motor3 = nullptr;
-// static control::MotorCANBase* motor4 = nullptr;
-// static control::MotorCANBase* motor5 = nullptr;
-// static control::MotorCANBase* motor6 = nullptr;
-// static control::MotorCANBase* motor7 = nullptr;
-// static control::MotorCANBase* motor8 = nullptr;
-
-// static control::SteeringMotor* steering_motor1 = nullptr;
-// static control::SteeringMotor* steering_motor2 = nullptr;
-// static control::SteeringMotor* steering_motor3 = nullptr;
-// static control::SteeringMotor* steering_motor4 = nullptr;
-
-// static bsp::GPIO* pe1 = nullptr;
-// static bsp::GPIO* pe2 = nullptr;
-// static bsp::GPIO* pe3 = nullptr;
-// static bsp::GPIO* pe4 = nullptr;
-
 static control::MotorCANBase* fl_motor = nullptr;
 static control::MotorCANBase* fr_motor = nullptr;
 static control::MotorCANBase* bl_motor = nullptr;
@@ -165,34 +146,19 @@ static const float CHASSIS_DEADZONE = 0.04;
 void chassisTask(void* arg) {
   UNUSED(arg);
 
-  // control::MotorCANBase* steer_motors[] = {motor1, motor2, motor3, motor4};
   control::MotorCANBase* motors[] = {fl_motor, fr_motor, bl_motor, br_motor};
 
-  // control::MotorCANBase* wheel_motors[] = {motor5, motor6, motor7, motor8};
-
+//  print("Here1\r\n");
   // control::PIDController pid5(120, 15, 0);
   // control::PIDController pid6(120, 15, 0);
   // control::PIDController pid7(120, 15, 0);
   // control::PIDController pid8(120, 15, 0);
 
-  while (!receive->start) osDelay(100);
+  // TODO NOT RECEIVING START SIGNAL
+//  while (!receive->start) osDelay(100);
   // ????? whether remove
-  while (receive->start < 0.5) osDelay(100);
-
-  // // Alignment
-  // chassis->SteerSetMaxSpeed(ALIGN_SPEED);
-  // bool alignment_complete = false;
-  // while (!alignment_complete) {
-  //   chassis->SteerCalcOutput();
-  //   control::MotorCANBase::TransmitOutput(steer_motors, 4);
-  //   alignment_complete = chassis->Calibrate();
-  //   osDelay(1);
-  // }
-  // chassis->ReAlign();
-  // chassis->SteerCalcOutput();
-  // chassis->SteerSetMaxSpeed(RUN_SPEED);
-  // chassis->SteerThetaReset();
-  // chassis->SetWheelSpeed(0,0,0,0);
+//  while (receive->start < 0.5) osDelay(100);
+//  print("Here2\r\n");
 
   while (true) {
     float relative_angle = receive->relative_angle;
@@ -201,8 +167,8 @@ void chassisTask(void* arg) {
 
     // TODO need to change the channels in gimbal.cc
     // change direction
-    vx_set = -receive->vy;
-    vy_set = receive->vx;
+    vx_set = receive->vx;
+    vy_set = receive->vy;
 
     if (receive->mode == 1) {  // spin mode
       // TODO:how to calculate the compensation(whether do we need this delay)
@@ -480,21 +446,21 @@ void RM_RTOS_Init() {
   can2 = new bsp::CAN(&hcan2, 0x201, false);
   RGB = new display::RGB(&htim5, 3, 2, 1, 1000000);
 
-  // TODO: fortress chassis initilize(need fortress mode)
-  // Chassis motor
-  // fl_motor = new control::Motor3508(can2, 0x201);
-  // fr_motor = new control::Motor3508(can2, 0x202);
-  // bl_motor = new control::Motor3508(can2, 0x203);
-  // br_motor = new control::Motor3508(can2, 0x204);
-  // control::MotorCANBase* motors[control::FourWheel::motor_num];
-  // motors[control::FourWheel::front_left] = fl_motor;
-  // motors[control::FourWheel::front_right] = fr_motor;
-  // motors[control::FourWheel::back_left] = bl_motor;
-  // motors[control::FourWheel::back_right] = br_motor;
-  // control::chassis_t chassis_data;
-  // chassis_data.motors = motors;
-  // chassis_data.model = control::CHASSIS_MECANUM_WHEEL;
-  // chassis = new control::Chassis(chassis_data);
+  fl_motor = new control::Motor3508(can1, 0x201);
+  fr_motor = new control::Motor3508(can1, 0x202);
+  bl_motor = new control::Motor3508(can1, 0x203);
+  br_motor = new control::Motor3508(can1, 0x204);
+
+  control::MotorCANBase* motors[control::FourWheel::motor_num];
+  motors[control::FourWheel::front_left] = fl_motor;
+  motors[control::FourWheel::front_right] = fr_motor;
+  motors[control::FourWheel::back_left] = bl_motor;
+  motors[control::FourWheel::back_right] = br_motor;
+
+  control::chassis_t chassis_data;
+  chassis_data.motors = motors;
+  chassis_data.model = control::CHASSIS_MECANUM_WHEEL;
+  chassis = new control::Chassis(chassis_data);
 
   // Fortress motor
   // left = new bsp::GPIO(IN1_GPIO_Port, IN1_Pin);
@@ -509,64 +475,6 @@ void RM_RTOS_Init() {
   // fortress_data.rightElevatorMotor = elevator_right_motor;
   // fortress_data.fortressMotor = fortress_motor;
   // fortress = new control::Fortress(fortress_data);
-
-
-
-
-  // motor1 = new control::Motor3508(can1, 0x201);
-  // motor2 = new control::Motor3508(can1, 0x202);
-  // motor3 = new control::Motor3508(can1, 0x203);
-  // motor4 = new control::Motor3508(can1, 0x204);
-
-  // motor5 = new control::Motor3508(can2, 0x205);
-  // motor6 = new control::Motor3508(can2, 0x206);
-  // motor7 = new control::Motor3508(can2, 0x207);
-  // motor8 = new control::Motor3508(can2, 0x208);
-
-  //TODO: need to remove the steering part
-  // pe1 = new bsp::GPIO(IN1_GPIO_Port, IN1_Pin);
-  // pe2 = new bsp::GPIO(IN2_GPIO_Port, IN2_Pin);
-  // pe3 = new bsp::GPIO(IN3_GPIO_Port, IN3_Pin);
-  // pe4 = new bsp::GPIO(IN4_GPIO_Port, IN4_Pin);
-
-  // chassis_data = new control::steering_chassis_t();
-
-  // control::steering_t steering_motor_data;
-  // steering_motor_data.motor = motor1;
-  // steering_motor_data.max_speed = RUN_SPEED;
-  // steering_motor_data.max_acceleration = ACCELERATION;
-  // steering_motor_data.transmission_ratio = 8;
-  // steering_motor_data.omega_pid_param = new float[3]{140, 1.2, 0};
-  // steering_motor_data.max_iout = 1000;
-  // steering_motor_data.max_out = 13000;
-  // steering_motor_data.calibrate_offset = 0;
-
-  // steering_motor_data.align_detect_func = steering_align_detect1;
-  // steering_motor1 = new control::SteeringMotor(steering_motor_data);
-
-  // steering_motor_data.motor = motor2;
-  // steering_motor_data.align_detect_func = steering_align_detect2;
-  // steering_motor2 = new control::SteeringMotor(steering_motor_data);
-  // steering_motor_data.motor = motor3;
-  // steering_motor_data.align_detect_func = steering_align_detect3;
-  // steering_motor3 = new control::SteeringMotor(steering_motor_data);
-  // steering_motor_data.motor = motor4;
-  // steering_motor_data.align_detect_func = steering_align_detect4;
-  // steering_motor4 = new control::SteeringMotor(steering_motor_data);
-
-  // chassis_data = new control::steering_chassis_t();
-
-  // chassis_data->fl_steer_motor = steering_motor4;
-  // chassis_data->fr_steer_motor = steering_motor3;
-  // chassis_data->bl_steer_motor = steering_motor1;
-  // chassis_data->br_steer_motor = steering_motor2;
-
-  // chassis_data->fl_wheel_motor = motor8;
-  // chassis_data->fr_wheel_motor = motor7;
-  // chassis_data->bl_wheel_motor = motor5;
-  // chassis_data->br_wheel_motor = motor6;
-
-  // chassis = new control::SteeringChassis(chassis_data);
 
   // supercap initilize
   // supercap = new control::SuperCap(can2, 0x201);
@@ -588,7 +496,7 @@ void RM_RTOS_Threads_Init(void) {
   refereeTaskHandle = osThreadNew(refereeTask, nullptr, &refereeTaskAttribute);
   chassisTaskHandle = osThreadNew(chassisTask, nullptr, &chassisTaskAttribute);
   selfTestTaskHandle = osThreadNew(self_Check_Task, nullptr, &selfTestingTask);
-  fortressTaskHandle = osThreadNew(fortressTask, nullptr, &fortressTaskAttribute);
+//  fortressTaskHandle = osThreadNew(fortressTask, nullptr, &fortressTaskAttribute);
 }
 
 //==================================================================================================
@@ -598,10 +506,10 @@ void RM_RTOS_Threads_Init(void) {
 void KillAll() {
   RM_EXPECT_TRUE(false, "Operation Killed!\r\n");
 
-  control::MotorCANBase* motors_can2_chassis[] = {fl_motor, fr_motor, bl_motor, br_motor};
-  control::MotorCANBase* motors_can2_elevator[] = {elevator_left_motor, elevator_right_motor};
-  // same name as above fortress task
-  control::MotorCANBase* motors_can2_fortress[] = {fortress_motor};
+  control::MotorCANBase* motors_can1_chassis[] = {fl_motor, fr_motor, bl_motor, br_motor};
+  // TODO
+//  control::MotorCANBase* motors_can2_elevator[] = {elevator_left_motor, elevator_right_motor};
+//  control::MotorCANBase* motors_can2_fortress[] = {fortress_motor};
 
   RGB->Display(display::color_blue);
 
@@ -617,13 +525,14 @@ void KillAll() {
     bl_motor->SetOutput(0);
     fr_motor->SetOutput(0);
     br_motor->SetOutput(0);
-    control::MotorCANBase::TransmitOutput(motors_can2_chassis, 4);
+    control::MotorCANBase::TransmitOutput(motors_can1_chassis, 4);
 
-    elevator_left_motor->SetOutput(0);
-    elevator_right_motor->SetOutput(0);
-    fortress_motor->SetOutput(0);
-    control::MotorCANBase::TransmitOutput(motors_can2_elevator, 2);
-    control::MotorCANBase::TransmitOutput(motors_can2_fortress, 1);
+    // TODO
+//    elevator_left_motor->SetOutput(0);
+//    elevator_right_motor->SetOutput(0);
+//    fortress_motor->SetOutput(0);
+//    control::MotorCANBase::TransmitOutput(motors_can2_elevator, 2);
+//    control::MotorCANBase::TransmitOutput(motors_can2_fortress, 1);
 
     osDelay(KILLALL_DELAY);
   }
@@ -646,8 +555,11 @@ void RM_RTOS_Default_Task(const void* args) {
     if (debug) {
       set_cursor(0, 0);
       clear_screen();
-      print("vx: %f, vy: %f, angle: %f, mode: %f, dead: %f\r\n", receive->vx, receive->vy,
-            receive->relative_angle, receive->mode, receive->dead);
+//      print("vx: %f, vy: %f, angle: %f, mode: %f, dead: %f, start: %f\r\n", receive->vx, receive->vy,
+//            receive->relative_angle, receive->mode, receive->dead, receive->start);
+      print("power limit: %.3f chassis power: %.3f power buffer: %.3f\r\n", (float)referee->game_robot_status.chassis_power_limit,
+            referee->power_heat_data.chassis_power,
+            (float)referee->power_heat_data.chassis_power_buffer);
     }
     osDelay(DEFAULT_TASK_DELAY);
   }

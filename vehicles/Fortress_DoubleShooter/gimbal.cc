@@ -53,9 +53,9 @@ static const int KILLALL_DELAY = 100;
 static const int DEFAULT_TASK_DELAY = 100;
 static const int SOFT_START_CONSTANT = 300;
 static const int SOFT_KILL_CONSTANT = 200;
-static const float START_PITCH_POS = PI/5;
+static const float START_PITCH_POS = 0.45f;
 // TODO: the start position of the yaw motor
-// static const float START_YAW_POS = ???;
+ static const float START_YAW_POS = 0;
 static const int INFANTRY_INITIAL_HP = 100;
 
 static bsp::CanBridge* send = nullptr;
@@ -74,7 +74,7 @@ static unsigned int chassis_flag_bitmap = 0;
 
 static volatile float pitch_pos = START_PITCH_POS;
 // TODO: need to measure the specific angle
-//static volatile float yaw_pos = START_YAW_POS;
+static volatile float yaw_pos = START_YAW_POS;
 
 static volatile unsigned int current_hp = 0;
 
@@ -157,13 +157,10 @@ const osThreadAttr_t gimbalTaskAttribute = {.name = "gimbalTask",
                                            .reserved = 0};
 osThreadId_t gimbalTaskHandle;
 
-//static control::MotorCANBase* pitch_motor = nullptr;
 static control::Motor4310* pitch_motor = nullptr;
-// TODO: initialize the yaw motor
-// static control::Motor4310* yaw_motor = nullptr;
-static control::Motor6020* yaw_motor = nullptr;
-static control::Gimbal* gimbal = nullptr;
-static control::gimbal_data_t* gimbal_param = nullptr;
+ static control::Motor4310* yaw_motor = nullptr;
+//static control::Gimbal* gimbal = nullptr;
+//static control::gimbal_data_t* gimbal_param = nullptr;
 static bsp::Laser* laser = nullptr;
 
 void gimbalTask(void* arg) {
@@ -196,9 +193,11 @@ void gimbalTask(void* arg) {
   }
 
   // the start code for motor 4310
+  pitch_motor->SetZeroPos(pitch_motor);
   pitch_motor->MotorEnable(pitch_motor);
   // TODO:
-  // yaw_motor->MotorEnable(yaw_motor);
+  yaw_motor->SetZeroPos(yaw_motor);
+  yaw_motor->MotorEnable(yaw_motor);
   osDelay(GIMBAL_TASK_DELAY);
 
   // 4310 soft start (for pitch)
@@ -207,11 +206,6 @@ void gimbalTask(void* arg) {
   // (based on the start position of yaw motor)
   float tmp_pos = 0;
   for (int j = 0; j < SOFT_START_CONSTANT; j++){
-    // TODO:
-    // (not sure whether the below part still need to keep)
-    // gimbal->TargetAbsWOffset(0, 0);
-    // gimbal->Update();
-    // control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
     tmp_pos += START_PITCH_POS / SOFT_START_CONSTANT;  // increase position gradually
     pitch_motor->SetOutput(tmp_pos, 1, 115, 0.5, 0);
     pitch_motor->TransmitOutput(pitch_motor);
@@ -252,35 +246,25 @@ void gimbalTask(void* arg) {
   send->cmd.data_bool = true;
   send->TransmitOutput();
 
-  float pitch_ratio, yaw_ratio;
-  float pitch_curr, yaw_curr;
-  float pitch_target = 0, yaw_target = 0;
-  float pitch_diff, yaw_diff;
+//  float pitch_ratio, yaw_ratio;
+//  float pitch_curr, yaw_curr;
+//  float pitch_target = 0, yaw_target = 0;
+//  float pitch_diff, yaw_diff;
+
+  float pitch_vel_range = 1.0, yaw_vel_range = 1.0;
 
   while (true) {
     while (Dead) osDelay(100);
 
-    pitch_ratio = dbus->mouse.y / 32767.0;
-    yaw_ratio = -dbus->mouse.x / 32767.0;
-
-    pitch_ratio += -dbus->ch3 / 660.0 / 210.0;
-    yaw_ratio += -dbus->ch2 / 660.0 / 210.0;
-
-    pitch_target = clip<float>(pitch_target + pitch_ratio, -gimbal_param->pitch_max_,
-                                gimbal_param->pitch_max_);
-    yaw_target = wrap<float>(yaw_target + yaw_ratio, -PI, PI);
-
-    pitch_curr = imu->INS_angle[1];
-    yaw_curr = imu->INS_angle[0];
-
-    pitch_diff = clip<float>(pitch_target - pitch_curr, -PI, PI);
-    yaw_diff = wrap<float>(yaw_target - yaw_curr, -PI, PI);
     // TODO:whether this for 4310 pitch motor ???
     // if this is for 4310, whether we need the same stuff for the 4310 yaw motor.
-    float pitch_vel;
-    pitch_vel = -1 * clip<float>(dbus->ch3 / 660.0, -15, 15);
+    float pitch_vel, yaw_vel;
+    pitch_vel = -1 * clip<float>(dbus->ch3 / 660.0 * pitch_vel_range, -pitch_vel_range, pitch_vel_range);
     pitch_pos += pitch_vel / 200 + dbus->mouse.y / 32767.0;
-    pitch_pos = clip<float>(pitch_pos, 0.1, 1); // measured range
+    pitch_pos = clip<float>(pitch_pos, 0.05, 0.5); // measured range
+
+    yaw_vel = clip<float>(dbus->ch2 / 660.0 * yaw_vel_range, -yaw_vel_range, yaw_vel_range);
+    yaw_pos += yaw_vel / 200;
 
     // TODO: whether we need handle the reset case for yaw stuff ???
     if (pitch_reset) {
@@ -298,16 +282,16 @@ void gimbalTask(void* arg) {
     }
     // TODO: whether we need to change the update function for both 4310 motor
     // the below stuff is for motor can base, not for 4310 base
-    gimbal->TargetRel(-pitch_diff, yaw_diff);
-    gimbal->Update();
+//    gimbal->TargetRel(-pitch_diff, yaw_diff);
+//    gimbal->Update();
 
     // TODO: the 4310 yaw motor need to set the new output
     pitch_motor->SetOutput(pitch_pos, pitch_vel, 115, 0.5, 0);
-    // TODO: no need for the below part ???
-    // control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
+    yaw_motor->SetOutput(yaw_pos, yaw_vel);
+
     pitch_motor->TransmitOutput(pitch_motor);
-    // TODO: the new update function
-    // yaw_motor->TransmitOutput(yaw_motor);
+    yaw_motor->TransmitOutput(yaw_motor);
+
     osDelay(GIMBAL_TASK_DELAY);
   }
 }
@@ -393,8 +377,8 @@ static const int SHOOTER_MODE_DELAY = 350;
 void shooterTask(void* arg) {
   UNUSED(arg);
 
-  control::MotorCANBase* motors_can1_shooter[] = {left_top_flywheel, left_bottom_flywheel, left_dial,
-                                                  right_top_flywheel, right_bottom_flywheel, right_dial};
+//  control::MotorCANBase* motors_can1_shooter[] = {left_top_flywheel, left_bottom_flywheel, left_dial,
+//                                                  right_top_flywheel, right_bottom_flywheel, right_dial};
 
   control::MotorCANBase* motors_can1_shooter_left[] = {left_top_flywheel, left_bottom_flywheel, left_dial};
 
@@ -523,8 +507,10 @@ void shooterTask(void* arg) {
     }
 
     left_shooter->Update();
+    control::MotorCANBase::TransmitOutput(motors_can1_shooter_left, 3);
     right_shooter->Update();
-    control::MotorCANBase::TransmitOutput(motors_can1_shooter, 6);
+    control::MotorCANBase::TransmitOutput(motors_can1_shooter_right, 3);
+
     osDelay(SHOOTER_TASK_DELAY);
   }
 }
@@ -601,10 +587,11 @@ void chassisTask(void* arg) {
     send->cmd.data_float = Dead ? 0 : vy_set;
     send->TransmitOutput();
 
-    relative_angle = yaw_motor->GetThetaDelta(gimbal_param->yaw_offset_);
-    send->cmd.id = bsp::RELATIVE_ANGLE;
-    send->cmd.data_float = relative_angle;
-    send->TransmitOutput();
+    // TODO
+//    relative_angle = yaw_motor->GetThetaDelta(gimbal_param->yaw_offset_);
+//    send->cmd.id = bsp::RELATIVE_ANGLE;
+//    send->cmd.data_float = relative_angle;
+//    send->TransmitOutput();
 
     osDelay(CHASSIS_TASK_DELAY);
   }
@@ -713,7 +700,8 @@ void selfTestTask(void* arg) {
 
     // gimbal
     pitch_motor->connection_flag_ = false;
-    yaw_motor->connection_flag_ = false;
+    // TODO
+//    yaw_motor->connection_flag_ = false;
 
     //left shooter
     left_top_flywheel->connection_flag_ = false;
@@ -731,7 +719,8 @@ void selfTestTask(void* arg) {
 
     // gimbal
     pitch_motor_flag = pitch_motor->connection_flag_;
-    yaw_motor_flag = yaw_motor->connection_flag_;
+    //TODO
+//    yaw_motor_flag = yaw_motor->connection_flag_;
 
     // left shooter
     left_top_flywheel_flag = left_top_flywheel->connection_flag_;
@@ -837,16 +826,15 @@ void RM_RTOS_Init(void) {
   imu = new IMU(imu_init, false);
 
   laser = new bsp::Laser(LASER_GPIO_Port, LASER_Pin);
-  pitch_motor = new control::Motor4310(can1, 0x02, 0x01, control::MIT);
+  pitch_motor = new control::Motor4310(can2, 0x02, 0x02, control::MIT);
   // TODO: initialize the yaw motor
-  // yaw_motor = new control::Motor6020(can1, 0x206); // (old)
-  // yaw_motor = new control::Motor4310(can1,???, control::MIT); // (new)
-  control::gimbal_t gimbal_data;
-  gimbal_data.pitch_motor_4310_ = pitch_motor;
+   yaw_motor = new control::Motor4310(can2, 0x01, 0x01, control::POS_VEL);
+//  control::gimbal_t gimbal_data;
+//  gimbal_data.pitch_motor_4310_ = pitch_motor;
   // gimbal_data.yaw_motor = yaw_motor;
-  // gimbal_data.model = control::GIMBAL_FORTRESS_4310;
-  gimbal = new control::Gimbal(gimbal_data);
-  gimbal_param = gimbal->GetData();
+//   gimbal_data.model = control::GIMBAL_FORTRESS_4310;
+//  gimbal = new control::Gimbal(gimbal_data);
+//  gimbal_param = gimbal->GetData();
 
   referee_uart = new RefereeUART(&huart6);
   referee_uart->SetupRx(300);
@@ -855,7 +843,7 @@ void RM_RTOS_Init(void) {
   // left shooter
   left_top_flywheel = new control::Motor3508(can1, 0x201);
   left_bottom_flywheel = new control::Motor3508(can1, 0x202);
-  left_dial = new control::Motor2006(can1, 0x205);
+  left_dial = new control::Motor2006(can1, 0x203);
   control::shooter_t left_shooter_data;
   left_shooter_data.left_flywheel_motor = left_top_flywheel;
   left_shooter_data.right_flywheel_motor = left_bottom_flywheel;
@@ -865,8 +853,8 @@ void RM_RTOS_Init(void) {
   left_shooter = new control::Shooter(left_shooter_data);
 
   // right shooter
-  right_top_flywheel = new control::Motor3508(can1, 0x203);
-  right_bottom_flywheel = new control::Motor3508(can1, 0x204);
+  right_top_flywheel = new control::Motor3508(can1, 0x208);
+  right_bottom_flywheel = new control::Motor3508(can1, 0x207);
   right_dial = new control::Motor2006(can1, 0x206);
   control::shooter_t right_shooter_data;
   right_shooter_data.left_flywheel_motor = right_top_flywheel;
@@ -894,10 +882,10 @@ void RM_RTOS_Threads_Init(void) {
   imuTaskHandle = osThreadNew(imuTask, nullptr, &imuTaskAttribute);
   gimbalTaskHandle = osThreadNew(gimbalTask, nullptr, &gimbalTaskAttribute);
   refereeTaskHandle = osThreadNew(refereeTask, nullptr, &refereeTaskAttribute);
-  shooterTaskHandle = osThreadNew(shooterTask, nullptr, &shooterTaskAttribute);
+//  shooterTaskHandle = osThreadNew(shooterTask, nullptr, &shooterTaskAttribute);
   chassisTaskHandle = osThreadNew(chassisTask, nullptr, &chassisTaskAttribute);
   selfTestTaskHandle = osThreadNew(selfTestTask, nullptr, &selfTestTaskAttribute);
-  fortressTaskHandle = osThreadNew(fortressTask, nullptr, &fortressTaskAttribute);
+//  fortressTaskHandle = osThreadNew(fortressTask, nullptr, &fortressTaskAttribute);
 }
 
 //==================================================================================================
@@ -962,7 +950,7 @@ void KillAll() {
   }
 }
 
-static bool debug = false;
+static bool debug = true;
 
 //==================================================================================================
 // RTOS Default Task (TODO???)
@@ -998,6 +986,8 @@ void RM_RTOS_Default_Task(const void* arg) {
 
       print("CH0: %-4d CH1: %-4d CH2: %-4d CH3: %-4d ", dbus->ch0, dbus->ch1, dbus->ch2, dbus->ch3);
       print("SWL: %d SWR: %d @ %d ms\r\n", dbus->swl, dbus->swr, dbus->timestamp);
+
+      yaw_motor->PrintData();
 
     }
 
