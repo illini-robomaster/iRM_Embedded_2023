@@ -1,6 +1,6 @@
 /****************************************************************************
  *                                                                          *
- *  Copyright (C) 2022 RoboMaster.                                          *
+ *  Copyright (C) 2023 RoboMaster.                                          *
  *  Illini RoboMaster @ University of Illinois at Urbana-Champaign          *
  *                                                                          *
  *  This program is free software: you can redistribute it and/or modify    *
@@ -44,6 +44,10 @@ typedef enum {
   VEL = 2,
 } mode_t;
 
+//==================================================================================================
+// MotorBase
+//==================================================================================================
+
 /**
  * @brief base class for motor representation
  */
@@ -57,6 +61,10 @@ class MotorBase {
  protected:
   int16_t output_;
 };
+
+//==================================================================================================
+// MotorCanBase(DJI Base)
+//==================================================================================================
 
 /**
  * @brief base class for CAN motor representation
@@ -140,7 +148,6 @@ class MotorCANBase : public MotorBase {
    *        many of the private parameters of MotorCANBase.
    */
   friend class ServoMotor;
-//  friend class Motor4310;
 
   volatile bool connection_flag_ = false;
 
@@ -153,6 +160,10 @@ class MotorCANBase : public MotorBase {
   uint16_t rx_id_;
   uint16_t tx_id_;
 };
+
+//==================================================================================================
+// Motor2006
+//==================================================================================================
 
 /**
  * @brief DJI 2006 motor class
@@ -173,6 +184,10 @@ class Motor2006 : public MotorCANBase {
  private:
   volatile int16_t raw_current_get_ = 0;
 };
+
+//==================================================================================================
+// Motor3508
+//==================================================================================================
 
 /**
  * @brief DJI 3508 motor class
@@ -197,6 +212,10 @@ class Motor3508 : public MotorCANBase {
   volatile uint8_t raw_temperature_ = 0;
 };
 
+//==================================================================================================
+// Motor6020
+//==================================================================================================
+
 /**
  * @brief DJI 6020 motor class
  */
@@ -219,6 +238,10 @@ class Motor6020 : public MotorCANBase {
   volatile int16_t raw_current_get_ = 0;
   volatile uint8_t raw_temperature_ = 0;
 };
+
+//==================================================================================================
+// Motor6623
+//==================================================================================================
 
 /**
  * @brief DJI 6623 motor class
@@ -243,6 +266,10 @@ class Motor6623 : public MotorCANBase {
 
   static const int16_t CURRENT_CORRECTION = -1;  // current direction is reversed
 };
+
+//==================================================================================================
+// MotorPWMBase
+//==================================================================================================
 
 /**
  * @brief PWM motor base class
@@ -275,6 +302,10 @@ class MotorPWMBase : public MotorBase {
   uint32_t idle_throttle_;
 };
 
+//==================================================================================================
+// Motor2305
+//==================================================================================================
+
 /**
  * @brief DJI snail 2305 motor class
  */
@@ -283,6 +314,10 @@ class Motor2305 : public MotorPWMBase {
   /* override base implementation with max current protection */
   void SetOutput(int16_t val) override final;
 };
+
+//==================================================================================================
+// ServoMotor
+//==================================================================================================
 
 /**
  * @brief servomotor turning mode
@@ -513,6 +548,9 @@ class ServoMotor {
   BoolEdgeDetector* jam_detector_;  /* detect motor jam toggling, call jam callback accordingly */
 };
 
+//==================================================================================================
+// SteeringMotor
+//==================================================================================================
 
 // function pointer for the calibration function of the steering motor, return True when calibrated
 typedef bool (*align_detect_t)(void);
@@ -622,6 +660,10 @@ class SteeringMotor {
   bool align_complete_;             /* if calibration is previously done, use the align_angle_                              */
 };
 
+//==================================================================================================
+// Motor4310
+//==================================================================================================
+
 /**
  * @brief m4310 motor class
  */
@@ -711,25 +753,63 @@ class Motor4310 {
    */
   void SetOutput(float velocity);
 
+  /**
+   * @brief get motor angle, in [rad]
+   *
+   * @return radian angle
+   */
+  float GetTheta() const;
+  /**
+   * @brief get motor angular velocity, in [rad / s]
+   * @return radian angular velocity
+   */
+  float GetOmega() const;
+
+  /**
+   * @brief get motor torque, in [Nm]
+   * @return motor torque
+   */
+  float GetTorque() const;
+
   volatile bool connection_flag_ = false;
 
  private:
   bsp::CAN* can_;
   uint16_t rx_id_;
   uint16_t tx_id_;
+  uint16_t tx_id_actual_;  // actual CAN id
 
-  volatile mode_t mode_;  // current motor mode
-  volatile float kp_set_ = 0;   // defined kp value
-  volatile float kd_set_ = 0;   // defined kd value
-  volatile float vel_set_ = 0;  // defined velocity
-  volatile float pos_set_ = 0;  // defined position
+  volatile mode_t mode_;           // current motor mode
+  volatile float kp_set_ = 0;      // defined kp value
+  volatile float kd_set_ = 0;      // defined kd value
+  volatile float vel_set_ = 0;     // defined velocity
+  volatile float pos_set_ = 0;     // defined position
   volatile float torque_set_ = 0;  // defined torque
 
-  volatile int16_t raw_pos_ = 0;  // actual position
-  volatile int16_t raw_vel_ = 0;  // actual velocity
-  volatile int16_t raw_torque_ = 0; // actual torque
-  volatile int16_t raw_rotorTemp_ = 0; // motor temp
-  volatile int16_t raw_mosTemp_ = 0; // MOS temp
+  volatile int16_t raw_pos_ = 0;        // actual position
+  volatile int16_t raw_vel_ = 0;        // actual velocity
+  volatile int16_t raw_torque_ = 0;     // actual torque
+  volatile int16_t raw_motorTemp_ = 0;  // motor temp
+  volatile int16_t raw_mosTemp_ = 0;    // MOS temp
+  volatile float theta_ = 0;            // actual angular position
+  volatile float omega_ = 0;            // actual angular velocity
+  volatile float torque_ = 0;           // actual torque
+
+  // P control
+  constexpr static float KP_MIN = 0;
+  constexpr static float KP_MAX = 500;
+  // D control
+  constexpr static float KD_MIN = 0;
+  constexpr static float KD_MAX = 5;
+  // position
+  constexpr static float P_MIN = -PI;
+  constexpr static float P_MAX = PI;
+  // velocity
+  constexpr static float V_MIN = -45;
+  constexpr static float V_MAX = 45;
+  // torque
+  constexpr static float T_MIN = -18;
+  constexpr static float T_MAX = 18;
 };
 
 
