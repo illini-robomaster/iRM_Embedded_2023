@@ -267,17 +267,25 @@ void chassisTask(void* arg) {
     constexpr float WHEEL_SPEED_FACTOR = 4;
     chassis->WheelUpdateSpeed(WHEEL_SPEED_FACTOR);
     chassis->SteerCalcOutput();
-    if (supercap_voltage <= 5.0){
+
+    if(supercap_voltage<=1){
+      chassis->Update(10.0,
+                      referee->power_heat_data.chassis_power,
+                      (float)referee->power_heat_data.chassis_power_buffer);
+      //corner case to prevent power limit from being negative
+    }
+    else if (supercap_voltage <= 5.0||supercap_voltage>1.0){
       chassis->Update((supercap_voltage-1)*7.5,
                       referee->power_heat_data.chassis_power,
                       (float)referee->power_heat_data.chassis_power_buffer);
-                      //Ensure chassis won't use too much power causing losing hp when revive
-                      //When voltage is lower than 1, so power should be used
+      //Ensure chassis won't use too much power causing losing hp when revive
+      //When voltage is lower than 1, so power should be used
     }
     else{
-        chassis->Update(((float)30+((float)supercap_voltage-5.0)*2.0),
+        chassis->Update(((float)25+((float)supercap_voltage-5.0)*2.0),
                             referee->power_heat_data.chassis_power,
                             (float)referee->power_heat_data.chassis_power_buffer);
+        //linear function for super capacitor's voltage above 5V
     }
     //consider using uart printing to check the power limit's value
     //log values out as files to obtain its trend
