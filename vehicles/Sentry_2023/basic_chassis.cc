@@ -256,18 +256,19 @@ void self_Check_Task(void* arg){
   buzzer->SingSong(Mario, [](uint32_t milli) { osDelay(milli); });
   OLED->OperateGram(display::PEN_CLEAR);
 
-  OLED->ShowString(3, 6, (uint8_t*)"Dbs");
   //dbus
+  OLED->ShowString(3, 6, (uint8_t*)"Dbs");
 
   // chassis motors self test
-  OLED->ShowString(0, 12, (uint8_t*)"FL");
   //Front Left
-  OLED->ShowString(1, 12, (uint8_t*)"FR");
+  OLED->ShowString(0, 12, (uint8_t*)"FL");
   //Front Right
-  OLED->ShowString(2, 12, (uint8_t*)"BL");
+  OLED->ShowString(1, 12, (uint8_t*)"FR");
   //Back Left
-  OLED->ShowString(3, 12, (uint8_t*)"BR");
+  OLED->ShowString(2, 12, (uint8_t*)"BL");
   //Back Right
+  OLED->ShowString(3, 12, (uint8_t*)"BR");
+  
 
   while(true){
     fl_motor->connection_flag_ = false;
