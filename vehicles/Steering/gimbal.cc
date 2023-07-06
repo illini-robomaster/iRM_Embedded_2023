@@ -21,6 +21,7 @@
 #include "gimbal.h"
 
 #include <cstdio>
+#include <memory>
 
 #include "bsp_buzzer.h"
 #include "bsp_can.h"
@@ -39,6 +40,7 @@
 #include "rgb.h"
 #include "shooter.h"
 #include "stepper.h"
+#include "autoaim_protocol.h"
 
 static bsp::CAN* can1 = nullptr;
 static bsp::CAN* can2 = nullptr;
@@ -95,6 +97,13 @@ static volatile bool pitch_reset = false;
 static volatile bool selftestStart = false;
 
 static volatile bool robot_hp_begin = false;
+
+// autoaim
+float abs_yaw_jetson = 0;
+float abs_pitch_jetson = START_PITCH_POS;
+// uint32_t last_timestamp = 100;  // in milliseconds
+const uint32_t AUTOAIM_INTERVAL = 1;  // in milliseconds
+uint32_t last_execution_timestamp = 0;
 
 //==================================================================================================
 // IMU
@@ -221,31 +230,44 @@ void gimbalTask(void* arg) {
   float pitch_ratio, yaw_ratio;
   float pitch_curr, yaw_curr;
   float pitch_target = 0, yaw_target = 0;
+  float pitch_vel = 0;
   float pitch_diff, yaw_diff;
 
   while (true) {
     while (Dead || GimbalDead) osDelay(100);
 
-    pitch_ratio = dbus->mouse.y / 32767.0;
-    yaw_ratio = -dbus->mouse.x / 32767.0;
+    if (dbus->keyboard.bit.F || dbus->swl == remote::UP) {
+      float abs_pitch_buffer = abs_pitch_jetson;
+      float abs_yaw_buffer = abs_yaw_jetson;
 
-    pitch_ratio += -dbus->ch3 / 660.0 / 210.0;
-    yaw_ratio += -dbus->ch2 / 660.0 / 210.0;
+      // clear after read
+      abs_pitch_jetson = START_PITCH_POS;
+      abs_yaw_jetson = 0;
 
-    pitch_target = clip<float>(pitch_target + pitch_ratio, -gimbal_param->pitch_max_,
-                               gimbal_param->pitch_max_);
-    yaw_target = wrap<float>(yaw_target + yaw_ratio, -PI, PI);
+      if (abs_pitch_buffer != START_PITCH_POS || abs_yaw_buffer != 0) {
+        if ((int)HAL_GetTick() - (int)last_execution_timestamp >= (int)AUTOAIM_INTERVAL) {
+          yaw_target = abs_yaw_buffer;
 
-    pitch_curr = imu->INS_angle[1];
-    yaw_curr = imu->INS_angle[0];
+          pitch_vel = 0;  // 4310 doesn't seem to need pitch_vel when pitch_pos is set
+          pitch_pos = abs_pitch_buffer;
 
-    pitch_diff = clip<float>(pitch_target - pitch_curr, -PI, PI);
-    yaw_diff = wrap<float>(yaw_target - yaw_curr, -PI, PI);
+          last_execution_timestamp = HAL_GetTick();
+        }
+      }
+    } else {
+      pitch_ratio = dbus->mouse.y / 32767.0;
+      yaw_ratio = -dbus->mouse.x / 32767.0;
 
-    float pitch_vel;
-    pitch_vel = -1 * clip<float>(dbus->ch3 / 660.0, -15, 15);
-    pitch_pos += pitch_vel / 200 + dbus->mouse.y / 32767.0;
-    pitch_pos = clip<float>(pitch_pos, 0.1, 1); // measured range
+      pitch_ratio += -dbus->ch3 / 660.0 / 210.0;
+      yaw_ratio += -dbus->ch2 / 660.0 / 210.0;
+
+      pitch_target = clip<float>(pitch_target + pitch_ratio, -gimbal_param->pitch_max_,
+                                gimbal_param->pitch_max_);
+      yaw_target = wrap<float>(yaw_target + yaw_ratio, -PI, PI);
+
+      pitch_vel = -1 * clip<float>(dbus->ch3 / 660.0, -15, 15);
+      pitch_pos += pitch_vel / 200 + dbus->mouse.y / 32767.0;
+    }
 
     if (pitch_reset) {
       // 4310 soft start
@@ -260,6 +282,15 @@ void gimbalTask(void* arg) {
       pitch_reset = false;
     }
 
+    pitch_curr = imu->INS_angle[1];
+    yaw_curr = imu->INS_angle[0];
+
+    pitch_diff = clip<float>(pitch_target - pitch_curr, -PI, PI);
+    yaw_diff = wrap<float>(yaw_target - yaw_curr, -PI, PI);
+
+    pitch_pos = clip<float>(pitch_pos, 0.1, 1); // measured range
+
+    // TODO: pitch_diff is actually no longer used by the gimbal
     gimbal->TargetRel(-pitch_diff, yaw_diff);
     gimbal->Update();
 
@@ -309,6 +340,79 @@ void refereeTask(void* arg) {
       length = referee_uart->Read(&data);
       referee->Receive(communication::package_t{data, (int)length});
     }
+  }
+}
+
+//==================================================================================================
+// Autoaim (communication w/ Jetson)
+//==================================================================================================
+
+#define JETSON_RX_SIGNAL (1 << 2)
+
+const osThreadAttr_t jetsonCommTaskAttribute = {.name = "jetsonCommTask",
+                                             .attr_bits = osThreadDetached,
+                                             .cb_mem = nullptr,
+                                             .cb_size = 0,
+                                             .stack_mem = nullptr,
+                                             .stack_size = 512 * 4,
+                                             .priority = (osPriority_t)osPriorityHigh,
+                                             .tz_module = 0,
+                                             .reserved = 0};
+osThreadId_t jetsonCommTaskHandle;
+
+class CustomUART : public bsp::UART {
+ public:
+  using bsp::UART::UART;
+
+ protected:
+  /* notify application when rx data is pending read */
+  void RxCompleteCallback() override final { osThreadFlagsSet(jetsonCommTaskHandle, JETSON_RX_SIGNAL); }
+};
+
+void jetsonCommTask(void* arg) {
+  UNUSED(arg);
+
+  uint32_t length;
+  uint8_t* data;
+
+  auto uart = std::make_unique<CustomUART>(&huart1);  // see cmake for which uart
+  uart->SetupRx(50);
+  uart->SetupTx(50);
+
+  auto miniPCreceiver = communication::AutoaimProtocol();
+
+  while (!imu->CaliDone()) {
+    osDelay(10);
+  }
+
+  int total_receive_count = 0;
+
+  while (true) {
+    uint32_t flags = osThreadFlagsGet();
+    if (flags & JETSON_RX_SIGNAL) {
+      /* time the non-blocking rx / tx calls (should be <= 1 osTick) */
+
+      // max length of the UART buffer at 150Hz is ~50 bytes
+      length = uart->Read(&data);
+
+      miniPCreceiver.Receive(data, length);
+
+      if (miniPCreceiver.get_valid_flag()) {
+        // there is at least one unprocessed valid packet
+        abs_yaw_jetson = miniPCreceiver.get_relative_yaw();
+        abs_pitch_jetson = miniPCreceiver.get_relative_pitch();
+        // last_timestamp = HAL_GetTick();
+        total_receive_count++;
+      }
+    }
+    // send IMU data anyway
+    communication::STMToJetsonData packet_to_send;
+    uint8_t my_color = 1; // blue
+    const float pitch_curr = pitch_pos;
+    const float yaw_curr = imu->INS_angle[0];
+    miniPCreceiver.Send(&packet_to_send, my_color, yaw_curr, pitch_curr, 0);
+    uart->Write((uint8_t*)&packet_to_send, sizeof(communication::STMToJetsonData));
+    osDelay(2);
   }
 }
 
@@ -454,7 +558,8 @@ void chassisTask(void* arg) {
   float vx_set, vy_set;
 
   while (true) {
-    ChangeSpinMode.input(dbus->keyboard.bit.SHIFT || dbus->swl == remote::UP);
+    // ChangeSpinMode.input(dbus->keyboard.bit.SHIFT || dbus->swl == remote::UP);
+    ChangeSpinMode.input(0);
     if (ChangeSpinMode.posEdge()) SpinMode = !SpinMode;
 
     send->cmd.id = bsp::MODE;
@@ -637,7 +742,7 @@ void selfTestTask(void* arg) {
 }
 
 void RM_RTOS_Init(void) {
-  print_use_uart(&huart1);
+  // print_use_uart(&huart1);
   bsp::SetHighresClockTimer(&htim5);
 
   can1 = new bsp::CAN(&hcan1, 0x201, true);
@@ -712,6 +817,7 @@ void RM_RTOS_Threads_Init(void) {
   shooterTaskHandle = osThreadNew(shooterTask, nullptr, &shooterTaskAttribute);
   chassisTaskHandle = osThreadNew(chassisTask, nullptr, &chassisTaskAttribute);
   selfTestTaskHandle = osThreadNew(selfTestTask, nullptr, &selfTestTaskAttribute);
+  jetsonCommTaskHandle = osThreadNew(jetsonCommTask, nullptr, &jetsonCommTaskAttribute);
 }
 
 void KillAll() {
