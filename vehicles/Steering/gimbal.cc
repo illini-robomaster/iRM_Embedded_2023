@@ -407,7 +407,13 @@ void jetsonCommTask(void* arg) {
     }
     // send IMU data anyway
     communication::STMToJetsonData packet_to_send;
-    uint8_t my_color = 1; // blue
+    uint8_t cur_robot_id = referee->game_robot_status.robot_id;
+    uint8_t my_color; // 1 for blue; 0 for red
+    if (cur_robot_id < 100) {
+      my_color = 0;
+    } else {
+      my_color = 1;
+    }
     const float pitch_curr = pitch_pos;
     const float yaw_curr = imu->INS_angle[0];
     miniPCreceiver.Send(&packet_to_send, my_color, yaw_curr, pitch_curr, 0);
@@ -559,7 +565,6 @@ void chassisTask(void* arg) {
 
   while (true) {
     ChangeSpinMode.input(dbus->keyboard.bit.SHIFT || dbus->swl == remote::UP);
-    ChangeSpinMode.input(0);
     if (ChangeSpinMode.posEdge()) SpinMode = !SpinMode;
 
     send->cmd.id = bsp::MODE;
