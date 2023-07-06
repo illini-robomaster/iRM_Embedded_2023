@@ -260,15 +260,34 @@ void chassisTask(void* arg) {
       if (-CHASSIS_DEADZONE < relative_angle && relative_angle < CHASSIS_DEADZONE) wz = 0;
     }
 
+    float supercap_voltage = supercap->info.voltage;
 
     chassis->SetSpeed(vx / 10, vy / 10, wz);
     chassis->SteerUpdateTarget();
     constexpr float WHEEL_SPEED_FACTOR = 4;
     chassis->WheelUpdateSpeed(WHEEL_SPEED_FACTOR);
     chassis->SteerCalcOutput();
-    chassis->Update((float)referee->game_robot_status.chassis_power_limit,
-                    referee->power_heat_data.chassis_power,
-                    (float)referee->power_heat_data.chassis_power_buffer);
+
+    //consider using uart printing to check the power limit's value
+    //log values out as files to obtain its trend
+    if(supercap_voltage<=1) {
+      //edge case to prevent power limit from being negative
+      chassis->Update(10.0,
+                      referee->power_heat_data.chassis_power,
+                      (float)referee->power_heat_data.chassis_power_buffer);
+    } else if (supercap_voltage>1.0 || supercap_voltage <= 5.0) {
+      //Ensure chassis won't use too much power causing losing hp when revive
+      //When voltage is lower than 1, so power should be used
+      chassis->Update((supercap_voltage-1)*7.5,
+                      referee->power_heat_data.chassis_power,
+                      (float)referee->power_heat_data.chassis_power_buffer);
+    } else {
+      //linear function for super capacitor's voltage above 5V
+      chassis->Update(((float)25+((float)supercap_voltage-5.0)*2.0),
+                      referee->power_heat_data.chassis_power,
+                      (float)referee->power_heat_data.chassis_power_buffer);
+    }
+
     if (Dead) {
       chassis->SetSpeed(0,0,0);
       motor5->SetOutput(0);
