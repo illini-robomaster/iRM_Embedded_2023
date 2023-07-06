@@ -558,7 +558,7 @@ void chassisTask(void* arg) {
   float vx_set, vy_set;
 
   while (true) {
-    // ChangeSpinMode.input(dbus->keyboard.bit.SHIFT || dbus->swl == remote::UP);
+    ChangeSpinMode.input(dbus->keyboard.bit.SHIFT || dbus->swl == remote::UP);
     ChangeSpinMode.input(0);
     if (ChangeSpinMode.posEdge()) SpinMode = !SpinMode;
 
