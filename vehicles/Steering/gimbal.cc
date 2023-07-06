@@ -59,7 +59,9 @@ static const int INFANTRY_INITIAL_HP = 100;
 static bsp::CanBridge* send = nullptr;
 
 static BoolEdgeDetector FakeDeath(false);
+static BoolEdgeDetector GimbalDeath(true);
 static volatile bool Dead = false;
+static volatile bool GimbalDead = false;
 static BoolEdgeDetector ChangeSpinMode(false);
 static volatile bool SpinMode = false;
 
@@ -222,7 +224,7 @@ void gimbalTask(void* arg) {
   float pitch_diff, yaw_diff;
 
   while (true) {
-    while (Dead) osDelay(100);
+    while (Dead || GimbalDead) osDelay(100);
 
     pitch_ratio = dbus->mouse.y / 32767.0;
     yaw_ratio = -dbus->mouse.x / 32767.0;
@@ -727,7 +729,7 @@ void KillAll() {
     send->TransmitOutput();
 
     FakeDeath.input(dbus->swl == remote::DOWN);
-    if (FakeDeath.posEdge() || send->remain_hp > 0) {
+    if (FakeDeath.posEdge()) {
       SpinMode = false;
       Dead = false;
       RGB->Display(display::color_green);
@@ -760,20 +762,52 @@ void KillAll() {
   }
 }
 
+void KillGimbal() {
+  while (true) {
+    GimbalDead = true;
+    GimbalDeath.input(send->remain_hp);
+    if (GimbalDeath.posEdge() && robot_hp_begin) {
+      GimbalDead = false;
+      pitch_motor->MotorEnable(pitch_motor);
+      break;
+    }
+
+    // 4310 soft kill
+    float tmp_pos = pitch_pos;
+    for (int j = 0; j < SOFT_KILL_CONSTANT; j++){
+      tmp_pos -= START_PITCH_POS / SOFT_KILL_CONSTANT;  // decrease position gradually
+      pitch_motor->SetOutput(tmp_pos, 1, 115, 0.5, 0);
+      pitch_motor->TransmitOutput(pitch_motor);
+      osDelay(GIMBAL_TASK_DELAY);
+    }
+
+    pitch_reset = true;
+    pitch_motor->MotorDisable(pitch_motor);
+
+    osDelay(KILLALL_DELAY);
+  }
+}
+
 static bool debug = false;
 
 void RM_RTOS_Default_Task(const void* arg) {
   UNUSED(arg);
 
   while (true) {
-    if (send->remain_hp == INFANTRY_INITIAL_HP) robot_hp_begin = true;
-    current_hp = robot_hp_begin ? send->remain_hp : INFANTRY_INITIAL_HP;
+    if (send->remain_hp == 1) robot_hp_begin = true;
+    current_hp = robot_hp_begin ? send->remain_hp : 1;
 
     FakeDeath.input(dbus->swl == remote::DOWN);
-    if (FakeDeath.posEdge() || current_hp == 0) {
+    if (FakeDeath.posEdge()) {
       Dead = true;
       KillAll();
     }
+
+    GimbalDeath.input(current_hp);
+    if (GimbalDeath.negEdge()) {
+      KillGimbal();
+    }
+
     send->cmd.id = bsp::DEAD;
     send->cmd.data_bool = false;
     send->TransmitOutput();
