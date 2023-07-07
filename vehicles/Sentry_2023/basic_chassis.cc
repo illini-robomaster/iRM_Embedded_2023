@@ -139,7 +139,7 @@ UNUSED(arg);
   float sin_yaw, cos_yaw;
   float vx_keyboard = 0, vy_keyboard = 0;
   float vx_remote, vy_remote;
-  float vx_set, vy_set, wz_set;
+  float vx_set, vy_set;
   float vx, vy, wz;
 
   float spin_speed = 600;
@@ -206,7 +206,7 @@ UNUSED(arg);
       vx = cos_yaw * vx_set + sin_yaw * vy_set;
       vy = -sin_yaw * vx_set + cos_yaw * vy_set;
       wz = std::min(follow_speed, follow_speed * relative_angle);
-      if (-CHASSIS_DEADZONE < relative_angle && relative_angle < CHASSIS_DEADZONE) wz_set = 0;
+      if (-CHASSIS_DEADZONE < relative_angle && relative_angle < CHASSIS_DEADZONE) wz = 0;
     }
 
     chassis->SetSpeed(vx, vy, wz);
@@ -216,11 +216,11 @@ UNUSED(arg);
                     (float)referee->power_heat_data.chassis_power_buffer);
 
     if (Dead) {
-      chassis->SetSpeed(0,0,0);
-      motor5->SetOutput(0);
-      motor6->SetOutput(0);
-      motor7->SetOutput(0);
-      motor8->SetOutput(0);
+      chassis->SetSpeed(0, 0, 0);
+      fl_motor->SetOutput(0);
+      bl_motor->SetOutput(0);
+      fr_motor->SetOutput(0);
+      br_motor->SetOutput(0);
     }
     control::MotorCANBase::TransmitOutput(motors, 4);
     osDelay(CHASSIS_TASK_DELAY);
