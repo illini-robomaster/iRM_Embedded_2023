@@ -25,9 +25,13 @@
 #include "cmsis_os.h"
 #include "dbus.h"
 #include "shooter.h"
+#include "bsp_os.h"
 
 #define LASER_Pin GPIO_PIN_13
 #define LASER_GPIO_Port GPIOG
+
+static const int DELAY = 350;  // ms
+static const float TARGET_SPEED_FLYWHEELS = 50;
 
 bsp::CAN* can = nullptr;
 control::MotorCANBase* left_flywheel_motor = nullptr;
@@ -35,23 +39,25 @@ control::MotorCANBase* right_flywheel_motor = nullptr;
 control::MotorCANBase* load_motor = nullptr;
 
 remote::DBUS* dbus = nullptr;
-control::ServoMotor* load_servo = nullptr;
 control::Shooter* shooter = nullptr;
 
 void RM_RTOS_Init() {
-  print_use_uart(&huart8);
+  print_use_uart(&huart1);
 
-  dbus = new remote::DBUS(&huart1);
+  dbus = new remote::DBUS(&huart3);
+  bsp::SetHighresClockTimer(&htim5);
 
   can = new bsp::CAN(&hcan1, 0x201);
-  left_flywheel_motor = new control::Motor3508(can, 0x203);
+  left_flywheel_motor = new control::Motor3508(can, 0x201);
   right_flywheel_motor = new control::Motor3508(can, 0x202);
-  load_motor = new control::Motor3508(can, 0x201);
+  load_motor = new control::Motor2006(can, 0x203);
 
   control::shooter_t shooter_data;
   shooter_data.left_flywheel_motor = left_flywheel_motor;
   shooter_data.right_flywheel_motor = right_flywheel_motor;
   shooter_data.load_motor = load_motor;
+  shooter_data.dial_direction = 1; // left shooter use 1(CCW), right shooter use -1(CW)
+  shooter_data.model = control::SHOOTER_STANDARD;
   shooter = new control::Shooter(shooter_data);
 }
 
@@ -60,22 +66,35 @@ void RM_RTOS_Default_Task(const void* args) {
   osDelay(500);  // DBUS initialization needs time
 
   control::MotorCANBase* motors[] = {left_flywheel_motor, right_flywheel_motor, load_motor};
-  bsp::GPIO laser(LASER_GPIO_Port, LASER_Pin);
-  laser.High();
+  // bsp::GPIO laser(LASER_GPIO_Port, LASER_Pin);
+  // laser.High();
+  uint32_t start_time = 0;
+  bool slow_shoot_detect = false;
 
   while (true) {
-    shooter->SetFlywheelSpeed(dbus->ch1);
-    if (dbus->ch3 > 500) shooter->LoadNext();
+    if (dbus->keyboard.bit.Q || dbus->swr == remote::DOWN) {
+      shooter->SetFlywheelSpeed(0);
+    } else {
+      shooter->SetFlywheelSpeed(482);
+    } 
+
+    if (dbus->mouse.l || dbus->swr == remote::UP) {
+      if ((bsp::GetHighresTickMicroSec() - start_time) / 1000 > DELAY) {
+        shooter->SlowContinueShoot();
+      } else if (slow_shoot_detect == false) {
+        slow_shoot_detect = true;
+        shooter->DoubleShoot();
+      }
+    } else if (dbus->mouse.r) {
+      shooter->FastContinueShoot();
+    } else {
+      shooter->DialStop();
+      start_time = bsp::GetHighresTickMicroSec();
+      slow_shoot_detect = false;
+    }
+
     shooter->Update();
     control::MotorCANBase::TransmitOutput(motors, 3);
-    osDelay(1);
-
-    static int i = 0;
-    if (i > 10) {
-      print("%10d, %10d, %10d, %10d ", dbus->ch0, dbus->ch1, dbus->ch2, dbus->ch3);
-      i = 0;
-    } else {
-      i++;
-    }
+    osDelay(100);
   }
 }
