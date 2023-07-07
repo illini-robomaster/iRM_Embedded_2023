@@ -165,26 +165,16 @@ void chassisTask(void* arg) {
     float sin_yaw, cos_yaw, vx_set, vy_set;
     float vx, vy, wz;
 
-    // TODO need to change the channels in gimbal.cc
-    // change direction
     vx_set = receive->vx;
     vy_set = receive->vy;
 
     if (receive->mode == 1) {  // spin mode
-      // TODO:how to calculate the compensation(whether do we need this delay)
-
-      // delay compensation(for spin mode)
-      // based on rule-of-thumb formula SPIN_SPEED = 80 = ~30 degree of error
-      relative_angle = relative_angle - PI * 30.0 / 180.0 / 80.0 * SPIN_SPEED;
-      // Do we need to set the chassis to max? I think the fortress has no need
-      // chassis->SteerSetMaxSpeed(RUN_SPEED * 2);
       sin_yaw = arm_sin_f32(relative_angle);
       cos_yaw = arm_cos_f32(relative_angle);
       vx = cos_yaw * vx_set + sin_yaw * vy_set;
       vy = -sin_yaw * vx_set + cos_yaw * vy_set;
       wz = SPIN_SPEED;
     } else {
-      // chassis->SteerSetMaxSpeed(RUN_SPEED);
       sin_yaw = arm_sin_f32(relative_angle);
       cos_yaw = arm_cos_f32(relative_angle);
       vx = cos_yaw * vx_set + sin_yaw * vy_set;
