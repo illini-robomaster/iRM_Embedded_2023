@@ -73,6 +73,7 @@ static volatile float relative_angle = 0;
 static unsigned int chassis_flag_bitmap = 0;
 
 static volatile float pitch_pos = START_PITCH_POS;
+static volatile float yaw_pos = 0;
 // TODO: need to measure the specific angle
 //static volatile float yaw_pos = START_YAW_POS;
 
@@ -158,7 +159,7 @@ const osThreadAttr_t gimbalTaskAttribute = {.name = "gimbalTask",
 osThreadId_t gimbalTaskHandle;
 
 static control::Motor4310* pitch_motor = nullptr;
- static control::Motor4310* yaw_motor = nullptr;
+static control::Motor4310* yaw_motor = nullptr;
 //static control::Gimbal* gimbal = nullptr;
 //static control::gimbal_data_t* gimbal_param = nullptr;
 static bsp::Laser* laser = nullptr;
@@ -252,7 +253,6 @@ void gimbalTask(void* arg) {
 //  float pitch_diff, yaw_diff;
 
   float pitch_vel_range = 5.0, yaw_vel_range = 5.0;
-  float yaw_pos = 0;
 
   while (true) {
     while (Dead) osDelay(100);
@@ -585,10 +585,11 @@ void chassisTask(void* arg) {
     send->TransmitOutput();
 
     // TODO
-//    relative_angle = yaw_motor->GetThetaDelta(gimbal_param->yaw_offset_);
-//    send->cmd.id = bsp::RELATIVE_ANGLE;
-//    send->cmd.data_float = relative_angle;
-//    send->TransmitOutput();
+    // the angle difference between the gimbal and the chassis
+    relative_angle = yaw_pos - yaw_motor.GetTheta();
+    send->cmd.id = bsp::RELATIVE_ANGLE;
+    send->cmd.data_float = relative_angle;
+    send->TransmitOutput();
 
     osDelay(CHASSIS_TASK_DELAY);
   }
@@ -825,7 +826,7 @@ void RM_RTOS_Init(void) {
   laser = new bsp::Laser(LASER_GPIO_Port, LASER_Pin);
   pitch_motor = new control::Motor4310(can2, 0x02, 0x02, control::MIT);
   // TODO: initialize the yaw motor
-   yaw_motor = new control::Motor4310(can2, 0x01, 0x01, control::MIT);
+  yaw_motor = new control::Motor4310(can2, 0x01, 0x01, control::MIT);
 //  control::gimbal_t gimbal_data;
 //  gimbal_data.pitch_motor_4310_ = pitch_motor;
   // gimbal_data.yaw_motor = yaw_motor;

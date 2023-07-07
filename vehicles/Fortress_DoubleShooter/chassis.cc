@@ -169,6 +169,7 @@ void chassisTask(void* arg) {
     vy_set = receive->vy;
 
     if (receive->mode == 1) {  // spin mode
+    // need add the relative angle compensation for the board communication
       sin_yaw = arm_sin_f32(relative_angle);
       cos_yaw = arm_cos_f32(relative_angle);
       vx = cos_yaw * vx_set + sin_yaw * vy_set;
@@ -184,11 +185,6 @@ void chassisTask(void* arg) {
     }
 
     chassis->SetSpeed(vx, vy, wz);
-    // TODO: remove the steering stuff
-    // chassis->SteerUpdateTarget();
-    // constexpr float WHEEL_SPEED_FACTOR = 4;
-    // chassis->WheelUpdateSpeed(WHEEL_SPEED_FACTOR);
-    // chassis->SteerCalcOutput();
     chassis->Update(true, (float)referee->game_robot_status.chassis_power_limit,
                     referee->power_heat_data.chassis_power,
                     (float)referee->power_heat_data.chassis_power_buffer);
@@ -200,13 +196,6 @@ void chassisTask(void* arg) {
       bl_motor->SetOutput(0);
       br_motor->SetOutput(0);
     }
-    // if (Dead) {
-    //   chassis->SetSpeed(0,0,0);
-    //   motor5->SetOutput(0);
-    //   motor6->SetOutput(0);
-    //   motor7->SetOutput(0);
-    //   motor8->SetOutput(0);
-    // }
 
     control::MotorCANBase::TransmitOutput(motors, 4);
 
