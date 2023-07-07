@@ -198,7 +198,7 @@ void jetsonCommTask(void* arg) {
     uint8_t my_color = 1; // blue
     const float pitch_curr = imu->INS_angle[1];
     const float yaw_curr = imu->INS_angle[0];
-    miniPCreceiver.Send(&packet_to_send, my_color, yaw_curr, pitch_curr);
+    miniPCreceiver.Send(&packet_to_send, my_color, yaw_curr, pitch_curr, 0);
     uart->Write((uint8_t*)&packet_to_send, sizeof(communication::STMToJetsonData));
     osDelay(2);
   }

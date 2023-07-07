@@ -95,7 +95,7 @@ void RM_RTOS_Default_Task(const void* argument) {
           } else {
             my_color = 0; // red
           }
-          miniPCreceiver.Send(&packet_to_send, my_color, 0.5, 0.42);
+          miniPCreceiver.Send(&packet_to_send, my_color, 0.5, 0.42, 0);
           uart->Write((uint8_t*)&packet_to_send, sizeof(communication::STMToJetsonData));
           // NOTE: THIS BREAKS WHEN WORKING AT 1000HZ!
           osDelay(2);
