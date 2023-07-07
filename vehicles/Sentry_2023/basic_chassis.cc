@@ -215,6 +215,13 @@ UNUSED(arg);
                     referee->power_heat_data.chassis_power,
                     (float)referee->power_heat_data.chassis_power_buffer);
 
+    if (Dead) {
+      chassis->SetSpeed(0,0,0);
+      motor5->SetOutput(0);
+      motor6->SetOutput(0);
+      motor7->SetOutput(0);
+      motor8->SetOutput(0);
+    }
     control::MotorCANBase::TransmitOutput(motors, 4);
     osDelay(CHASSIS_TASK_DELAY);
   }
