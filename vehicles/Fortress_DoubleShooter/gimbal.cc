@@ -396,11 +396,11 @@ void shooterTask(void* arg) {
 
   control::MotorCANBase* motors_can1_shooter_right[] = {right_top_flywheel, right_bottom_flywheel, right_dial};
 
-//  uint32_t start_time_left = 0;
-//  uint32_t start_time_right = 0;
+  uint32_t start_time_left = 0;
+  uint32_t start_time_right = 0;
 
-//  bool slow_shoot_detect_left = false;
-//  bool slow_shoot_detect_right = false;
+  bool slow_shoot_detect_left = false;
+  bool slow_shoot_detect_right = false;
 
   while (true) {
     if (dbus->keyboard.bit.B || dbus->swr == remote::DOWN) break;
@@ -412,13 +412,16 @@ void shooterTask(void* arg) {
   while (true) {
     while (Dead) osDelay(100);
     // TODO: need both left and right shooter
+//    print("power1: %d, cooling heat: %.4f, cooling limit: %.4f\r\n", send->shooter_power, send->cooling_heat1, send->cooling_limit1);
+//    print("power2: %d, cooling heat: %.4f, cooling limit: %.4f\r\n", send->shooter_power, send->cooling_heat2, send->cooling_limit2);
+
     if (send->shooter_power && send->cooling_heat1 > send->cooling_limit1 - 20) {
       left_top_flywheel->SetOutput(0);
       left_bottom_flywheel->SetOutput(0);
       left_dial->SetOutput(0);
       control::MotorCANBase::TransmitOutput(motors_can1_shooter_left, 3);
       osDelay(100);
-    } 
+    }
     
     if (send->shooter_power && send->cooling_heat2 > send->cooling_limit2 - 20) {
       right_top_flywheel->SetOutput(0);
@@ -428,26 +431,26 @@ void shooterTask(void* arg) {
       osDelay(100);
     }
 
-//    // left shooter(dial part)
-//    if (send->shooter_power && send->cooling_heat1 < send->cooling_limit1 - 20) {
-//      if (dbus->mouse.l || dbus->swr == remote::UP) {
-//        if ((bsp::GetHighresTickMicroSec() - start_time_left) / 1000 > SHOOTER_MODE_DELAY) {
-//          left_shooter->SlowContinueShoot();
-//        } else if (slow_shoot_detect_left == false) {
-//          slow_shoot_detect_left = true;
-//          left_shooter->DoubleShoot();
-//        }
-//      } else if (dbus->mouse.r) {
-//        left_shooter->FastContinueShoot();
-//      } else {
-//        left_shooter->DialStop();
-//        start_time_left = bsp::GetHighresTickMicroSec();
-//        slow_shoot_detect_left = false;
-//      }
-//    }
+    // left shooter(dial part)
+    if (send->shooter_power && send->cooling_heat1 < send->cooling_limit1 - 20) {
+      if (dbus->mouse.l || dbus->swr == remote::UP) {
+        if ((bsp::GetHighresTickMicroSec() - start_time_left) / 1000 > SHOOTER_MODE_DELAY) {
+          left_shooter->SlowContinueShoot();
+        } else if (slow_shoot_detect_left == false) {
+          slow_shoot_detect_left = true;
+          left_shooter->DoubleShoot();
+        }
+      } else if (dbus->mouse.r) {
+        left_shooter->FastContinueShoot();
+      } else {
+        left_shooter->DialStop();
+        start_time_left = bsp::GetHighresTickMicroSec();
+        slow_shoot_detect_left = false;
+      }
+    }
 
     // flywheel part for left shooter
-    if (!send->shooter_power || dbus->keyboard.bit.Q || dbus->swr == remote::MID) {
+    if (!send->shooter_power || dbus->keyboard.bit.Q || dbus->swr == remote::DOWN) {
       leftflywheelFlag = false;
       left_shooter->SetFlywheelSpeed(0);
     } else {
@@ -464,46 +467,47 @@ void shooterTask(void* arg) {
     }
 
 
-//    // right shooter(dial part)
-//    if (send->shooter_power && send->cooling_heat2 < send->cooling_limit2 - 20) {
-//      if (dbus->mouse.l || dbus->swr == remote::UP) {
-//        if ((bsp::GetHighresTickMicroSec() - start_time_right) / 1000 > SHOOTER_MODE_DELAY) {
-//          right_shooter->SlowContinueShoot();
-//        } else if (slow_shoot_detect_right == false) {
-//          slow_shoot_detect_right = true;
-//          right_shooter->DoubleShoot();
-//        }
-//      } else if (dbus->mouse.r) {
-//        right_shooter->FastContinueShoot();
-//      } else {
-//        right_shooter->DialStop();
-//        start_time_right = bsp::GetHighresTickMicroSec();
-//        slow_shoot_detect_right = false;
-//      }
-//    }
-//
-//    // flywheel part for right shooter
-//    if (!send->shooter_power || dbus->keyboard.bit.Q || dbus->swr == remote::DOWN) {
-//      rightflywheelFlag = false;
-//      right_shooter->SetFlywheelSpeed(0);
-//    } else {
-//      if (14 < send->speed_limit2 && send->speed_limit2 < 16) {
-//        rightflywheelFlag = true;
-//        right_shooter->SetFlywheelSpeed(437);  // 445 MAX
-//      } else if (send->speed_limit1 >= 18) {
-//        rightflywheelFlag = true;
-//        right_shooter->SetFlywheelSpeed(482);  // 490 MAX
-//      } else {
-//        rightflywheelFlag = false;
-//        right_shooter->SetFlywheelSpeed(0);
-//      }
-//    }
+    // right shooter(dial part)
+    if (send->shooter_power && send->cooling_heat2 < send->cooling_limit2 - 20) {
+      if (dbus->mouse.l || dbus->swr == remote::UP) {
+        if ((bsp::GetHighresTickMicroSec() - start_time_right) / 1000 > SHOOTER_MODE_DELAY) {
+          right_shooter->SlowContinueShoot();
+        } else if (slow_shoot_detect_right == false) {
+          slow_shoot_detect_right = true;
+          right_shooter->DoubleShoot();
+        }
+      } else if (dbus->mouse.r) {
+        right_shooter->FastContinueShoot();
+      } else {
+        right_shooter->DialStop();
+        start_time_right = bsp::GetHighresTickMicroSec();
+        slow_shoot_detect_right = false;
+      }
+    }
+
+    // flywheel part for right shooter
+    if (!send->shooter_power || dbus->keyboard.bit.Q || dbus->swr == remote::DOWN) {
+      rightflywheelFlag = false;
+      right_shooter->SetFlywheelSpeed(0);
+    } else {
+      if (14 < send->speed_limit2 && send->speed_limit2 < 16) {
+        rightflywheelFlag = true;
+        right_shooter->SetFlywheelSpeed(437);  // 445 MAX
+      } else if (send->speed_limit1 >= 18) {
+        rightflywheelFlag = true;
+        right_shooter->SetFlywheelSpeed(482);  // 490 MAX
+      } else {
+        rightflywheelFlag = false;
+        right_shooter->SetFlywheelSpeed(0);
+      }
+    }
 
     left_shooter->Update();
     control::MotorCANBase::TransmitOutput(motors_can1_shooter_left, 3);
-//    right_shooter->Update();
-//    control::MotorCANBase::TransmitOutput(motors_can1_shooter_right, 3);
+//    osDelay(SHOOTER_TASK_DELAY);
 
+    right_shooter->Update();
+    control::MotorCANBase::TransmitOutput(motors_can1_shooter_right, 3);
     osDelay(SHOOTER_TASK_DELAY);
   }
 }
