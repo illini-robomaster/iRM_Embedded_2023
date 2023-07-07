@@ -393,7 +393,7 @@ void shooterTask(void* arg) {
         }
       } else if (dbus->mouse.r) {
         shooter->FastContinueShoot();
-      } else if (dbus->keyboard.bit.R) {
+      } else if (dbus->keyboard.bit.G) {
         shooter->Antijam();
       }else {
         shooter->DialStop();
