@@ -66,6 +66,7 @@ static volatile bool Dead = false;
 static volatile bool GimbalDead = false;
 static BoolEdgeDetector ChangeSpinMode(false);
 static volatile bool SpinMode = false;
+static BoolEdgeDetector Antijam(false);
 
 static volatile float relative_angle = 0;
 
@@ -494,8 +495,11 @@ void shooterTask(void* arg) {
       }
       stepper_direction = !stepper_direction;
     }
-
+    
     if (send->shooter_power && send->cooling_heat1 < send->cooling_limit1 - 20) {
+      // for manual antijam 
+      Antijam.input(dbus->keyboard.bit.G);
+
       if (dbus->mouse.l || dbus->swr == remote::UP) {
         if ((bsp::GetHighresTickMicroSec() - start_time) / 1000 > SHOOTER_MODE_DELAY) {
           shooter->SlowContinueShoot();
@@ -505,7 +509,9 @@ void shooterTask(void* arg) {
         }
       } else if (dbus->mouse.r) {
         shooter->FastContinueShoot();
-      } else {
+      } else if (Antijam.posEdge()) {
+        shooter->Antijam();
+      }else {
         shooter->DialStop();
         start_time = bsp::GetHighresTickMicroSec();
         slow_shoot_detect = false;
