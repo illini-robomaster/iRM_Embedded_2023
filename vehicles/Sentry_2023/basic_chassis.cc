@@ -316,10 +316,10 @@ void RM_RTOS_Init() {
 
   // TODO: Sentry chassis initilize
   // Chassis motor
-  fl_motor = new control::Motor3508(can2, 0x201);
-  fr_motor = new control::Motor3508(can2, 0x202);
-  bl_motor = new control::Motor3508(can2, 0x203);
-  br_motor = new control::Motor3508(can2, 0x204);
+  fl_motor = new control::Motor3508(can1, 0x201);
+  fr_motor = new control::Motor3508(can1, 0x202);
+  bl_motor = new control::Motor3508(can1, 0x203);
+  br_motor = new control::Motor3508(can1, 0x204);
   control::MotorCANBase* motors[control::FourWheel::motor_num];
   motors[control::FourWheel::front_left] = fl_motor;
   motors[control::FourWheel::front_right] = fr_motor;
