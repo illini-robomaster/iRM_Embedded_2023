@@ -140,6 +140,7 @@ UNUSED(arg);
   float vx_keyboard = 0, vy_keyboard = 0;
   float vx_remote, vy_remote;
   float vx_set, vy_set, wz_set;
+  float vx, vy, wz;
 
   float spin_speed = 600;
   float follow_speed = 400;
@@ -196,19 +197,19 @@ UNUSED(arg);
     if (SpinMode) {
       sin_yaw = arm_sin_f32(relative_angle);
       cos_yaw = arm_cos_f32(relative_angle);
-      vx_set = cos_yaw * vx_set + sin_yaw * vy_set;
-      vy_set = -sin_yaw * vx_set + cos_yaw * vy_set;
-      wz_set = spin_speed;
+      vx = cos_yaw * vx_set + sin_yaw * vy_set;
+      vy = -sin_yaw * vx_set + cos_yaw * vy_set;
+      wz = spin_speed;
     } else {
       sin_yaw = arm_sin_f32(relative_angle);
       cos_yaw = arm_cos_f32(relative_angle);
-      vx_set = cos_yaw * vx_set + sin_yaw * vy_set;
-      vy_set = -sin_yaw * vx_set + cos_yaw * vy_set;
-      wz_set = std::min(follow_speed, follow_speed * relative_angle);
+      vx = cos_yaw * vx_set + sin_yaw * vy_set;
+      vy = -sin_yaw * vx_set + cos_yaw * vy_set;
+      wz = std::min(follow_speed, follow_speed * relative_angle);
       if (-CHASSIS_DEADZONE < relative_angle && relative_angle < CHASSIS_DEADZONE) wz_set = 0;
     }
 
-    chassis->SetSpeed(vx_set, vy_set, wz_set);
+    chassis->SetSpeed(vx, vy, wz);
 
     chassis->Update(true, (float)referee->game_robot_status.chassis_power_limit,
                     referee->power_heat_data.chassis_power,
