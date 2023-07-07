@@ -236,7 +236,7 @@ void gimbalTask(void* arg) {
   while (true) {
     while (Dead || GimbalDead) osDelay(100);
 
-    if (dbus->keyboard.bit.F || dbus->swl == remote::UP) {
+    if (dbus->keyboard.bit.F || dbus->swl == remote::UP || dbus->keyboard.bit.CTRL) {
       float abs_pitch_buffer = abs_pitch_jetson;
       float abs_yaw_buffer = abs_yaw_jetson;
 
