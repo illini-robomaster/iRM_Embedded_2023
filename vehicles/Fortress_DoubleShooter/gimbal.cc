@@ -447,7 +447,7 @@ void shooterTask(void* arg) {
 //    }
 
     // flywheel part for left shooter
-    if (!send->shooter_power || dbus->keyboard.bit.Q || dbus->swr == remote::MID) {
+    if (!send->shooter_power || dbus->keyboard.bit.Q || dbus->swr == remote::DOWN) {
       leftflywheelFlag = false;
       left_shooter->SetFlywheelSpeed(0);
     } else {

@@ -56,7 +56,7 @@ void RM_RTOS_Init() {
   shooter_data.left_flywheel_motor = left_flywheel_motor;
   shooter_data.right_flywheel_motor = right_flywheel_motor;
   shooter_data.load_motor = load_motor;
-  shooter_data.dial_direction = 1;
+  shooter_data.dial_direction = 1; // left shooter use 1(CCW), right shooter use -1(CW)
   shooter_data.model = control::SHOOTER_STANDARD;
   shooter = new control::Shooter(shooter_data);
 }
