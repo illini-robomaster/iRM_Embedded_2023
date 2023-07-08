@@ -87,6 +87,9 @@ void CanBridge::UpdateData(const uint8_t* data) {
     case RECALIBRATE:
       recalibrate = cmd.data_bool;
       break;
+    case IS_MY_COLOR_BLUE:
+      is_my_color_blue = cmd.data_bool;
+      break;
     default:;
   }
 }

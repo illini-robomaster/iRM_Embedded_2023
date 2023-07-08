@@ -490,6 +490,10 @@ void RM_RTOS_Default_Task(const void* args) {
     receive->cmd.data_uint = referee->game_robot_status.mains_power_gimbal_output;
     receive->TransmitOutput();
 
+    receive->cmd.id = bsp::IS_MY_COLOR_BLUE;
+    receive->cmd.data_bool = (referee->game_robot_status.robot_id >= 100) ? true : false;
+    receive->TransmitOutput();
+
     if (debug) {
       set_cursor(0, 0);
       clear_screen();

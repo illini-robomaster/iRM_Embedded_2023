@@ -402,18 +402,16 @@ void jetsonCommTask(void* arg) {
         // there is at least one unprocessed valid packet
         abs_yaw_jetson = miniPCreceiver.get_relative_yaw();
         abs_pitch_jetson = miniPCreceiver.get_relative_pitch();
-        // last_timestamp = HAL_GetTick();
         total_receive_count++;
       }
     }
     // send IMU data anyway
     communication::STMToJetsonData packet_to_send;
-    uint8_t cur_robot_id = referee->game_robot_status.robot_id;
     uint8_t my_color; // 1 for blue; 0 for red
-    if (cur_robot_id < 100) {
-      my_color = 0;
-    } else {
+    if (send->is_my_color_blue) {
       my_color = 1;
+    } else {
+      my_color = 0;
     }
     const float pitch_curr = pitch_pos;
     const float yaw_curr = imu->INS_angle[0];
@@ -570,7 +568,7 @@ void chassisTask(void* arg) {
   float vx_set, vy_set;
 
   while (true) {
-    ChangeSpinMode.input(dbus->keyboard.bit.SHIFT || dbus->swl == remote::UP);
+    ChangeSpinMode.input(dbus->keyboard.bit.SHIFT);
     if (ChangeSpinMode.posEdge()) SpinMode = !SpinMode;
 
     send->cmd.id = bsp::MODE;
