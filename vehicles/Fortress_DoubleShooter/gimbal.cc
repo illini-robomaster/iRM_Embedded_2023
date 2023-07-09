@@ -586,7 +586,7 @@ void chassisTask(void* arg) {
 
     // TODO
     // the angle difference between the gimbal and the chassis
-    relative_angle = yaw_pos - yaw_motor.GetTheta();
+    relative_angle = yaw_pos - yaw_motor->GetTheta();
     send->cmd.id = bsp::RELATIVE_ANGLE;
     send->cmd.data_float = relative_angle;
     send->TransmitOutput();
