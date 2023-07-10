@@ -19,6 +19,7 @@
  ****************************************************************************/
 
 #include "main.h"
+#include <cstring>
 
 #include "bsp_os.h"
 #include "bsp_print.h"
@@ -34,6 +35,20 @@ void delay_us(uint32_t us) {
 
 namespace display {
 
+char font_lib[][5]  ={
+ {0x7f,0x7f,0x41,0x7f,0x7f}, // 0
+ {0x00,0x7f,0x7f,0x7f,0x00}, // 1
+ {0x79,0x79,0x69,0x6f,0x6f}, // 2
+ {0x6b,0x6b,0x6b,0x7f,0x7f}, // 3
+ {0x1f,0x1f,0x18,0x7f,0x7f}, // 4
+ {0x6f,0x6f,0x69,0x79,0x79}, // 5
+ {0x7f,0x7f,0x49,0x79,0x79}, // 6
+ {0x03,0x03,0x03,0x7f,0x7f}, // 7
+ {0x7f,0x7f,0x49,0x7f,0x7f}, // 8
+ {0x4f,0x4f,0x49,0x7f,0x7f}, // 9
+ {0x00,0x00,0x36,0x36,0x00}, // :
+ };
+
 class VFD {
  public:
   VFD(bsp::GPIO* din, bsp::GPIO* clk, bsp::GPIO* cs, bsp::GPIO* rst, bsp::GPIO* en) {
@@ -42,12 +57,6 @@ class VFD {
     cs_ = cs;
     rst_ = rst;
     en_ = en;
-
-    en_->High();
-    delay_us(100);
-    rst_->Low();
-    osDelay(5);
-    rst_->High();
   }
 
   void Show() {
@@ -57,6 +66,11 @@ class VFD {
   }
 
   void Init() {
+    en_->High();
+    rst_->Low();
+    osDelay(5);
+    rst_->High();
+
     cs_->Low();
     write_data(0xe0);
     osDelay(5);
@@ -64,20 +78,62 @@ class VFD {
     cs_->High();
     osDelay(5);
 
-    cs_->Low();
-    write_data(0xe4);
-    osDelay(5);
-    write_data(0xff);
-    cs_->High();
-    osDelay(5);
+    SetBrightness(100);
   }
 
-  void WriteOneChar(unsigned char x, unsigned char chr) {
+  void SetBrightness(int val) {
+    val = val / 100.0f * 255;
+    val = val < 0? 0 : val;
+    val = val > 255? 255 : val;
+
     cs_->Low();
-    write_data(0x20 + x);
+    write_data(0xe4);
+    delay_us(3);
+    write_data(val);
+    cs_->High();
+    delay_us(3);
+  }
+
+  void WriteOneChar(uint16_t pos, char chr) {
+    if (pos >= 8) return ;
+
+    cs_->Low();
+    write_data(0x20 + pos);
     write_data(chr);
     cs_->High();
-    Show();
+  }
+
+  void WriteString(uint16_t pos, char* str, int len) {
+    if (pos >= 8 || len <= 0 || pos + len > 8) return;
+
+    cs_->Low();
+    write_data(0x20 + pos);
+    for (int i = 0; i < len; ++i)
+      write_data(str[i]);
+    cs_->High();
+  }
+
+  void Clear() {
+    cs_->Low();
+    write_data(0x20);
+    for (int i = 0; i < 8; ++i)
+      write_data(0x20);
+    cs_->High();
+  }
+
+  void WriteCustom(uint16_t pos, char* str) {
+    if (pos >= 8) return ;
+
+    cs_->Low();
+    write_data(0x40 + pos);
+    for (int i = 0; i < 7; ++i)
+      write_data(str[i]);
+    cs_->High();
+
+    cs_->Low();
+    write_data(0x20 + pos);
+    write_data(0x00 + pos);
+    cs_->High();
   }
 
  private:
@@ -121,6 +177,32 @@ static BoolEdgeDetector left(false);
 static BoolEdgeDetector button(false);
 static BoolEdgeDetector right(false);
 
+const osThreadAttr_t switchTaskAttribute = {.name = "switchTask",
+                                            .attr_bits = osThreadDetached,
+                                            .cb_mem = nullptr,
+                                            .cb_size = 0,
+                                            .stack_mem = nullptr,
+                                            .stack_size = 128 * 4,
+                                            .priority = (osPriority_t)osPriorityNormal,
+                                            .tz_module = 0,
+                                            .reserved = 0};
+osThreadId_t switchTaskHandle;
+
+void switchTask(void* arg) {
+  UNUSED(arg);
+
+  while (true) {
+    left.input(ccw->Read());
+    button.input(push->Read());
+    right.input(cw->Read());
+
+    if (left.negEdge() || button.negEdge() || right.negEdge())
+      led->Toggle();
+
+    osDelay(50);
+  }
+}
+
 void RM_RTOS_Init(void) {
   bsp::SetHighresClockTimer(&htim2);
   print_use_uart(&huart1);
@@ -139,28 +221,29 @@ void RM_RTOS_Init(void) {
   vfd = new display::VFD(din, clk, cs, rst, en);
 }
 
+void RM_RTOS_Threads_Init(void) {
+  switchTaskHandle = osThreadNew(switchTask, nullptr, &switchTaskAttribute);
+}
+
 void RM_RTOS_Default_Task(const void* arguments) {
   UNUSED(arguments);
-//  vfd->Init();
+  char string[] = "WWWWWWWW";
+  vfd->Init();
 
   while (true) {
-    left.input(ccw->Read());
-    button.input(push->Read());
-    right.input(cw->Read());
+    vfd->WriteString(0, string, strlen(string));
+    vfd->Show();
+    osDelay(500);
 
-    if (left.negEdge() || button.negEdge() || right.negEdge())
-      led->Toggle();
-//    vfd->WriteOneChar(0, 0x30);
-//    osDelay(5);
-//    vfd->Show();
-//    osDelay(5);
-    din->Toggle();
-    delay_us(1000);
-//    set_cursor(0, 0);
-//    clear_screen();
-
-//    led->Low();
-//    print("%ld\r\n", bsp::GetHighresTickMicroSec());
-//    osDelay(100);
+    vfd->WriteCustom(0, display::font_lib[9]);
+    vfd->WriteCustom(1, display::font_lib[1]);
+    vfd->WriteCustom(2, display::font_lib[2]);
+    vfd->WriteCustom(3, display::font_lib[3]);
+    vfd->WriteCustom(4, display::font_lib[4]);
+    vfd->WriteCustom(5, display::font_lib[5]);
+    vfd->WriteCustom(6, display::font_lib[10]);
+    vfd->WriteCustom(7, display::font_lib[7]);
+    vfd->Show();
+    osDelay(500);
   }
 }
