@@ -20,6 +20,7 @@
 
 #include "main.h"
 #include <cstring>
+#include <cstdlib>
 
 #include "bsp_os.h"
 #include "bsp_print.h"
@@ -35,7 +36,28 @@ void delay_us(uint32_t us) {
 
 namespace display {
 
-char font_lib[][5]  ={
+struct {
+  int hour = 0;
+  int minute = 0;
+  int second = 0;
+} time;
+
+void UpdateTime() {
+  ++time.second;
+  if (time.second >= 60) {
+    time.second = 0;
+    ++time.minute;
+    if (time.minute >= 60) {
+      time.minute = 0;
+      ++time.hour;
+      if (time.hour >= 24) {
+        time.hour = 0;
+      }
+    }
+  }
+}
+
+char font_lib[][5] = {
  {0x7f,0x7f,0x41,0x7f,0x7f}, // 0
  {0x00,0x7f,0x7f,0x7f,0x00}, // 1
  {0x79,0x79,0x69,0x6f,0x6f}, // 2
@@ -49,6 +71,8 @@ char font_lib[][5]  ={
  {0x00,0x00,0x36,0x36,0x00}, // :
  };
 
+char vfd_buffer[8][5] = {};
+
 class VFD {
  public:
   VFD(bsp::GPIO* din, bsp::GPIO* clk, bsp::GPIO* cs, bsp::GPIO* rst, bsp::GPIO* en) {
@@ -57,6 +81,8 @@ class VFD {
     cs_ = cs;
     rst_ = rst;
     en_ = en;
+
+    srand(bsp::GetHighresTickMicroSec());
   }
 
   void Show() {
@@ -94,7 +120,7 @@ class VFD {
     delay_us(3);
   }
 
-  void WriteOneChar(uint16_t pos, char chr) {
+  void WriteOneChar(unsigned pos, char chr) {
     if (pos >= 8) return ;
 
     cs_->Low();
@@ -103,7 +129,7 @@ class VFD {
     cs_->High();
   }
 
-  void WriteString(uint16_t pos, char* str, int len) {
+  void WriteString(unsigned pos, char* str, int len) {
     if (pos >= 8 || len <= 0 || pos + len > 8) return;
 
     cs_->Low();
@@ -121,7 +147,7 @@ class VFD {
     cs_->High();
   }
 
-  void WriteCustom(uint16_t pos, char* str) {
+  void WriteCustom(unsigned pos, char* str) {
     if (pos >= 8) return ;
 
     cs_->Low();
@@ -135,6 +161,28 @@ class VFD {
     write_data(0x00 + pos);
     cs_->High();
   }
+
+  void Font2Buffer(char* font, char* buffer) {
+    memcpy(buffer, font, sizeof(char) * 5);
+  }
+
+  unsigned GetRandomFont() {
+    return rand() % (sizeof(font_lib) / sizeof(char) / 5);
+  }
+
+  void VerticalMoveDown(unsigned pos, int step, unsigned new_font) {
+    UNUSED(new_font);
+
+//    step = step / 100.0f * 7;
+//    memcpy(vfd_buffer[pos] + step, vfd_buffer[pos], 7 - step);
+//    memcpy(vfd_buffer[pos], font_lib[new_font] + 7 - step, step);
+    for (int i = 0; i < 5; ++i) {
+        vfd_buffer[pos][i] = 0x7f & (vfd_buffer[pos][i] << 1);
+        vfd_buffer[pos][i] |= font_lib[new_font][i] >> (7 - step);
+    }
+  }
+
+
 
  private:
   bsp::GPIO* din_;
@@ -203,6 +251,108 @@ void switchTask(void* arg) {
   }
 }
 
+const osThreadAttr_t displayTaskAttribute = {.name = "displayTask",
+                                             .attr_bits = osThreadDetached,
+                                             .cb_mem = nullptr,
+                                             .cb_size = 0,
+                                             .stack_mem = nullptr,
+                                             .stack_size = 128 * 4,
+                                             .priority = (osPriority_t)osPriorityNormal,
+                                             .tz_module = 0,
+                                             .reserved = 0};
+osThreadId_t displayTaskHandle;
+
+void displayTask(void* arg) {
+  UNUSED(arg);
+
+//  unsigned new_font[8] = {};
+//
+//  for (unsigned int & i : new_font)
+//    i = vfd->GetRandomFont();
+//  for (int i = 0; i < 8; ++i)
+//    vfd->Font2Buffer(display::font_lib[new_font[i]], display::vfd_buffer[i]);
+//  osDelay(1000);
+
+  vfd->Font2Buffer(display::font_lib[0], display::vfd_buffer[0]);
+  vfd->Font2Buffer(display::font_lib[0], display::vfd_buffer[1]);
+
+  vfd->Font2Buffer(display::font_lib[10], display::vfd_buffer[2]);
+
+  vfd->Font2Buffer(display::font_lib[0], display::vfd_buffer[3]);
+  vfd->Font2Buffer(display::font_lib[0], display::vfd_buffer[4]);
+
+  vfd->Font2Buffer(display::font_lib[10], display::vfd_buffer[5]);
+
+  vfd->Font2Buffer(display::font_lib[0], display::vfd_buffer[6]);
+  vfd->Font2Buffer(display::font_lib[0], display::vfd_buffer[7]);
+
+  display::time.hour = 23;
+  display::time.minute = 49;
+  display::time.second = 55;
+
+  while (true) {
+//    for (unsigned int & i : new_font)
+//      i = vfd->GetRandomFont();
+//
+//    for (int i = 1; i <= 7; ++i) {
+//      for (int j = 0; j < 8; ++j)
+//        vfd->VerticalMoveDown(j, i, new_font[j]);
+//      osDelay(500 / 7);
+//    }
+
+    display::UpdateTime();
+
+    if (display::time.second % 10 != 0) {
+      for (int i = 1; i <= 7; ++i) {
+        vfd->VerticalMoveDown(7, i, display::time.second % 10);
+        osDelay(500 / 7);
+      }
+    } else if (display::time.second / 10 != 0) {
+      for (int i = 1; i <= 7; ++i) {
+        vfd->VerticalMoveDown(6, i, display::time.second / 10);
+        vfd->VerticalMoveDown(7, i, display::time.second % 10);
+        osDelay(500 / 7);
+      }
+    } else if (display::time.minute % 10 != 0) {
+      for (int i = 1; i <= 7; ++i) {
+        vfd->VerticalMoveDown(4, i, display::time.minute % 10);
+        vfd->VerticalMoveDown(6, i, display::time.second / 10);
+        vfd->VerticalMoveDown(7, i, display::time.second % 10);
+        osDelay(500 / 7);
+     }
+    } else if (display::time.minute / 10 != 0) {
+      for (int i = 1; i <= 7; ++i) {
+        vfd->VerticalMoveDown(3, i, display::time.minute / 10);
+        vfd->VerticalMoveDown(4, i, display::time.minute % 10);
+        vfd->VerticalMoveDown(6, i, display::time.second / 10);
+        vfd->VerticalMoveDown(7, i, display::time.second % 10);
+        osDelay(500 / 7);
+      }
+    } else if (display::time.hour % 10 != 4) {
+      for (int i = 1; i <= 7; ++i) {
+        vfd->VerticalMoveDown(1, i, display::time.hour % 10);
+        vfd->VerticalMoveDown(3, i, display::time.minute / 10);
+        vfd->VerticalMoveDown(4, i, display::time.minute % 10);
+        vfd->VerticalMoveDown(6, i, display::time.second / 10);
+        vfd->VerticalMoveDown(7, i, display::time.second % 10);
+        osDelay(500 / 7);
+      }
+    } else {
+       for (int i = 1; i <= 7; ++i) {
+        vfd->VerticalMoveDown(0, i, display::time.hour / 10);
+        vfd->VerticalMoveDown(1, i, display::time.hour % 10);
+        vfd->VerticalMoveDown(3, i, display::time.minute / 10);
+        vfd->VerticalMoveDown(4, i, display::time.minute % 10);
+        vfd->VerticalMoveDown(6, i, display::time.second / 10);
+        vfd->VerticalMoveDown(7, i, display::time.second % 10);
+        osDelay(500 / 7);
+      }
+    }
+
+    osDelay(500);
+  }
+}
+
 void RM_RTOS_Init(void) {
   bsp::SetHighresClockTimer(&htim2);
   print_use_uart(&huart1);
@@ -223,27 +373,23 @@ void RM_RTOS_Init(void) {
 
 void RM_RTOS_Threads_Init(void) {
   switchTaskHandle = osThreadNew(switchTask, nullptr, &switchTaskAttribute);
+  displayTaskHandle = osThreadNew(displayTask, nullptr, &displayTaskAttribute);
 }
 
 void RM_RTOS_Default_Task(const void* arguments) {
   UNUSED(arguments);
-  char string[] = "WWWWWWWW";
   vfd->Init();
 
   while (true) {
-    vfd->WriteString(0, string, strlen(string));
+    vfd->WriteCustom(0, display::vfd_buffer[0]);
+    vfd->WriteCustom(1, display::vfd_buffer[1]);
+    vfd->WriteCustom(2, display::vfd_buffer[2]);
+    vfd->WriteCustom(3, display::vfd_buffer[3]);
+    vfd->WriteCustom(4, display::vfd_buffer[4]);
+    vfd->WriteCustom(5, display::vfd_buffer[5]);
+    vfd->WriteCustom(6, display::vfd_buffer[6]);
+    vfd->WriteCustom(7, display::vfd_buffer[7]);
     vfd->Show();
-    osDelay(500);
-
-    vfd->WriteCustom(0, display::font_lib[9]);
-    vfd->WriteCustom(1, display::font_lib[1]);
-    vfd->WriteCustom(2, display::font_lib[2]);
-    vfd->WriteCustom(3, display::font_lib[3]);
-    vfd->WriteCustom(4, display::font_lib[4]);
-    vfd->WriteCustom(5, display::font_lib[5]);
-    vfd->WriteCustom(6, display::font_lib[10]);
-    vfd->WriteCustom(7, display::font_lib[7]);
-    vfd->Show();
-    osDelay(500);
+    osDelay(10);
   }
 }
