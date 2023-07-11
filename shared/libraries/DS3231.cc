@@ -30,10 +30,10 @@ bool DS3231::ReadData(uint8_t ReadAddr) {
   uint8_t DS3231_DataAddr[1];
   DS3231_DataAddr[0] = ReadAddr;
 
-  if (HAL_I2C_Master_Transmit(hi2c_, (DS3231_ADDRESS | I2C_WR), DS3231_DataAddr, sizeof(DS3231_DataAddr), 1000) != HAL_OK)
+  if (HAL_I2C_Master_Transmit(hi2c_, (DS3231_ADDRESS | I2C_WR), DS3231_DataAddr, sizeof(DS3231_DataAddr), 100) != HAL_OK)
     return false;
 
-  if (HAL_I2C_Master_Receive(hi2c_, (DS3231_ADDRESS | I2C_RD), &DS3231Buffer, sizeof(DS3231Buffer), 1000) != HAL_OK)
+  if (HAL_I2C_Master_Receive(hi2c_, (DS3231_ADDRESS | I2C_RD), &DS3231Buffer, sizeof(DS3231Buffer), 100) != HAL_OK)
     return false;
 
   return true;
@@ -44,7 +44,7 @@ bool DS3231::WriteData(uint8_t WriteAddr, uint8_t Data) {
   DS3231_Data[0] = WriteAddr;
   DS3231_Data[1] = Data;
 
-  if(HAL_I2C_Master_Transmit(hi2c_,(DS3231_ADDRESS | I2C_WR),DS3231_Data,sizeof(DS3231_Data), 1000) != HAL_OK)
+  if(HAL_I2C_Master_Transmit(hi2c_,(DS3231_ADDRESS | I2C_WR),DS3231_Data,sizeof(DS3231_Data), 100) != HAL_OK)
     return false;
 
   return true;

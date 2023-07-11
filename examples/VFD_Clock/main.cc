@@ -113,6 +113,10 @@ class VFD {
   }
 
   void SetBrightness(int val) {
+    brightness_ = val;
+    brightness_ = brightness_ < 0? 0 : brightness_;
+    brightness_ = brightness_ > 100? 100 : brightness_;
+
     val = val / 100.0f * 255;
     val = val < 0? 0 : val;
     val = val > 255? 255 : val;
@@ -206,6 +210,8 @@ class VFD {
   int minute_ = 0;
   int second_ = 0;
 
+  int brightness_ = 0;
+
  private:
   bsp::GPIO* din_;
   bsp::GPIO* clk_;
@@ -271,6 +277,12 @@ void switchTask(void* arg) {
     if (left.negEdge() || button.negEdge() || right.negEdge())
       led->Toggle();
 
+    if (left.negEdge())
+      vfd->brightness_ += 10;
+
+    if (right.negEdge())
+      vfd->brightness_ -= 10;
+
     osDelay(50);
   }
 }
@@ -289,13 +301,11 @@ osThreadId_t updateTimeTaskHandle;
 void updateTimeTask(void* arg) {
   UNUSED(arg);
 
-  clock->SetTime(23, 7, 11, 2, 2, 15, 20) ? led->Low() : led->High();
+  clock->SetTime(23, 7, 11, 2, 2, 15, 20);
 
   while (true) {
-//    display::UpdateTime();
-//    osDelay(1000);
-//    clock->ReadTime() ? led->Low() : led->High();
     clock->ReadTime();
+
     display::time.second = clock->second;
     display::time.minute = clock->minute;
     display::time.hour = clock->hour;
@@ -390,6 +400,8 @@ void RM_RTOS_Default_Task(const void* arguments) {
   vfd->Init();
 
   while (true) {
+    vfd->SetBrightness(vfd->brightness_);
+
     vfd->WriteCustom(0, display::vfd_buffer[0]);
     vfd->WriteCustom(1, display::vfd_buffer[1]);
     vfd->WriteCustom(2, display::vfd_buffer[2]);
@@ -398,6 +410,7 @@ void RM_RTOS_Default_Task(const void* arguments) {
     vfd->WriteCustom(5, display::vfd_buffer[5]);
     vfd->WriteCustom(6, display::vfd_buffer[6]);
     vfd->WriteCustom(7, display::vfd_buffer[7]);
+
     vfd->Show();
     osDelay(10);
   }
