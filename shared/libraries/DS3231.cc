@@ -6,6 +6,10 @@ DS3231::DS3231(I2C_HandleTypeDef* hi2c) {
   hi2c_ = hi2c;
 }
 
+bool DS3231::IsReady() {
+  return HAL_I2C_IsDeviceReady(hi2c_, DS3231_ADDRESS, 1, 100) == HAL_OK;
+}
+
 uint8_t DS3231::BCD_DEC(uint8_t BCD_Data) {
   uint8_t DEC_Data;
 

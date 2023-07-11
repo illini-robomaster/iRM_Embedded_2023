@@ -255,6 +255,8 @@ static BoolEdgeDetector left(false);
 static BoolEdgeDetector button(false);
 static BoolEdgeDetector right(false);
 
+static volatile bool clock_flag = false;
+
 const osThreadAttr_t switchTaskAttribute = {.name = "switchTask",
                                             .attr_bits = osThreadDetached,
                                             .cb_mem = nullptr,
@@ -277,11 +279,11 @@ void switchTask(void* arg) {
     if (left.negEdge() || button.negEdge() || right.negEdge())
       led->Toggle();
 
-    if (left.negEdge())
-      vfd->brightness_ += 10;
+    if (ccw->Read())
+      vfd->brightness_ -= 2;
 
-    if (right.negEdge())
-      vfd->brightness_ -= 10;
+    if (cw->Read())
+      vfd->brightness_ += 2;
 
     osDelay(50);
   }
@@ -301,6 +303,20 @@ osThreadId_t updateTimeTaskHandle;
 void updateTimeTask(void* arg) {
   UNUSED(arg);
 
+  while (!clock->IsReady()) {
+    clock_flag = false;
+    vfd->Font2Buffer(display::font_lib[2], display::vfd_buffer[0]);
+    vfd->Font2Buffer(display::font_lib[3], display::vfd_buffer[1]);
+    vfd->Font2Buffer(display::font_lib[3], display::vfd_buffer[2]);
+    vfd->Font2Buffer(display::font_lib[3], display::vfd_buffer[3]);
+    vfd->Font2Buffer(display::font_lib[3], display::vfd_buffer[4]);
+    vfd->Font2Buffer(display::font_lib[3], display::vfd_buffer[5]);
+    vfd->Font2Buffer(display::font_lib[3], display::vfd_buffer[6]);
+    vfd->Font2Buffer(display::font_lib[3], display::vfd_buffer[7]);
+    osDelay(100);
+  }
+  clock_flag = true;
+
   clock->SetTime(23, 7, 11, 2, 2, 15, 20);
 
   while (true) {
@@ -314,7 +330,7 @@ void updateTimeTask(void* arg) {
     display::time.month = clock->month;
     display::time.year = clock->year;
 
-    osDelay(10);
+    osDelay(20);
   }
 }
 
@@ -331,6 +347,9 @@ osThreadId_t displayTaskHandle;
 
 void displayTask(void* arg) {
   UNUSED(arg);
+
+  while (!clock_flag)
+    osDelay(100);
 
   vfd->Font2Buffer(display::font_lib[0], display::vfd_buffer[0]);
   vfd->Font2Buffer(display::font_lib[0], display::vfd_buffer[1]);

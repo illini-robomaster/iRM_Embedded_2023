@@ -8,6 +8,7 @@ namespace time {
 class DS3231 {
  public:
   DS3231(I2C_HandleTypeDef* hi2c);
+  bool IsReady();
 
   bool SetTime(uint8_t Yea,uint8_t Mon,uint8_t Dat,uint8_t Wee,uint8_t Hou,uint8_t Min,uint8_t Sec);
   bool ReadTime();
