@@ -23,12 +23,13 @@
 #include <cstdlib>
 
 #include "bsp_os.h"
-#include "bsp_print.h"
 #include "cmsis_os.h"
 #include "utils.h"
 
 #include "bsp_gpio.h"
+#include "bsp_uart.h"
 #include "DS3231.h"
+#include "ESP8266.h"
 
 void delay_us(uint32_t us) {
   uint32_t start = bsp::GetHighresTickMicroSec();
@@ -251,6 +252,9 @@ static display::VFD* vfd = nullptr;
 
 static time::DS3231* clock = nullptr;
 
+static bsp::UART* uart = nullptr;
+static wifi::ESP8266* ESP8266 = nullptr;
+
 static BoolEdgeDetector left(false);
 static BoolEdgeDetector button(false);
 static BoolEdgeDetector right(false);
@@ -276,8 +280,8 @@ void switchTask(void* arg) {
     button.input(push->Read());
     right.input(cw->Read());
 
-    if (left.negEdge() || button.negEdge() || right.negEdge())
-      led->Toggle();
+//    if (left.negEdge() || button.negEdge() || right.negEdge())
+//      led->Toggle();
 
     if (ccw->Read())
       vfd->brightness_ -= 2;
@@ -313,14 +317,21 @@ void updateTimeTask(void* arg) {
     vfd->Font2Buffer(display::font_lib[3], display::vfd_buffer[5]);
     vfd->Font2Buffer(display::font_lib[3], display::vfd_buffer[6]);
     vfd->Font2Buffer(display::font_lib[3], display::vfd_buffer[7]);
+
+    HAL_I2C_DeInit(&hi2c2);
+    HAL_I2C_Init(&hi2c2);
+
     osDelay(100);
   }
   clock_flag = true;
 
-  clock->SetTime(23, 7, 11, 2, 2, 15, 20);
+//  clock->SetTime(23, 7, 11, 2, 2, 15, 20);
 
   while (true) {
-    clock->ReadTime();
+    if (!clock->ReadTime()) {
+      HAL_I2C_DeInit(&hi2c2);
+      HAL_I2C_Init(&hi2c2);
+    }
 
     display::time.second = clock->second;
     display::time.minute = clock->minute;
@@ -333,6 +344,62 @@ void updateTimeTask(void* arg) {
     osDelay(20);
   }
 }
+
+//const osThreadAttr_t WiFiTaskAttribute = {.name = "WiFiTask",
+//                                          .attr_bits = osThreadDetached,
+//                                          .cb_mem = nullptr,
+//                                          .cb_size = 0,
+//                                          .stack_mem = nullptr,
+//                                          .stack_size = 128 * 4,
+//                                          .priority = (osPriority_t)osPriorityNormal,
+//                                          .tz_module = 0,
+//                                          .reserved = 0};
+//osThreadId_t WiFiTaskHandle;
+//
+//void WiFiTask(void* arg) {
+//  UNUSED(arg);
+//
+//  led->High();
+//
+//  ESP8266->IsReady();
+//  osDelay(20);
+//
+//  while (!ESP8266->OK()) {
+//    ESP8266->IsReady();
+//    osDelay(20);
+//  }
+//
+//  ESP8266->SetMode();
+//  osDelay(20);
+//
+//  while (!ESP8266->OK())
+//    osDelay(20);
+//
+//  ESP8266->Reset();
+//  osDelay(20);
+//
+//  while (!ESP8266->OK())
+//    osDelay(20);
+//
+//  ESP8266->ConnectWiFi();
+//  osDelay(1000);
+//
+//  while (!ESP8266->OK())
+//    osDelay(20);
+//
+//  ESP8266->SetConnectionType();
+//  osDelay(300);
+//
+//  while (!ESP8266->OK())
+//    osDelay(20);
+//
+//  led->Low();
+//
+//  while (true) {
+//    ESP8266->IsReady();
+//    osDelay(1000);
+//  }
+//}
 
 const osThreadAttr_t displayTaskAttribute = {.name = "displayTask",
                                              .attr_bits = osThreadDetached,
@@ -390,7 +457,6 @@ void displayTask(void* arg) {
 
 void RM_RTOS_Init(void) {
   bsp::SetHighresClockTimer(&htim2);
-  print_use_uart(&huart1);
 
   led = new bsp::GPIO(LED_GPIO_Port, LED_Pin);
 
@@ -406,11 +472,17 @@ void RM_RTOS_Init(void) {
   vfd = new display::VFD(din, clk, cs, rst, en);
 
   clock = new time::DS3231(&hi2c2);
+
+  uart = new bsp::UART(&huart1);
+  uart->SetupRx(300);
+  uart->SetupTx(300);
+  ESP8266 = new wifi::ESP8266(uart);
 }
 
 void RM_RTOS_Threads_Init(void) {
   switchTaskHandle = osThreadNew(switchTask, nullptr, &switchTaskAttribute);
   updateTimeTaskHandle = osThreadNew(updateTimeTask, nullptr, &updateTimeTaskAttribute);
+//  WiFiTaskHandle = osThreadNew(WiFiTask, nullptr, &WiFiTaskAttribute);
   displayTaskHandle = osThreadNew(displayTask, nullptr, &displayTaskAttribute);
 }
 
