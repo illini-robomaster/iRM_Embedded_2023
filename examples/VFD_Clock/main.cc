@@ -28,6 +28,7 @@
 #include "utils.h"
 
 #include "bsp_gpio.h"
+#include "DS3231.h"
 
 void delay_us(uint32_t us) {
   uint32_t start = bsp::GetHighresTickMicroSec();
@@ -37,9 +38,13 @@ void delay_us(uint32_t us) {
 namespace display {
 
 struct {
-  int hour = 0;
-  int minute = 0;
   int second = 0;
+  int minute = 0;
+  int hour = 0;
+  int day = 0;
+  int date = 0;
+  int month = 0;
+  int year = 0;
 } time;
 
 void UpdateTime() {
@@ -152,13 +157,14 @@ class VFD {
 
     cs_->Low();
     write_data(0x40 + pos);
-    for (int i = 0; i < 7; ++i)
+    for (int i = 0; i < 5; ++i)
       write_data(str[i]);
     cs_->High();
 
     cs_->Low();
-    write_data(0x20 + pos);
-    write_data(0x00 + pos);
+    write_data(0x20);
+    for (int i = 0; i < 8; ++i)
+      write_data(0x00 + i);
     cs_->High();
   }
 
@@ -171,18 +177,34 @@ class VFD {
   }
 
   void VerticalMoveDown(unsigned pos, int step, unsigned new_font) {
-    UNUSED(new_font);
-
-//    step = step / 100.0f * 7;
-//    memcpy(vfd_buffer[pos] + step, vfd_buffer[pos], 7 - step);
-//    memcpy(vfd_buffer[pos], font_lib[new_font] + 7 - step, step);
     for (int i = 0; i < 5; ++i) {
         vfd_buffer[pos][i] = 0x7f & (vfd_buffer[pos][i] << 1);
         vfd_buffer[pos][i] |= font_lib[new_font][i] >> (7 - step);
     }
   }
 
+  void GetTime() {
+    NeedUpdate[0] = time.second % 10 != second_ % 10;
+    NeedUpdate[1] = time.second / 10 != second_ / 10;
+    NeedUpdate[2] = time.minute % 10 != minute_ % 10;
+    NeedUpdate[3] = time.minute / 10 != minute_ / 10;
+    NeedUpdate[4] = time.hour % 10 != hour_ % 10;
+    NeedUpdate[5] = time.hour / 10 != hour_ / 10;
 
+    UpdateFlag = NeedUpdate[0] || NeedUpdate[1] || NeedUpdate[2] || NeedUpdate[3] || NeedUpdate[4] || NeedUpdate[5];
+
+    hour_ = time.hour;
+    minute_ = time.minute;
+    second_ = time.second;
+  }
+
+  bool NeedUpdate[8] = {};
+
+  bool UpdateFlag = false;
+
+  int hour_ = 0;
+  int minute_ = 0;
+  int second_ = 0;
 
  private:
   bsp::GPIO* din_;
@@ -221,6 +243,8 @@ static bsp::GPIO* rst = nullptr;
 static bsp::GPIO* en = nullptr;
 static display::VFD* vfd = nullptr;
 
+static time::DS3231* clock = nullptr;
+
 static BoolEdgeDetector left(false);
 static BoolEdgeDetector button(false);
 static BoolEdgeDetector right(false);
@@ -230,7 +254,7 @@ const osThreadAttr_t switchTaskAttribute = {.name = "switchTask",
                                             .cb_mem = nullptr,
                                             .cb_size = 0,
                                             .stack_mem = nullptr,
-                                            .stack_size = 128 * 4,
+                                            .stack_size = 32 * 4,
                                             .priority = (osPriority_t)osPriorityNormal,
                                             .tz_module = 0,
                                             .reserved = 0};
@@ -251,6 +275,39 @@ void switchTask(void* arg) {
   }
 }
 
+const osThreadAttr_t updateTimeTaskAttribute = {.name = "updateTimeTask",
+    .attr_bits = osThreadDetached,
+    .cb_mem = nullptr,
+    .cb_size = 0,
+    .stack_mem = nullptr,
+    .stack_size = 64 * 4,
+    .priority = (osPriority_t)osPriorityNormal,
+    .tz_module = 0,
+    .reserved = 0};
+osThreadId_t updateTimeTaskHandle;
+
+void updateTimeTask(void* arg) {
+  UNUSED(arg);
+
+  clock->SetTime(23, 7, 11, 2, 2, 15, 20) ? led->Low() : led->High();
+
+  while (true) {
+//    display::UpdateTime();
+//    osDelay(1000);
+//    clock->ReadTime() ? led->Low() : led->High();
+    clock->ReadTime();
+    display::time.second = clock->second;
+    display::time.minute = clock->minute;
+    display::time.hour = clock->hour;
+    display::time.day = clock->day;
+    display::time.date = clock->date;
+    display::time.month = clock->month;
+    display::time.year = clock->year;
+
+    osDelay(10);
+  }
+}
+
 const osThreadAttr_t displayTaskAttribute = {.name = "displayTask",
                                              .attr_bits = osThreadDetached,
                                              .cb_mem = nullptr,
@@ -265,14 +322,6 @@ osThreadId_t displayTaskHandle;
 void displayTask(void* arg) {
   UNUSED(arg);
 
-//  unsigned new_font[8] = {};
-//
-//  for (unsigned int & i : new_font)
-//    i = vfd->GetRandomFont();
-//  for (int i = 0; i < 8; ++i)
-//    vfd->Font2Buffer(display::font_lib[new_font[i]], display::vfd_buffer[i]);
-//  osDelay(1000);
-
   vfd->Font2Buffer(display::font_lib[0], display::vfd_buffer[0]);
   vfd->Font2Buffer(display::font_lib[0], display::vfd_buffer[1]);
 
@@ -286,67 +335,24 @@ void displayTask(void* arg) {
   vfd->Font2Buffer(display::font_lib[0], display::vfd_buffer[6]);
   vfd->Font2Buffer(display::font_lib[0], display::vfd_buffer[7]);
 
-  display::time.hour = 23;
-  display::time.minute = 49;
-  display::time.second = 55;
-
   while (true) {
-//    for (unsigned int & i : new_font)
-//      i = vfd->GetRandomFont();
-//
-//    for (int i = 1; i <= 7; ++i) {
-//      for (int j = 0; j < 8; ++j)
-//        vfd->VerticalMoveDown(j, i, new_font[j]);
-//      osDelay(500 / 7);
-//    }
+    vfd->GetTime();
 
-    display::UpdateTime();
-
-    if (display::time.second % 10 != 0) {
-      for (int i = 1; i <= 7; ++i) {
-        vfd->VerticalMoveDown(7, i, display::time.second % 10);
+    for (int i = 1; i <= 7; ++i) {
+      if (vfd->NeedUpdate[0])
+        vfd->VerticalMoveDown(7, i, vfd->second_ % 10);
+      if (vfd->NeedUpdate[1])
+        vfd->VerticalMoveDown(6, i, vfd->second_ / 10);
+      if (vfd->NeedUpdate[2])
+        vfd->VerticalMoveDown(4, i, vfd->minute_ % 10);
+      if (vfd->NeedUpdate[3])
+        vfd->VerticalMoveDown(3, i, vfd->minute_ / 10);
+      if (vfd->NeedUpdate[4])
+        vfd->VerticalMoveDown(1, i, vfd->hour_ % 10);
+      if (vfd->NeedUpdate[5])
+        vfd->VerticalMoveDown(0, i, vfd->hour_ / 10);
+      if (vfd->UpdateFlag)
         osDelay(500 / 7);
-      }
-    } else if (display::time.second / 10 != 0) {
-      for (int i = 1; i <= 7; ++i) {
-        vfd->VerticalMoveDown(6, i, display::time.second / 10);
-        vfd->VerticalMoveDown(7, i, display::time.second % 10);
-        osDelay(500 / 7);
-      }
-    } else if (display::time.minute % 10 != 0) {
-      for (int i = 1; i <= 7; ++i) {
-        vfd->VerticalMoveDown(4, i, display::time.minute % 10);
-        vfd->VerticalMoveDown(6, i, display::time.second / 10);
-        vfd->VerticalMoveDown(7, i, display::time.second % 10);
-        osDelay(500 / 7);
-     }
-    } else if (display::time.minute / 10 != 0) {
-      for (int i = 1; i <= 7; ++i) {
-        vfd->VerticalMoveDown(3, i, display::time.minute / 10);
-        vfd->VerticalMoveDown(4, i, display::time.minute % 10);
-        vfd->VerticalMoveDown(6, i, display::time.second / 10);
-        vfd->VerticalMoveDown(7, i, display::time.second % 10);
-        osDelay(500 / 7);
-      }
-    } else if (display::time.hour % 10 != 4) {
-      for (int i = 1; i <= 7; ++i) {
-        vfd->VerticalMoveDown(1, i, display::time.hour % 10);
-        vfd->VerticalMoveDown(3, i, display::time.minute / 10);
-        vfd->VerticalMoveDown(4, i, display::time.minute % 10);
-        vfd->VerticalMoveDown(6, i, display::time.second / 10);
-        vfd->VerticalMoveDown(7, i, display::time.second % 10);
-        osDelay(500 / 7);
-      }
-    } else {
-       for (int i = 1; i <= 7; ++i) {
-        vfd->VerticalMoveDown(0, i, display::time.hour / 10);
-        vfd->VerticalMoveDown(1, i, display::time.hour % 10);
-        vfd->VerticalMoveDown(3, i, display::time.minute / 10);
-        vfd->VerticalMoveDown(4, i, display::time.minute % 10);
-        vfd->VerticalMoveDown(6, i, display::time.second / 10);
-        vfd->VerticalMoveDown(7, i, display::time.second % 10);
-        osDelay(500 / 7);
-      }
     }
 
     osDelay(500);
@@ -369,10 +375,13 @@ void RM_RTOS_Init(void) {
   rst = new bsp::GPIO(RST_GPIO_Port, RST_Pin);
   en = new bsp::GPIO(EN_GPIO_Port, EN_Pin);
   vfd = new display::VFD(din, clk, cs, rst, en);
+
+  clock = new time::DS3231(&hi2c2);
 }
 
 void RM_RTOS_Threads_Init(void) {
   switchTaskHandle = osThreadNew(switchTask, nullptr, &switchTaskAttribute);
+  updateTimeTaskHandle = osThreadNew(updateTimeTask, nullptr, &updateTimeTaskAttribute);
   displayTaskHandle = osThreadNew(displayTask, nullptr, &displayTaskAttribute);
 }
 

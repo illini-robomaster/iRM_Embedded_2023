@@ -85,6 +85,10 @@ void RM_RTOS_Default_Task(const void *argument);
 #define CLK_GPIO_Port GPIOA
 #define DIN_Pin GPIO_PIN_7
 #define DIN_GPIO_Port GPIOA
+#define I2C_SCL_Pin GPIO_PIN_10
+#define I2C_SCL_GPIO_Port GPIOB
+#define I2C_SDA_Pin GPIO_PIN_11
+#define I2C_SDA_GPIO_Port GPIOB
 #define LED_Pin GPIO_PIN_8
 #define LED_GPIO_Port GPIOA
 #define UART_TX_Pin GPIO_PIN_9
