@@ -227,10 +227,6 @@ void chassisTask(void* arg) {
     receive->cmd.data_float = (float)referee->game_robot_status.shooter_id2_17mm_speed_limit;
     receive->TransmitOutput();
 
-    receive->cmd.id = bsp::REMAIN_HP;
-    receive->cmd.data_int = referee->game_robot_status.remain_HP;
-    receive->TransmitOutput();
-
     osDelay(CHASSIS_TASK_DELAY);
 
   }
@@ -531,6 +527,12 @@ void RM_RTOS_Default_Task(const void* args) {
       Dead = true;
       KillAll();
     }
+
+    receive->cmd.id = bsp::GIMBAL_POWER;
+    receive->cmd.data_uint = referee->game_robot_status.mains_power_gimbal_output;
+    receive->TransmitOutput();
+//    print("out: %d\r\n", referee->game_robot_status.mains_power_gimbal_output);
+//    print("test");
     if (debug) {
       set_cursor(0, 0);
       clear_screen();

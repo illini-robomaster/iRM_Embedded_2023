@@ -39,7 +39,7 @@ typedef enum {
   SPEED_LIMIT1,
   SPEED_LIMIT2,
   CHASSIS_FLAG,
-  REMAIN_HP,
+  GIMBAL_POWER,
   FORTRESS_MODE,
   FORTRESS_CALIBRATED,
   RECALIBRATE,
@@ -77,7 +77,7 @@ class CanBridge {
   float speed_limit2 = 0;
   unsigned int chassis_flag = 0;
   bool self_check_flag = false;
-  unsigned int remain_hp = 0;
+  unsigned int gimbal_power = 0;
   bool fortress_mode = false;
   bool fortress_calibrated = false;
   bool recalibrate = false;

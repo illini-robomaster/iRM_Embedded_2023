@@ -61,7 +61,9 @@ static const int INFANTRY_INITIAL_HP = 100;
 static bsp::CanBridge* send = nullptr;
 
 static BoolEdgeDetector FakeDeath(false);
+static BoolEdgeDetector GimbalDeath(true);
 static volatile bool Dead = false;
+static volatile bool GimbalDead = false;
 static BoolEdgeDetector ChangeSpinMode(false);
 static volatile bool SpinMode = false;
 // TODO: Fortress mode
@@ -74,10 +76,10 @@ static unsigned int chassis_flag_bitmap = 0;
 
 static volatile float pitch_pos = START_PITCH_POS;
 static volatile float yaw_pos = 0;
+
+static volatile unsigned int gimbal_alive = 0;
 // TODO: need to measure the specific angle
 //static volatile float yaw_pos = START_YAW_POS;
-
-//static volatile unsigned int current_hp = 0;
 
 // do we need to move this below? just self test use.
 static volatile bool pitch_motor_flag = false;
@@ -255,7 +257,7 @@ void gimbalTask(void* arg) {
   float pitch_vel_range = 5.0, yaw_vel_range = 5.0;
 
   while (true) {
-    while (Dead) osDelay(100);
+    while (Dead || GimbalDead) osDelay(100);
 
     // TODO:whether this for 4310 pitch motor ???
     // if this is for 4310, whether we need the same stuff for the 4310 yaw motor.
@@ -431,83 +433,91 @@ void shooterTask(void* arg) {
       osDelay(100);
     }
 
-    // left shooter(dial part)
-    if (send->shooter_power && send->cooling_heat1 < send->cooling_limit1 - 20) {
-      if (dbus->mouse.l || dbus->swr == remote::UP) {
-        if ((bsp::GetHighresTickMicroSec() - start_time_left) / 1000 > SHOOTER_MODE_DELAY) {
-          left_shooter->SlowContinueShoot();
-        } else if (slow_shoot_detect_left == false) {
-          slow_shoot_detect_left = true;
-          left_shooter->DoubleShoot();
+    if (GimbalDead) {
+      left_shooter->DialStop();
+      right_shooter->DialStop();
+    } else {
+      // left shooter(dial part)
+      if (send->shooter_power && send->cooling_heat1 < send->cooling_limit1 - 20) {
+        if (dbus->mouse.l || dbus->swr == remote::UP) {
+          if ((bsp::GetHighresTickMicroSec() - start_time_left) / 1000 > SHOOTER_MODE_DELAY) {
+            left_shooter->SlowContinueShoot();
+          } else if (slow_shoot_detect_left == false) {
+            slow_shoot_detect_left = true;
+            left_shooter->DoubleShoot();
+          }
+        } else if (dbus->mouse.r) {
+          left_shooter->FastContinueShoot();
+        } else {
+          left_shooter->DialStop();
+          start_time_left = bsp::GetHighresTickMicroSec();
+          slow_shoot_detect_left = false;
         }
-      } else if (dbus->mouse.r) {
-        left_shooter->FastContinueShoot();
-      } else {
-        left_shooter->DialStop();
-        start_time_left = bsp::GetHighresTickMicroSec();
-        slow_shoot_detect_left = false;
+      }
+      // right shooter(dial part)
+      if (send->shooter_power && send->cooling_heat2 < send->cooling_limit2 - 20) {
+        if (dbus->mouse.l || dbus->swr == remote::UP) {
+          if ((bsp::GetHighresTickMicroSec() - start_time_right) / 1000 > SHOOTER_MODE_DELAY) {
+            right_shooter->SlowContinueShoot();
+          } else if (slow_shoot_detect_right == false) {
+            slow_shoot_detect_right = true;
+            right_shooter->DoubleShoot();
+          }
+        } else if (dbus->mouse.r) {
+          right_shooter->FastContinueShoot();
+        } else {
+          right_shooter->DialStop();
+          start_time_right = bsp::GetHighresTickMicroSec();
+          slow_shoot_detect_right = false;
+        }
       }
     }
 
-    // flywheel part for left shooter
-    if (!send->shooter_power || dbus->keyboard.bit.Q || dbus->swr == remote::DOWN) {
+    if (GimbalDead) {
       leftflywheelFlag = false;
       left_shooter->SetFlywheelSpeed(0);
-    } else {
-      if (14 < send->speed_limit1 && send->speed_limit1 < 16) {
-        leftflywheelFlag = true;
-        left_shooter->SetFlywheelSpeed(437);  // 445 MAX
-      } else if (send->speed_limit1 >= 18) {
-        leftflywheelFlag = true;
-        left_shooter->SetFlywheelSpeed(482);  // 490 MAX
-      } else {
-        leftflywheelFlag = false;
-        left_shooter->SetFlywheelSpeed(0);
-      }
-    }
-
-
-    // right shooter(dial part)
-    if (send->shooter_power && send->cooling_heat2 < send->cooling_limit2 - 20) {
-      if (dbus->mouse.l || dbus->swr == remote::UP) {
-        if ((bsp::GetHighresTickMicroSec() - start_time_right) / 1000 > SHOOTER_MODE_DELAY) {
-          right_shooter->SlowContinueShoot();
-        } else if (slow_shoot_detect_right == false) {
-          slow_shoot_detect_right = true;
-          right_shooter->DoubleShoot();
-        }
-      } else if (dbus->mouse.r) {
-        right_shooter->FastContinueShoot();
-      } else {
-        right_shooter->DialStop();
-        start_time_right = bsp::GetHighresTickMicroSec();
-        slow_shoot_detect_right = false;
-      }
-    }
-
-    // flywheel part for right shooter
-    if (!send->shooter_power || dbus->keyboard.bit.Q || dbus->swr == remote::DOWN) {
       rightflywheelFlag = false;
       right_shooter->SetFlywheelSpeed(0);
     } else {
-      if (14 < send->speed_limit2 && send->speed_limit2 < 16) {
-        rightflywheelFlag = true;
-        right_shooter->SetFlywheelSpeed(437);  // 445 MAX
-      } else if (send->speed_limit1 >= 18) {
-        rightflywheelFlag = true;
-        right_shooter->SetFlywheelSpeed(482);  // 490 MAX
+      // flywheel part for left shooter
+      if (!send->shooter_power || dbus->keyboard.bit.Q || dbus->swr == remote::DOWN) {
+        leftflywheelFlag = false;
+        left_shooter->SetFlywheelSpeed(0);
       } else {
+        if (14 < send->speed_limit1 && send->speed_limit1 < 16) {
+          leftflywheelFlag = true;
+          left_shooter->SetFlywheelSpeed(437);  // 445 MAX
+        } else if (send->speed_limit1 >= 18) {
+          leftflywheelFlag = true;
+          left_shooter->SetFlywheelSpeed(482);  // 490 MAX
+        } else {
+          leftflywheelFlag = false;
+          left_shooter->SetFlywheelSpeed(0);
+        }
+      }
+      // flywheel part for right shooter
+      if (!send->shooter_power || dbus->keyboard.bit.Q || dbus->swr == remote::DOWN) {
         rightflywheelFlag = false;
         right_shooter->SetFlywheelSpeed(0);
+      } else {
+        if (14 < send->speed_limit2 && send->speed_limit2 < 16) {
+          rightflywheelFlag = true;
+          right_shooter->SetFlywheelSpeed(437);  // 445 MAX
+        } else if (send->speed_limit1 >= 18) {
+          rightflywheelFlag = true;
+          right_shooter->SetFlywheelSpeed(482);  // 490 MAX
+        } else {
+          rightflywheelFlag = false;
+          right_shooter->SetFlywheelSpeed(0);
+        }
       }
     }
 
     left_shooter->Update();
     control::MotorCANBase::TransmitOutput(motors_can1_shooter_left, 3);
-//    osDelay(SHOOTER_TASK_DELAY);
-
     right_shooter->Update();
     control::MotorCANBase::TransmitOutput(motors_can1_shooter_right, 3);
+
     osDelay(SHOOTER_TASK_DELAY);
   }
 }
@@ -586,10 +596,11 @@ void chassisTask(void* arg) {
 
     // TODO
     // the angle difference between the gimbal and the chassis
-    relative_angle = yaw_pos - yaw_motor.GetTheta();
-    send->cmd.id = bsp::RELATIVE_ANGLE;
-    send->cmd.data_float = relative_angle;
-    send->TransmitOutput();
+    relative_angle = wrap<float>(yaw_pos - yaw_motor->GetTheta(), -PI, PI);
+
+//    send->cmd.id = bsp::RELATIVE_ANGLE;
+//    send->cmd.data_float = relative_angle;
+//    send->TransmitOutput();
 
     osDelay(CHASSIS_TASK_DELAY);
   }
@@ -911,7 +922,7 @@ void KillAll() {
     send->TransmitOutput();
 
     FakeDeath.input(dbus->swl == remote::DOWN);
-    if (FakeDeath.posEdge() || send->remain_hp > 0) {
+    if (FakeDeath.posEdge()) {
       SpinMode = false;
       Dead = false;
       RGB->Display(display::color_green);
@@ -954,6 +965,33 @@ void KillAll() {
   }
 }
 
+void KillGimbal() {
+  while (true) {
+    GimbalDead = true;
+    GimbalDeath.input(send->gimbal_power);
+    if (GimbalDeath.posEdge() && robot_hp_begin) {
+      GimbalDead = false;
+      pitch_motor->MotorEnable(pitch_motor);
+      break;
+    }
+    print("gimbal killed\r\n");
+
+    // 4310 soft kill
+    float tmp_pos = pitch_pos;
+    for (int j = 0; j < SOFT_KILL_CONSTANT; j++){
+      tmp_pos -= START_PITCH_POS / SOFT_KILL_CONSTANT;  // decrease position gradually
+      pitch_motor->SetOutput(tmp_pos, 1, 115, 0.5, 0);
+      pitch_motor->TransmitOutput(pitch_motor);
+      osDelay(GIMBAL_TASK_DELAY);
+    }
+
+    pitch_reset = true;
+    pitch_motor->MotorDisable(pitch_motor);
+
+    osDelay(KILLALL_DELAY);
+  }
+}
+
 static bool debug = false;
 
 //==================================================================================================
@@ -964,12 +1002,20 @@ void RM_RTOS_Default_Task(const void* arg) {
   UNUSED(arg);
 
   while (true) {
+    if (send->gimbal_power == 1) robot_hp_begin = true;
+    gimbal_alive = robot_hp_begin ? send->gimbal_power : 1;
 
     FakeDeath.input(dbus->swl == remote::DOWN);
     if (FakeDeath.posEdge()) {
       Dead = true;
       KillAll();
     }
+
+    GimbalDeath.input(gimbal_alive);
+    if (GimbalDeath.negEdge()) {
+      KillGimbal();
+    }
+
     send->cmd.id = bsp::DEAD;
     send->cmd.data_bool = false;
     send->TransmitOutput();
