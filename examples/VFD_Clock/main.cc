@@ -267,7 +267,7 @@ const osThreadAttr_t switchTaskAttribute = {.name = "switchTask",
                                             .cb_size = 0,
                                             .stack_mem = nullptr,
                                             .stack_size = 32 * 4,
-                                            .priority = (osPriority_t)osPriorityNormal,
+                                            .priority = (osPriority_t)osPriorityLow,
                                             .tz_module = 0,
                                             .reserved = 0};
 osThreadId_t switchTaskHandle;
@@ -280,8 +280,8 @@ void switchTask(void* arg) {
     button.input(push->Read());
     right.input(cw->Read());
 
-//    if (left.negEdge() || button.negEdge() || right.negEdge())
-//      led->Toggle();
+    if (left.negEdge() || button.negEdge() || right.negEdge())
+      led->Toggle();
 
     if (ccw->Read())
       vfd->brightness_ -= 2;
@@ -298,29 +298,42 @@ const osThreadAttr_t updateTimeTaskAttribute = {.name = "updateTimeTask",
     .cb_mem = nullptr,
     .cb_size = 0,
     .stack_mem = nullptr,
-    .stack_size = 64 * 4,
-    .priority = (osPriority_t)osPriorityNormal,
+    .stack_size = 128 * 4,
+    .priority = (osPriority_t)osPriorityHigh,
     .tz_module = 0,
     .reserved = 0};
 osThreadId_t updateTimeTaskHandle;
+
+void i2c_reset() {
+    GPIO_InitTypeDef GPIO_InitStruct;
+    GPIO_InitStruct.Pin = GPIO_PIN_10 | GPIO_PIN_11;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+    for (int i = 0; i < 10; ++i) {
+        if(HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_10) == GPIO_PIN_SET)
+            break;
+        else
+            HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10 | GPIO_PIN_11, GPIO_PIN_SET);
+        osDelay(10);
+    }
+
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_OD;
+    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+    hi2c2.Instance->CR1 |= I2C_CR1_SWRST;
+    hi2c2.Instance->CR1 &= ~I2C_CR1_SWRST;
+
+    MX_I2C2_Init();
+}
 
 void updateTimeTask(void* arg) {
   UNUSED(arg);
 
   while (!clock->IsReady()) {
     clock_flag = false;
-    vfd->Font2Buffer(display::font_lib[2], display::vfd_buffer[0]);
-    vfd->Font2Buffer(display::font_lib[3], display::vfd_buffer[1]);
-    vfd->Font2Buffer(display::font_lib[3], display::vfd_buffer[2]);
-    vfd->Font2Buffer(display::font_lib[3], display::vfd_buffer[3]);
-    vfd->Font2Buffer(display::font_lib[3], display::vfd_buffer[4]);
-    vfd->Font2Buffer(display::font_lib[3], display::vfd_buffer[5]);
-    vfd->Font2Buffer(display::font_lib[3], display::vfd_buffer[6]);
-    vfd->Font2Buffer(display::font_lib[3], display::vfd_buffer[7]);
-
-    HAL_I2C_DeInit(&hi2c2);
-    HAL_I2C_Init(&hi2c2);
-
+    i2c_reset();
     osDelay(100);
   }
   clock_flag = true;
@@ -328,9 +341,9 @@ void updateTimeTask(void* arg) {
 //  clock->SetTime(23, 7, 11, 2, 2, 15, 20);
 
   while (true) {
-    if (!clock->ReadTime()) {
-      HAL_I2C_DeInit(&hi2c2);
-      HAL_I2C_Init(&hi2c2);
+    while (!clock->ReadTime()) {
+            i2c_reset();
+            osDelay(100);
     }
 
     display::time.second = clock->second;
@@ -341,7 +354,7 @@ void updateTimeTask(void* arg) {
     display::time.month = clock->month;
     display::time.year = clock->year;
 
-    osDelay(20);
+    osDelay(100);
   }
 }
 
