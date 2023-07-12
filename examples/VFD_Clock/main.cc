@@ -63,18 +63,276 @@ void UpdateTime() {
   }
 }
 
+int num2ascii = 6;
+
+enum font_idx {
+  NUL,
+  SOH,
+  STX,
+  ETX,
+  EOT,
+  ENQ,
+  ACK,
+  BEL,
+  BS,
+  HT,
+  LF,
+  VT,
+  FF,
+  CR,
+  SO,
+  SI,
+  DLE,
+  DC1,
+  DC2,
+  DC3,
+  DC4,
+  NAK,
+  SYN,
+  ETB,
+  CAN,
+  EM,
+  SUB,
+  ESC,
+  FS,
+  GS,
+  RS,
+  US,
+  SP = 0,
+  EXCL,
+  QUOT,
+  NUM,
+  DOLLAR,
+  PERCNT,
+  AMP,
+  APOS,
+  LPAREN = 1,
+  RPAREN = 2,
+  AST = 3,
+  PLUS,
+  COMMA = 4,
+  MINUS,
+  PERIOD,
+  SOL = 5,
+  zero = 6,
+  one,
+  two,
+  three,
+  four,
+  five,
+  six,
+  seven,
+  eight,
+  nine,
+  COLON = 16,
+  SEMI,
+  LT = 17,
+  EQUALS,
+  GT = 18,
+  QUEST,
+  COMMAT,
+  A,
+  B,
+  C,
+  D,
+  E = 19,
+  F,
+  G = 20,
+  H = 21,
+  I = 22,
+  J,
+  K = 23,
+  L = 24,
+  M,
+  N = 25,
+  O = 26,
+  P,
+  Q,
+  R,
+  S = 27,
+  T = 28,
+  U,
+  V,
+  W,
+  X,
+  Y = 29,
+  Z,
+  LSQB,
+  BSOL,
+  RSQB,
+  HAT,
+  LOWBAR,
+  GRAVE = 30,
+  a,
+  b,
+  c,
+  d,
+  e = 31,
+  f,
+  g,
+  h,
+  i = 32,
+  j,
+  k,
+  l,
+  m,
+  n,
+  o = 33,
+  p,
+  q,
+  r,
+  s,
+  t,
+  u,
+  v,
+  w,
+  x,
+  y,
+  z,
+  LCUB,
+  VERBAR = 34,
+  RCUB,
+  TILDE,
+  DEL,
+
+  Phi = 35,
+  Omega = 36,
+  Dot = 37,
+};
+
 char font_lib[][5] = {
- {0x7f,0x7f,0x41,0x7f,0x7f}, // 0
- {0x00,0x7f,0x7f,0x7f,0x00}, // 1
- {0x79,0x79,0x69,0x6f,0x6f}, // 2
- {0x6b,0x6b,0x6b,0x7f,0x7f}, // 3
- {0x1f,0x1f,0x18,0x7f,0x7f}, // 4
- {0x6f,0x6f,0x69,0x79,0x79}, // 5
- {0x7f,0x7f,0x49,0x79,0x79}, // 6
- {0x03,0x03,0x03,0x7f,0x7f}, // 7
- {0x7f,0x7f,0x49,0x7f,0x7f}, // 8
- {0x4f,0x4f,0x49,0x7f,0x7f}, // 9
- {0x00,0x00,0x36,0x36,0x00}, // :
+//    {}, // NUL
+//    {}, // SOH
+//    {}, // STX
+//    {}, // ETX
+//    {}, // EOT
+//    {}, // ENQ
+//    {}, // ACK
+//    {}, // BEL
+//    {}, // BS
+//    {}, // HT
+//    {}, // LF
+//    {}, // VT
+//    {}, // FF
+//    {}, // CR
+//    {}, // SO
+//    {}, // SI
+//    {}, // DLE
+//    {}, // DC1
+//    {}, // DC2
+//    {}, // DC3
+//    {}, // DC4
+//    {}, // NAK
+//    {}, // SYN
+//    {}, // ETB
+//    {}, // CAN
+//    {}, // EM
+//    {}, // SUB
+//    {}, // ESC
+//    {}, // FS
+//    {}, // GS
+//    {}, // RS
+//    {}, // US
+    {0x00, 0x00, 0x00, 0x00, 0x00}, // SP
+//    {0x00, 0x00, 0x4f, 0x00, 0x00}, // !
+//    {}, // "
+//    {}, // #
+//    {}, // $
+//    {}, // %
+//    {}, // &
+//    {}, // '
+    {}, // (
+    {}, // )
+    {}, // *
+//    {}, // +
+    {}, // ,
+//    {}, // -
+//    {}, // .
+    {}, // /
+    {0x7f, 0x7f, 0x41, 0x7f, 0x7f}, // 0
+    {0x00, 0x7f, 0x7f, 0x7f, 0x00}, // 1
+    {0x79, 0x79, 0x69, 0x6f, 0x6f}, // 2
+    {0x6b, 0x6b, 0x6b, 0x7f, 0x7f}, // 3
+    {0x1f, 0x1f, 0x18, 0x7f, 0x7f}, // 4
+    {0x6f, 0x6f, 0x69, 0x79, 0x79}, // 5
+    {0x7f, 0x7f, 0x49, 0x79, 0x79}, // 6
+    {0x03, 0x03, 0x03, 0x7f, 0x7f}, // 7
+    {0x7f, 0x7f, 0x49, 0x7f, 0x7f}, // 8
+    {0x4f, 0x4f, 0x49, 0x7f, 0x7f}, // 9
+    {0x00, 0x00, 0x36, 0x36, 0x00}, // :
+//    {}, // ;
+    {}, // <
+//    {}, // =
+    {}, // >
+//    {}, // ?
+//    {}, // @
+//    {}, // A
+//    {}, // B
+//    {}, // C
+//    {}, // D
+    {}, // E
+//    {}, // F
+    {}, // G
+    {}, // H
+    {}, // I
+//    {}, // J
+    {}, // K
+    {}, // L
+//    {}, // M
+    {}, // N
+    {}, // O
+//    {}, // P
+//    {}, // Q
+//    {}, // R
+    {}, // S
+    {}, // T
+//    {}, // U
+//    {}, // V
+//    {}, // W
+//    {}, // X
+    {}, // Y
+//    {}, // Z
+//    {}, // [
+//    {}, // \/
+//    {}, // ]
+//    {}, // ^
+//    {}, // _
+    {}, // `
+//    {}, // a
+//    {}, // b
+//    {}, // c
+//    {}, // d
+    {}, // e
+//    {}, // f
+//    {}, // g
+//    {}, // h
+    {}, // i
+//    {}, // j
+//    {}, // k
+//    {}, // l
+//    {}, // m
+//    {}, // n
+    {}, // o
+//    {}, // p
+//    {}, // q
+//    {}, // r
+//    {}, // s
+//    {}, // t
+//    {}, // u
+//    {}, // v
+//    {}, // w
+//    {}, // x
+//    {}, // y
+//    {}, // z
+//    {}, // {
+    {}, // |
+//    {}, // }
+//    {}, // ~
+//    {}, // DEL
+
+    {}, // Φ
+    {}, // ω
+    {}, // ･
  };
 
 char vfd_buffer[8][5] = {};
@@ -432,35 +690,35 @@ void displayTask(void* arg) {
     osDelay(100);
   vfd->GetTime();
 
-  vfd->Font2Buffer(display::font_lib[vfd->second_ % 10], display::vfd_buffer[7]);
-  vfd->Font2Buffer(display::font_lib[vfd->second_ / 10], display::vfd_buffer[6]);
+  vfd->Font2Buffer(display::font_lib[vfd->second_ % 10 + display::num2ascii], display::vfd_buffer[7]);
+  vfd->Font2Buffer(display::font_lib[vfd->second_ / 10 + display::num2ascii], display::vfd_buffer[6]);
 
-  vfd->Font2Buffer(display::font_lib[10], display::vfd_buffer[5]);
+  vfd->Font2Buffer(display::font_lib[display::COLON], display::vfd_buffer[5]);
 
-  vfd->Font2Buffer(display::font_lib[vfd->minute_ % 10], display::vfd_buffer[4]);
-  vfd->Font2Buffer(display::font_lib[vfd->minute_ / 10], display::vfd_buffer[3]);
+  vfd->Font2Buffer(display::font_lib[vfd->minute_ % 10 + display::num2ascii], display::vfd_buffer[4]);
+  vfd->Font2Buffer(display::font_lib[vfd->minute_ / 10 + display::num2ascii], display::vfd_buffer[3]);
 
-  vfd->Font2Buffer(display::font_lib[10], display::vfd_buffer[2]);
+  vfd->Font2Buffer(display::font_lib[display::COLON], display::vfd_buffer[2]);
 
-  vfd->Font2Buffer(display::font_lib[vfd->hour_ % 10], display::vfd_buffer[1]);
-  vfd->Font2Buffer(display::font_lib[vfd->hour_ / 10], display::vfd_buffer[0]);
+  vfd->Font2Buffer(display::font_lib[vfd->hour_ % 10 + display::num2ascii], display::vfd_buffer[1]);
+  vfd->Font2Buffer(display::font_lib[vfd->hour_ / 10 + display::num2ascii], display::vfd_buffer[0]);
 
   while (true) {
     vfd->GetTime();
 
     for (int i = 1; i <= 7; ++i) {
       if (vfd->NeedUpdate[0])
-        vfd->VerticalMoveDown(7, i, vfd->second_ % 10);
+        vfd->VerticalMoveDown(7, i, vfd->second_ % 10 + display::num2ascii);
       if (vfd->NeedUpdate[1])
-        vfd->VerticalMoveDown(6, i, vfd->second_ / 10);
+        vfd->VerticalMoveDown(6, i, vfd->second_ / 10 + display::num2ascii);
       if (vfd->NeedUpdate[2])
-        vfd->VerticalMoveDown(4, i, vfd->minute_ % 10);
+        vfd->VerticalMoveDown(4, i, vfd->minute_ % 10 + display::num2ascii);
       if (vfd->NeedUpdate[3])
-        vfd->VerticalMoveDown(3, i, vfd->minute_ / 10);
+        vfd->VerticalMoveDown(3, i, vfd->minute_ / 10 + display::num2ascii);
       if (vfd->NeedUpdate[4])
-        vfd->VerticalMoveDown(1, i, vfd->hour_ % 10);
+        vfd->VerticalMoveDown(1, i, vfd->hour_ % 10 + display::num2ascii);
       if (vfd->NeedUpdate[5])
-        vfd->VerticalMoveDown(0, i, vfd->hour_ / 10);
+        vfd->VerticalMoveDown(0, i, vfd->hour_ / 10 + display::num2ascii);
       if (vfd->UpdateFlag)
         osDelay(500 / 7);
     }
