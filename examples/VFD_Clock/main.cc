@@ -270,27 +270,27 @@ char font_lib[][5] = {
 //    {}, // B
 //    {}, // C
 //    {}, // D
-    {}, // E
+    {0x7f, 0x49, 0x49, 0x49, 0x49}, // E
 //    {}, // F
     {}, // G
     {}, // H
     {}, // I
 //    {}, // J
     {}, // K
-    {}, // L
+    {0x7f, 0x40, 0x40, 0x40, 0x40}, // L
 //    {}, // M
-    {}, // N
+    {0x7f, 0x04, 0x08, 0x10, 0x7f}, // N
     {}, // O
 //    {}, // P
 //    {}, // Q
 //    {}, // R
-    {}, // S
+    {0x46, 0x49, 0x49, 0x49, 0x31}, // S
     {}, // T
 //    {}, // U
 //    {}, // V
 //    {}, // W
 //    {}, // X
-    {}, // Y
+    {0x07, 0x08, 0x70, 0x08, 0x07}, // Y
 //    {}, // Z
 //    {}, // [
 //    {}, // \/
@@ -302,7 +302,7 @@ char font_lib[][5] = {
 //    {}, // b
 //    {}, // c
 //    {}, // d
-    {}, // e
+    {0x38, 0x54, 0x54, 0x54, 0x58}, // e
 //    {}, // f
 //    {}, // g
 //    {}, // h
@@ -312,7 +312,7 @@ char font_lib[][5] = {
 //    {}, // l
 //    {}, // m
 //    {}, // n
-    {}, // o
+    {0x38, 0x44, 0x44, 0x44, 0x38}, // o
 //    {}, // p
 //    {}, // q
 //    {}, // r
@@ -333,6 +333,9 @@ char font_lib[][5] = {
     {}, // Φ
     {}, // ω
     {}, // ･
+/* (/ >w< )/
+   (*ΦωΦ*)
+   |･ω･｀) */
  };
 
 char vfd_buffer[8][5] = {};
@@ -519,6 +522,21 @@ static BoolEdgeDetector right(false);
 
 static volatile bool clock_flag = false;
 
+static volatile enum mode {
+  START,
+  DISPLAY_TIME,
+  SETTING_TIME,
+} VFD_Clock_Mode;
+
+static volatile enum unit {
+  HOUR,
+  MINUTE,
+  SECOND,
+} Setting_Unit;
+
+static volatile int flash_count;
+static volatile bool flash_flag;
+
 const osThreadAttr_t switchTaskAttribute = {.name = "switchTask",
                                             .attr_bits = osThreadDetached,
                                             .cb_mem = nullptr,
@@ -534,18 +552,24 @@ void switchTask(void* arg) {
   UNUSED(arg);
 
   while (true) {
-    left.input(ccw->Read());
-    button.input(push->Read());
-    right.input(cw->Read());
+    if (VFD_Clock_Mode == DISPLAY_TIME) {
+      left.input(ccw->Read());
+      button.input(push->Read());
+      right.input(cw->Read());
+    }
 
-    if (left.negEdge() || button.negEdge() || right.negEdge())
-      led->Toggle();
+    if (VFD_Clock_Mode == DISPLAY_TIME && !ccw->Read())
+      vfd->brightness_ += 2;
 
-    if (ccw->Read())
+    if (VFD_Clock_Mode == DISPLAY_TIME && !cw->Read())
       vfd->brightness_ -= 2;
 
-    if (cw->Read())
-      vfd->brightness_ += 2;
+    if (VFD_Clock_Mode == DISPLAY_TIME && button.negEdge()) {
+      VFD_Clock_Mode = SETTING_TIME;
+      Setting_Unit = HOUR;
+      flash_count = 0;
+      flash_flag = false;
+    }
 
     osDelay(50);
   }
@@ -594,8 +618,6 @@ void updateTimeTask(void* arg) {
     i2c_reset();
     osDelay(100);
   }
-
-//  clock->SetTime(23, 7, 11, 2, 2, 15, 20);
 
   while (true) {
     while (!clock->ReadTime()) {
@@ -688,42 +710,133 @@ void displayTask(void* arg) {
 
   while (!clock_flag)
     osDelay(100);
-  vfd->GetTime();
-
-  vfd->Font2Buffer(display::font_lib[vfd->second_ % 10 + display::num2ascii], display::vfd_buffer[7]);
-  vfd->Font2Buffer(display::font_lib[vfd->second_ / 10 + display::num2ascii], display::vfd_buffer[6]);
-
-  vfd->Font2Buffer(display::font_lib[display::COLON], display::vfd_buffer[5]);
-
-  vfd->Font2Buffer(display::font_lib[vfd->minute_ % 10 + display::num2ascii], display::vfd_buffer[4]);
-  vfd->Font2Buffer(display::font_lib[vfd->minute_ / 10 + display::num2ascii], display::vfd_buffer[3]);
-
-  vfd->Font2Buffer(display::font_lib[display::COLON], display::vfd_buffer[2]);
-
-  vfd->Font2Buffer(display::font_lib[vfd->hour_ % 10 + display::num2ascii], display::vfd_buffer[1]);
-  vfd->Font2Buffer(display::font_lib[vfd->hour_ / 10 + display::num2ascii], display::vfd_buffer[0]);
 
   while (true) {
-    vfd->GetTime();
+    if (VFD_Clock_Mode == START) {
+            vfd->Font2Buffer(display::font_lib[display::L], display::vfd_buffer[0]);
+            vfd->Font2Buffer(display::font_lib[display::e], display::vfd_buffer[1]);
+            vfd->Font2Buffer(display::font_lib[display::e], display::vfd_buffer[2]);
+            vfd->Font2Buffer(display::font_lib[display::SP], display::vfd_buffer[3]);
+            vfd->Font2Buffer(display::font_lib[display::SP], display::vfd_buffer[4]);
+            vfd->Font2Buffer(display::font_lib[display::N], display::vfd_buffer[5]);
+            vfd->Font2Buffer(display::font_lib[display::e], display::vfd_buffer[6]);
+            vfd->Font2Buffer(display::font_lib[display::o], display::vfd_buffer[7]);
+            osDelay(2000);
+            vfd->Font2Buffer(display::font_lib[display::Y], display::vfd_buffer[0]);
+            vfd->Font2Buffer(display::font_lib[display::S], display::vfd_buffer[1]);
+            vfd->Font2Buffer(display::font_lib[display::Y], display::vfd_buffer[2]);
+            vfd->Font2Buffer(display::font_lib[display::S], display::vfd_buffer[3]);
+            vfd->Font2Buffer(display::font_lib[display::Y], display::vfd_buffer[4]);
+            vfd->Font2Buffer(display::font_lib[display::L], display::vfd_buffer[5]);
+            vfd->Font2Buffer(display::font_lib[display::Y], display::vfd_buffer[6]);
+            vfd->Font2Buffer(display::font_lib[display::N], display::vfd_buffer[7]);
+            osDelay(2000);
+            VFD_Clock_Mode = DISPLAY_TIME;
 
-    for (int i = 1; i <= 7; ++i) {
-      if (vfd->NeedUpdate[0])
-        vfd->VerticalMoveDown(7, i, vfd->second_ % 10 + display::num2ascii);
-      if (vfd->NeedUpdate[1])
-        vfd->VerticalMoveDown(6, i, vfd->second_ / 10 + display::num2ascii);
-      if (vfd->NeedUpdate[2])
-        vfd->VerticalMoveDown(4, i, vfd->minute_ % 10 + display::num2ascii);
-      if (vfd->NeedUpdate[3])
-        vfd->VerticalMoveDown(3, i, vfd->minute_ / 10 + display::num2ascii);
-      if (vfd->NeedUpdate[4])
-        vfd->VerticalMoveDown(1, i, vfd->hour_ % 10 + display::num2ascii);
-      if (vfd->NeedUpdate[5])
-        vfd->VerticalMoveDown(0, i, vfd->hour_ / 10 + display::num2ascii);
-      if (vfd->UpdateFlag)
-        osDelay(500 / 7);
+            vfd->GetTime();
+
+            vfd->Font2Buffer(display::font_lib[vfd->second_ % 10 + display::num2ascii], display::vfd_buffer[7]);
+            vfd->Font2Buffer(display::font_lib[vfd->second_ / 10 + display::num2ascii], display::vfd_buffer[6]);
+
+            vfd->Font2Buffer(display::font_lib[display::COLON], display::vfd_buffer[5]);
+
+            vfd->Font2Buffer(display::font_lib[vfd->minute_ % 10 + display::num2ascii], display::vfd_buffer[4]);
+            vfd->Font2Buffer(display::font_lib[vfd->minute_ / 10 + display::num2ascii], display::vfd_buffer[3]);
+
+            vfd->Font2Buffer(display::font_lib[display::COLON], display::vfd_buffer[2]);
+
+            vfd->Font2Buffer(display::font_lib[vfd->hour_ % 10 + display::num2ascii], display::vfd_buffer[1]);
+            vfd->Font2Buffer(display::font_lib[vfd->hour_ / 10 + display::num2ascii], display::vfd_buffer[0]);
+    } else if (VFD_Clock_Mode == DISPLAY_TIME) {
+            led->High();
+            vfd->GetTime();
+            for (int i = 1; i <= 7; ++i) {
+              if (vfd->NeedUpdate[0])
+                vfd->VerticalMoveDown(7, i, vfd->second_ % 10 + display::num2ascii);
+              if (vfd->NeedUpdate[1])
+                vfd->VerticalMoveDown(6, i, vfd->second_ / 10 + display::num2ascii);
+              if (vfd->NeedUpdate[2])
+                vfd->VerticalMoveDown(4, i, vfd->minute_ % 10 + display::num2ascii);
+              if (vfd->NeedUpdate[3])
+                vfd->VerticalMoveDown(3, i, vfd->minute_ / 10 + display::num2ascii);
+              if (vfd->NeedUpdate[4])
+                vfd->VerticalMoveDown(1, i, vfd->hour_ % 10 + display::num2ascii);
+              if (vfd->NeedUpdate[5])
+                vfd->VerticalMoveDown(0, i, vfd->hour_ / 10 + display::num2ascii);
+              if (vfd->UpdateFlag)
+                osDelay(500 / 7);
+            }
+    } else if (VFD_Clock_Mode == SETTING_TIME) {
+            led->Low();
+            left.input(ccw->Read());
+            button.input(push->Read());
+            right.input(cw->Read());
+
+            if (left.negEdge()) {
+              if (Setting_Unit == HOUR) {
+                vfd->hour_ += 1;
+                vfd->hour_ %= 24;
+              } else if (Setting_Unit == MINUTE) {
+                vfd->minute_ += 1;
+                vfd->minute_ %= 60;
+              } else if (Setting_Unit == SECOND) {
+                vfd->second_ += 1;
+                vfd->second_ %= 60;
+              }
+            }
+
+            if (right.negEdge()) {
+              if (Setting_Unit == HOUR) {
+                vfd->hour_ -= 1;
+                vfd->hour_ = vfd->hour_ < 0 ? 23 : vfd->hour_;
+              } else if (Setting_Unit == MINUTE) {
+                vfd->minute_ -= 1;
+                vfd->minute_ = vfd->minute_ < 0 ? 59 : vfd->minute_;
+              } else if (Setting_Unit == SECOND) {
+                vfd->second_ -= 1;
+                vfd->second_ = vfd->second_ < 0 ? 59 : vfd->second_;
+              }
+            }
+
+            flash_count += 1;
+            if (flash_count % 30 == 0)
+              flash_flag = !flash_flag;
+
+            if (Setting_Unit == HOUR) {
+              vfd->Font2Buffer(display::font_lib[flash_flag? vfd->hour_ % 10 + display::num2ascii : display::SP], display::vfd_buffer[1]);
+              vfd->Font2Buffer(display::font_lib[flash_flag? vfd->hour_ / 10 + display::num2ascii : display::SP], display::vfd_buffer[0]);
+              vfd->Font2Buffer(display::font_lib[vfd->minute_ % 10 + display::num2ascii], display::vfd_buffer[4]);
+              vfd->Font2Buffer(display::font_lib[vfd->minute_ / 10 + display::num2ascii], display::vfd_buffer[3]);
+              vfd->Font2Buffer(display::font_lib[vfd->second_ % 10 + display::num2ascii], display::vfd_buffer[7]);
+              vfd->Font2Buffer(display::font_lib[vfd->second_ / 10 + display::num2ascii], display::vfd_buffer[6]);
+            } else if (Setting_Unit == MINUTE) {
+              vfd->Font2Buffer(display::font_lib[vfd->hour_ % 10 + display::num2ascii], display::vfd_buffer[1]);
+              vfd->Font2Buffer(display::font_lib[vfd->hour_ / 10 + display::num2ascii], display::vfd_buffer[0]);
+              vfd->Font2Buffer(display::font_lib[flash_flag? vfd->minute_ % 10 + display::num2ascii : display::SP], display::vfd_buffer[4]);
+              vfd->Font2Buffer(display::font_lib[flash_flag? vfd->minute_ / 10 + display::num2ascii : display::SP], display::vfd_buffer[3]);
+              vfd->Font2Buffer(display::font_lib[vfd->second_ % 10 + display::num2ascii], display::vfd_buffer[7]);
+              vfd->Font2Buffer(display::font_lib[vfd->second_ / 10 + display::num2ascii], display::vfd_buffer[6]);
+            } else if (Setting_Unit == SECOND) {
+              vfd->Font2Buffer(display::font_lib[vfd->hour_ % 10 + display::num2ascii], display::vfd_buffer[1]);
+              vfd->Font2Buffer(display::font_lib[vfd->hour_ / 10 + display::num2ascii], display::vfd_buffer[0]);
+              vfd->Font2Buffer(display::font_lib[vfd->minute_ % 10 + display::num2ascii], display::vfd_buffer[4]);
+              vfd->Font2Buffer(display::font_lib[vfd->minute_ / 10 + display::num2ascii], display::vfd_buffer[3]);
+              vfd->Font2Buffer(display::font_lib[flash_flag? vfd->second_ % 10 + display::num2ascii : display::SP], display::vfd_buffer[7]);
+              vfd->Font2Buffer(display::font_lib[flash_flag? vfd->second_ / 10 + display::num2ascii : display::SP], display::vfd_buffer[6]);
+            }
+
+            if (button.negEdge()) {
+              if (Setting_Unit == HOUR)
+                Setting_Unit = MINUTE;
+              else if (Setting_Unit == MINUTE)
+                Setting_Unit = SECOND;
+              else if (Setting_Unit == SECOND) {
+                VFD_Clock_Mode = DISPLAY_TIME;
+                clock->SetTime(21, 6, 5, 6, vfd->hour_, vfd->minute_, vfd->second_);
+              }
+            }
     }
-
-    osDelay(500);
+    osDelay(10);
   }
 }
 
@@ -749,6 +862,8 @@ void RM_RTOS_Init(void) {
   uart->SetupRx(300);
   uart->SetupTx(300);
   ESP8266 = new wifi::ESP8266(uart);
+
+  VFD_Clock_Mode = START;
 }
 
 void RM_RTOS_Threads_Init(void) {
