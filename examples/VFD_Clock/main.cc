@@ -115,15 +115,15 @@ enum font_idx {
   PERIOD,
   SOL = 5,
   zero = 6,
-  one,
-  two,
-  three,
-  four,
-  five,
-  six,
-  seven,
-  eight,
-  nine,
+  one = 7,
+  two = 8,
+  three = 9,
+  four = 10,
+  five = 11,
+  six = 12,
+  seven = 13,
+  eight = 14,
+  nine = 15,
   COLON = 16,
   SEMI,
   LT = 17,
@@ -158,26 +158,26 @@ enum font_idx {
   Y = 29,
   Z,
   LSQB,
-  BSOL,
+  BSOL = 30,
   RSQB,
-  HAT,
-  LOWBAR,
-  GRAVE = 30,
+  HAT = 31,
+  LOWBAR = 32,
+  GRAVE = 33,
   a,
   b,
   c,
   d,
-  e = 31,
+  e = 34,
   f,
   g,
   h,
-  i = 32,
+  i = 35,
   j,
   k,
   l,
   m,
   n,
-  o = 33,
+  o = 36,
   p,
   q,
   r,
@@ -190,14 +190,25 @@ enum font_idx {
   y,
   z,
   LCUB,
-  VERBAR = 34,
+  VERBAR = 37,
   RCUB,
   TILDE,
   DEL,
 
-  Phi = 35,
-  Omega = 36,
-  Dot = 37,
+  Phi = 38,
+  Omega = 39,
+  Dot = 40,
+  Intersection = 41,
+  Angle = 42,
+  Waa = 43,
+  Left_Corner_Bracket = 44,
+  Right_Corner_Bracket = 45,
+  Sigma = 46,
+  Hiragana = 47,
+  Degree = 48,
+  Cyrillic = 49,
+  Bold_LT = 50,
+  Bold_GT = 51,
 };
 
 char font_lib[][5] = {
@@ -234,21 +245,21 @@ char font_lib[][5] = {
 //    {}, // RS
 //    {}, // US
     {0x00, 0x00, 0x00, 0x00, 0x00}, // SP
-//    {0x00, 0x00, 0x4f, 0x00, 0x00}, // !
+//    {}, // !
 //    {}, // "
 //    {}, // #
 //    {}, // $
 //    {}, // %
 //    {}, // &
 //    {}, // '
-    {}, // (
-    {}, // )
-    {}, // *
+    {0x00, 0x1c, 0x22, 0x41, 0x00}, // (
+    {0x00, 0x41, 0x22, 0x1c, 0x00}, // )
+    {0x00, 0x14, 0x08, 0x14, 0x00}, // *
 //    {}, // +
-    {}, // ,
+    {0x00, 0x40, 0x30, 0x00, 0x00}, // ,
 //    {}, // -
 //    {}, // .
-    {}, // /
+    {0x40, 0x30, 0x0c, 0x02, 0x00}, // /
     {0x7f, 0x7f, 0x41, 0x7f, 0x7f}, // 0
     {0x00, 0x7f, 0x7f, 0x7f, 0x00}, // 1
     {0x79, 0x79, 0x69, 0x6f, 0x6f}, // 2
@@ -261,9 +272,9 @@ char font_lib[][5] = {
     {0x4f, 0x4f, 0x49, 0x7f, 0x7f}, // 9
     {0x00, 0x00, 0x36, 0x36, 0x00}, // :
 //    {}, // ;
-    {}, // <
+    {0x08, 0x14, 0x22, 0x00, 0x00}, // <
 //    {}, // =
-    {}, // >
+    {0x00, 0x00, 0x22, 0x14, 0x08}, // >
 //    {}, // ?
 //    {}, // @
 //    {}, // A
@@ -272,20 +283,20 @@ char font_lib[][5] = {
 //    {}, // D
     {0x7f, 0x49, 0x49, 0x49, 0x49}, // E
 //    {}, // F
-    {}, // G
-    {}, // H
-    {}, // I
+    {0x3e, 0x41, 0x49, 0x49, 0x3a}, // G
+    {0x7f, 0x08, 0x08, 0x08, 0x7f}, // H
+    {0x00, 0x41, 0x7f, 0x41, 0x00}, // I
 //    {}, // J
-    {}, // K
+    {0x7f, 0x08, 0x14, 0x22, 0x41}, // K
     {0x7f, 0x40, 0x40, 0x40, 0x40}, // L
 //    {}, // M
     {0x7f, 0x04, 0x08, 0x10, 0x7f}, // N
-    {}, // O
+    {0x3e, 0x41, 0x41, 0x41, 0x3e}, // O
 //    {}, // P
 //    {}, // Q
 //    {}, // R
     {0x46, 0x49, 0x49, 0x49, 0x31}, // S
-    {}, // T
+    {0x01, 0x01, 0x7f, 0x01, 0x01}, // T
 //    {}, // U
 //    {}, // V
 //    {}, // W
@@ -293,11 +304,11 @@ char font_lib[][5] = {
     {0x07, 0x08, 0x70, 0x08, 0x07}, // Y
 //    {}, // Z
 //    {}, // [
-//    {}, // \/
+    {0x00, 0x02, 0x0c, 0x30, 0x40}, // \/
 //    {}, // ]
-//    {}, // ^
-//    {}, // _
-    {}, // `
+    {0x00, 0x02, 0x01, 0x02,0x00}, // ^
+    {0x40, 0x40, 0x40, 0x40, 0x40}, // _
+    {0x00, 0x00, 0x02, 0x04, 0x00}, // `
 //    {}, // a
 //    {}, // b
 //    {}, // c
@@ -306,7 +317,7 @@ char font_lib[][5] = {
 //    {}, // f
 //    {}, // g
 //    {}, // h
-    {}, // i
+    {0x00, 0x48, 0x7a, 0x40, 0x00}, // i
 //    {}, // j
 //    {}, // k
 //    {}, // l
@@ -325,17 +336,25 @@ char font_lib[][5] = {
 //    {}, // y
 //    {}, // z
 //    {}, // {
-    {}, // |
+    {0x00, 0x00, 0x7f, 0x00, 0x00}, // |
 //    {}, // }
 //    {}, // ~
 //    {}, // DEL
 
-    {}, // Φ
-    {}, // ω
-    {}, // ･
-/* (/ >w< )/
-   (*ΦωΦ*)
-   |･ω･｀) */
+    {0x0c, 0x12, 0x3f, 0x12, 0x0c}, // Φ
+    {0x18, 0x20, 0x10, 0x20, 0x18}, // ω
+    {0x00, 0x00, 0x08, 0x00, 0x00}, // ･
+    {0x78, 0x04, 0x04, 0x04, 0x78}, // ∩
+    {0x00, 0x60, 0x50, 0x48, 0x44}, // ∠
+    {0x02, 0x10, 0x28, 0x45, 0x7c}, // ᐛ
+    {0x00, 0x3f, 0x01, 0x01, 0x00}, // 「
+    {0x00, 0x40, 0x40, 0x7e, 0x00}, // 」
+    {0x00, 0x62, 0x55, 0x49, 0x41}, // Σ
+    {0x08, 0x04, 0x44, 0x24, 0x18}, // っ
+    {0x00, 0x04, 0x0a, 0x04, 0x00}, // °
+    {0x40, 0x38, 0x24, 0x38, 0x40}, // Д
+    {0x08, 0x14, 0x2a, 0x55, 0x22}, // bold <
+    {0x22, 0x55, 0x2a, 0x14, 0x08}, // bold >
  };
 
 char vfd_buffer[8][5] = {};
@@ -348,8 +367,6 @@ class VFD {
     cs_ = cs;
     rst_ = rst;
     en_ = en;
-
-    srand(bsp::GetHighresTickMicroSec());
   }
 
   void Show() {
@@ -713,15 +730,18 @@ void displayTask(void* arg) {
 
   while (true) {
     if (VFD_Clock_Mode == START) {
-            vfd->Font2Buffer(display::font_lib[display::L], display::vfd_buffer[0]);
-            vfd->Font2Buffer(display::font_lib[display::e], display::vfd_buffer[1]);
+            // 「LeeNeo」
+            vfd->Font2Buffer(display::font_lib[display::Left_Corner_Bracket], display::vfd_buffer[0]);
+            vfd->Font2Buffer(display::font_lib[display::L], display::vfd_buffer[1]);
             vfd->Font2Buffer(display::font_lib[display::e], display::vfd_buffer[2]);
-            vfd->Font2Buffer(display::font_lib[display::SP], display::vfd_buffer[3]);
-            vfd->Font2Buffer(display::font_lib[display::SP], display::vfd_buffer[4]);
-            vfd->Font2Buffer(display::font_lib[display::N], display::vfd_buffer[5]);
-            vfd->Font2Buffer(display::font_lib[display::e], display::vfd_buffer[6]);
-            vfd->Font2Buffer(display::font_lib[display::o], display::vfd_buffer[7]);
-            osDelay(2000);
+            vfd->Font2Buffer(display::font_lib[display::e], display::vfd_buffer[3]);
+            vfd->Font2Buffer(display::font_lib[display::N], display::vfd_buffer[4]);
+            vfd->Font2Buffer(display::font_lib[display::e], display::vfd_buffer[5]);
+            vfd->Font2Buffer(display::font_lib[display::o], display::vfd_buffer[6]);
+            vfd->Font2Buffer(display::font_lib[display::Right_Corner_Bracket], display::vfd_buffer[7]);
+            osDelay(1000);
+
+            // YSYSYLYN
             vfd->Font2Buffer(display::font_lib[display::Y], display::vfd_buffer[0]);
             vfd->Font2Buffer(display::font_lib[display::S], display::vfd_buffer[1]);
             vfd->Font2Buffer(display::font_lib[display::Y], display::vfd_buffer[2]);
@@ -730,7 +750,116 @@ void displayTask(void* arg) {
             vfd->Font2Buffer(display::font_lib[display::L], display::vfd_buffer[5]);
             vfd->Font2Buffer(display::font_lib[display::Y], display::vfd_buffer[6]);
             vfd->Font2Buffer(display::font_lib[display::N], display::vfd_buffer[7]);
-            osDelay(2000);
+            osDelay(1000);
+
+            srand(display::time.second);
+
+            int start_idx = rand() % 9;
+
+            switch (start_idx) {
+              case 0:
+                // (/>w<)/
+                vfd->Font2Buffer(display::font_lib[display::LPAREN], display::vfd_buffer[0]);
+                vfd->Font2Buffer(display::font_lib[display::SOL], display::vfd_buffer[1]);
+                vfd->Font2Buffer(display::font_lib[display::GT], display::vfd_buffer[2]);
+                vfd->Font2Buffer(display::font_lib[display::Omega], display::vfd_buffer[3]);
+                vfd->Font2Buffer(display::font_lib[display::LT], display::vfd_buffer[4]);
+                vfd->Font2Buffer(display::font_lib[display::RPAREN], display::vfd_buffer[5]);
+                vfd->Font2Buffer(display::font_lib[display::SOL], display::vfd_buffer[6]);
+                vfd->Font2Buffer(display::font_lib[display::SP], display::vfd_buffer[7]);
+                break ;
+              case 1:
+                // (*ΦωΦ*)
+                vfd->Font2Buffer(display::font_lib[display::LPAREN], display::vfd_buffer[0]);
+                vfd->Font2Buffer(display::font_lib[display::AST], display::vfd_buffer[1]);
+                vfd->Font2Buffer(display::font_lib[display::Phi], display::vfd_buffer[2]);
+                vfd->Font2Buffer(display::font_lib[display::Omega], display::vfd_buffer[3]);
+                vfd->Font2Buffer(display::font_lib[display::Phi], display::vfd_buffer[4]);
+                vfd->Font2Buffer(display::font_lib[display::AST], display::vfd_buffer[5]);
+                vfd->Font2Buffer(display::font_lib[display::RPAREN], display::vfd_buffer[6]);
+                vfd->Font2Buffer(display::font_lib[display::SP], display::vfd_buffer[7]);
+                break ;
+              case 2:
+                // |･ω･｀)/
+                vfd->Font2Buffer(display::font_lib[display::VERBAR], display::vfd_buffer[0]);
+                vfd->Font2Buffer(display::font_lib[display::Dot], display::vfd_buffer[1]);
+                vfd->Font2Buffer(display::font_lib[display::Omega], display::vfd_buffer[2]);
+                vfd->Font2Buffer(display::font_lib[display::Dot], display::vfd_buffer[3]);
+                vfd->Font2Buffer(display::font_lib[display::GRAVE], display::vfd_buffer[4]);
+                vfd->Font2Buffer(display::font_lib[display::RPAREN], display::vfd_buffer[5]);
+                vfd->Font2Buffer(display::font_lib[display::SOL], display::vfd_buffer[6]);
+                vfd->Font2Buffer(display::font_lib[display::SP], display::vfd_buffer[7]);
+                break ;
+              case 3:
+                // (//ω//)
+                vfd->Font2Buffer(display::font_lib[display::LPAREN], display::vfd_buffer[0]);
+                vfd->Font2Buffer(display::font_lib[display::SOL], display::vfd_buffer[1]);
+                vfd->Font2Buffer(display::font_lib[display::SOL], display::vfd_buffer[2]);
+                vfd->Font2Buffer(display::font_lib[display::Omega], display::vfd_buffer[3]);
+                vfd->Font2Buffer(display::font_lib[display::SOL], display::vfd_buffer[4]);
+                vfd->Font2Buffer(display::font_lib[display::SOL], display::vfd_buffer[5]);
+                vfd->Font2Buffer(display::font_lib[display::RPAREN], display::vfd_buffer[6]);
+                vfd->Font2Buffer(display::font_lib[display::SP], display::vfd_buffer[7]);
+                break ;
+              case 4:
+                // (*/ω\*)
+                vfd->Font2Buffer(display::font_lib[display::LPAREN], display::vfd_buffer[0]);
+                vfd->Font2Buffer(display::font_lib[display::AST], display::vfd_buffer[1]);
+                vfd->Font2Buffer(display::font_lib[display::SOL], display::vfd_buffer[2]);
+                vfd->Font2Buffer(display::font_lib[display::Omega], display::vfd_buffer[3]);
+                vfd->Font2Buffer(display::font_lib[display::BSOL], display::vfd_buffer[4]);
+                vfd->Font2Buffer(display::font_lib[display::AST], display::vfd_buffer[5]);
+                vfd->Font2Buffer(display::font_lib[display::RPAREN], display::vfd_buffer[6]);
+                vfd->Font2Buffer(display::font_lib[display::SP], display::vfd_buffer[7]);
+                break ;
+              case 5:
+                // (^･ω･^)
+                vfd->Font2Buffer(display::font_lib[display::LPAREN], display::vfd_buffer[0]);
+                vfd->Font2Buffer(display::font_lib[display::HAT], display::vfd_buffer[1]);
+                vfd->Font2Buffer(display::font_lib[display::Dot], display::vfd_buffer[2]);
+                vfd->Font2Buffer(display::font_lib[display::Omega], display::vfd_buffer[3]);
+                vfd->Font2Buffer(display::font_lib[display::Dot], display::vfd_buffer[4]);
+                vfd->Font2Buffer(display::font_lib[display::HAT], display::vfd_buffer[5]);
+                vfd->Font2Buffer(display::font_lib[display::RPAREN], display::vfd_buffer[6]);
+                vfd->Font2Buffer(display::font_lib[display::SP], display::vfd_buffer[7]);
+                break ;
+              case 6:
+                // (∩>ω<∩)
+                vfd->Font2Buffer(display::font_lib[display::LPAREN], display::vfd_buffer[0]);
+                vfd->Font2Buffer(display::font_lib[display::Intersection], display::vfd_buffer[1]);
+                vfd->Font2Buffer(display::font_lib[display::GT], display::vfd_buffer[2]);
+                vfd->Font2Buffer(display::font_lib[display::Omega], display::vfd_buffer[3]);
+                vfd->Font2Buffer(display::font_lib[display::LT], display::vfd_buffer[4]);
+                vfd->Font2Buffer(display::font_lib[display::Intersection], display::vfd_buffer[5]);
+                vfd->Font2Buffer(display::font_lib[display::RPAREN], display::vfd_buffer[6]);
+                vfd->Font2Buffer(display::font_lib[display::SP], display::vfd_buffer[7]);
+                break ;
+              case 7:
+                // ∠(ᐛ 」∠)_
+                vfd->Font2Buffer(display::font_lib[display::Angle], display::vfd_buffer[0]);
+                vfd->Font2Buffer(display::font_lib[display::LPAREN], display::vfd_buffer[1]);
+                vfd->Font2Buffer(display::font_lib[display::Waa], display::vfd_buffer[2]);
+                vfd->Font2Buffer(display::font_lib[display::Right_Corner_Bracket], display::vfd_buffer[3]);
+                vfd->Font2Buffer(display::font_lib[display::Angle], display::vfd_buffer[4]);
+                vfd->Font2Buffer(display::font_lib[display::RPAREN], display::vfd_buffer[5]);
+                vfd->Font2Buffer(display::font_lib[display::LOWBAR], display::vfd_buffer[6]);
+                vfd->Font2Buffer(display::font_lib[display::SP], display::vfd_buffer[7]);
+                break ;
+              case 8:
+                // Σ(っ °Д °)っ
+                vfd->Font2Buffer(display::font_lib[display::Sigma], display::vfd_buffer[0]);
+                vfd->Font2Buffer(display::font_lib[display::LPAREN], display::vfd_buffer[1]);
+                vfd->Font2Buffer(display::font_lib[display::Hiragana], display::vfd_buffer[2]);
+                vfd->Font2Buffer(display::font_lib[display::Degree], display::vfd_buffer[3]);
+                vfd->Font2Buffer(display::font_lib[display::Cyrillic], display::vfd_buffer[4]);
+                vfd->Font2Buffer(display::font_lib[display::Degree], display::vfd_buffer[5]);
+                vfd->Font2Buffer(display::font_lib[display::RPAREN], display::vfd_buffer[6]);
+                vfd->Font2Buffer(display::font_lib[display::Hiragana], display::vfd_buffer[7]);
+                break ;
+              default: ;
+            }
+            osDelay(1000);
+
             VFD_Clock_Mode = DISPLAY_TIME;
 
             vfd->GetTime();
