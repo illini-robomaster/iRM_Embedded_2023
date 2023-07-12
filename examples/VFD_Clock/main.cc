@@ -336,7 +336,6 @@ void updateTimeTask(void* arg) {
     i2c_reset();
     osDelay(100);
   }
-  clock_flag = true;
 
 //  clock->SetTime(23, 7, 11, 2, 2, 15, 20);
 
@@ -345,6 +344,7 @@ void updateTimeTask(void* arg) {
             i2c_reset();
             osDelay(100);
     }
+    clock_flag = true;
 
     display::time.second = clock->second;
     display::time.minute = clock->minute;
@@ -430,19 +430,20 @@ void displayTask(void* arg) {
 
   while (!clock_flag)
     osDelay(100);
+  vfd->GetTime();
 
-  vfd->Font2Buffer(display::font_lib[0], display::vfd_buffer[0]);
-  vfd->Font2Buffer(display::font_lib[0], display::vfd_buffer[1]);
-
-  vfd->Font2Buffer(display::font_lib[10], display::vfd_buffer[2]);
-
-  vfd->Font2Buffer(display::font_lib[0], display::vfd_buffer[3]);
-  vfd->Font2Buffer(display::font_lib[0], display::vfd_buffer[4]);
+  vfd->Font2Buffer(display::font_lib[vfd->second_ % 10], display::vfd_buffer[7]);
+  vfd->Font2Buffer(display::font_lib[vfd->second_ / 10], display::vfd_buffer[6]);
 
   vfd->Font2Buffer(display::font_lib[10], display::vfd_buffer[5]);
 
-  vfd->Font2Buffer(display::font_lib[0], display::vfd_buffer[6]);
-  vfd->Font2Buffer(display::font_lib[0], display::vfd_buffer[7]);
+  vfd->Font2Buffer(display::font_lib[vfd->minute_ % 10], display::vfd_buffer[4]);
+  vfd->Font2Buffer(display::font_lib[vfd->minute_ / 10], display::vfd_buffer[3]);
+
+  vfd->Font2Buffer(display::font_lib[10], display::vfd_buffer[2]);
+
+  vfd->Font2Buffer(display::font_lib[vfd->hour_ % 10], display::vfd_buffer[1]);
+  vfd->Font2Buffer(display::font_lib[vfd->hour_ / 10], display::vfd_buffer[0]);
 
   while (true) {
     vfd->GetTime();
