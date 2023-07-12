@@ -81,8 +81,8 @@ void CanBridge::UpdateData(const uint8_t* data) {
     case CHASSIS_FLAG:
       chassis_flag = cmd.data_uint;
       break;
-    case REMAIN_HP:
-      remain_hp = cmd.data_uint;
+    case GIMBAL_POWER:
+      gimbal_power = cmd.data_uint;
       break;
     case RECALIBRATE:
       recalibrate = cmd.data_bool;

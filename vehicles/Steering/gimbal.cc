@@ -74,7 +74,7 @@ static unsigned int chassis_flag_bitmap = 0;
 
 static volatile float pitch_pos = START_PITCH_POS;
 
-static volatile unsigned int current_hp = 0;
+static volatile unsigned int gimbal_alive = 0;
 
 static volatile bool pitch_motor_flag = false;
 static volatile bool yaw_motor_flag = false;
@@ -493,41 +493,50 @@ void shooterTask(void* arg) {
       stepper_direction = !stepper_direction;
     }
     
-    if (send->shooter_power && send->cooling_heat1 < send->cooling_limit1 - 20) {
-      // for manual antijam 
-      Antijam.input(dbus->keyboard.bit.G);
+    if (GimbalDead) {
+      shooter->DialStop();
+    } else {
+      if (send->shooter_power && send->cooling_heat1 < send->cooling_limit1 - 20) {
+        // for manual antijam 
+        Antijam.input(dbus->keyboard.bit.G);
 
-      if (dbus->mouse.l || dbus->swr == remote::UP) {
-        if ((bsp::GetHighresTickMicroSec() - start_time) / 1000 > SHOOTER_MODE_DELAY) {
-          shooter->SlowContinueShoot();
-        } else if (slow_shoot_detect == false) {
-          slow_shoot_detect = true;
-          shooter->DoubleShoot();
+        if (dbus->mouse.l || dbus->swr == remote::UP) {
+          if ((bsp::GetHighresTickMicroSec() - start_time) / 1000 > SHOOTER_MODE_DELAY) {
+            shooter->SlowContinueShoot();
+          } else if (slow_shoot_detect == false) {
+            slow_shoot_detect = true;
+            shooter->DoubleShoot();
+          }
+        } else if (dbus->mouse.r) {
+          shooter->FastContinueShoot();
+        } else if (Antijam.posEdge()) {
+          shooter->Antijam();
+        }else {
+          shooter->DialStop();
+          start_time = bsp::GetHighresTickMicroSec();
+          slow_shoot_detect = false;
         }
-      } else if (dbus->mouse.r) {
-        shooter->FastContinueShoot();
-      } else if (Antijam.posEdge()) {
-        shooter->Antijam();
-      }else {
-        shooter->DialStop();
-        start_time = bsp::GetHighresTickMicroSec();
-        slow_shoot_detect = false;
       }
     }
-      
-    if (!send->shooter_power || dbus->keyboard.bit.Q || dbus->swr == remote::DOWN) {
-      flywheelFlag = false;
-      shooter->SetFlywheelSpeed(0);
-    } else {
-      if (14 < send->speed_limit1 && send->speed_limit1 < 16) {
-        flywheelFlag = true;
-        shooter->SetFlywheelSpeed(437);  // 445 MAX
-      } else if (send->speed_limit1 >= 18) {
-        flywheelFlag = true;
-        shooter->SetFlywheelSpeed(482);  // 490 MAX
-      } else {
+
+    if (GimbalDead) {
         flywheelFlag = false;
         shooter->SetFlywheelSpeed(0);
+    } else { 
+      if (!send->shooter_power || dbus->keyboard.bit.Q || dbus->swr == remote::DOWN) {
+        flywheelFlag = false;
+        shooter->SetFlywheelSpeed(0);
+      } else {
+        if (14 < send->speed_limit1 && send->speed_limit1 < 16) {
+          flywheelFlag = true;
+          shooter->SetFlywheelSpeed(437);  // 445 MAX
+        } else if (send->speed_limit1 >= 18) {
+          flywheelFlag = true;
+          shooter->SetFlywheelSpeed(482);  // 490 MAX
+        } else {
+          flywheelFlag = false;
+          shooter->SetFlywheelSpeed(0);
+        }
       }
     }
 
@@ -878,8 +887,9 @@ void KillAll() {
 
 void KillGimbal() {
   while (true) {
+    shooter->DialStop();
     GimbalDead = true;
-    GimbalDeath.input(send->remain_hp);
+    GimbalDeath.input(send->gimbal_power);
     if (GimbalDeath.posEdge() && robot_hp_begin) {
       GimbalDead = false;
       pitch_motor->MotorEnable(pitch_motor);
@@ -908,8 +918,8 @@ void RM_RTOS_Default_Task(const void* arg) {
   UNUSED(arg);
 
   while (true) {
-    if (send->remain_hp == 1) robot_hp_begin = true;
-    current_hp = robot_hp_begin ? send->remain_hp : 1;
+    if (send->gimbal_power == 1) robot_hp_begin = true;
+    gimbal_alive = robot_hp_begin ? send->gimbal_power : 1;
 
     FakeDeath.input(dbus->swl == remote::DOWN);
     if (FakeDeath.posEdge()) {
@@ -917,7 +927,7 @@ void RM_RTOS_Default_Task(const void* arg) {
       KillAll();
     }
 
-    GimbalDeath.input(current_hp);
+    GimbalDeath.input(gimbal_alive);
     if (GimbalDeath.negEdge()) {
       KillGimbal();
     }

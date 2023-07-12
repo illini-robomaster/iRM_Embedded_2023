@@ -468,7 +468,7 @@ void RM_RTOS_Default_Task(const void* args) {
       KillAll();
     }
 
-    receive->cmd.id = bsp::REMAIN_HP;
+    receive->cmd.id = bsp::GIMBAL_POWER;
     receive->cmd.data_uint = referee->game_robot_status.mains_power_gimbal_output;
     receive->TransmitOutput();
 
