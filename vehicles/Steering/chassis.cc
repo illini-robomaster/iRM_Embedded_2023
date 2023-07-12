@@ -280,10 +280,6 @@ void chassisTask(void* arg) {
     receive->cmd.data_float = (float)referee->game_robot_status.shooter_id2_17mm_speed_limit;
     receive->TransmitOutput();
 
-    receive->cmd.id = bsp::REMAIN_HP;
-    receive->cmd.data_int = referee->game_robot_status.remain_HP;
-    receive->TransmitOutput();
-
     osDelay(CHASSIS_TASK_DELAY);
 
   }

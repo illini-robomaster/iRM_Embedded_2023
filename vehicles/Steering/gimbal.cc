@@ -728,7 +728,7 @@ void KillAll() {
     send->TransmitOutput();
 
     FakeDeath.input(dbus->swl == remote::DOWN);
-    if (FakeDeath.posEdge() || send->remain_hp > 0) {
+    if (FakeDeath.posEdge() || send->gimbal_power > 0) {
       SpinMode = false;
       Dead = false;
       RGB->Display(display::color_green);
@@ -767,8 +767,8 @@ void RM_RTOS_Default_Task(const void* arg) {
   UNUSED(arg);
 
   while (true) {
-    if (send->remain_hp == INFANTRY_INITIAL_HP) robot_hp_begin = true;
-    current_hp = robot_hp_begin ? send->remain_hp : INFANTRY_INITIAL_HP;
+    if (send->gimbal_power == INFANTRY_INITIAL_HP) robot_hp_begin = true;
+    current_hp = robot_hp_begin ? send->gimbal_power : INFANTRY_INITIAL_HP;
 
     FakeDeath.input(dbus->swl == remote::DOWN);
     if (FakeDeath.posEdge() || current_hp == 0) {
