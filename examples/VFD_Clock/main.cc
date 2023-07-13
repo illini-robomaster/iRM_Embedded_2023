@@ -355,8 +355,8 @@ char font_lib[][5] = {
     {0x08, 0x04, 0x44, 0x24, 0x18}, // っ
     {0x00, 0x06, 0x09, 0x09, 0x06}, // °
     {0x40, 0x38, 0x24, 0x38, 0x40}, // Д
-    {0x08, 0x14, 0x2a, 0x55, 0x22}, // bold <
-    {0x22, 0x55, 0x2a, 0x14, 0x08}, // bold >
+    {0x08, 0x1c, 0x3e, 0x77, 0x22}, // bold <
+    {0x22, 0x77, 0x3e, 0x1c, 0x08}, // bold >
  };
 
 char vfd_buffer[8][5] = {};
@@ -461,7 +461,9 @@ class VFD {
     return rand() % (sizeof(font_lib) / sizeof(char) / 5);
   }
 
-  static void MoveDown(unsigned pos, int step, unsigned new_font) {
+  static void MoveDown(int pos, int step, unsigned new_font) {
+    if (!(0 <= pos && pos <= 7 && 1 <= step && step <= 7))
+        return ;
     for (int i = 0; i < 5; ++i) {
         vfd_buffer[pos][i] = 0x7f & (vfd_buffer[pos][i] << 1);
         vfd_buffer[pos][i] |= font_lib[new_font][i] >> (7 - step);
@@ -504,6 +506,26 @@ class VFD {
           else
             vfd_buffer[i][4] = font_lib[font2][step - 11];
         }
+    }
+  }
+
+  static void MoveCircularRight(int pos, int step, unsigned font) {
+    if (!(0 <= pos && pos <= 7 && 0 <= step && step < 5))
+        return ;
+    for (int i = 0; i < 5; ++i) {
+        int idx = i - step;
+        if (idx < 0) idx += 5;
+        vfd_buffer[pos][i] = font_lib[font][idx];
+    }
+  }
+
+  static void MoveCircularLeft(int pos, int step, unsigned font) {
+    if (!(0 <= pos && pos <= 7 && 0 <= step && step < 5))
+        return ;
+    for (int i = 0; i < 5; ++i) {
+        int idx = i + step;
+        if (idx >= 5) idx -= 5;
+        vfd_buffer[pos][i] = font_lib[font][idx];
     }
   }
 
@@ -598,7 +620,9 @@ static BoolEdgeDetector right(false);
 
 static volatile bool clock_flag = false;
 
-static volatile int display_calendar_flag = 0; // 0 for time, 1 for date, 2 for week
+static volatile int display_calendar_flag = 0; // 0 for time, 1 for date, 2 for day
+
+static volatile long move_count;
 
 static volatile enum mode {
   START,
@@ -607,6 +631,10 @@ static volatile enum mode {
 } VFD_Clock_Mode;
 
 static volatile enum unit {
+  YEAR,
+  MONTH,
+  DATE,
+  DAY,
   HOUR,
   MINUTE,
   SECOND,
@@ -644,25 +672,27 @@ void switchTask(void* arg) {
 
     if (VFD_Clock_Mode == DISPLAY_TIME && button.negEdge()) {
       int press_count = 0;
-      do {
+      while (true) {
         osDelay(50);
         button.input(push->Read());
         ++press_count;
-      } while (!button.posEdge());
-
-      if (press_count > 20) {
-        VFD_Clock_Mode = SETTING_TIME;
-        Setting_Unit = HOUR;
-        flash_count = 0;
-        flash_flag = false;
-      } else {
-        if (display_calendar_flag == 0)
-          display_calendar_flag = 1;
-        else if (display_calendar_flag == 1)
-          display_calendar_flag = 2;
-        else if (display_calendar_flag == 2) {
-          display_calendar_flag = 0;
-          refresh_all_flag = true;
+        if (button.posEdge()) {
+            move_count = 0;
+            if (display_calendar_flag == 0)
+              display_calendar_flag = 1;
+            else if (display_calendar_flag == 1)
+              display_calendar_flag = 2;
+            else if (display_calendar_flag == 2) {
+              display_calendar_flag = 0;
+              refresh_all_flag = true;
+            }
+            break;
+        } else if (press_count > 20) {
+          VFD_Clock_Mode = SETTING_TIME;
+          Setting_Unit = YEAR;
+          flash_count = 0;
+          flash_flag = false;
+          break;
         }
       }
     }
@@ -719,7 +749,7 @@ void updateTimeTask(void* arg) {
   }
 
 #ifdef SET_TIME
-  if (!clock->SetTime(23, 7, 13, 4, 6, 18, 0)) {
+  if (!clock->SetTime(21, 6, 5, 6, 5, 20, 0)) {
     i2c_reset();
     osDelay(100);
   }
@@ -980,7 +1010,7 @@ void displayTask(void* arg) {
             }
 
             while (vfd->brightness_ < 100) {
-              if (vfd->brightness_ % 3 == 0)
+              if (vfd->brightness_ % 5 == 0)
                 for (auto & i : display::vfd_buffer)
                   display::VFD::Font2Buffer(display::font_lib[display::VFD::GetRandomFont()], i);
               ++vfd->brightness_;
@@ -988,13 +1018,13 @@ void displayTask(void* arg) {
             }
 
             for (int i = 0; i < 8; ++i) {
-              for (int j = 0; j < 4; ++j) {
+              for (int j = 0; j < 3; ++j) {
                 for (int k = 0; k < 8; ++k)
                   display::VFD::Font2Buffer(display::font_lib[i >= k ? emoji[k] : display::VFD::GetRandomFont()], display::vfd_buffer[k]);
-                osDelay(60);
+                osDelay(100);
               }
             }
-            osDelay(2000);
+            osDelay(1000);
 
             while (vfd->brightness_ > 0) {
               --vfd->brightness_;
@@ -1034,17 +1064,19 @@ void displayTask(void* arg) {
             } else if (display_calendar_flag == 1) {
               display::VFD::Font2Buffer(display::font_lib[vfd->year_ / 10 + display::num2ascii], display::vfd_buffer[0]);
               display::VFD::Font2Buffer(display::font_lib[vfd->year_ % 10 + display::num2ascii], display::vfd_buffer[1]);
-              display::VFD::Font2Buffer(display::font_lib[display::MINUS], display::vfd_buffer[2]);
+              display::VFD::MoveCircularRight(2, (move_count / 10) % 5, display::MINUS);
               display::VFD::Font2Buffer(display::font_lib[vfd->month_ / 10 + display::num2ascii], display::vfd_buffer[3]);
               display::VFD::Font2Buffer(display::font_lib[vfd->month_ % 10 + display::num2ascii], display::vfd_buffer[4]);
-              display::VFD::Font2Buffer(display::font_lib[display::MINUS], display::vfd_buffer[5]);
+              display::VFD::MoveCircularRight(5, (move_count / 10) % 5, display::MINUS);
               display::VFD::Font2Buffer(display::font_lib[vfd->date_ / 10 + display::num2ascii], display::vfd_buffer[6]);
               display::VFD::Font2Buffer(display::font_lib[vfd->date_ % 10 + display::num2ascii], display::vfd_buffer[7]);
+
+              ++move_count;
             } else if (display_calendar_flag == 2) {
-              display::VFD::Font2Buffer(display::font_lib[display::GT], display::vfd_buffer[0]);
-              display::VFD::Font2Buffer(display::font_lib[display::Bold_GT], display::vfd_buffer[1]);
-              display::VFD::Font2Buffer(display::font_lib[display::Bold_LT], display::vfd_buffer[5]);
-              display::VFD::Font2Buffer(display::font_lib[display::LT], display::vfd_buffer[6]);
+              display::VFD::MoveCircularRight(0, (move_count / 10) % 5, display::GT);
+              display::VFD::MoveCircularRight(1, (move_count / 10) % 5, display::Bold_GT);
+              display::VFD::MoveCircularLeft(5, (move_count / 10) % 5, display::Bold_LT);
+              display::VFD::MoveCircularLeft(6, (move_count / 10) % 5, display::LT);
               display::VFD::Font2Buffer(display::font_lib[display::SP], display::vfd_buffer[7]);
 
               switch (vfd->day_) {
@@ -1086,6 +1118,8 @@ void displayTask(void* arg) {
                 default:
                   break ;
               }
+
+              ++move_count;
             }
 
             refresh_all_flag = false;
@@ -1096,28 +1130,52 @@ void displayTask(void* arg) {
             right.input(cw->Read());
 
             if (left.negEdge()) {
-              if (Setting_Unit == HOUR) {
+              if (Setting_Unit == YEAR) {
+                vfd->year_ += 1;
+                vfd->year_ = vfd->year_ > 99? 00 : vfd->year_;
+              } else if (Setting_Unit == MONTH) {
+                vfd->month_ += 1;
+                vfd->month_ = vfd->month_ > 12? 1 : vfd->month_;
+              } else if (Setting_Unit == DATE) {
+                vfd->date_ += 1;
+                vfd->date_ = vfd->date_ > 31? 1 : vfd->date_;
+              } else if (Setting_Unit == DAY) {
+                vfd->day_ += 1;
+                vfd->day_ = vfd->day_ > 7? 1 : vfd->day_;
+              } else if (Setting_Unit == HOUR) {
                 vfd->hour_ += 1;
-                vfd->hour_ %= 24;
+                vfd->hour_ = vfd->hour_ > 23? 0 : vfd->hour_;
               } else if (Setting_Unit == MINUTE) {
                 vfd->minute_ += 1;
-                vfd->minute_ %= 60;
+                vfd->minute_  = vfd->minute_ > 59? 0 : vfd->minute_;
               } else if (Setting_Unit == SECOND) {
                 vfd->second_ += 1;
-                vfd->second_ %= 60;
+                vfd->second_  = vfd->second_ > 59? 0 : vfd->second_;
               }
             }
 
             if (right.negEdge()) {
-              if (Setting_Unit == HOUR) {
+              if (Setting_Unit == YEAR) {
+                vfd->year_ -= 1;
+                vfd->year_ = vfd->year_ < 0? 99 : vfd->year_;
+              } else if (Setting_Unit == MONTH) {
+                vfd->month_ -= 1;
+                vfd->month_ = vfd->month_ < 1? 12 : vfd->month_;
+              } else if (Setting_Unit == DATE) {
+                vfd->date_ -= 1;
+                vfd->date_ = vfd->date_ < 1? 31 : vfd->date_;
+              } else if (Setting_Unit == DAY) {
+                vfd->day_ -= 1;
+                vfd->day_ = vfd->day_ < 1? 7 : vfd->day_;
+              } else if (Setting_Unit == HOUR) {
                 vfd->hour_ -= 1;
-                vfd->hour_ = vfd->hour_ < 0 ? 23 : vfd->hour_;
+                vfd->hour_ = vfd->hour_ < 0? 23 : vfd->hour_;
               } else if (Setting_Unit == MINUTE) {
                 vfd->minute_ -= 1;
-                vfd->minute_ = vfd->minute_ < 0 ? 59 : vfd->minute_;
+                vfd->minute_ = vfd->minute_ < 0? 59 : vfd->minute_;
               } else if (Setting_Unit == SECOND) {
                 vfd->second_ -= 1;
-                vfd->second_ = vfd->second_ < 0 ? 59 : vfd->second_;
+                vfd->second_ = vfd->second_ < 0? 59 : vfd->second_;
               }
             }
 
@@ -1125,31 +1183,117 @@ void displayTask(void* arg) {
             if (flash_count % 30 == 0)
               flash_flag = !flash_flag;
 
-            if (Setting_Unit == HOUR) {
-              display::VFD::Font2Buffer(display::font_lib[flash_flag? vfd->hour_ % 10 + display::num2ascii : display::SP], display::vfd_buffer[1]);
+            if (Setting_Unit == YEAR) {
+              display::VFD::Font2Buffer(display::font_lib[flash_flag? vfd->year_ / 10 + display::num2ascii : display::SP], display::vfd_buffer[0]);
+              display::VFD::Font2Buffer(display::font_lib[flash_flag? vfd->year_ % 10 + display::num2ascii : display::SP], display::vfd_buffer[1]);
+              display::VFD::Font2Buffer(display::font_lib[display::MINUS], display::vfd_buffer[2]);
+              display::VFD::Font2Buffer(display::font_lib[vfd->month_ / 10 + display::num2ascii], display::vfd_buffer[3]);
+              display::VFD::Font2Buffer(display::font_lib[vfd->month_ % 10 + display::num2ascii], display::vfd_buffer[4]);
+              display::VFD::Font2Buffer(display::font_lib[display::MINUS], display::vfd_buffer[5]);
+              display::VFD::Font2Buffer(display::font_lib[vfd->date_ / 10 + display::num2ascii], display::vfd_buffer[6]);
+              display::VFD::Font2Buffer(display::font_lib[vfd->date_ % 10 + display::num2ascii], display::vfd_buffer[7]);
+            } else if (Setting_Unit == MONTH) {
+              display::VFD::Font2Buffer(display::font_lib[vfd->year_ / 10 + display::num2ascii], display::vfd_buffer[0]);
+              display::VFD::Font2Buffer(display::font_lib[vfd->year_ % 10 + display::num2ascii], display::vfd_buffer[1]);
+              display::VFD::Font2Buffer(display::font_lib[display::MINUS], display::vfd_buffer[2]);
+              display::VFD::Font2Buffer(display::font_lib[flash_flag? vfd->month_ / 10 + display::num2ascii : display::SP], display::vfd_buffer[3]);
+              display::VFD::Font2Buffer(display::font_lib[flash_flag? vfd->month_ % 10 + display::num2ascii : display::SP], display::vfd_buffer[4]);
+              display::VFD::Font2Buffer(display::font_lib[display::MINUS], display::vfd_buffer[5]);
+              display::VFD::Font2Buffer(display::font_lib[vfd->date_ / 10 + display::num2ascii], display::vfd_buffer[6]);
+              display::VFD::Font2Buffer(display::font_lib[vfd->date_ % 10 + display::num2ascii], display::vfd_buffer[7]);
+            } else if (Setting_Unit == DATE) {
+              display::VFD::Font2Buffer(display::font_lib[vfd->year_ / 10 + display::num2ascii], display::vfd_buffer[0]);
+              display::VFD::Font2Buffer(display::font_lib[vfd->year_ % 10 + display::num2ascii], display::vfd_buffer[1]);
+              display::VFD::Font2Buffer(display::font_lib[display::MINUS], display::vfd_buffer[2]);
+              display::VFD::Font2Buffer(display::font_lib[vfd->month_ / 10 + display::num2ascii], display::vfd_buffer[3]);
+              display::VFD::Font2Buffer(display::font_lib[vfd->month_ % 10 + display::num2ascii], display::vfd_buffer[4]);
+              display::VFD::Font2Buffer(display::font_lib[display::MINUS], display::vfd_buffer[5]);
+              display::VFD::Font2Buffer(display::font_lib[flash_flag? vfd->date_ / 10 + display::num2ascii : display::SP], display::vfd_buffer[6]);
+              display::VFD::Font2Buffer(display::font_lib[flash_flag? vfd->date_ % 10 + display::num2ascii : display::SP], display::vfd_buffer[7]);
+            } else if (Setting_Unit == DAY) {
+              display::VFD::Font2Buffer(display::font_lib[display::GT], display::vfd_buffer[0]);
+              display::VFD::Font2Buffer(display::font_lib[display::Bold_GT], display::vfd_buffer[1]);
+              switch (vfd->day_) {
+                case 1:
+                  display::VFD::Font2Buffer(display::font_lib[flash_flag? display::M : display::SP], display::vfd_buffer[2]);
+                  display::VFD::Font2Buffer(display::font_lib[flash_flag? display::o : display::SP], display::vfd_buffer[3]);
+                  display::VFD::Font2Buffer(display::font_lib[flash_flag? display::n : display::SP], display::vfd_buffer[4]);
+                  break ;
+                case 2:
+                  display::VFD::Font2Buffer(display::font_lib[flash_flag? display::T : display::SP], display::vfd_buffer[2]);
+                  display::VFD::Font2Buffer(display::font_lib[flash_flag? display::u : display::SP], display::vfd_buffer[3]);
+                  display::VFD::Font2Buffer(display::font_lib[flash_flag? display::e : display::SP], display::vfd_buffer[4]);
+                  break ;
+                case 3:
+                  display::VFD::Font2Buffer(display::font_lib[flash_flag? display::W : display::SP], display::vfd_buffer[2]);
+                  display::VFD::Font2Buffer(display::font_lib[flash_flag? display::e : display::SP], display::vfd_buffer[3]);
+                  display::VFD::Font2Buffer(display::font_lib[flash_flag? display::d : display::SP], display::vfd_buffer[4]);
+                  break ;
+                case 4:
+                  display::VFD::Font2Buffer(display::font_lib[flash_flag? display::T : display::SP], display::vfd_buffer[2]);
+                  display::VFD::Font2Buffer(display::font_lib[flash_flag? display::h : display::SP], display::vfd_buffer[3]);
+                  display::VFD::Font2Buffer(display::font_lib[flash_flag? display::u : display::SP], display::vfd_buffer[4]);
+                  break ;
+                case 5:
+                  display::VFD::Font2Buffer(display::font_lib[flash_flag? display::F : display::SP], display::vfd_buffer[2]);
+                  display::VFD::Font2Buffer(display::font_lib[flash_flag? display::r : display::SP], display::vfd_buffer[3]);
+                  display::VFD::Font2Buffer(display::font_lib[flash_flag? display::i : display::SP], display::vfd_buffer[4]);
+                  break ;
+                case 6:
+                  display::VFD::Font2Buffer(display::font_lib[flash_flag? display::S : display::SP], display::vfd_buffer[2]);
+                  display::VFD::Font2Buffer(display::font_lib[flash_flag? display::a : display::SP], display::vfd_buffer[3]);
+                  display::VFD::Font2Buffer(display::font_lib[flash_flag? display::t : display::SP], display::vfd_buffer[4]);
+                  break ;
+                case 7:
+                  display::VFD::Font2Buffer(display::font_lib[flash_flag? display::S : display::SP], display::vfd_buffer[2]);
+                  display::VFD::Font2Buffer(display::font_lib[flash_flag? display::u : display::SP], display::vfd_buffer[3]);
+                  display::VFD::Font2Buffer(display::font_lib[flash_flag? display::n : display::SP], display::vfd_buffer[4]);
+                  break ;
+                default:
+                  break ;
+              }
+              display::VFD::Font2Buffer(display::font_lib[display::Bold_LT], display::vfd_buffer[5]);
+              display::VFD::Font2Buffer(display::font_lib[display::LT], display::vfd_buffer[6]);
+              display::VFD::Font2Buffer(display::font_lib[display::SP], display::vfd_buffer[7]);
+            } else if (Setting_Unit == HOUR) {
               display::VFD::Font2Buffer(display::font_lib[flash_flag? vfd->hour_ / 10 + display::num2ascii : display::SP], display::vfd_buffer[0]);
-              display::VFD::Font2Buffer(display::font_lib[vfd->minute_ % 10 + display::num2ascii], display::vfd_buffer[4]);
+              display::VFD::Font2Buffer(display::font_lib[flash_flag? vfd->hour_ % 10 + display::num2ascii : display::SP], display::vfd_buffer[1]);
+              display::VFD::Font2Buffer(display::font_lib[display::COLON], display::vfd_buffer[2]);
               display::VFD::Font2Buffer(display::font_lib[vfd->minute_ / 10 + display::num2ascii], display::vfd_buffer[3]);
-              display::VFD::Font2Buffer(display::font_lib[vfd->second_ % 10 + display::num2ascii], display::vfd_buffer[7]);
+              display::VFD::Font2Buffer(display::font_lib[vfd->minute_ % 10 + display::num2ascii], display::vfd_buffer[4]);
+              display::VFD::Font2Buffer(display::font_lib[display::COLON], display::vfd_buffer[5]);
               display::VFD::Font2Buffer(display::font_lib[vfd->second_ / 10 + display::num2ascii], display::vfd_buffer[6]);
+              display::VFD::Font2Buffer(display::font_lib[vfd->second_ % 10 + display::num2ascii], display::vfd_buffer[7]);
             } else if (Setting_Unit == MINUTE) {
-              display::VFD::Font2Buffer(display::font_lib[vfd->hour_ % 10 + display::num2ascii], display::vfd_buffer[1]);
               display::VFD::Font2Buffer(display::font_lib[vfd->hour_ / 10 + display::num2ascii], display::vfd_buffer[0]);
-              display::VFD::Font2Buffer(display::font_lib[flash_flag? vfd->minute_ % 10 + display::num2ascii : display::SP], display::vfd_buffer[4]);
+              display::VFD::Font2Buffer(display::font_lib[vfd->hour_ % 10 + display::num2ascii], display::vfd_buffer[1]);
+              display::VFD::Font2Buffer(display::font_lib[display::COLON], display::vfd_buffer[2]);
               display::VFD::Font2Buffer(display::font_lib[flash_flag? vfd->minute_ / 10 + display::num2ascii : display::SP], display::vfd_buffer[3]);
-              display::VFD::Font2Buffer(display::font_lib[vfd->second_ % 10 + display::num2ascii], display::vfd_buffer[7]);
+              display::VFD::Font2Buffer(display::font_lib[flash_flag? vfd->minute_ % 10 + display::num2ascii : display::SP], display::vfd_buffer[4]);
+              display::VFD::Font2Buffer(display::font_lib[display::COLON], display::vfd_buffer[5]);
               display::VFD::Font2Buffer(display::font_lib[vfd->second_ / 10 + display::num2ascii], display::vfd_buffer[6]);
+              display::VFD::Font2Buffer(display::font_lib[vfd->second_ % 10 + display::num2ascii], display::vfd_buffer[7]);
             } else if (Setting_Unit == SECOND) {
-              display::VFD::Font2Buffer(display::font_lib[vfd->hour_ % 10 + display::num2ascii], display::vfd_buffer[1]);
               display::VFD::Font2Buffer(display::font_lib[vfd->hour_ / 10 + display::num2ascii], display::vfd_buffer[0]);
-              display::VFD::Font2Buffer(display::font_lib[vfd->minute_ % 10 + display::num2ascii], display::vfd_buffer[4]);
+              display::VFD::Font2Buffer(display::font_lib[vfd->hour_ % 10 + display::num2ascii], display::vfd_buffer[1]);
+              display::VFD::Font2Buffer(display::font_lib[display::COLON], display::vfd_buffer[2]);
               display::VFD::Font2Buffer(display::font_lib[vfd->minute_ / 10 + display::num2ascii], display::vfd_buffer[3]);
-              display::VFD::Font2Buffer(display::font_lib[flash_flag? vfd->second_ % 10 + display::num2ascii : display::SP], display::vfd_buffer[7]);
+              display::VFD::Font2Buffer(display::font_lib[vfd->minute_ % 10 + display::num2ascii], display::vfd_buffer[4]);
+              display::VFD::Font2Buffer(display::font_lib[display::COLON], display::vfd_buffer[5]);
               display::VFD::Font2Buffer(display::font_lib[flash_flag? vfd->second_ / 10 + display::num2ascii : display::SP], display::vfd_buffer[6]);
+              display::VFD::Font2Buffer(display::font_lib[flash_flag? vfd->second_ % 10 + display::num2ascii : display::SP], display::vfd_buffer[7]);
             }
 
             if (button.negEdge()) {
-              if (Setting_Unit == HOUR)
+              if (Setting_Unit == YEAR)
+                Setting_Unit = MONTH;
+              else if (Setting_Unit == MONTH)
+                Setting_Unit = DATE;
+              else if (Setting_Unit == DATE)
+                Setting_Unit = DAY;
+              else if (Setting_Unit == DAY)
+                Setting_Unit = HOUR;
+              else if (Setting_Unit == HOUR)
                 Setting_Unit = MINUTE;
               else if (Setting_Unit == MINUTE)
                 Setting_Unit = SECOND;
