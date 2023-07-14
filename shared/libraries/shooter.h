@@ -97,6 +97,7 @@ class Shooter {
   // acquired from user
   MotorBase* left_flywheel_motor_;
   MotorBase* right_flywheel_motor_;
+  MotorCANBase* load_motor_;
   ServoMotor* load_servo_;
   shooter_model_t model_;
 
@@ -112,6 +113,7 @@ class Shooter {
   float dial_continue_slowly_acceleration;      /* acceleration for slowly continue shooting mode */
   float dial_double_acceleration;               /* acceleration for double shooting mode */
   int dial_direction_;
+  bool violent_shooting_;
 };
 
 }  // namespace control

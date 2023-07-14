@@ -44,7 +44,9 @@ Shooter::Shooter(shooter_t shooter) {
   left_flywheel_motor_ = shooter.left_flywheel_motor;
   right_flywheel_motor_ = shooter.right_flywheel_motor;
   model_ = shooter.model;
+  load_motor_ = shooter.load_motor;
   dial_direction_ = shooter.dial_direction;
+  violent_shooting_ = false;
 
   servo_t servo_data;
   servo_data.motor = shooter.load_motor;
@@ -107,6 +109,12 @@ Shooter::Shooter(shooter_t shooter) {
 Shooter::~Shooter() {
   delete load_servo_;
   load_servo_ = nullptr;
+  delete load_motor_;
+  load_motor_ = nullptr;
+  delete left_flywheel_motor_;
+  left_flywheel_motor_ = nullptr;
+  delete right_flywheel_motor_;
+  right_flywheel_motor_ = nullptr;
 
   switch (model_) {
     case SHOOTER_SENTRY:
@@ -150,7 +158,11 @@ void Shooter::Update() {
       float right_diff = static_cast<MotorCANBase*>(right_flywheel_motor_)->GetOmegaDelta(-speed_ * dial_direction_);
       left_flywheel_motor_->SetOutput(left_pid_->ComputeConstrainedOutput(left_diff));
       right_flywheel_motor_->SetOutput(right_pid_->ComputeConstrainedOutput(right_diff));
-      load_servo_->CalcOutput();
+      if (violent_shooting_) {
+        
+      } else {
+        load_servo_->CalcOutput();
+      }
       break;
   }
 }
