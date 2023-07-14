@@ -93,6 +93,8 @@ class Shooter {
 
   void DialStop();
 
+  void SetViolentShoot(bool status);
+
  private:
   // acquired from user
   MotorBase* left_flywheel_motor_;
@@ -103,6 +105,7 @@ class Shooter {
 
   PIDController* left_pid_;  /* pid for left flywheel  */
   PIDController* right_pid_; /* pid for right flywheel */
+  ConstrainedPID* load_moter_pid_;
 
   BoolEdgeDetector* flywheel_turning_detector_; /* flywheel turning state detector */
   float load_step_angle_;                       /* angle rotated for every bullet loaded */
@@ -114,6 +117,7 @@ class Shooter {
   float dial_double_acceleration;               /* acceleration for double shooting mode */
   int dial_direction_;
   bool violent_shooting_;
+  float violent_shooting_speed_;
 };
 
 }  // namespace control

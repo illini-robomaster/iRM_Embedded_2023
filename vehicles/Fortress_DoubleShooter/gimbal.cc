@@ -447,11 +447,13 @@ void shooterTask(void* arg) {
             left_shooter->DoubleShoot();
           }
         } else if (dbus->mouse.r) {
-          left_shooter->FastContinueShoot();
+          // left_shooter->FastContinueShoot();
+          left_shooter->SetViolentShoot(true);
         } else {
           left_shooter->DialStop();
           start_time_left = bsp::GetHighresTickMicroSec();
           slow_shoot_detect_left = false;
+          left_shooter->SetViolentShoot(false);
         }
       }
       // right shooter(dial part)
@@ -464,11 +466,13 @@ void shooterTask(void* arg) {
             right_shooter->DoubleShoot();
           }
         } else if (dbus->mouse.r) {
-          right_shooter->FastContinueShoot();
+          right_shooter->SetViolentShoot(true);
+          // right_shooter->FastContinueShoot();
         } else {
           right_shooter->DialStop();
           start_time_right = bsp::GetHighresTickMicroSec();
           slow_shoot_detect_right = false;
+          right_shooter->SetViolentShoot(false);
         }
       }
     }
