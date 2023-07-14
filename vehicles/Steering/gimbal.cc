@@ -194,6 +194,7 @@ void gimbalTask(void* arg) {
   print("Start Calibration.\r\n");
   RGB->Display(display::color_yellow);
   laser->Off();
+  gimbal->RecordIMUStatus(imu->CaliDone());
   gimbal->TargetAbsWOffset(0, 0);
   gimbal->Update();
   control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
@@ -207,6 +208,8 @@ void gimbalTask(void* arg) {
     pitch_motor->TransmitOutput(pitch_motor);
     osDelay(GIMBAL_TASK_DELAY);
   }
+
+  gimbal->RecordIMUStatus(imu->CaliDone() && imu->DataReady());
 
   print("Gimbal Begin!\r\n");
   RGB->Display(display::color_green);

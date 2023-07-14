@@ -136,6 +136,18 @@ class Gimbal {
    */
   float ComputeYawRel(float new_yaw, float yaw_ref);
 
+  /**
+   * @brief Record IMU status(Calibrated or not)
+   */
+  void RecordIMUStatus(bool status);
+
+  /**
+   * @brief Get IMU status(Calibrated or not)
+   * 
+   * @return bool 
+   */
+  bool GetIMUStatus();
+
  private:
   // acquired from user
   Motor4310* pitch_motor_4310_ = nullptr;
@@ -157,6 +169,7 @@ class Gimbal {
   ConstrainedPID* pitch_omega_pid_ = nullptr; /* pitch omega pid */
   ConstrainedPID* yaw_theta_pid_ = nullptr;   /* yaw theta pid   */
   ConstrainedPID* yaw_omega_pid_ = nullptr;   /* yaw omega pid   */
+  bool imu_calibrated_ = false;  /* if the IMU calibrated, we just need the speed pid control */
 
   // pitch and yaw angle
   float pitch_angle_; /* current TARGET gimbal pitch angle */

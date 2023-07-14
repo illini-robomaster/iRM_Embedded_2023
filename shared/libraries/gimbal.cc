@@ -42,6 +42,7 @@ Gimbal::Gimbal(gimbal_t gimbal)
         pitch_omega_pid_param_ = new float[3]{2900, 60, 0};
         yaw_theta_pid_param_ = new float[3]{26, 0, 0.3};
         yaw_omega_pid_param_ = new float[3]{3600, 20, 0};
+        imu_calibrated_ = false;
       }
       break;
     case GIMBAL_SENTRY:
@@ -63,6 +64,7 @@ Gimbal::Gimbal(gimbal_t gimbal)
         pitch_omega_pid_param_ = new float[3]{2000, 15, 5};
         yaw_theta_pid_param_ = new float[3]{18, 0, 5};
         yaw_omega_pid_param_ = new float[3]{2100, 10, 10};
+        imu_calibrated_ = false;
       }
       break;
     case GIMBAL_STEERING:
@@ -83,6 +85,7 @@ Gimbal::Gimbal(gimbal_t gimbal)
         pitch_omega_pid_param_ = new float[3]{2900, 60, 0};
         yaw_theta_pid_param_ = new float[3]{30, 0, 0.3};
         yaw_omega_pid_param_ = new float[3]{3600, 20, 0};
+        imu_calibrated_ = false;
       }
       break;
     case GIMBAL_STEERING_4310:
@@ -101,6 +104,7 @@ Gimbal::Gimbal(gimbal_t gimbal)
             new ConstrainedPID(yaw_theta_pid_param_, yaw_theta_max_iout, yaw_theta_max_out);
         yaw_omega_pid_ =
             new ConstrainedPID(yaw_omega_pid_param_, yaw_omega_max_iout, yaw_omega_max_out);
+        imu_calibrated_ = false;
       }
       break;
     default:
@@ -174,15 +178,29 @@ Gimbal::~Gimbal() {
 
 gimbal_data_t* Gimbal::GetData() { return &data_; }
 
+void Gimbal::RecordIMUStatus(bool status) {
+  imu_calibrated_ = status;
+}
+
+bool Gimbal::GetIMUStatus() {
+  return imu_calibrated_;
+}
+
 void Gimbal::Update() {
   switch (model_) {
     case GIMBAL_STEERING_4310: {
-      float yt_diff = yaw_motor_->GetThetaDelta(yaw_angle_);
-      float yt_out = yaw_theta_pid_->ComputeOutput(yt_diff);
-      float yt_in = yaw_motor_->GetOmegaDelta(yt_out);
-      float yo_out = yaw_omega_pid_->ComputeConstrainedOutput(yt_in);
-
-      yaw_motor_->SetOutput(yo_out);
+      if (imu_calibrated_) {
+        // just use speed pid control
+        float yt_in = yaw_motor_->GetOmegaDelta(yaw_angle_);
+        float yo_out = yaw_omega_pid_->ComputeConstrainedOutput(yt_in);
+        yaw_motor_->SetOutput(yo_out);
+      } else {
+        float yt_diff = yaw_motor_->GetThetaDelta(yaw_angle_);
+        float yt_out = yaw_theta_pid_->ComputeOutput(yt_diff);
+        float yt_in = yaw_motor_->GetOmegaDelta(yt_out);
+        float yo_out = yaw_omega_pid_->ComputeConstrainedOutput(yt_in);
+        yaw_motor_->SetOutput(yo_out);
+      }
       break;
     }
     default:
@@ -190,14 +208,20 @@ void Gimbal::Update() {
       float pt_out = pitch_theta_pid_->ComputeOutput(pt_diff);
       float po_in = pitch_motor_->GetOmegaDelta(pt_out);
       float po_out = pitch_omega_pid_->ComputeConstrainedOutput(po_in);
-
-      float yt_diff = yaw_motor_->GetThetaDelta(yaw_angle_);
-      float yt_out = yaw_theta_pid_->ComputeOutput(yt_diff);
-      float yt_in = yaw_motor_->GetOmegaDelta(yt_out);
-      float yo_out = yaw_omega_pid_->ComputeConstrainedOutput(yt_in);
-
       pitch_motor_->SetOutput(po_out);
-      yaw_motor_->SetOutput(yo_out);
+
+      if (imu_calibrated_) {
+        // just use speed pid control
+        float yt_in = yaw_motor_->GetOmegaDelta(yaw_angle_);
+        float yo_out = yaw_omega_pid_->ComputeConstrainedOutput(yt_in);
+        yaw_motor_->SetOutput(yo_out);
+      } else {
+        float yt_diff = yaw_motor_->GetThetaDelta(yaw_angle_);
+        float yt_out = yaw_theta_pid_->ComputeOutput(yt_diff);
+        float yt_in = yaw_motor_->GetOmegaDelta(yt_out);
+        float yo_out = yaw_omega_pid_->ComputeConstrainedOutput(yt_in);
+        yaw_motor_->SetOutput(yo_out);
+      }
   }
 }
 
