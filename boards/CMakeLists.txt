@@ -30,6 +30,4 @@ target_link_options(board_interface INTERFACE
 target_link_libraries(board_interface INTERFACE c m)
 
 # board specific interfaces
-add_subdirectory(DJI_Board_TypeA)
-add_subdirectory(DJI_Board_TypeC)
 add_subdirectory(F103C8)

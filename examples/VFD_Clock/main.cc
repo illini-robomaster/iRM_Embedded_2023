@@ -27,9 +27,7 @@
 #include "utils.h"
 
 #include "bsp_gpio.h"
-#include "bsp_uart.h"
 #include "DS3231.h"
-#include "ESP8266.h"
 
 static void delay_us(uint32_t us) {
   uint32_t start = bsp::GetHighresTickMicroSec();
@@ -611,9 +609,6 @@ static display::VFD* vfd = nullptr;
 
 static time::DS3231* clock = nullptr;
 
-static bsp::UART* uart = nullptr;
-static wifi::ESP8266* ESP8266 = nullptr;
-
 static BoolEdgeDetector left(false);
 static BoolEdgeDetector button(false);
 static BoolEdgeDetector right(false);
@@ -773,62 +768,6 @@ void updateTimeTask(void* arg) {
     osDelay(10);
   }
 }
-
-//const osThreadAttr_t WiFiTaskAttribute = {.name = "WiFiTask",
-//                                          .attr_bits = osThreadDetached,
-//                                          .cb_mem = nullptr,
-//                                          .cb_size = 0,
-//                                          .stack_mem = nullptr,
-//                                          .stack_size = 128 * 4,
-//                                          .priority = (osPriority_t)osPriorityNormal,
-//                                          .tz_module = 0,
-//                                          .reserved = 0};
-//osThreadId_t WiFiTaskHandle;
-//
-//void WiFiTask(void* arg) {
-//  UNUSED(arg);
-//
-//  led->High();
-//
-//  ESP8266->IsReady();
-//  osDelay(20);
-//
-//  while (!ESP8266->OK()) {
-//    ESP8266->IsReady();
-//    osDelay(20);
-//  }
-//
-//  ESP8266->SetMode();
-//  osDelay(20);
-//
-//  while (!ESP8266->OK())
-//    osDelay(20);
-//
-//  ESP8266->Reset();
-//  osDelay(20);
-//
-//  while (!ESP8266->OK())
-//    osDelay(20);
-//
-//  ESP8266->ConnectWiFi();
-//  osDelay(1000);
-//
-//  while (!ESP8266->OK())
-//    osDelay(20);
-//
-//  ESP8266->SetConnectionType();
-//  osDelay(300);
-//
-//  while (!ESP8266->OK())
-//    osDelay(20);
-//
-//  led->Low();
-//
-//  while (true) {
-//    ESP8266->IsReady();
-//    osDelay(1000);
-//  }
-//}
 
 const osThreadAttr_t displayTaskAttribute = {.name = "displayTask",
                                              .attr_bits = osThreadDetached,
@@ -1325,18 +1264,12 @@ void RM_RTOS_Init(void) {
 
   clock = new time::DS3231(&hi2c2);
 
-  uart = new bsp::UART(&huart1);
-  uart->SetupRx(300);
-  uart->SetupTx(300);
-  ESP8266 = new wifi::ESP8266(uart);
-
   VFD_Clock_Mode = START;
 }
 
 void RM_RTOS_Threads_Init(void) {
   switchTaskHandle = osThreadNew(switchTask, nullptr, &switchTaskAttribute);
   updateTimeTaskHandle = osThreadNew(updateTimeTask, nullptr, &updateTimeTaskAttribute);
-//  WiFiTaskHandle = osThreadNew(WiFiTask, nullptr, &WiFiTaskAttribute);
   displayTaskHandle = osThreadNew(displayTask, nullptr, &displayTaskAttribute);
 }
 
