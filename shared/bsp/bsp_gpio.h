@@ -30,7 +30,6 @@
  *    L1 and M1 on board A is PULLUP mode
  */
 
-#include "bsp_error_handler.h"
 #include "main.h"
 
 #define NUM_GPITS 16
