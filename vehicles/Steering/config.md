@@ -11,7 +11,6 @@
 | can_bridge    | 2   | 0x20A  | 0x20B  |
 
 ### Chassis Type C Board
-
 |               | CAN | TX ID  | RX ID  |
 | ------------- | --- | ------ | ------ |
 | motor1        | 1   | 0x200  | 0x201  |
@@ -25,7 +24,6 @@
 | can_bridge    | 2   | 0x20B  | 0x20A  |
 
 ## Key Definition
-
 |          | Function         |
 | -------- | ---------------- |
 | WASD     | Directions       |
