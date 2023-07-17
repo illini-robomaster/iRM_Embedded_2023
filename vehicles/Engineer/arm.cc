@@ -34,6 +34,7 @@
 
 // Motor enable list
 #define BASE_TRANSLATE_MOTOR_ENABLE
+#define FOREARM_ROTATE_MOTOR_ENABLE
 
 constexpr float RUN_SPEED = (2 * PI);
 constexpr float ALIGN_SPEED = (0.5 * PI);
@@ -45,6 +46,12 @@ bsp::CAN* can1 = nullptr;
 static int base_translate_motor_enable = 1;
 #else
 static int base_translate_motor_enable = 0;
+#endif
+
+#ifdef FOREARM_ROTATE_MOTOR_ENABLE
+static int forearm_rotate_motor_enable = 1;
+#else
+static int forearm_rotate_motor_enable = 0;
 #endif
 
 // base translate motor params
@@ -61,6 +68,11 @@ BoolEdgeDetector key_detector(false);
 bool base_translate_align_detect() {
   return base_translate_pe_sensor->Read() == 1;
 }
+#endif
+
+#ifdef FOREARM_ROTATE_MOTOR_ENABLE
+constexpr float M4310_VEL = 4.0; // magic number, see m4310_mit example
+static control::Motor4310* forearm_rotate_motor = nullptr;
 #endif
 
 void RM_RTOS_Init() {
@@ -93,16 +105,29 @@ void RM_RTOS_Init() {
   // TODO measure the calibrate offset for base translate motor
   steering_data.calibrate_offset = 0;
   #endif
+
+  #ifdef FOREARM_ROTATE_MOTOR_ENABLE
+  static const int RX_ID = 0x02;
+  static const int TX_ID = 0x01;
+
+  /* rx_id = Master id
+   * tx_id = CAN id
+   * see example/m4310_mit.cc
+   */
+  forearm_rotate_motor = new control::Motor4310(can1, RX_ID, TX_ID, control::MIT);
+  #endif
+
 }
 
 void RM_RTOS_Default_Task(const void* args) {
   UNUSED(args);
+
+  // 4310 doesn't follow this control pipeline
   control::MotorCANBase* motors[] = {
     #ifdef BASE_TRANSLATE_MOTOR_ENABLE
     motor1,
     #endif
   };
-
   int motor_num = base_translate_motor_enable;
 
   // Press Key to start aligning. Else sudden current change when power is switched on might break
@@ -116,7 +141,11 @@ void RM_RTOS_Default_Task(const void* args) {
     print("base translate motor enabled\n");
   }
 
-  print("total motor num = %d\n", motor_num); 
+  if (forearm_rotate_motor_enable) {
+    print("forearm rotate motor enabled\n");
+  }
+
+  print("total motor num = %d\n", motor_num + forearm_rotate_motor_enable);
 
   // base translate motor calibrate
   #ifdef BASE_TRANSLATE_MOTOR_ENABLE
@@ -136,6 +165,13 @@ void RM_RTOS_Default_Task(const void* args) {
   print("base translate motor alignment complete\n");
   #endif
 
+  // forearm rotate motor calibrate
+  #ifdef FOREARM_ROTATE_MOTOR_ENABLE
+  // TODO: config zero pos with 4310 config assist
+  forearm_rotate_motor->SetZeroPos(forearm_rotate_motor);
+  forearm_rotate_motor->MotorEnable(forearm_rotate_motor);
+  #endif
+
   if (motor_num >= 1) {
     control::MotorCANBase::TransmitOutput(motors, motor_num);
   }
@@ -153,17 +189,28 @@ void RM_RTOS_Default_Task(const void* args) {
         base_translate_motor->TurnRelative(PI / 4);
         #endif
 
+        #ifdef FOREARM_ROTATE_MOTOR_ENABLE
+        forearm_rotate_motor->SetOutput(PI / 4, M4310_VEL, 30, 0.5, 0);
+        #endif
+
       } else {
         #ifdef BASE_TRANSLATE_MOTOR_ENABLE
         base_translate_motor->ReAlign();
         #endif
 
+        #ifdef FOREARM_ROTATE_MOTOR_ENABLE
+        forearm_rotate_motor->SetOutput(0, M4310_VEL, 30, 0.5, 0);
+        #endif
      }
       dir *= -1;
     }
 
     #ifdef BASE_TRANSLATE_MOTOR_ENABLE
     base_translate_motor->CalcOutput();
+    #endif
+
+    #ifdef FOREARM_ROTATE_MOTOR_ENABLE
+    forearm_rotate_motor->TransmitOutput(forearm_rotate_motor);
     #endif
 
     control::MotorCANBase::TransmitOutput(motors, motor_num);
