@@ -23,6 +23,16 @@
 | motor8        | 2   | 0x1ff  | 0x208  |
 | can_bridge    | 2   | 0x20B  | 0x20A  |
 
+## RC Switch Definition
+|                             | Function           |
+| ----------------------------| ------------------ |
+| swl-down                    | Toggle Kill        |
+| swl-up                      | Toggle spin mode   |
+| swr-down (pre-calibration)  | Calibrate          |
+| swr-down (post-calibration) | Do nothing         |
+| swr-mid                     | Turn on flywheels  |
+| swr-up                      | Turn on load motor |
+
 ## Key Definition
 |          | Function         |
 | -------- | ---------------- |
