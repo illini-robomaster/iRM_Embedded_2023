@@ -26,15 +26,19 @@
 #include "dbus.h"
 #include "main.h"
 #include "motor.h"
+#include "unitree_motor.h"
 #include "utils.h"
 
 #define KEY_GPIO_GROUP GPIOA
 #define KEY_GPIO_PIN GPIO_PIN_0
 
+#define RX_SIGNAL (1 << 0)
 
 // Motor enable list
-#define BASE_TRANSLATE_MOTOR_ENABLE
-#define FOREARM_ROTATE_MOTOR_ENABLE
+// TODO enable motors to test them
+//#define BASE_TRANSLATE_MOTOR_ENABLE
+//#define FOREARM_ROTATE_MOTOR_ENABLE
+//#define ELBOW_ROTATE_MOTOR_ENABLE
 
 constexpr float RUN_SPEED = (2 * PI);
 constexpr float ALIGN_SPEED = (0.5 * PI);
@@ -54,16 +58,25 @@ static int forearm_rotate_motor_enable = 1;
 static int forearm_rotate_motor_enable = 0;
 #endif
 
-// base translate motor params
+
+#ifdef ELBOW_ROTATE_MOTOR_ENABLE
+static int elbow_rotate_motor_enable = 1;
+#else
+static int elbow_rotate_motor_enable = 0;
+#endif
+
+bsp::GPIO* key = nullptr;
+BoolEdgeDetector key_detector(false);
+
+/**
+ * define params for each motor
+**/
 #ifdef BASE_TRANSLATE_MOTOR_ENABLE
 
 control::MotorCANBase* motor1 = nullptr;
 control::SteeringMotor* base_translate_motor = nullptr;
 
-bsp::GPIO* key = nullptr;
 bsp::GPIO* base_translate_pe_sensor = nullptr;
-
-BoolEdgeDetector key_detector(false);
 
 bool base_translate_align_detect() {
   return base_translate_pe_sensor->Read() == 1;
@@ -74,6 +87,25 @@ bool base_translate_align_detect() {
 constexpr float M4310_VEL = 4.0; // magic number, see m4310_mit example
 static control::Motor4310* forearm_rotate_motor = nullptr;
 #endif
+
+#ifdef ELBOW_ROTATE_MOTOR_ENABLE
+// TODO this part is unstable
+extern osThreadId_t defaultTaskHandle;
+class CustomUART : public bsp::UART {
+ public:
+  using bsp::UART::UART;
+ protected:
+  /* notify application when rx data is pending read */
+  void RxCompleteCallback() override final { osThreadFlagsSet(defaultTaskHandle, RX_SIGNAL); }
+};
+constexpr int ELBOW_MOTOR_ID = 0;
+static control::UnitreeMotor* elbow_rotate_motor = nullptr;
+static CustomUART* elbow_rotate_motor_uart = nullptr;
+#endif
+
+/**
+ * define params ends
+**/
 
 void RM_RTOS_Init() {
   print_use_uart(&huart1);
@@ -117,6 +149,14 @@ void RM_RTOS_Init() {
   forearm_rotate_motor = new control::Motor4310(can1, RX_ID, TX_ID, control::MIT);
   #endif
 
+
+  #ifdef ELBOW_ROTATE_MOTOR_ENABLE
+  elbow_rotate_motor_uart = new CustomUART(&huart6);
+  elbow_rotate_motor_uart->SetupRx(300);
+  elbow_rotate_motor_uart->SetupTx(300);
+  elbow_rotate_motor = new control::UnitreeMotor();
+  #endif
+
 }
 
 void RM_RTOS_Default_Task(const void* args) {
@@ -145,7 +185,13 @@ void RM_RTOS_Default_Task(const void* args) {
     print("forearm rotate motor enabled\n");
   }
 
-  print("total motor num = %d\n", motor_num + forearm_rotate_motor_enable);
+  if (elbow_rotate_motor_enable) {
+    print("elbow rotate motor enabled\n");
+  }
+
+  print("total motor num = %d\n", motor_num
+    + forearm_rotate_motor_enable
+    + elbow_rotate_motor_enable);
 
   // base translate motor calibrate
   #ifdef BASE_TRANSLATE_MOTOR_ENABLE
@@ -172,6 +218,13 @@ void RM_RTOS_Default_Task(const void* args) {
   forearm_rotate_motor->MotorEnable(forearm_rotate_motor);
   #endif
 
+
+  #ifdef ELBOW_ROTATE_MOTOR_ENABLE
+  elbow_rotate_motor->Stop(0);
+  elbow_rotate_motor_uart->Write((uint8_t*)(&(elbow_rotate_motor->send.data)),
+                                elbow_rotate_motor->send_length);
+  #endif
+
   if (motor_num >= 1) {
     control::MotorCANBase::TransmitOutput(motors, motor_num);
   }
@@ -193,6 +246,19 @@ void RM_RTOS_Default_Task(const void* args) {
         forearm_rotate_motor->SetOutput(PI / 4, M4310_VEL, 30, 0.5, 0);
         #endif
 
+
+        #ifdef ELBOW_ROTATE_MOTOR_ENABLE
+        // motor_id motor ID
+        // torque expect torque
+        // speed expect speed
+        // position expect position
+        // Kp Kp parameter for the PD controller
+        // Kd Kd parameter for the PD controller
+        elbow_rotate_motor->Control(ELBOW_MOTOR_ID, 0.0, 0.0, PI/4, 0.0, 3.0);
+        elbow_rotate_motor_uart->Write((uint8_t*)(&(elbow_rotate_motor->send.data)),
+                                      elbow_rotate_motor->send_length);
+        #endif
+
       } else {
         #ifdef BASE_TRANSLATE_MOTOR_ENABLE
         base_translate_motor->ReAlign();
@@ -200,6 +266,12 @@ void RM_RTOS_Default_Task(const void* args) {
 
         #ifdef FOREARM_ROTATE_MOTOR_ENABLE
         forearm_rotate_motor->SetOutput(0, M4310_VEL, 30, 0.5, 0);
+        #endif
+
+        #ifdef ELBOW_ROTATE_MOTOR_ENABLE
+        elbow_rotate_motor->Control(ELBOW_MOTOR_ID, 0.0, 0.0, 0.0, 0.0, 3.0);
+        elbow_rotate_motor_uart->Write((uint8_t*)(&(elbow_rotate_motor->send.data)),
+                                      elbow_rotate_motor->send_length);
         #endif
      }
       dir *= -1;
