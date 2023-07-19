@@ -47,6 +47,9 @@ void RM_RTOS_Init() {
 void RM_RTOS_Default_Task(const void* args) {
   /* press reset if no response */
   UNUSED(args);
+
+  control::Motor4310* motors[] = {motor};
+
   while(dbus->swr != remote::DOWN){}  // flip swr to start
 
   /* Use SetZeroPos if you want to set current motor position as zero position. If uncommented, the
@@ -66,7 +69,7 @@ void RM_RTOS_Default_Task(const void* args) {
     print("Vel Set: %f  Pos Set: %f\n", vel, pos);
 
     motor->SetOutput(pos, vel);
-    motor->TransmitOutput(motor);
+    control::Motor4310::TransmitOutput(motors, 1);
     osDelay(10);
   }
 }
