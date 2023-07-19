@@ -703,7 +703,7 @@ class Motor4310 {
    *                1: position-velocity
    *                2: velocity
    */
-  void TransmitOutput(control::Motor4310* motor);
+  static void TransmitOutput(control::Motor4310* motors[], uint8_t num_motors);
 
   /* implements data printout */
   void PrintData();
@@ -770,6 +770,8 @@ class Motor4310 {
    * @return motor torque
    */
   float GetTorque() const;
+
+  mode_t GetMode() const;
 
   volatile bool connection_flag_ = false;
 
