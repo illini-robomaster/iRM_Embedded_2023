@@ -185,10 +185,10 @@ void chassisTask(void* arg) {
   control::MotorCANBase* steer_motors[] = {motor1, motor2, motor3, motor4};
   control::MotorCANBase* wheel_motors[] = {motor5, motor6, motor7, motor8};
 
-  control::PIDController pid5(120, 15, 0);
-  control::PIDController pid6(120, 15, 0);
-  control::PIDController pid7(120, 15, 0);
-  control::PIDController pid8(120, 15, 0);
+  // control::PIDController pid5(120, 15, 0);
+  // control::PIDController pid6(120, 15, 0);
+  // control::PIDController pid7(120, 15, 0);
+  // control::PIDController pid8(120, 15, 0);
 
   while (!receive->start) osDelay(100);
 
@@ -205,6 +205,8 @@ void chassisTask(void* arg) {
   }
   chassis->ReAlign();
   chassis->SteerCalcOutput();
+  control::MotorCANBase::TransmitOutput(steer_motors, 4);
+
   chassis->SteerSetMaxSpeed(RUN_SPEED);
   chassis->SteerThetaReset();
   chassis->SetWheelSpeed(0,0,0,0);
@@ -234,6 +236,8 @@ void chassisTask(void* arg) {
       }
       chassis->ReAlign();
       chassis->SteerCalcOutput();
+      control::MotorCANBase::TransmitOutput(steer_motors, 4);
+      
       chassis->SteerSetMaxSpeed(RUN_SPEED);
       chassis->SteerThetaReset();
       chassis->SetWheelSpeed(0,0,0,0);
@@ -384,7 +388,7 @@ void RM_RTOS_Init() {
   steering_motor_data.max_speed = RUN_SPEED;
   steering_motor_data.max_acceleration = ACCELERATION;
   steering_motor_data.transmission_ratio = 8;
-  steering_motor_data.omega_pid_param = new float[3]{140, 1.2, 0};
+  steering_motor_data.omega_pid_param = new float[3]{200, 7, 1};
   steering_motor_data.max_iout = 1000;
   steering_motor_data.max_out = 13000;
   steering_motor_data.calibrate_offset = 0;
