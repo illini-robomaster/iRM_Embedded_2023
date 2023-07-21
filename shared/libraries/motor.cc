@@ -755,5 +755,13 @@ float Motor4310::GetTorque() const {
   return torque_;
 }
 
+float Motor4310::GetRelativeTarget() const{
+  return relative_target_;
+}
+
+void Motor4310::SetRelativeTarget(float target) {
+  relative_target_ = target;
+}
+
 
 } /* namespace control */
