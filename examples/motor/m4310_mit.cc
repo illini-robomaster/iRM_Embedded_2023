@@ -52,8 +52,8 @@ void RM_RTOS_Default_Task(const void* args) {
 
   /* Use SetZeroPos if you want to set current motor position as zero position. If uncommented, the
    * zero position is the zero position set before */
-  motor->SetZeroPos(motor);
-  motor->MotorEnable(motor);
+  motor->SetZeroPos();
+  motor->MotorEnable();
 
   float pos = 0;
   float min_pos = -PI/8;

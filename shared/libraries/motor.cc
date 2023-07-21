@@ -616,7 +616,7 @@ Motor4310::Motor4310(bsp::CAN* can, uint16_t rx_id, uint16_t tx_id, mode_t mode)
   }
 }
 
-void Motor4310::MotorEnable(Motor4310* motor) {
+void Motor4310::MotorEnable() {
   uint8_t data[8] = {0};
   data[0] = 0xff;
   data[1] = 0xff;
@@ -626,10 +626,10 @@ void Motor4310::MotorEnable(Motor4310* motor) {
   data[5] = 0xff;
   data[6] = 0xff;
   data[7] = 0xfc;
-  motor->can_->Transmit(motor->tx_id_actual_, data, 8);
+  this->can_->Transmit(this->tx_id_actual_, data, 8);
 }
 
-void Motor4310::MotorDisable(control::Motor4310* motor) {
+void Motor4310::MotorDisable() {
   uint8_t data[8] = {0};
   data[0] = 0xff;
   data[1] = 0xff;
@@ -639,10 +639,10 @@ void Motor4310::MotorDisable(control::Motor4310* motor) {
   data[5] = 0xff;
   data[6] = 0xff;
   data[7] = 0xfd;
-  motor->can_->Transmit(motor->tx_id_actual_, data, 8);
+  this->can_->Transmit(this->tx_id_actual_, data, 8);
 }
 
-void Motor4310::SetZeroPos(control::Motor4310* motor) {
+void Motor4310::SetZeroPos() {
   uint8_t data[8] = {0};
   data[0] = 0xff;
   data[1] = 0xff;
@@ -652,7 +652,7 @@ void Motor4310::SetZeroPos(control::Motor4310* motor) {
   data[5] = 0xff;
   data[6] = 0xff;
   data[7] = 0xfe;
-  motor->can_->Transmit(motor->tx_id_actual_, data, 8);
+  this->can_->Transmit(this->tx_id_actual_, data, 8);
 }
 
 void Motor4310::SetOutput(float position, float velocity, float kp, float kd, float torque) {

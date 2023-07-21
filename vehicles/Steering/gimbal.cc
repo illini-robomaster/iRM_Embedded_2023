@@ -175,8 +175,8 @@ void gimbalTask(void* arg) {
     ++i;
   }
 
-  pitch_motor->SetZeroPos(pitch_motor);
-  pitch_motor->MotorEnable(pitch_motor);
+  pitch_motor->SetZeroPos();
+  pitch_motor->MotorEnable();
   osDelay(GIMBAL_TASK_DELAY);
 
   // 4310 soft start
@@ -732,7 +732,7 @@ void KillAll() {
       Dead = false;
       RGB->Display(display::color_green);
       laser->On();
-      pitch_motor->MotorEnable(pitch_motor);
+      pitch_motor->MotorEnable();
       break;
     }
 
@@ -746,7 +746,7 @@ void KillAll() {
     }
 
     pitch_reset = true;
-    pitch_motor->MotorDisable(pitch_motor);
+    pitch_motor->MotorDisable();
 
     yaw_motor->SetOutput(0);
     control::MotorCANBase::TransmitOutput(motors_can2_gimbal, 1);
