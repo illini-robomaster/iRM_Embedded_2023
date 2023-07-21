@@ -1,6 +1,6 @@
 /****************************************************************************
  *                                                                          *
- *  Copyright (C) 2022 RoboMaster.                                          *
+ *  Copyright (C) 2023 RoboMaster.                                          *
  *  Illini RoboMaster @ University of Illinois at Urbana-Champaign          *
  *                                                                          *
  *  This program is free software: you can redistribute it and/or modify    *
@@ -33,7 +33,7 @@ static control::MotorCANBase* motor = nullptr;
 void RM_RTOS_Init() {
   print_use_uart(&huart8);
 
-  can1 = new bsp::CAN(&hcan1, 0x201);
+  can1 = new bsp::CAN(&hcan1, true);
   motor = new control::Motor6623(can1, 0x209);
 }
 

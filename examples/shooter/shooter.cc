@@ -1,6 +1,6 @@
 /****************************************************************************
  *                                                                          *
- *  Copyright (C) 2022 RoboMaster.                                          *
+ *  Copyright (C) 2023 RoboMaster.                                          *
  *  Illini RoboMaster @ University of Illinois at Urbana-Champaign          *
  *                                                                          *
  *  This program is free software: you can redistribute it and/or modify    *
@@ -43,7 +43,7 @@ void RM_RTOS_Init() {
 
   dbus = new remote::DBUS(&huart1);
 
-  can = new bsp::CAN(&hcan1, 0x201);
+  can = new bsp::CAN(&hcan1, true);
   left_flywheel_motor = new control::Motor3508(can, 0x203);
   right_flywheel_motor = new control::Motor3508(can, 0x202);
   load_motor = new control::Motor3508(can, 0x201);

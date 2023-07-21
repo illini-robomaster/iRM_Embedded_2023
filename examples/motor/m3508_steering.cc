@@ -1,6 +1,6 @@
 /****************************************************************************
  *                                                                          *
- *  Copyright (C) 2022 RoboMaster.                                          *
+ *  Copyright (C) 2023 RoboMaster.                                          *
  *  Illini RoboMaster @ University of Illinois at Urbana-Champaign          *
  *                                                                          *
  *  This program is free software: you can redistribute it and/or modify    *
@@ -59,7 +59,7 @@ void RM_RTOS_Init() {
   print_use_uart(&huart8);
   bsp::SetHighresClockTimer(&htim5);
 
-  can1 = new bsp::CAN(&hcan1, 0x201, true);
+  can1 = new bsp::CAN(&hcan1, true);
   motor1 = new control::Motor3508(can1, 0x201);
   motor3 = new control::Motor3508(can1, 0x203);
 
