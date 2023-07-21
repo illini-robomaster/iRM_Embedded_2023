@@ -260,7 +260,6 @@ void chassisTask(void* arg) {
     }
 
     uint16_t supercap_voltage = supercap->info.voltage;
-//    float supercap_p = supercap -> info.chassis_power;
     float maximum_energy = 0.5 * pow(27.0,2) * 6.0;
 
     chassis->SetSpeed(vx / 10, vy / 10, wz);
@@ -272,9 +271,9 @@ void chassisTask(void* arg) {
 
     //consider using uart printing to check the power limit's value
     //log values out as files to obtain its trend
-    if(pow(supercap_voltage,2) * 6 / 2 <= maximum_energy) {
+    if(pow(supercap_voltage,2) * 6 / 2 <= maximum_energy / 2) {
     //edge case to prevent power limit from being negative
-      chassis->Update(wrap<float>(20 * supercap_voltage, 0, referee->game_robot_status.chassis_power_limit),
+      chassis->Update(wrap<float>(6 * supercap_voltage, 0, referee->game_robot_status.chassis_power_limit),
                       referee->power_heat_data.chassis_power,
                       (float)referee->power_heat_data.chassis_power_buffer);
     } else {
