@@ -178,26 +178,17 @@ void gimbalTask(void* arg) {
     osDelay(100);
   }
 
-  int i = 0;
-  while (i < 1000 || !imu->DataReady()) {
-    gimbal->TargetAbsWOffset(0, 0);
-    gimbal->Update();
-    control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
-    osDelay(GIMBAL_TASK_DELAY);
-    ++i;
-  }
-
   pitch_motor->MotorEnable(pitch_motor);
   osDelay(GIMBAL_TASK_DELAY);
 
   // 4310 soft start
-  float tmp_pos = 0;
-  for (int j = 0; j < SOFT_START_CONSTANT; j++){
+  pitch_motor->SetRelativeTarget(0);
+  for (int i = 0; i < SOFT_START_CONSTANT; i++){
     gimbal->TargetAbsWOffset(0, 0);
     gimbal->Update();
     control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
-    tmp_pos += START_PITCH_POS / SOFT_START_CONSTANT;  // increase position gradually
-    pitch_motor->SetOutput(tmp_pos, 1, 115, 0.5, 0);
+    pitch_motor->SetRelativeTarget(pitch_motor->GetRelativeTarget() + START_PITCH_POS / SOFT_START_CONSTANT);  // increase position gradually
+    pitch_motor->SetOutput(pitch_motor->GetRelativeTarget(), 1, 115, 0.5, 0);
     pitch_motor->TransmitOutput(pitch_motor);
     osDelay(GIMBAL_TASK_DELAY);
   }
@@ -214,7 +205,7 @@ void gimbalTask(void* arg) {
     gimbal->TargetAbsWOffset(0, 0);
     gimbal->Update();
     control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
-    pitch_motor->SetOutput(tmp_pos, 1, 115, 0.5, 0);
+    pitch_motor->SetOutput(pitch_motor->GetRelativeTarget(), 1, 115, 0.5, 0);
     pitch_motor->TransmitOutput(pitch_motor);
     osDelay(GIMBAL_TASK_DELAY);
   }
@@ -237,7 +228,7 @@ void gimbalTask(void* arg) {
     while (Dead || GimbalDead) osDelay(100);
 
     // autoaim comflict with spinmode control
-    if (dbus->keyboard.bit.F || dbus->swl == remote::UP || dbus->keyboard.bit.CTRL) {
+    if (dbus->keyboard.bit.F /*|| dbus->swl == remote::UP*/ || dbus->keyboard.bit.CTRL) {
       float abs_pitch_buffer = abs_pitch_jetson;
       float abs_yaw_buffer = abs_yaw_jetson;
 
@@ -272,14 +263,14 @@ void gimbalTask(void* arg) {
 
     if (pitch_reset) {
       // 4310 soft start
-      tmp_pos = 0;
+      pitch_motor->SetRelativeTarget(0);
       for (int j = 0; j < SOFT_START_CONSTANT; j++){
-        tmp_pos += START_PITCH_POS / SOFT_START_CONSTANT;  // increase position gradually
-        pitch_motor->SetOutput(tmp_pos, 1, 115, 0.5, 0);
+        pitch_motor->SetRelativeTarget(pitch_motor->GetRelativeTarget() + START_PITCH_POS / SOFT_START_CONSTANT);  // increase position gradually
+        pitch_motor->SetOutput(pitch_motor->GetRelativeTarget(), 1, 115, 0.5, 0);
         pitch_motor->TransmitOutput(pitch_motor);
         osDelay(GIMBAL_TASK_DELAY);
       }
-      pitch_pos = tmp_pos;
+      pitch_pos = pitch_motor->GetRelativeTarget();
       pitch_reset = false;
     }
 
@@ -863,10 +854,10 @@ void KillAll() {
     }
 
     // 4310 soft kill
-    float tmp_pos = pitch_pos;
+    pitch_motor->SetRelativeTarget(pitch_pos);
     for (int j = 0; j < SOFT_KILL_CONSTANT; j++){
-      tmp_pos -= START_PITCH_POS / SOFT_KILL_CONSTANT;  // decrease position gradually
-      pitch_motor->SetOutput(tmp_pos, 1, 115, 0.5, 0);
+      pitch_motor->SetRelativeTarget(pitch_motor->GetRelativeTarget() - START_PITCH_POS / SOFT_KILL_CONSTANT);  // increase position gradually
+      pitch_motor->SetOutput(pitch_motor->GetRelativeTarget(), 1, 115, 0.5, 0);
       pitch_motor->TransmitOutput(pitch_motor);
       osDelay(GIMBAL_TASK_DELAY);
     }
@@ -898,10 +889,10 @@ void KillGimbal() {
     }
 
     // 4310 soft kill
-    float tmp_pos = pitch_pos;
+    pitch_motor->SetRelativeTarget(pitch_pos);
     for (int j = 0; j < SOFT_KILL_CONSTANT; j++){
-      tmp_pos -= START_PITCH_POS / SOFT_KILL_CONSTANT;  // decrease position gradually
-      pitch_motor->SetOutput(tmp_pos, 1, 115, 0.5, 0);
+      pitch_motor->SetRelativeTarget(pitch_motor->GetRelativeTarget() - START_PITCH_POS / SOFT_KILL_CONSTANT);  // increase position gradually
+      pitch_motor->SetOutput(pitch_motor->GetRelativeTarget(), 1, 115, 0.5, 0);
       pitch_motor->TransmitOutput(pitch_motor);
       osDelay(GIMBAL_TASK_DELAY);
     }

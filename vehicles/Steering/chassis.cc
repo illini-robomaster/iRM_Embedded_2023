@@ -185,11 +185,6 @@ void chassisTask(void* arg) {
   control::MotorCANBase* steer_motors[] = {motor1, motor2, motor3, motor4};
   control::MotorCANBase* wheel_motors[] = {motor5, motor6, motor7, motor8};
 
-  // control::PIDController pid5(120, 15, 0);
-  // control::PIDController pid6(120, 15, 0);
-  // control::PIDController pid7(120, 15, 0);
-  // control::PIDController pid8(120, 15, 0);
-
   while (!receive->start) osDelay(100);
 
   while (receive->start < 0.5) osDelay(100);
