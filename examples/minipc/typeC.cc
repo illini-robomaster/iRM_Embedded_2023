@@ -65,8 +65,11 @@ void RM_RTOS_Default_Task(const void* argument) {
   while (true) {
     /* wait until rx data is available */
     led->Display(0xFF0000FF);
-    uint32_t flags = osThreadFlagsWait(RX_SIGNAL, osFlagsWaitAll, osWaitForever);
-    if (flags & RX_SIGNAL) {  // unnecessary check
+
+    // An alternative is to use osThreadFlagsWait.
+    // However, we want to experiment with periodic sending
+    uint32_t flags = osThreadFlagsGet();
+    if (flags & RX_SIGNAL) {
       /* time the non-blocking rx / tx calls (should be <= 1 osTick) */
 
       // max length of the UART buffer at 150Hz is ~50 bytes
@@ -92,14 +95,15 @@ void RM_RTOS_Default_Task(const void* argument) {
           } else {
             my_color = 0; // red
           }
-          miniPCreceiver.Send(&packet_to_send, my_color);
+          miniPCreceiver.Send(&packet_to_send, my_color, 0.5, 0.42, 0);
           uart->Write((uint8_t*)&packet_to_send, sizeof(communication::STMToJetsonData));
-          osDelay(1);
+          // NOTE: THIS BREAKS WHEN WORKING AT 1000HZ!
+          osDelay(2);
         }
       }
       // blue when nothing is received
       led->Display(0xFF0000FF);
     }
-    osDelay(1);
+    osDelay(2);
   }
 }
