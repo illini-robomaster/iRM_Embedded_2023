@@ -177,13 +177,23 @@ void gimbalTask(void* arg) {
     if (dbus->keyboard.bit.B || dbus->swr == remote::DOWN) break;
     osDelay(100);
   }
+  
+  // to avoid the zero drifting problem
+  int i = 0;
+  while (i < 1000 || !imu->DataReady()) {
+    gimbal->TargetAbsWOffset(0, 0);
+    gimbal->Update();
+    control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
+    osDelay(GIMBAL_TASK_DELAY);
+    ++i;
+  }
 
   pitch_motor->MotorEnable(pitch_motor);
   osDelay(GIMBAL_TASK_DELAY);
 
   // 4310 soft start
   pitch_motor->SetRelativeTarget(0);
-  for (int i = 0; i < SOFT_START_CONSTANT; i++){
+  for (int j = 0; j < SOFT_START_CONSTANT; j++){
     gimbal->TargetAbsWOffset(0, 0);
     gimbal->Update();
     control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
