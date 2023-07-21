@@ -245,8 +245,9 @@ void gimbalTask(void* arg) {
       // clear after read
       abs_pitch_jetson = START_PITCH_POS;
       abs_yaw_jetson = 0;
-
+      // wait for the data send by the autoaim thread.
       if (abs_pitch_buffer != START_PITCH_POS || abs_yaw_buffer != 0) {
+        // avoid 4310 motor response too strong and fast(temp solution)
         if ((int)HAL_GetTick() - (int)last_execution_timestamp >= (int)AUTOAIM_INTERVAL) {
           yaw_target = abs_yaw_buffer;
 
