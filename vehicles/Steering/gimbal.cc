@@ -501,7 +501,7 @@ void shooterTask(void* arg) {
     } else {
       if (send->shooter_power && send->cooling_heat1 < send->cooling_limit1 - 20) {
         // for manual antijam 
-        Antijam.input(dbus->keyboard.bit.G);
+        Antijam.input(dbus->keyboard.bit.G || dbus->swl == remote::UP);
 
         if (dbus->mouse.l || dbus->swr == remote::UP) {
           if ((bsp::GetHighresTickMicroSec() - start_time) / 1000 > SHOOTER_MODE_DELAY) {
@@ -579,7 +579,7 @@ void chassisTask(void* arg) {
   float vx_set, vy_set;
 
   while (true) {
-    ChangeSpinMode.input(dbus->keyboard.bit.SHIFT || dbus->swl == remote::UP);
+    ChangeSpinMode.input(dbus->keyboard.bit.SHIFT /*|| dbus->swl == remote::UP*/);
     if (ChangeSpinMode.posEdge()) SpinMode = !SpinMode;
 
     send->cmd.id = bsp::MODE;
@@ -762,7 +762,7 @@ void selfTestTask(void* arg) {
 }
 
 void RM_RTOS_Init(void) {
-  // print_use_uart(&huart1);
+  print_use_uart(&huart1);
   bsp::SetHighresClockTimer(&htim5);
 
   can1 = new bsp::CAN(&hcan1, 0x201, true);
@@ -837,7 +837,7 @@ void RM_RTOS_Threads_Init(void) {
   shooterTaskHandle = osThreadNew(shooterTask, nullptr, &shooterTaskAttribute);
   chassisTaskHandle = osThreadNew(chassisTask, nullptr, &chassisTaskAttribute);
   selfTestTaskHandle = osThreadNew(selfTestTask, nullptr, &selfTestTaskAttribute);
-  jetsonCommTaskHandle = osThreadNew(jetsonCommTask, nullptr, &jetsonCommTaskAttribute);
+  // jetsonCommTaskHandle = osThreadNew(jetsonCommTask, nullptr, &jetsonCommTaskAttribute);
 }
 
 void KillAll() {

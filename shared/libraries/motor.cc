@@ -388,6 +388,7 @@ void ServoMotor::CalcOutput() {
     // detect if motor is jammed
     // detect total is used as filter.
     if (detect_total_ >= jam_threshold_) {
+      omega_pid_.Reset();
       servo_jam_t data;
       data.speed = max_speed_;
       // this function is in shooter.cc called jam_callback.
