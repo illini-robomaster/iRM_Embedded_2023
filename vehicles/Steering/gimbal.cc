@@ -156,6 +156,7 @@ void gimbalTask(void* arg) {
   UNUSED(arg);
 
   control::MotorCANBase* motors_can1_gimbal[] = {yaw_motor};
+  control::Motor4310* motors_can1_pitch[] = {pitch_motor};
 
   print("Wait for beginning signal...\r\n");
   RGB->Display(display::color_red);
@@ -187,7 +188,7 @@ void gimbalTask(void* arg) {
     control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
     tmp_pos += START_PITCH_POS / SOFT_START_CONSTANT;  // increase position gradually
     pitch_motor->SetOutput(tmp_pos, 1, 115, 0.5, 0);
-    pitch_motor->TransmitOutput(pitch_motor);
+    control::Motor4310::TransmitOutput(motors_can1_pitch, 1);
     osDelay(GIMBAL_TASK_DELAY);
   }
 
@@ -204,7 +205,7 @@ void gimbalTask(void* arg) {
     gimbal->Update();
     control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
     pitch_motor->SetOutput(tmp_pos, 1, 115, 0.5, 0);
-    pitch_motor->TransmitOutput(pitch_motor);
+    control::Motor4310::TransmitOutput(motors_can1_pitch, 1);
     osDelay(GIMBAL_TASK_DELAY);
   }
 
@@ -251,7 +252,7 @@ void gimbalTask(void* arg) {
       for (int j = 0; j < SOFT_START_CONSTANT; j++){
         tmp_pos += START_PITCH_POS / SOFT_START_CONSTANT;  // increase position gradually
         pitch_motor->SetOutput(tmp_pos, 1, 115, 0.5, 0);
-        pitch_motor->TransmitOutput(pitch_motor);
+        control::Motor4310::TransmitOutput(motors_can1_pitch, 1);
         osDelay(GIMBAL_TASK_DELAY);
       }
       pitch_pos = tmp_pos;
@@ -263,7 +264,7 @@ void gimbalTask(void* arg) {
 
     pitch_motor->SetOutput(pitch_pos, pitch_vel, 115, 0.5, 0);
     control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
-    pitch_motor->TransmitOutput(pitch_motor);
+    control::Motor4310::TransmitOutput(motors_can1_pitch, 1);
     osDelay(GIMBAL_TASK_DELAY);
   }
 }
@@ -717,6 +718,7 @@ void KillAll() {
 
   control::MotorCANBase* motors_can2_gimbal[] = {yaw_motor};
   control::MotorCANBase* motors_can1_shooter[] = {sl_motor, sr_motor, ld_motor};
+  control::Motor4310* motors_can1_pitch[] = {pitch_motor};
 
   RGB->Display(display::color_blue);
   laser->Off();
@@ -741,7 +743,7 @@ void KillAll() {
     for (int j = 0; j < SOFT_KILL_CONSTANT; j++){
       tmp_pos -= START_PITCH_POS / SOFT_KILL_CONSTANT;  // decrease position gradually
       pitch_motor->SetOutput(tmp_pos, 1, 115, 0.5, 0);
-      pitch_motor->TransmitOutput(pitch_motor);
+      control::Motor4310::TransmitOutput(motors_can1_pitch, 1);
       osDelay(GIMBAL_TASK_DELAY);
     }
 
