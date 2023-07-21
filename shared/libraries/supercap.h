@@ -24,17 +24,17 @@
 namespace control {
 
 typedef struct {
-  float voltage;
-  float energy;
+  uint8_t cap_state;
+  uint8_t reserve;
+  uint16_t voltage;
+  float chassis_power;
 } __packed cap_message_t;
 
 class SuperCap {
  public:
   SuperCap(bsp::CAN* can, uint16_t rx_id);
   void UpdateData(const uint8_t data[]);
-
   volatile bool connection_flag_ = false;
-
   cap_message_t info;
 };
 
