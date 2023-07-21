@@ -178,12 +178,25 @@ void gimbalTask(void* arg) {
     osDelay(100);
   }
 
+  
+  // to avoid the zero drifting problem
+  int i = 0;
+  while (i < 1000 || !imu->DataReady()) {
+    gimbal->TargetAbsWOffset(0, 0);
+    gimbal->Update();
+    control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
+    osDelay(GIMBAL_TASK_DELAY);
+    ++i;
+  }
+
+
   pitch_motor->MotorEnable(pitch_motor);
   osDelay(GIMBAL_TASK_DELAY);
 
   // 4310 soft start
   pitch_motor->SetRelativeTarget(0);
-  for (int i = 0; i < SOFT_START_CONSTANT; i++){
+
+  for (int j = 0; j < SOFT_START_CONSTANT; j++){
     gimbal->TargetAbsWOffset(0, 0);
     gimbal->Update();
     control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
@@ -236,9 +249,12 @@ void gimbalTask(void* arg) {
       abs_pitch_jetson = START_PITCH_POS;
       abs_yaw_jetson = 0;
 
+      // wait for the data send by the autoaim thread.
       if (abs_pitch_buffer != START_PITCH_POS || abs_yaw_buffer != 0) {
+        // avoid 4310 motor response too strong and fast(temp solution)
         if ((int)HAL_GetTick() - (int)last_execution_timestamp >= (int)AUTOAIM_INTERVAL) {
           yaw_target = abs_yaw_buffer;
+
 
           pitch_vel = 0;  // 4310 doesn't seem to need pitch_vel when pitch_pos is set
           pitch_pos = abs_pitch_buffer;

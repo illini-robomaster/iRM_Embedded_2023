@@ -259,8 +259,10 @@ void chassisTask(void* arg) {
       if (-CHASSIS_DEADZONE < relative_angle && relative_angle < CHASSIS_DEADZONE) wz = 0;
     }
 
+
     uint16_t supercap_voltage = supercap->info.voltage / 1000;
     float maximum_energy = 0.5 * pow(26.0,2) * 6.0;
+
 
     chassis->SetSpeed(vx / 10, vy / 10, wz);
     chassis->SteerUpdateTarget();
@@ -285,6 +287,7 @@ void chassisTask(void* arg) {
     }
 
     print("%d\r\n",supercap_voltage);
+
 
     if (Dead) {
       chassis->SetSpeed(0,0,0);
@@ -494,6 +497,7 @@ void RM_RTOS_Default_Task(const void* args) {
     receive->TransmitOutput();
 
 //    print("type: %d\r\n", referee->robot_hurt.hurt_type);
+
 
     if (debug) {
       set_cursor(0, 0);
