@@ -80,8 +80,8 @@ SteeringChassis::SteeringChassis(steering_chassis_t* _chassis) {
   SteerThetaReset();
   // Init private variables ends
 
-  // TODO change to params
-  float* pid_params = new float[3]{40, 3, 0};
+  // just for wheel speed pid (not for steer motor)
+  float* pid_params = new float[3]{120, 3, 1};
   float motor_max_iout = 2000;
   float motor_max_out = 20000;
   for (int i = 0; i < MOTOR_NUM; i++) {

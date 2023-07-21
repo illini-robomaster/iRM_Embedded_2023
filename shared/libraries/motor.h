@@ -771,6 +771,17 @@ class Motor4310 {
    */
   float GetTorque() const;
 
+  /**
+   * @brief get motor target angle, in [rad]
+   * @return motor target angle
+   */
+  float GetRelativeTarget() const;
+
+  /**
+   * @brief Set motor target position, in [rad]
+   */
+  void SetRelativeTarget(float target);
+
   volatile bool connection_flag_ = false;
 
  private:
@@ -794,6 +805,7 @@ class Motor4310 {
   volatile float theta_ = 0;            // actual angular position
   volatile float omega_ = 0;            // actual angular velocity
   volatile float torque_ = 0;           // actual torque
+  float relative_target_ = 0;           // target position
 
   // P control
   constexpr static float KP_MIN = 0;
