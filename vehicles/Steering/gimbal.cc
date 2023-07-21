@@ -236,6 +236,7 @@ void gimbalTask(void* arg) {
   while (true) {
     while (Dead || GimbalDead) osDelay(100);
 
+    // autoaim comflict with spinmode control
     if (dbus->keyboard.bit.F || dbus->swl == remote::UP || dbus->keyboard.bit.CTRL) {
       float abs_pitch_buffer = abs_pitch_jetson;
       float abs_yaw_buffer = abs_yaw_jetson;
@@ -576,7 +577,7 @@ void chassisTask(void* arg) {
   float vx_set, vy_set;
 
   while (true) {
-    ChangeSpinMode.input(dbus->keyboard.bit.SHIFT);
+    ChangeSpinMode.input(dbus->keyboard.bit.SHIFT || dbus->swl == remote::UP);
     if (ChangeSpinMode.posEdge()) SpinMode = !SpinMode;
 
     send->cmd.id = bsp::MODE;
