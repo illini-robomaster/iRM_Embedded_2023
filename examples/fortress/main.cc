@@ -1,6 +1,6 @@
 /****************************************************************************
  *                                                                          *
- *  Copyright (C) 2022 RoboMaster.                                          *
+ *  Copyright (C) 2023 RoboMaster.                                          *
  *  Illini RoboMaster @ University of Illinois at Urbana-Champaign          *
  *                                                                          *
  *  This program is free software: you can redistribute it and/or modify    *
@@ -91,8 +91,8 @@ void RM_RTOS_Init() {
   left = new bsp::GPIO(IN1_GPIO_Port, IN1_Pin);
   right = new bsp::GPIO(IN2_GPIO_Port, IN2_Pin);
 
-  can1 = new bsp::CAN(&hcan1, 0x207, true);
-  can2 = new bsp::CAN(&hcan2, 0x205, false);
+  can1 = new bsp::CAN(&hcan1, true);
+  can2 = new bsp::CAN(&hcan2, false);
 
   motor_left = new control::Motor3508(can2, 0x205);
   motor_right = new control::Motor3508(can2, 0x208);

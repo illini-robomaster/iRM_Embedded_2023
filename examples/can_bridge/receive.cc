@@ -1,6 +1,6 @@
 /****************************************************************************
  *                                                                          *
- *  Copyright (C) 2022 RoboMaster.                                          *
+ *  Copyright (C) 2023 RoboMaster.                                          *
  *  Illini RoboMaster @ University of Illinois at Urbana-Champaign          *
  *                                                                          *
  *  This program is free software: you can redistribute it and/or modify    *
@@ -28,7 +28,7 @@ static bsp::CanBridge* receive = nullptr;
 
 void RM_RTOS_Init(void) {
   print_use_uart(&huart1);
-  can = new bsp::CAN(&hcan2, 0x201, false);
+  can = new bsp::CAN(&hcan2, false);
   receive = new bsp::CanBridge(can, 0x20B, 0x20A);
 }
 
