@@ -658,7 +658,6 @@ void selfTestTask(void* arg) {
   OLED->ShowString(1, 0, (uint8_t*)"SL");
   OLED->ShowString(1, 5, (uint8_t*)"SR");
   OLED->ShowString(2, 0, (uint8_t*)"LD");
-  OLED->ShowString(2, 5, (uint8_t*)"Ldr");
   OLED->ShowString(3, 0, (uint8_t*)"Cal");
   OLED->ShowString(3, 6, (uint8_t*)"Dbs");
   OLED->ShowString(4, 0, (uint8_t*)"Temp:");
@@ -721,7 +720,6 @@ void selfTestTask(void* arg) {
     OLED->ShowBlock(1, 2, sl_motor_flag);
     OLED->ShowBlock(1, 7, sr_motor_flag);
     OLED->ShowBlock(2, 2, ld_motor_flag);
-    OLED->ShowBlock(2, 8, lidar_flag);
     OLED->ShowBlock(3, 3, imu->CaliDone());
     OLED->ShowBlock(3, 9, dbus_flag);
     snprintf(temp, 6, "%.2f", imu->Temp);

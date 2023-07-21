@@ -259,8 +259,8 @@ void chassisTask(void* arg) {
       if (-CHASSIS_DEADZONE < relative_angle && relative_angle < CHASSIS_DEADZONE) wz = 0;
     }
 
-    uint16_t supercap_voltage = supercap->info.voltage;
-    float maximum_energy = 0.5 * pow(27.0,2) * 6.0;
+    uint16_t supercap_voltage = supercap->info.voltage / 1000;
+    float maximum_energy = 0.5 * pow(26.0,2) * 6.0;
 
     chassis->SetSpeed(vx / 10, vy / 10, wz);
     chassis->SteerUpdateTarget();
@@ -271,9 +271,10 @@ void chassisTask(void* arg) {
 
     //consider using uart printing to check the power limit's value
     //log values out as files to obtain its trend
+
     if(pow(supercap_voltage,2) * 6 / 2 <= maximum_energy / 2) {
     //edge case to prevent power limit from being negative
-      chassis->Update(wrap<float>(6 * supercap_voltage, 0, referee->game_robot_status.chassis_power_limit),
+      chassis->Update(wrap<float>(5 * supercap_voltage, 25, referee->game_robot_status.chassis_power_limit),
                       referee->power_heat_data.chassis_power,
                       (float)referee->power_heat_data.chassis_power_buffer);
     } else {
@@ -282,8 +283,8 @@ void chassisTask(void* arg) {
                       referee->power_heat_data.chassis_power,
                       (float)referee->power_heat_data.chassis_power_buffer);
     }
-    set_cursor(0,0);
-    print("%d\n",sizeof(supercap_voltage));
+
+    print("%d\r\n",supercap_voltage);
 
     if (Dead) {
       chassis->SetSpeed(0,0,0);
@@ -492,7 +493,7 @@ void RM_RTOS_Default_Task(const void* args) {
     receive->cmd.data_bool = (referee->game_robot_status.robot_id >= 100) ? true : false;
     receive->TransmitOutput();
 
-    print("type: %d\r\n", referee->robot_hurt.hurt_type);
+//    print("type: %d\r\n", referee->robot_hurt.hurt_type);
 
     if (debug) {
       set_cursor(0, 0);
