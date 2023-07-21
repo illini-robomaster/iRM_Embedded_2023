@@ -724,7 +724,7 @@ void Motor4310::UpdateData(const uint8_t data[]) {
   raw_mosTemp_ = data[6];
   raw_motorTemp_ = data[7];
 
-  theta_ = uint_to_float(raw_pos_, P_MIN, P_MAX, 16);
+  theta_ = wrap<float>(-1* uint_to_float(raw_pos_, P_MIN, P_MAX, 16),-PI,PI);
   omega_ = uint_to_float(raw_vel_, V_MIN, V_MAX, 12);
   torque_ = uint_to_float(raw_torque_, T_MIN, T_MAX, 12);
 
@@ -732,12 +732,7 @@ void Motor4310::UpdateData(const uint8_t data[]) {
 }
 
 void Motor4310::PrintData() {
-  set_cursor(0, 0);
-  clear_screen();
-  print("Position: % .4f ", GetTheta());
-  print("Velocity: % .4f ", GetOmega());
-  print("Torque: % .4f ", GetTorque());
-  print("Rotor temp: % .4f \r\n", raw_motorTemp_);
+  print("Position: % .4f Velocity: % .4f Torque: % .4f\r\n", GetTheta(),GetOmega(),GetTorque());
 }
 
 float Motor4310::GetTheta() const {

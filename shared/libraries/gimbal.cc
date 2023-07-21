@@ -10,6 +10,7 @@ Gimbal::Gimbal(gimbal_t gimbal)
   // acquired from user
   pitch_motor_4310_ = gimbal.pitch_motor_4310_;
   pitch_motor_ = gimbal.pitch_motor;
+  yaw_motor_4310_ = gimbal.yaw_motor_4310_;
   yaw_motor_ = gimbal.yaw_motor;
   model_ = gimbal.model;
 

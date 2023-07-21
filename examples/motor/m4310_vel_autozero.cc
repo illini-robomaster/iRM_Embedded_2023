@@ -22,11 +22,13 @@
 #include "cmsis_os.h"
 #include "main.h"
 #include "motor.h"
+#include "controller.h"
 #include "dbus.h"
 
 bsp::CAN* can = nullptr;
 control::Motor4310* motor = nullptr;
 remote::DBUS* dbus = nullptr;
+control::ConstrainedPID* motor_pid = nullptr;
 
 void RM_RTOS_Init() {
   HAL_Delay(100);
@@ -43,6 +45,12 @@ void RM_RTOS_Init() {
   /* Make sure motor is set to the correct mode (in helper tool). Otherwise, motor won't start */
   motor = new control::Motor4310(can, 0x34, 0x35, control::VEL);
   dbus = new remote::DBUS(&huart3);
+
+  float pid_param[] = {10,0,1};
+  float pid_max_iout = 0;
+  float pid_max_out=30;
+  motor_pid = new control::ConstrainedPID(pid_param,pid_max_iout,pid_max_out);
+
   HAL_Delay(100);
 }
 
@@ -57,16 +65,20 @@ void RM_RTOS_Default_Task(const void* args) {
   motor->MotorEnable(motor);
 
   while (true) {
-    float vel;
-    vel = clip<float>(dbus->ch1 / 660.0 * 30.0, -30, 30);
-
+//    float vel;
+//    vel = clip<float>(dbus->ch1 / 660.0 * 30.0, -30, 30);
+    float output = motor_pid->ComputeOutput(motor->GetTheta());
     set_cursor(0, 0);
     clear_screen();
     // print("Vel: %f \n", vel);
     motor->PrintData();
-
-    motor->SetOutput(vel);
+    if(abs(motor->GetTheta())<=0.001){
+      motor->SetOutput(0);
+    }
+    else{
+      motor->SetOutput(output);
+    }
     motor->TransmitOutput(motor);
-    osDelay(10);
+    osDelay(1);
   }
 }

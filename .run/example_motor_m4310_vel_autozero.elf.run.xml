@@ -1,0 +1,10 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="example_motor_m4310_vel_autozero.elf" type="com.jetbrains.cidr.embedded.openocd.conf.type" factoryName="com.jetbrains.cidr.embedded.openocd.conf.factory" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" PASS_PARENT_ENVS_2="true" PROJECT_NAME="iRM_Embedded_2023" TARGET_NAME="example_motor_m4310_vel_autozero.elf" CONFIG_NAME="Debug" version="1" RUN_TARGET_PROJECT_NAME="iRM_Embedded_2023" RUN_TARGET_NAME="example_motor_m4310_vel_autozero.elf">
+    <openocd version="1" gdb-port="3333" telnet-port="4444" board-config="C:\Users\yangr\CLionProjects\UICRM-Embedded\openocd\stm32f4\daplink.cfg" reset-type="INIT" download-type="ALWAYS">
+      <debugger kind="GDB" isBundled="true" />
+    </openocd>
+    <method v="2">
+      <option name="CLION.COMPOUND.BUILD" enabled="true" />
+    </method>
+  </configuration>
+</component>
