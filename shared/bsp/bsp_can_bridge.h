@@ -1,6 +1,6 @@
 /****************************************************************************
  *                                                                          *
- *  Copyright (C) 2022 RoboMaster.                                          *
+ *  Copyright (C) 2023 RoboMaster.                                          *
  *  Illini RoboMaster @ University of Illinois at Urbana-Champaign          *
  *                                                                          *
  *  This program is free software: you can redistribute it and/or modify    *
@@ -39,8 +39,9 @@ typedef enum {
   SPEED_LIMIT1,
   SPEED_LIMIT2,
   CHASSIS_FLAG,
-  REMAIN_HP,
+  GIMBAL_POWER,
   RECALIBRATE,
+  IS_MY_COLOR_BLUE,
 } can_bridge_cmd;
 
 typedef struct {
@@ -75,8 +76,9 @@ class CanBridge {
   float speed_limit2 = 0;
   unsigned int chassis_flag = 0;
   bool self_check_flag = false;
-  unsigned int remain_hp = 0;
+  unsigned int gimbal_power = 0;
   bool recalibrate = false;
+  bool is_my_color_blue = false;
   // each bit represents a flag correspond to specific motor e.g.(at index 0, it represents the motor 1's connection flag)
  private:
   bsp::CAN* can_;
