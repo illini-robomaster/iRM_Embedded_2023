@@ -255,7 +255,6 @@ void gimbalTask(void* arg) {
         if ((int)HAL_GetTick() - (int)last_execution_timestamp >= (int)AUTOAIM_INTERVAL) {
           yaw_target = abs_yaw_buffer;
 
-
           pitch_vel = 0;  // 4310 doesn't seem to need pitch_vel when pitch_pos is set
           pitch_pos = abs_pitch_buffer;
 
@@ -674,6 +673,7 @@ void selfTestTask(void* arg) {
   OLED->ShowString(1, 0, (uint8_t*)"SL");
   OLED->ShowString(1, 5, (uint8_t*)"SR");
   OLED->ShowString(2, 0, (uint8_t*)"LD");
+  //Super capacitor
   OLED->ShowString(3, 0, (uint8_t*)"Cal");
   OLED->ShowString(3, 6, (uint8_t*)"Dbs");
   OLED->ShowString(4, 0, (uint8_t*)"Temp:");
@@ -689,6 +689,7 @@ void selfTestTask(void* arg) {
   OLED->ShowString(4, 12, (uint8_t*)"BR");
 
   char temp[6] = "";
+  char volt[6] = "";
   while (true) {
 
     osDelay(100);
@@ -731,6 +732,7 @@ void selfTestTask(void* arg) {
     //    referee_flag = referee->connection_flag_;
     dbus_flag = dbus->connection_flag_;
 
+
     OLED->ShowBlock(0, 2, pitch_motor_flag);
     OLED->ShowBlock(0, 7, yaw_motor_flag);
     OLED->ShowBlock(1, 2, sl_motor_flag);
@@ -741,6 +743,9 @@ void selfTestTask(void* arg) {
     snprintf(temp, 6, "%.2f", imu->Temp);
     OLED->ShowString(4, 6, (uint8_t*)temp);
     //    OLED->ShowBlock(4, 3, referee_flag);
+    uint16_t voltage = send->supercap_voltage;
+    snprintf(volt, 6, "%u", voltage);
+    OLED->ShowString(2,4,(uint8_t*)volt);
 
     OLED->ShowBlock(1, 18, fl_wheel_flag);
 

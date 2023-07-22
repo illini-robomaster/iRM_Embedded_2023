@@ -110,7 +110,7 @@ class SteeringChassis {
    * @note  Steer motors will turn as little as possible to reach the desired configuration
    *        The idea is compute 2 potential position and choose the closer one
    */
-  void SteerUpdateTarget();
+  void  SteerUpdateTarget();
 
   /**
    * @brief Compute speed for 4 WheelMotors
