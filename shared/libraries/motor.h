@@ -136,6 +136,8 @@ class MotorCANBase : public MotorBase {
 
   virtual uint16_t GetTemp() const;
 
+  virtual float GetTorque() const;
+
   /**
    * @brief transmit CAN message for setting motor outputs
    *
@@ -212,6 +214,37 @@ class Motor3508 : public MotorCANBase {
   volatile uint8_t raw_temperature_ = 0;
 };
 
+
+
+//==================================================================================================
+// Motor 3510
+//==================================================================================================
+
+/**
+ * @brief DJI 3510 motor class
+ */
+class Motor3510 : public MotorCANBase {
+ public:
+  /* constructor wrapper over MotorCANBase */
+  Motor3510(bsp::CAN* can, uint16_t rx_id);
+  /* implements data update callback */
+  void UpdateData(const uint8_t data[]) override final;
+  /* implements data printout */
+  void PrintData() const override final;
+  /* override base implementation with max current protection */
+  void SetOutput(int16_t val) override final;
+
+  float GetTorque() const override final;
+
+ private:
+  volatile int16_t raw_current_get_ = 0;
+  volatile uint8_t raw_temperature_ = 0;
+  volatile int16_t raw_torque_ = 0;
+  volatile int16_t raw_theta_ = 0;
+};
+
+
+
 //==================================================================================================
 // Motor6020
 //==================================================================================================
@@ -266,6 +299,10 @@ class Motor6623 : public MotorCANBase {
 
   static const int16_t CURRENT_CORRECTION = -1;  // current direction is reversed
 };
+
+
+
+
 
 //==================================================================================================
 // MotorPWMBase
