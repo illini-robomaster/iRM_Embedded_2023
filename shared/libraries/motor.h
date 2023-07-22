@@ -687,13 +687,13 @@ class Motor4310 {
   void UpdateData(const uint8_t data[]);
 
   /* enable m4310; MUST be called after motor is powered up, otherwise SetOutput commands are ignored */
-  void MotorEnable(Motor4310* motor);
+  void MotorEnable();
   /* disable m4310 */
-  void MotorDisable(Motor4310* motor);
+  void MotorDisable();
 
   /** sets current motor position as zero position (when motor is powered). M4310 remembers this position
    * when powered off. */
-  void SetZeroPos(Motor4310* motor);
+  void SetZeroPos();
 
   /**
    * implements transmit output specifically for 4310
@@ -703,7 +703,7 @@ class Motor4310 {
    *                1: position-velocity
    *                2: velocity
    */
-  void TransmitOutput(control::Motor4310* motor);
+  static void TransmitOutput(control::Motor4310* motors[], uint8_t num_motors);
 
   /* implements data printout */
   void PrintData();
@@ -770,6 +770,8 @@ class Motor4310 {
    * @return motor torque
    */
   float GetTorque() const;
+
+  mode_t GetMode() const;
 
   /**
    * @brief get motor target angle, in [rad]

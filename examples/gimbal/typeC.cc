@@ -1,6 +1,6 @@
 /****************************************************************************
  *                                                                          *
- *  Copyright (C) 2022 RoboMaster.                                          *
+ *  Copyright (C) 2023 RoboMaster.                                          *
  *  Illini RoboMaster @ University of Illinois at Urbana-Champaign          *
  *                                                                          *
  *  This program is free software: you can redistribute it and/or modify    *
@@ -166,7 +166,7 @@ void gimbalTask(void* arg) {
 void RM_RTOS_Init(void) {
   print_use_uart(&huart1);
 
-  can1 = new bsp::CAN(&hcan1, 0x201, true);
+  can1 = new bsp::CAN(&hcan1, true);
   dbus = new remote::DBUS(&huart3);
   laser = new bsp::Laser(LASER_GPIO_Port, LASER_Pin);
 
