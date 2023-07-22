@@ -174,8 +174,8 @@ void Motor6020::PrintData() const {
 }
 
 void Motor6020::SetOutput(int16_t val) {
-  constexpr int16_t MAX_ABS_CURRENT = 30000;  // ~
-  output_ = clip<int16_t>(val, -MAX_ABS_CURRENT, MAX_ABS_CURRENT);
+  constexpr int16_t MAX_ABS_VOLTAGE = 30000;  // ~
+  output_ = clip<int16_t>(val, -MAX_ABS_VOLTAGE, MAX_ABS_VOLTAGE);
 }
 
 int16_t Motor6020::GetCurr() const { return raw_current_get_; }

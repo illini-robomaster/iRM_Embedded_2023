@@ -98,8 +98,8 @@ Gimbal::Gimbal(gimbal_t gimbal)
         yaw_omega_max_iout = 10000;  // 10000
         yaw_omega_max_out = 30000;
 
-        yaw_theta_pid_param_ = new float[3]{30, 0, 0.3};
-        yaw_omega_pid_param_ = new float[3]{3600, 20, 0};
+        yaw_theta_pid_param_ = new float[3]{100, 1, 10};
+        yaw_omega_pid_param_ = new float[3]{300, 1, 500};
         yaw_theta_pid_ =
             new ConstrainedPID(yaw_theta_pid_param_, yaw_theta_max_iout, yaw_theta_max_out);
         yaw_omega_pid_ =
@@ -189,8 +189,10 @@ void Gimbal::Update() {
         // just use speed pid control
         float yt_in = yaw_motor_->GetOmegaDelta(yaw_angle_);
         float yo_out = yaw_omega_pid_->ComputeConstrainedOutput(yt_in);
+        // print("yaw_angle_: %f, yt_in: %f, yo_out: %f\r\n", yaw_angle_, yt_in, yo_out);
         yaw_motor_->SetOutput(yo_out);
       } else {
+        // print("imu calibrating\r\n");
         float yt_diff = yaw_motor_->GetThetaDelta(yaw_angle_);
         float yt_out = yaw_theta_pid_->ComputeOutput(yt_diff);
         float yt_in = yaw_motor_->GetOmegaDelta(yt_out);

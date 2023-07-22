@@ -47,7 +47,7 @@ static bsp::CAN* can2 = nullptr;
 static remote::DBUS* dbus = nullptr;
 static display::RGB* RGB = nullptr;
 
-static const int GIMBAL_TASK_DELAY = 1;
+static const int GIMBAL_TASK_DELAY = 10;
 static const int CHASSIS_TASK_DELAY = 2;
 static const int SHOOTER_TASK_DELAY = 10;
 static const int SELFTEST_TASK_DELAY = 100;
@@ -211,9 +211,12 @@ void gimbalTask(void* arg) {
   gimbal->TargetAbsWOffset(0, 0);
   gimbal->Update();
   control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
+  print("%d\n", 1);
   imu->Calibrate();
+  print("%d\n", 2);
 
   while (!imu->DataReady() || !imu->CaliDone()) {
+    print("%d\n", 10);
     gimbal->TargetAbsWOffset(0, 0);
     gimbal->Update();
     control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
@@ -222,6 +225,8 @@ void gimbalTask(void* arg) {
     osDelay(GIMBAL_TASK_DELAY);
   }
 
+  print("%d\n", 3);
+  print("Calibration Done.\r\n");
   gimbal->RecordIMUStatus(imu->CaliDone() && imu->DataReady());
 
   print("Gimbal Begin!\r\n");
@@ -766,7 +771,7 @@ void selfTestTask(void* arg) {
 }
 
 void RM_RTOS_Init(void) {
-  // print_use_uart(&huart1);
+  print_use_uart(&huart1);
   bsp::SetHighresClockTimer(&htim5);
 
   can1 = new bsp::CAN(&hcan1, true);
@@ -841,7 +846,7 @@ void RM_RTOS_Threads_Init(void) {
   shooterTaskHandle = osThreadNew(shooterTask, nullptr, &shooterTaskAttribute);
   chassisTaskHandle = osThreadNew(chassisTask, nullptr, &chassisTaskAttribute);
   selfTestTaskHandle = osThreadNew(selfTestTask, nullptr, &selfTestTaskAttribute);
-  jetsonCommTaskHandle = osThreadNew(jetsonCommTask, nullptr, &jetsonCommTaskAttribute);
+  // jetsonCommTaskHandle = osThreadNew(jetsonCommTask, nullptr, &jetsonCommTaskAttribute);
 }
 
 void KillAll() {
