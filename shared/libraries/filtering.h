@@ -21,33 +21,33 @@
 #pragma once
 
 class FilterBase {
-public:
-    virtual void register_state(float input, float timestamp) = 0;
+ public:
+  virtual void register_state(float input, float timestamp) = 0;
 
-    virtual float get_estimation() = 0;
+  virtual float get_estimation() = 0;
 };
 
 class KalmanFilter : public FilterBase {
-public:
-    KalmanFilter(float init_x, float init_t);
-    void register_state(float input, float timestamp);
-    float get_estimation();
-    float iter_and_get_estimation();
+ public:
+  KalmanFilter(float init_x, float init_t);
+  void register_state(float input, float timestamp);
+  float get_estimation();
+  float iter_and_get_estimation();
 
-private:
-    float xhat = 0;  // a posteriori estimate of x
-    float xhatminus = 0;  // a priori estimate of x
-    float P = 0;  // posteriori error estimate
-    float Pminus = 0;  // a priori error estimate
+ private:
+  float xhat = 0;       // a posteriori estimate of x
+  float xhatminus = 0;  // a priori estimate of x
+  float P = 0;          // posteriori error estimate
+  float Pminus = 0;     // a priori error estimate
 
-    float Q = 2; // process noise covariance
-    float H = 1; // measurement function
+  float Q = 2;  // process noise covariance
+  float H = 1;  // measurement function
 
-    float A = 1; // state transition matrix
-    float B = 0; // control matrix
+  float A = 1;  // state transition matrix
+  float B = 0;  // control matrix
 
-    float R = 2; // measurement noise covariance
+  float R = 2;  // measurement noise covariance
 
-    float last_x = 0;
-    float last_t = 0;
+  float last_x = 0;
+  float last_t = 0;
 };

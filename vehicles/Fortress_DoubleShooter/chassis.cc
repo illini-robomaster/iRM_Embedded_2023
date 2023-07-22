@@ -18,6 +18,10 @@
  *                                                                          *
  ****************************************************************************/
 
+#include "chassis.h"
+
+#include <cmath>
+
 #include "bsp_can_bridge.h"
 #include "bsp_gpio.h"
 #include "bsp_os.h"
@@ -25,14 +29,12 @@
 #include "cmsis_os.h"
 #include "controller.h"
 #include "dbus.h"
+#include "fortress.h"
 #include "main.h"
 #include "motor.h"
-#include "fortress.h"
 #include "protocol.h"
 #include "rgb.h"
-#include "chassis.h"
 #include "supercap.h"
-#include <cmath>
 
 static bsp::CAN* can1 = nullptr;
 static bsp::CAN* can2 = nullptr;
@@ -83,10 +85,10 @@ const osThreadAttr_t refereeTaskAttribute = {.name = "refereeTask",
 osThreadId_t refereeTaskHandle;
 
 class RefereeUART : public bsp::UART {
-public:
+ public:
   using bsp::UART::UART;
 
-protected:
+ protected:
   void RxCompleteCallback() final { osThreadFlagsSet(refereeTaskHandle, REFEREE_RX_SIGNAL); }
 };
 
@@ -148,17 +150,17 @@ void chassisTask(void* arg) {
 
   control::MotorCANBase* motors[] = {fl_motor, fr_motor, bl_motor, br_motor};
 
-//  print("Here1\r\n");
+  //  print("Here1\r\n");
   // control::PIDController pid5(120, 15, 0);
   // control::PIDController pid6(120, 15, 0);
   // control::PIDController pid7(120, 15, 0);
   // control::PIDController pid8(120, 15, 0);
 
   // TODO NOT RECEIVING START SIGNAL
-//  while (!receive->start) osDelay(100);
+  //  while (!receive->start) osDelay(100);
   // ????? whether remove
-//  while (receive->start < 0.5) osDelay(100);
-//  print("Here2\r\n");
+  //  while (receive->start < 0.5) osDelay(100);
+  //  print("Here2\r\n");
 
   while (true) {
     float relative_angle = receive->relative_angle;
@@ -169,7 +171,7 @@ void chassisTask(void* arg) {
     vy_set = receive->vy;
 
     if (receive->mode == 1) {  // spin mode
-    // need add the relative angle compensation for the board communication
+                               // need add the relative angle compensation for the board communication
       sin_yaw = arm_sin_f32(relative_angle);
       cos_yaw = arm_cos_f32(relative_angle);
       vx = cos_yaw * vx_set + sin_yaw * vy_set;
@@ -188,7 +190,7 @@ void chassisTask(void* arg) {
     chassis->Update(true, (float)referee->game_robot_status.chassis_power_limit,
                     referee->power_heat_data.chassis_power,
                     (float)referee->power_heat_data.chassis_power_buffer);
-    
+
     // TODO: for fortress mode and dead
     if (Dead || receive->fortress_mode) {
       fl_motor->SetOutput(0);
@@ -228,7 +230,6 @@ void chassisTask(void* arg) {
     receive->TransmitOutput();
 
     osDelay(CHASSIS_TASK_DELAY);
-
   }
 }
 
@@ -300,7 +301,7 @@ void fortressTask(void* arg) {
   receive->TransmitOutput();
 
   while (true) {
-    if (receive->fortress_mode) { // fortress mode
+    if (receive->fortress_mode) {  // fortress mode
       int i = 0;
       while (true) {
         // let the code run at least 0.1s
@@ -347,14 +348,14 @@ void fortressTask(void* arg) {
 //==================================================================================================
 
 const osThreadAttr_t selfTestingTask = {.name = "selfTestTask",
-                                             .attr_bits = osThreadDetached,
-                                             .cb_mem = nullptr,
-                                             .cb_size = 0,
-                                             .stack_mem = nullptr,
-                                             .stack_size = 256 * 4,
-                                             .priority = (osPriority_t)osPriorityBelowNormal,
-                                             .tz_module = 0,
-                                             .reserved = 0};
+                                        .attr_bits = osThreadDetached,
+                                        .cb_mem = nullptr,
+                                        .cb_size = 0,
+                                        .stack_mem = nullptr,
+                                        .stack_size = 256 * 4,
+                                        .priority = (osPriority_t)osPriorityBelowNormal,
+                                        .tz_module = 0,
+                                        .reserved = 0};
 osThreadId_t selfTestTaskHandle;
 
 static bool fl_motor_flag = false;
@@ -367,10 +368,10 @@ static bool fortress_motor_flag = false;
 
 static bool transmission_flag = true;
 
-void self_Check_Task(void* arg){
+void self_Check_Task(void* arg) {
   UNUSED(arg);
 
-  while(true){
+  while (true) {
     osDelay(100);
     // TODO：fortress self check(7 motor)
     fl_motor->connection_flag_ = false;
@@ -400,7 +401,7 @@ void self_Check_Task(void* arg){
                    fortress_motor_flag << 6;
 
     osDelay(100);
-    if(transmission_flag){
+    if (transmission_flag) {
       receive->cmd.id = bsp::CHASSIS_FLAG;
       receive->cmd.data_uint = (unsigned int)flag_summary;
       receive->TransmitOutput();
@@ -458,7 +459,7 @@ void RM_RTOS_Init() {
   referee_uart->SetupRx(300);
   referee_uart->SetupTx(300);
   referee = new communication::Referee;
-  
+
   receive = new bsp::CanBridge(can2, 0x20B, 0x20A);
 }
 
@@ -471,7 +472,7 @@ void RM_RTOS_Threads_Init(void) {
   refereeTaskHandle = osThreadNew(refereeTask, nullptr, &refereeTaskAttribute);
   chassisTaskHandle = osThreadNew(chassisTask, nullptr, &chassisTaskAttribute);
   selfTestTaskHandle = osThreadNew(self_Check_Task, nullptr, &selfTestingTask);
-//  fortressTaskHandle = osThreadNew(fortressTask, nullptr, &fortressTaskAttribute);
+  //  fortressTaskHandle = osThreadNew(fortressTask, nullptr, &fortressTaskAttribute);
 }
 
 //==================================================================================================
@@ -483,8 +484,8 @@ void KillAll() {
 
   control::MotorCANBase* motors_can1_chassis[] = {fl_motor, fr_motor, bl_motor, br_motor};
   // TODO
-//  control::MotorCANBase* motors_can2_elevator[] = {elevator_left_motor, elevator_right_motor};
-//  control::MotorCANBase* motors_can2_fortress[] = {fortress_motor};
+  //  control::MotorCANBase* motors_can2_elevator[] = {elevator_left_motor, elevator_right_motor};
+  //  control::MotorCANBase* motors_can2_fortress[] = {fortress_motor};
 
   RGB->Display(display::color_blue);
 
@@ -503,11 +504,11 @@ void KillAll() {
     control::MotorCANBase::TransmitOutput(motors_can1_chassis, 4);
 
     // TODO
-//    elevator_left_motor->SetOutput(0);
-//    elevator_right_motor->SetOutput(0);
-//    fortress_motor->SetOutput(0);
-//    control::MotorCANBase::TransmitOutput(motors_can2_elevator, 2);
-//    control::MotorCANBase::TransmitOutput(motors_can2_fortress, 1);
+    //    elevator_left_motor->SetOutput(0);
+    //    elevator_right_motor->SetOutput(0);
+    //    fortress_motor->SetOutput(0);
+    //    control::MotorCANBase::TransmitOutput(motors_can2_elevator, 2);
+    //    control::MotorCANBase::TransmitOutput(motors_can2_fortress, 1);
 
     osDelay(KILLALL_DELAY);
   }
@@ -531,13 +532,13 @@ void RM_RTOS_Default_Task(const void* args) {
     receive->cmd.id = bsp::GIMBAL_POWER;
     receive->cmd.data_uint = referee->game_robot_status.mains_power_gimbal_output;
     receive->TransmitOutput();
-//    print("out: %d\r\n", referee->game_robot_status.mains_power_gimbal_output);
-//    print("test");
+    //    print("out: %d\r\n", referee->game_robot_status.mains_power_gimbal_output);
+    //    print("test");
     if (debug) {
       set_cursor(0, 0);
       clear_screen();
-//      print("vx: %f, vy: %f, angle: %f, mode: %f, dead: %f, start: %f\r\n", receive->vx, receive->vy,
-//            receive->relative_angle, receive->mode, receive->dead, receive->start);
+      //      print("vx: %f, vy: %f, angle: %f, mode: %f, dead: %f, start: %f\r\n", receive->vx, receive->vy,
+      //            receive->relative_angle, receive->mode, receive->dead, receive->start);
       print("power limit: %.3f chassis power: %.3f power buffer: %.3f\r\n", (float)referee->game_robot_status.chassis_power_limit,
             referee->power_heat_data.chassis_power,
             (float)referee->power_heat_data.chassis_power_buffer);

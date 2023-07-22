@@ -25,11 +25,10 @@
 #include "bsp_print.h"
 #include "cmsis_os.h"
 #include "controller.h"
+#include "dbus.h"
 #include "main.h"
 #include "motor.h"
 #include "utils.h"
-#include "dbus.h"
-
 
 #define KEY_GPIO_GROUP GPIOB
 #define KEY_GPIO_PIN GPIO_PIN_2

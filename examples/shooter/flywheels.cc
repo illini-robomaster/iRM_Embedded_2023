@@ -21,9 +21,9 @@
 #include "bsp_print.h"
 #include "cmsis_os.h"
 #include "controller.h"
+#include "dbus.h"
 #include "main.h"
 #include "motor.h"
-#include "dbus.h"
 
 bsp::CAN* can = nullptr;
 control::MotorCANBase* left = nullptr;
@@ -31,7 +31,7 @@ control::MotorCANBase* right = nullptr;
 static remote::DBUS* dbus;
 
 void RM_RTOS_Init() {
-//  print_use_uart(&huart1);
+  //  print_use_uart(&huart1);
   dbus = new remote::DBUS(&huart1);
   can = new bsp::CAN(&hcan1, 0x201, true);
   right = new control::Motor3508(can, 0x201);
@@ -46,7 +46,7 @@ void RM_RTOS_Default_Task(const void* args) {
   control::PIDController pid2(75, 15, 30);
 
   while (true) {
-    if (dbus->swr == remote::UP){
+    if (dbus->swr == remote::UP) {
       float diff1 = right->GetOmegaDelta(100);
       float diff2 = left->GetOmegaDelta(-100);
       int16_t out1 = pid1.ComputeConstrainedOutput(diff1);
@@ -55,8 +55,7 @@ void RM_RTOS_Default_Task(const void* args) {
       left->SetOutput(out2);
       control::MotorCANBase::TransmitOutput(motors, 2);
       osDelay(10);
-    }
-    else if (dbus->swr == remote::DOWN){
+    } else if (dbus->swr == remote::DOWN) {
       float diff1 = right->GetOmegaDelta(0);
       float diff2 = left->GetOmegaDelta(0);
       int16_t out1 = pid1.ComputeConstrainedOutput(diff1);
@@ -66,6 +65,5 @@ void RM_RTOS_Default_Task(const void* args) {
       control::MotorCANBase::TransmitOutput(motors, 2);
       osDelay(10);
     }
-
   }
 }

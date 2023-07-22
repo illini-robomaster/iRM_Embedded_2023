@@ -32,10 +32,10 @@
 #include "bsp_print.h"
 #include "cmsis_os.h"
 #include "controller.h"
+#include "dbus.h"
 #include "main.h"
 #include "motor.h"
 #include "utils.h"
-#include "dbus.h"
 
 static const float NOTCH = (2 * PI / 8);
 static const float LOAD_ANGLE_CONTINUE = (2 * PI / 8);
@@ -59,7 +59,7 @@ void jam_callback(control::ServoMotor* servo, const control::servo_jam_t data) {
     float prev_target = servo->GetTheta() - NOTCH;
     servo->SetTarget(prev_target, true);
     // print("Antijam engage\r\n");
-  } 
+  }
   // else {
   //   // print("Antijam in operation\r\n");
   // }
@@ -98,7 +98,7 @@ void RM_RTOS_Default_Task(const void* args) {
       servo->SetTarget(servo->GetTarget() + LOAD_ANGLE_CONTINUE, false);
       servo->SetMaxSpeed(SPEED);
       servo->SetMaxAcceleration(ACCELERATION_CONTINUE);
-    } else if (dbus->swr == remote::DOWN || dbus->mouse.l){
+    } else if (dbus->swr == remote::DOWN || dbus->mouse.l) {
       if ((bsp::GetHighresTickMicroSec() - start_time) / 1000 > DELAY) {
         servo->SetTarget(servo->GetTarget() + LOAD_ANGLE_CONTINUE, false);
         servo->SetMaxSpeed(SPEED);

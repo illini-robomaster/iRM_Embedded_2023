@@ -45,9 +45,11 @@ void RM_RTOS_Default_Task(const void* args) {
   UNUSED(args);
   control::MotorCANBase* motors[] = {motor1, motor2};
 
-  while(!key->Read());
+  while (!key->Read())
+    ;
 
-  while(key->Read());
+  while (key->Read())
+    ;
 
   print("ok!\r\n");
 

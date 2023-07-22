@@ -1,22 +1,22 @@
 /****************************************************************************
-*                                                                          *
-*  Copyright (C) 2023 RoboMaster.                                          *
-*  Illini RoboMaster @ University of Illinois at Urbana-Champaign          *
-*                                                                          *
-*  This program is free software: you can redistribute it and/or modify    *
-*  it under the terms of the GNU General Public License as published by    *
-*  the Free Software Foundation, either version 3 of the License, or       *
-*  (at your option) any later version.                                     *
-*                                                                          *
-*  This program is distributed in the hope that it will be useful,         *
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of          *
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the           *
-*  GNU General Public License for more details.                            *
-*                                                                          *
-*  You should have received a copy of the GNU General Public License       *
-*  along with this program. If not, see <http://www.gnu.org/licenses/>.    *
-*                                                                          *
-****************************************************************************/
+ *                                                                          *
+ *  Copyright (C) 2023 RoboMaster.                                          *
+ *  Illini RoboMaster @ University of Illinois at Urbana-Champaign          *
+ *                                                                          *
+ *  This program is free software: you can redistribute it and/or modify    *
+ *  it under the terms of the GNU General Public License as published by    *
+ *  the Free Software Foundation, either version 3 of the License, or       *
+ *  (at your option) any later version.                                     *
+ *                                                                          *
+ *  This program is distributed in the hope that it will be useful,         *
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of          *
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the           *
+ *  GNU General Public License for more details.                            *
+ *                                                                          *
+ *  You should have received a copy of the GNU General Public License       *
+ *  along with this program. If not, see <http://www.gnu.org/licenses/>.    *
+ *                                                                          *
+ ****************************************************************************/
 
 #include "gimbal.h"
 
@@ -51,11 +51,11 @@ static const int SHOOTER_TASK_DELAY = 10;
 static const int SELFTEST_TASK_DELAY = 100;
 static const int KILLALL_DELAY = 100;
 static const int DEFAULT_TASK_DELAY = 100;
-static const int SOFT_START_CONSTANT = 300;
+static const int SOFT_START_CONSTANT = 5000;
 static const int SOFT_KILL_CONSTANT = 200;
 static const float START_PITCH_POS = 0.45f;
 // TODO: the start position of the yaw motor
- static const float START_YAW_POS = 0;
+static const float START_YAW_POS = 0;
 static const int INFANTRY_INITIAL_HP = 100;
 
 static bsp::CanBridge* send = nullptr;
@@ -79,7 +79,7 @@ static volatile float yaw_pos = 0;
 
 static volatile unsigned int gimbal_alive = 0;
 // TODO: need to measure the specific angle
-//static volatile float yaw_pos = START_YAW_POS;
+// static volatile float yaw_pos = START_YAW_POS;
 
 // do we need to move this below? just self test use.
 static volatile bool pitch_motor_flag = false;
@@ -116,21 +116,21 @@ static volatile bool robot_hp_begin = false;
 #define IMU_RX_SIGNAL (1 << 0)
 
 const osThreadAttr_t imuTaskAttribute = {.name = "imuTask",
-                                        .attr_bits = osThreadDetached,
-                                        .cb_mem = nullptr,
-                                        .cb_size = 0,
-                                        .stack_mem = nullptr,
-                                        .stack_size = 512 * 4,
-                                        .priority = (osPriority_t)osPriorityRealtime,
-                                        .tz_module = 0,
-                                        .reserved = 0};
+                                         .attr_bits = osThreadDetached,
+                                         .cb_mem = nullptr,
+                                         .cb_size = 0,
+                                         .stack_mem = nullptr,
+                                         .stack_size = 512 * 4,
+                                         .priority = (osPriority_t)osPriorityRealtime,
+                                         .tz_module = 0,
+                                         .reserved = 0};
 osThreadId_t imuTaskHandle;
 
 class IMU : public bsp::IMU_typeC {
-public:
+ public:
   using bsp::IMU_typeC::IMU_typeC;
 
-protected:
+ protected:
   void RxCompleteCallback() final { osThreadFlagsSet(imuTaskHandle, IMU_RX_SIGNAL); }
 };
 
@@ -150,21 +150,24 @@ void imuTask(void* arg) {
 //==================================================================================================
 
 const osThreadAttr_t gimbalTaskAttribute = {.name = "gimbalTask",
-                                           .attr_bits = osThreadDetached,
-                                           .cb_mem = nullptr,
-                                           .cb_size = 0,
-                                           .stack_mem = nullptr,
-                                           .stack_size = 512 * 4,
-                                           .priority = (osPriority_t)osPriorityHigh,
-                                           .tz_module = 0,
-                                           .reserved = 0};
+                                            .attr_bits = osThreadDetached,
+                                            .cb_mem = nullptr,
+                                            .cb_size = 0,
+                                            .stack_mem = nullptr,
+                                            .stack_size = 512 * 4,
+                                            .priority = (osPriority_t)osPriorityHigh,
+                                            .tz_module = 0,
+                                            .reserved = 0};
 osThreadId_t gimbalTaskHandle;
 
 static control::Motor4310* pitch_motor = nullptr;
 static control::Motor4310* yaw_motor = nullptr;
-//static control::Gimbal* gimbal = nullptr;
-//static control::gimbal_data_t* gimbal_param = nullptr;
+// static control::Gimbal* gimbal = nullptr;
+// static control::gimbal_data_t* gimbal_param = nullptr;
 static bsp::Laser* laser = nullptr;
+
+// 4310 PID
+static control::ConstrainedPID* yaw_pid = nullptr;
 
 void gimbalTask(void* arg) {
   UNUSED(arg);
@@ -199,19 +202,28 @@ void gimbalTask(void* arg) {
   pitch_motor->SetZeroPos(pitch_motor);
   pitch_motor->MotorEnable(pitch_motor);
   // TODO:
-  yaw_motor->SetZeroPos(yaw_motor);
   yaw_motor->MotorEnable(yaw_motor);
   osDelay(GIMBAL_TASK_DELAY);
 
-  // 4310 soft start (for pitch)
+  // 4310 soft start (for pitch and yaw)
   // TODO:
   // whether the 4310 yaw motor need the soft start
   // (based on the start position of yaw motor)
-  float tmp_pos = 0;
-  for (int j = 0; j < SOFT_START_CONSTANT; j++){
-    tmp_pos += START_PITCH_POS / SOFT_START_CONSTANT;  // increase position gradually
-    pitch_motor->SetOutput(tmp_pos, 1, 115, 0.5, 0);
+
+  float yaw_offset;
+  float yaw_error;
+  float yaw_output;
+  yaw_offset = 0;
+  float tmp_pitch_pos = 0;
+  for (int j = 0; j < SOFT_START_CONSTANT; j++) {
+    tmp_pitch_pos += START_PITCH_POS / SOFT_START_CONSTANT;  // increase position gradually
+    pitch_motor->SetOutput(tmp_pitch_pos, 1, 115, 0.5, 0);
     pitch_motor->TransmitOutput(pitch_motor);
+    // Caluclate the PID output of the yaw motor
+    yaw_error = wrap<float>(-(yaw_motor->GetTheta() - yaw_offset), -PI, PI);
+    yaw_output = yaw_pid->ComputeOutput(yaw_error);
+    yaw_motor->SetOutput(yaw_output);
+    yaw_motor->TransmitOutput(yaw_motor);
     osDelay(GIMBAL_TASK_DELAY);
   }
 
@@ -223,6 +235,13 @@ void gimbalTask(void* arg) {
   // gimbal->TargetAbsWOffset(0, 0);
   // gimbal->Update();
   // control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
+  pitch_motor->SetOutput(tmp_pitch_pos, 1, 115, 0.5, 0);
+  pitch_motor->TransmitOutput(pitch_motor);
+  // TODO:
+  // stop yaw
+  yaw_motor->SetOutput(0);
+  yaw_motor->TransmitOutput(yaw_motor);
+  osDelay(200);
   imu->Calibrate();
 
   while (!imu->DataReady() || !imu->CaliDone()) {
@@ -234,10 +253,12 @@ void gimbalTask(void* arg) {
     // gimbal->Update();
     // control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
 
-    pitch_motor->SetOutput(tmp_pos, 1, 115, 0.5, 0);
+    pitch_motor->SetOutput(tmp_pitch_pos, 1, 115, 0.5, 0);
     pitch_motor->TransmitOutput(pitch_motor);
     // TODO:
-    // whether the yaw motor need to set to specific position???
+    // stop yaw
+    yaw_motor->SetOutput(0);
+    yaw_motor->TransmitOutput(yaw_motor);
     osDelay(GIMBAL_TASK_DELAY);
   }
 
@@ -249,50 +270,50 @@ void gimbalTask(void* arg) {
   send->cmd.data_bool = true;
   send->TransmitOutput();
 
-//  float pitch_ratio, yaw_ratio;
-//  float pitch_curr, yaw_curr;
-//  float pitch_target = 0, yaw_target = 0;
-//  float pitch_diff, yaw_diff;
+  //  float pitch_ratio, yaw_ratio;
+  //  float pitch_curr, yaw_curr;
+  //  float pitch_target = 0, yaw_target = 0;
+  //  float pitch_diff, yaw_diff;
 
-  float pitch_vel_range = 5.0, yaw_vel_range = 5.0;
+  float pitch_vel_range = 5.0;
 
   while (true) {
     while (Dead || GimbalDead) osDelay(100);
 
     // TODO:whether this for 4310 pitch motor ???
     // if this is for 4310, whether we need the same stuff for the 4310 yaw motor.
-    float pitch_vel, yaw_vel;
-    pitch_vel = clip<float>(-dbus->ch3 / 660.0 * pitch_vel_range, -pitch_vel_range, pitch_vel_range);
+    float pitch_vel;
+    pitch_vel = clip<float>(dbus->ch3 / 660.0 * pitch_vel_range, -pitch_vel_range, pitch_vel_range);
     pitch_pos += pitch_vel / 200 + dbus->mouse.y / 32767.0;
-    pitch_pos = clip<float>(pitch_pos, 0.05, 0.6); // measured range
+    pitch_pos = clip<float>(pitch_pos, 0.05, 0.6);  // measured range
 
-    yaw_vel = clip<float>(-dbus->ch2 / 660.0 * yaw_vel_range, -yaw_vel_range, yaw_vel_range);
-    yaw_pos += yaw_vel / 200.0;
-//    yaw_pos = clip<float>(yaw_pos, -PI/4, PI/4);
+
 
     // TODO: whether we need handle the reset case for yaw stuff ???
     if (pitch_reset) {
       // 4310 soft start
-      tmp_pos = 0;
-      for (int j = 0; j < SOFT_START_CONSTANT; j++){
-        tmp_pos += START_PITCH_POS / SOFT_START_CONSTANT;  // increase position gradually
-        pitch_motor->SetOutput(tmp_pos, 1, 115, 0.5, 0);
+      tmp_pitch_pos = 0;
+      for (int j = 0; j < SOFT_START_CONSTANT; j++) {
+        tmp_pitch_pos += START_PITCH_POS / SOFT_START_CONSTANT;  // increase position gradually
+        pitch_motor->SetOutput(tmp_pitch_pos, 1, 115, 0.5, 0);
         pitch_motor->TransmitOutput(pitch_motor);
         osDelay(GIMBAL_TASK_DELAY);
       }
-      pitch_pos = tmp_pos;
+      pitch_pos = tmp_pitch_pos;
       pitch_reset = false;
       // yaw_reset = false;
     }
+
+
     // TODO: whether we need to change the update function for both 4310 motor
     // the below stuff is for motor can base, not for 4310 base
-//    gimbal->TargetRel(-pitch_diff, yaw_diff);
-//    gimbal->Update();
-//
-//    set_cursor(0, 0);
-//    clear_screen();
-//    print("Vel Set: %f  Pos Set: %f\r\n", yaw_vel, yaw_pos);
-//    print("actual pos: %.4f, actual vel: %.4f\r\n", yaw_motor->GetTheta(), yaw_motor->GetOmega());
+    //    gimbal->TargetRel(-pitch_diff, yaw_diff);
+    //    gimbal->Update();
+    //
+    //    set_cursor(0, 0);
+    //    clear_screen();
+    //    print("Vel Set: %f  Pos Set: %f\r\n", yaw_vel, yaw_pos);
+    //    print("actual pos: %.4f, actual vel: %.4f\r\n", yaw_motor->GetTheta(), yaw_motor->GetOmega());
 
     // TODO: the 4310 yaw motor need to set the new output
     pitch_motor->SetOutput(pitch_pos, pitch_vel, 115, 0.5, 0);
@@ -301,12 +322,23 @@ void gimbalTask(void* arg) {
     //    set_cursor(0,0);
     //    print("pos: %.4f, vel: %.4f\r\n", yaw_pos, yaw_vel);
     //    print("actual pos: %.4f, actual vel: %.4f\r\n", yaw_motor->GetTheta(), yaw_motor->GetOmega());
-//    yaw_motor->SetOutput(yaw_pos, yaw_vel);
-    yaw_motor->SetOutput(yaw_pos, yaw_vel, 5, 0.5, 0);
+    //    yaw_motor->SetOutput(yaw_pos, yaw_vel);
 
     pitch_motor->TransmitOutput(pitch_motor);
+
+    // yaw calculation
+    float yaw_ratio, yaw_target;
+    yaw_ratio = -(dbus->ch2 / 18000.0 / 7.0);
+    yaw_target = clip<float>(yaw_ratio, -PI, PI);
+    yaw_offset = wrap<float>(yaw_target + yaw_offset, -PI, PI);
+    yaw_error = wrap<float>(yaw_offset - imu->INS_angle[0], -PI, PI);
+    if (abs(yaw_error) <= 0.001) yaw_error = 0;
+    yaw_output = yaw_pid->ComputeOutput(yaw_error);
+    yaw_motor->SetOutput(yaw_output);
+
+    //    yaw_pos = clip<float>(yaw_pos, -PI/4, PI/4);
     yaw_motor->TransmitOutput(yaw_motor);
-    osDelay(5);
+    osDelay(GIMBAL_TASK_DELAY);
   }
 }
 
@@ -317,21 +349,21 @@ void gimbalTask(void* arg) {
 #define REFEREE_RX_SIGNAL (1 << 1)
 
 const osThreadAttr_t refereeTaskAttribute = {.name = "refereeTask",
-                                            .attr_bits = osThreadDetached,
-                                            .cb_mem = nullptr,
-                                            .cb_size = 0,
-                                            .stack_mem = nullptr,
-                                            .stack_size = 1024 * 4,
-                                            .priority = (osPriority_t)osPriorityAboveNormal,
-                                            .tz_module = 0,
-                                            .reserved = 0};
+                                             .attr_bits = osThreadDetached,
+                                             .cb_mem = nullptr,
+                                             .cb_size = 0,
+                                             .stack_mem = nullptr,
+                                             .stack_size = 1024 * 4,
+                                             .priority = (osPriority_t)osPriorityAboveNormal,
+                                             .tz_module = 0,
+                                             .reserved = 0};
 osThreadId_t refereeTaskHandle;
 
 class RefereeUART : public bsp::UART {
-public:
+ public:
   using bsp::UART::UART;
 
-protected:
+ protected:
   void RxCompleteCallback() final { osThreadFlagsSet(refereeTaskHandle, REFEREE_RX_SIGNAL); }
 };
 
@@ -357,14 +389,14 @@ void refereeTask(void* arg) {
 //==================================================================================================
 
 const osThreadAttr_t shooterTaskAttribute = {.name = "shooterTask",
-                                            .attr_bits = osThreadDetached,
-                                            .cb_mem = nullptr,
-                                            .cb_size = 0,
-                                            .stack_mem = nullptr,
-                                            .stack_size = 256 * 4,
-                                            .priority = (osPriority_t)osPriorityNormal,
-                                            .tz_module = 0,
-                                            .reserved = 0};
+                                             .attr_bits = osThreadDetached,
+                                             .cb_mem = nullptr,
+                                             .cb_size = 0,
+                                             .stack_mem = nullptr,
+                                             .stack_size = 256 * 4,
+                                             .priority = (osPriority_t)osPriorityNormal,
+                                             .tz_module = 0,
+                                             .reserved = 0};
 
 osThreadId_t shooterTaskHandle;
 
@@ -391,8 +423,8 @@ static const int SHOOTER_MODE_DELAY = 350;
 void shooterTask(void* arg) {
   UNUSED(arg);
 
-//  control::MotorCANBase* motors_can1_shooter[] = {left_top_flywheel, left_bottom_flywheel, left_dial,
-//                                                  right_top_flywheel, right_bottom_flywheel, right_dial};
+  //  control::MotorCANBase* motors_can1_shooter[] = {left_top_flywheel, left_bottom_flywheel, left_dial,
+  //                                                  right_top_flywheel, right_bottom_flywheel, right_dial};
 
   control::MotorCANBase* motors_can1_shooter_left[] = {left_top_flywheel, left_bottom_flywheel, left_dial};
 
@@ -414,8 +446,8 @@ void shooterTask(void* arg) {
   while (true) {
     while (Dead) osDelay(100);
     // TODO: need both left and right shooter
-//    print("power1: %d, cooling heat: %.4f, cooling limit: %.4f\r\n", send->shooter_power, send->cooling_heat1, send->cooling_limit1);
-//    print("power2: %d, cooling heat: %.4f, cooling limit: %.4f\r\n", send->shooter_power, send->cooling_heat2, send->cooling_limit2);
+    //    print("power1: %d, cooling heat: %.4f, cooling limit: %.4f\r\n", send->shooter_power, send->cooling_heat1, send->cooling_limit1);
+    //    print("power2: %d, cooling heat: %.4f, cooling limit: %.4f\r\n", send->shooter_power, send->cooling_heat2, send->cooling_limit2);
 
     if (send->shooter_power && send->cooling_heat1 > send->cooling_limit1 - 20) {
       left_top_flywheel->SetOutput(0);
@@ -424,7 +456,7 @@ void shooterTask(void* arg) {
       control::MotorCANBase::TransmitOutput(motors_can1_shooter_left, 3);
       osDelay(100);
     }
-    
+
     if (send->shooter_power && send->cooling_heat2 > send->cooling_limit2 - 20) {
       right_top_flywheel->SetOutput(0);
       right_bottom_flywheel->SetOutput(0);
@@ -531,14 +563,14 @@ void shooterTask(void* arg) {
 //==================================================================================================
 
 const osThreadAttr_t chassisTaskAttribute = {.name = "chassisTask",
-                                            .attr_bits = osThreadDetached,
-                                            .cb_mem = nullptr,
-                                            .cb_size = 0,
-                                            .stack_mem = nullptr,
-                                            .stack_size = 256 * 4,
-                                            .priority = (osPriority_t)osPriorityNormal,
-                                            .tz_module = 0,
-                                            .reserved = 0};
+                                             .attr_bits = osThreadDetached,
+                                             .cb_mem = nullptr,
+                                             .cb_size = 0,
+                                             .stack_mem = nullptr,
+                                             .stack_size = 256 * 4,
+                                             .priority = (osPriority_t)osPriorityNormal,
+                                             .tz_module = 0,
+                                             .reserved = 0};
 osThreadId_t chassisTaskHandle;
 
 void chassisTask(void* arg) {
@@ -600,11 +632,11 @@ void chassisTask(void* arg) {
 
     // TODO
     // the angle difference between the gimbal and the chassis
-    relative_angle = wrap<float>(yaw_pos - yaw_motor->GetTheta(), -PI, PI);
+    relative_angle = wrap<float>(yaw_motor->GetTheta(),-PI,PI);
 
-//    send->cmd.id = bsp::RELATIVE_ANGLE;
-//    send->cmd.data_float = relative_angle;
-//    send->TransmitOutput();
+    send->cmd.id = bsp::RELATIVE_ANGLE;
+    send->cmd.data_float = -relative_angle;
+    send->TransmitOutput();
 
     osDelay(CHASSIS_TASK_DELAY);
   }
@@ -615,14 +647,14 @@ void chassisTask(void* arg) {
 //==================================================================================================
 
 const osThreadAttr_t fortressTaskAttribute = {.name = "fortressTask",
-                                             .attr_bits = osThreadDetached,
-                                             .cb_mem = nullptr,
-                                             .cb_size = 0,
-                                             .stack_mem = nullptr,
-                                             .stack_size = 256 * 4,
-                                             .priority = (osPriority_t)osPriorityNormal,
-                                             .tz_module = 0,
-                                             .reserved = 0};
+                                              .attr_bits = osThreadDetached,
+                                              .cb_mem = nullptr,
+                                              .cb_size = 0,
+                                              .stack_mem = nullptr,
+                                              .stack_size = 256 * 4,
+                                              .priority = (osPriority_t)osPriorityNormal,
+                                              .tz_module = 0,
+                                              .reserved = 0};
 
 osThreadId_t fortressTaskHandle;
 
@@ -654,29 +686,29 @@ void fortressTask(void* arg) {
 //==================================================================================================
 
 const osThreadAttr_t selfTestTaskAttribute = {.name = "selfTestTask",
-                                             .attr_bits = osThreadDetached,
-                                             .cb_mem = nullptr,
-                                             .cb_size = 0,
-                                             .stack_mem = nullptr,
-                                             .stack_size = 256 * 4,
-                                             .priority = (osPriority_t)osPriorityBelowNormal,
-                                             .tz_module = 0,
-                                             .reserved = 0};
+                                              .attr_bits = osThreadDetached,
+                                              .cb_mem = nullptr,
+                                              .cb_size = 0,
+                                              .stack_mem = nullptr,
+                                              .stack_size = 256 * 4,
+                                              .priority = (osPriority_t)osPriorityBelowNormal,
+                                              .tz_module = 0,
+                                              .reserved = 0};
 
 osThreadId_t selfTestTaskHandle;
 
 using Note = bsp::BuzzerNote;
 
 static bsp::BuzzerNoteDelayed Mario[] = {
-   {Note::Mi3M, 80}, {Note::Silent, 80}, {Note::Mi3M, 80}, {Note::Silent, 240}, {Note::Mi3M, 80}, {Note::Silent, 240}, {Note::Do1M, 80}, {Note::Silent, 80}, {Note::Mi3M, 80}, {Note::Silent, 240}, {Note::So5M, 80}, {Note::Silent, 560}, {Note::So5L, 80}, {Note::Silent, 0}, {Note::Finish, 0}};
+    {Note::Mi3M, 80}, {Note::Silent, 80}, {Note::Mi3M, 80}, {Note::Silent, 240}, {Note::Mi3M, 80}, {Note::Silent, 240}, {Note::Do1M, 80}, {Note::Silent, 80}, {Note::Mi3M, 80}, {Note::Silent, 240}, {Note::So5M, 80}, {Note::Silent, 560}, {Note::So5L, 80}, {Note::Silent, 0}, {Note::Finish, 0}};
 
 static bsp::Buzzer* buzzer = nullptr;
 static display::OLED* OLED = nullptr;
-//simple bitmask function for chassis flag
+// simple bitmask function for chassis flag
 void selfTestTask(void* arg) {
   UNUSED(arg);
   osDelay(100);
-  //The self test task for chassis will not update after the first check.
+  // The self test task for chassis will not update after the first check.
   OLED->ShowIlliniRMLOGO();
   buzzer->SingSong(Mario, [](uint32_t milli) { osDelay(milli); });
   OLED->OperateGram(display::PEN_CLEAR);
@@ -690,9 +722,9 @@ void selfTestTask(void* arg) {
   //  OLED->ShowString(4, 0, (uint8_t*)"Ref");
 
   // Fortress mode motors self test
-  OLED->ShowString(0,12, (uint8_t*)"EL");
+  OLED->ShowString(0, 12, (uint8_t*)"EL");
   OLED->ShowString(0, 17, (uint8_t*)"ER");
-  OLED->ShowString(1,17, (uint8_t*)"FM");
+  OLED->ShowString(1, 17, (uint8_t*)"FM");
 
   // chassis motors self test
   OLED->ShowString(1, 12, (uint8_t*)"FL");
@@ -714,14 +746,14 @@ void selfTestTask(void* arg) {
     // gimbal
     pitch_motor->connection_flag_ = false;
     // TODO
-//    yaw_motor->connection_flag_ = false;
+    //    yaw_motor->connection_flag_ = false;
 
-    //left shooter
+    // left shooter
     left_top_flywheel->connection_flag_ = false;
     left_bottom_flywheel->connection_flag_ = false;
     left_dial->connection_flag_ = false;
 
-    //right shooter
+    // right shooter
     right_top_flywheel->connection_flag_ = false;
     right_bottom_flywheel->connection_flag_ = false;
     right_dial->connection_flag_ = false;
@@ -732,15 +764,15 @@ void selfTestTask(void* arg) {
 
     // gimbal
     pitch_motor_flag = pitch_motor->connection_flag_;
-    //TODO
-//    yaw_motor_flag = yaw_motor->connection_flag_;
+    // TODO
+    //    yaw_motor_flag = yaw_motor->connection_flag_;
 
     // left shooter
     left_top_flywheel_flag = left_top_flywheel->connection_flag_;
     left_bottom_flywheel_flag = left_bottom_flywheel->connection_flag_;
     left_dial_flag = left_dial->connection_flag_;
 
-    //right shooter
+    // right shooter
     right_top_flywheel_flag = right_top_flywheel->connection_flag_;
     right_bottom_flywheel_flag = right_bottom_flywheel->connection_flag_;
     right_dial_flag = right_dial->connection_flag_;
@@ -755,21 +787,20 @@ void selfTestTask(void* arg) {
     elevator_right_motor_flag = (0x20 & chassis_flag_bitmap);
     fortress_motor_flag = (0x40 & chassis_flag_bitmap);
 
-
     // TODO: position of checkboxes and terms need update
-    OLED->ShowBlock(1,15,fl_motor_flag);
+    OLED->ShowBlock(1, 15, fl_motor_flag);
 
-    OLED->ShowBlock(2,15,fr_motor_flag);
+    OLED->ShowBlock(2, 15, fr_motor_flag);
 
-    OLED->ShowBlock(3,15,bl_motor_flag);
+    OLED->ShowBlock(3, 15, bl_motor_flag);
 
-    OLED->ShowBlock(4,15,br_motor_flag);
+    OLED->ShowBlock(4, 15, br_motor_flag);
 
-    OLED->ShowBlock(0,15,elevator_left_motor_flag);
+    OLED->ShowBlock(0, 15, elevator_left_motor_flag);
 
-    OLED->ShowBlock(0,20,elevator_right_motor_flag);
+    OLED->ShowBlock(0, 20, elevator_right_motor_flag);
 
-    OLED->ShowBlock(1,20,fortress_motor_flag);
+    OLED->ShowBlock(1, 20, fortress_motor_flag);
 
     //    fl_wheel_flag = send->selfCheck_flag;
     calibration_flag = imu->CaliDone();
@@ -839,15 +870,15 @@ void RM_RTOS_Init(void) {
   imu = new IMU(imu_init, false);
 
   laser = new bsp::Laser(LASER_GPIO_Port, LASER_Pin);
-  pitch_motor = new control::Motor4310(can2, 0x02, 0x02, control::MIT);
+  pitch_motor = new control::Motor4310(can2, 0x32, 0x33, control::MIT);
   // TODO: initialize the yaw motor
-  yaw_motor = new control::Motor4310(can2, 0x01, 0x01, control::MIT);
-//  control::gimbal_t gimbal_data;
-//  gimbal_data.pitch_motor_4310_ = pitch_motor;
+  yaw_motor = new control::Motor4310(can2, 0x34, 0x35, control::VEL);
+  //  control::gimbal_t gimbal_data;
+  //  gimbal_data.pitch_motor_4310_ = pitch_motor;
   // gimbal_data.yaw_motor = yaw_motor;
-//   gimbal_data.model = control::GIMBAL_FORTRESS_4310;
-//  gimbal = new control::Gimbal(gimbal_data);
-//  gimbal_param = gimbal->GetData();
+  //   gimbal_data.model = control::GIMBAL_FORTRESS_4310;
+  //  gimbal = new control::Gimbal(gimbal_data);
+  //  gimbal_param = gimbal->GetData();
 
   referee_uart = new RefereeUART(&huart6);
   referee_uart->SetupRx(300);
@@ -879,12 +910,18 @@ void RM_RTOS_Init(void) {
   right_shooter = new control::Shooter(right_shooter_data);
 
   stepper = new control::Stepper(&htim1, 1, 1000000, DIR_GPIO_Port, DIR_Pin, ENABLE_GPIO_Port,
-                                  ENABLE_Pin);
+                                 ENABLE_Pin);
 
   buzzer = new bsp::Buzzer(&htim4, 3, 1000000);
   OLED = new display::OLED(&hi2c2, 0x3C);
 
   send = new bsp::CanBridge(can2, 0x20A, 0x20B);
+
+  // 4310 PID Init
+  float yaw_pid_param[] = {2, 0, 0.01};
+  float yaw_max_iout = 0;
+  float yaw_max_out = 30;
+  yaw_pid = new control::ConstrainedPID(yaw_pid_param, yaw_max_iout, yaw_max_out);
 }
 
 //==================================================================================================
@@ -898,7 +935,7 @@ void RM_RTOS_Threads_Init(void) {
   shooterTaskHandle = osThreadNew(shooterTask, nullptr, &shooterTaskAttribute);
   chassisTaskHandle = osThreadNew(chassisTask, nullptr, &chassisTaskAttribute);
   selfTestTaskHandle = osThreadNew(selfTestTask, nullptr, &selfTestTaskAttribute);
-//  fortressTaskHandle = osThreadNew(fortressTask, nullptr, &fortressTaskAttribute);
+  //  fortressTaskHandle = osThreadNew(fortressTask, nullptr, &fortressTaskAttribute);
 }
 
 //==================================================================================================
@@ -910,8 +947,8 @@ void KillAll() {
   // TODO: change kill all for 4310 yaw motor
   //  control::MotorCANBase* motors_can1_gimbal[] = {pitch_motor};
   // control::MotorCANBase* motors_can2_gimbal[] = {yaw_motor};
-//  control::MotorCANBase* motors_can1_shooter[] = {left_top_flywheel, left_bottom_flywheel, left_dial,
-//                                                  right_top_flywheel, right_bottom_flywheel, right_dial};
+  //  control::MotorCANBase* motors_can1_shooter[] = {left_top_flywheel, left_bottom_flywheel, left_dial,
+  //                                                  right_top_flywheel, right_bottom_flywheel, right_dial};
 
   control::MotorCANBase* motors_can1_shooter_left[] = {left_top_flywheel, left_bottom_flywheel, left_dial};
 
@@ -940,10 +977,12 @@ void KillAll() {
     // TODO: whether yaw motor need soft kill
     // 4310 soft kill
     float tmp_pos = pitch_pos;
-    for (int j = 0; j < SOFT_KILL_CONSTANT; j++){
+    for (int j = 0; j < SOFT_KILL_CONSTANT; j++) {
       tmp_pos -= START_PITCH_POS / SOFT_KILL_CONSTANT;  // decrease position gradually
       pitch_motor->SetOutput(tmp_pos, 1, 115, 0.5, 0);
       pitch_motor->TransmitOutput(pitch_motor);
+      yaw_motor->SetOutput(0);
+      yaw_motor->TransmitOutput();
       osDelay(GIMBAL_TASK_DELAY);
     }
 
@@ -982,7 +1021,7 @@ void KillGimbal() {
 
     // 4310 soft kill
     float tmp_pos = pitch_pos;
-    for (int j = 0; j < SOFT_KILL_CONSTANT; j++){
+    for (int j = 0; j < SOFT_KILL_CONSTANT; j++) {
       tmp_pos -= START_PITCH_POS / SOFT_KILL_CONSTANT;  // decrease position gradually
       pitch_motor->SetOutput(tmp_pos, 1, 115, 0.5, 0);
       pitch_motor->TransmitOutput(pitch_motor);
@@ -1040,7 +1079,6 @@ void RM_RTOS_Default_Task(const void* arg) {
       print("SWL: %d SWR: %d @ %d ms\r\n", dbus->swl, dbus->swr, dbus->timestamp);
 
       print("theta: %.4f, omega: %.4f\r\n", yaw_motor->GetTheta(), yaw_motor->GetOmega());
-
     }
 
     osDelay(DEFAULT_TASK_DELAY);

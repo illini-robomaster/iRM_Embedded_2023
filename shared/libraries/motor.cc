@@ -71,7 +71,7 @@ MotorCANBase::MotorCANBase(bsp::CAN* can, uint16_t rx_id)
 }
 
 MotorCANBase::MotorCANBase(bsp::CAN* can, uint16_t rx_id, uint16_t type)
-  : theta_(0), omega_(0), can_(can), rx_id_(rx_id) {
+    : theta_(0), omega_(0), can_(can), rx_id_(rx_id) {
   UNUSED(type);
 }
 
@@ -749,6 +749,5 @@ float Motor4310::GetOmega() const {
 float Motor4310::GetTorque() const {
   return torque_;
 }
-
 
 } /* namespace control */

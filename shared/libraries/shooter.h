@@ -44,7 +44,7 @@ typedef struct {
   MotorBase* right_flywheel_motor; /* motor instance of right flywheel motor */
   MotorCANBase* load_motor;        /* CAN motor instance of load motor       */
   shooter_model_t model;
-  int dial_direction = 1;          /* CCW is 1(default), CW is -1                     */
+  int dial_direction = 1; /* CCW is 1(default), CW is -1                     */
 } shooter_t;
 
 /**

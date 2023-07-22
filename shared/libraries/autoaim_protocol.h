@@ -29,7 +29,7 @@ namespace communication {
 
 struct STMToJetsonData {
   char header[2];
-  uint8_t my_color; // RED is 0; BLUE is one
+  uint8_t my_color;  // RED is 0; BLUE is one
   uint8_t crc8_checksum;
   char tail[2];
 };

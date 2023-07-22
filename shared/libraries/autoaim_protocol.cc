@@ -26,7 +26,7 @@
 namespace communication {
 
 AutoaimProtocol::AutoaimProtocol() {
-  index = 0; // current pointer to write
+  index = 0;  // current pointer to write
   flag = 0;
 }
 
@@ -35,10 +35,10 @@ void AutoaimProtocol::Send(STMToJetsonData* packet, uint8_t color) {
   packet->header[1] = 'D';
   packet->my_color = color;
 
-  const int tail_offset = 3; // size of data minus uint8_t checksum and 2 uint8_t tail
+  const int tail_offset = 3;  // size of data minus uint8_t checksum and 2 uint8_t tail
   packet->crc8_checksum = get_crc8_check_sum((uint8_t*)packet,
-                                              sizeof(STMToJetsonData) - tail_offset,
-                                              0);
+                                             sizeof(STMToJetsonData) - tail_offset,
+                                             0);
 
   packet->tail[0] = 'E';
   packet->tail[1] = 'D';
@@ -159,9 +159,9 @@ void AutoaimProtocol::process_data() {
   uint8_t* rel_yaw_start = host_command + this->REL_YAW_OFFSET;
   uint8_t* rel_pitch_start = host_command + this->REL_PITCH_OFFSET;
 
-  seqnum = (*(uint32_t *)seq_num_start);
-  relative_yaw = (*(int32_t *)rel_yaw_start) * 1.0f / this->INT_FP_SCALE;
-  relative_pitch = *(int32_t *)rel_pitch_start *1.0f / this->INT_FP_SCALE;
+  seqnum = (*(uint32_t*)seq_num_start);
+  relative_yaw = (*(int32_t*)rel_yaw_start) * 1.0f / this->INT_FP_SCALE;
+  relative_pitch = *(int32_t*)rel_pitch_start * 1.0f / this->INT_FP_SCALE;
 }
 
 uint8_t AutoaimProtocol::get_valid_flag(void) {

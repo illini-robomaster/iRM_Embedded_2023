@@ -31,7 +31,11 @@ namespace control {
  * @brief gimbal models
  */
 // TODO: GIMBAL_FORTRESS_4310
-typedef enum { GIMBAL_FORTRESS, GIMBAL_SENTRY, GIMBAL_STEERING, GIMBAL_STEERING_4310, GIMBAL_FORTRESS_4310} gimbal_model_t;
+typedef enum { GIMBAL_FORTRESS,
+               GIMBAL_SENTRY,
+               GIMBAL_STEERING,
+               GIMBAL_STEERING_4310,
+               GIMBAL_FORTRESS_4310 } gimbal_model_t;
 
 /**
  * @brief offset, max, and proximity angles of different gimbals
@@ -49,7 +53,7 @@ typedef struct {
  * @brief structure used when gimbal instance is initialized
  */
 typedef struct {
-  Motor4310* pitch_motor_4310_;    /* 4310 pitch motor instance */
+  Motor4310* pitch_motor_4310_; /* 4310 pitch motor instance */
   // TODO: new yaw motor
   // Motor4310* yaw_motor_4310_;      /* 4310 yaw motor instance   */
   MotorCANBase* pitch_motor; /* pitch motor instance */
@@ -113,37 +117,37 @@ class Gimbal {
 
   /**
    * @brief Get pitch angle target
-   * 
-   * @return float 
+   *
+   * @return float
    */
   float GetTargetPitchAngle();
 
   /**
    * @brief Get yaw angle target
-   * 
-   * @return float 
+   *
+   * @return float
    */
   float GetTargetYawAngle();
 
   /**
    * @brief Get absolute pitch angle with wrapping and clipping
-   * 
-   * @return float 
+   *
+   * @return float
    */
   float ComputePitchRel(float new_pitch, float pitch_ref);
 
   /**
    * @brief Get absolute yaw angle with wrapping and clipping
-   * 
-   * @return float 
+   *
+   * @return float
    */
   float ComputeYawRel(float new_yaw, float yaw_ref);
 
  private:
   // acquired from user
   Motor4310* pitch_motor_4310_ = nullptr;
-  //TODO:
-  // Motor4310* yaw_motor_4310_ = nullptr;
+  // TODO:
+  //  Motor4310* yaw_motor_4310_ = nullptr;
   MotorCANBase* pitch_motor_ = nullptr;
   MotorCANBase* yaw_motor_ = nullptr;
   gimbal_model_t model_;
@@ -155,9 +159,9 @@ class Gimbal {
   float* pitch_theta_pid_param_ =
       nullptr; /* pid param that used to control pitch motor when moving  */
   float* pitch_omega_pid_param_ =
-      nullptr; /* pid param that used to control pitch motor when holding */
-  float* yaw_theta_pid_param_ = nullptr; /* pid param that used to control yaw motor when moving */
-  float* yaw_omega_pid_param_ = nullptr; /* pid param that used to control yaw motor when holding */
+      nullptr;                                /* pid param that used to control pitch motor when holding */
+  float* yaw_theta_pid_param_ = nullptr;      /* pid param that used to control yaw motor when moving */
+  float* yaw_omega_pid_param_ = nullptr;      /* pid param that used to control yaw motor when holding */
   ConstrainedPID* pitch_theta_pid_ = nullptr; /* pitch theta pid */
   ConstrainedPID* pitch_omega_pid_ = nullptr; /* pitch omega pid */
   ConstrainedPID* yaw_theta_pid_ = nullptr;   /* yaw theta pid   */

@@ -25,7 +25,8 @@
 
 namespace control {
 
-enum dir { FORWARD, BACKWARD };
+enum dir { FORWARD,
+           BACKWARD };
 
 class Stepper {
  public:

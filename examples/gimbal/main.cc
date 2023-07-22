@@ -20,12 +20,11 @@
 
 #include "main.h"
 
+#include "bsp_gpio.h"
 #include "bsp_print.h"
 #include "cmsis_os.h"
 #include "dbus.h"
 #include "gimbal.h"
-
-#include "bsp_gpio.h"
 
 #define NOTCH (2 * PI / 8)
 #define SERVO_SPEED (PI)
@@ -67,8 +66,10 @@ void RM_RTOS_Default_Task(const void* args) {
   control::MotorCANBase* motors[2] = {pitch_motor, yaw_motor};
   control::gimbal_data_t* gimbal_data = gimbal->GetData();
 
-  while(!key->Read());
-  while(key->Read());
+  while (!key->Read())
+    ;
+  while (key->Read())
+    ;
   print("ok!\r\n");
 
   float pitch_ratio = 0.0;

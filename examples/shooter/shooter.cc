@@ -18,14 +18,14 @@
  *                                                                          *
  ****************************************************************************/
 
-#include "main.h"
+#include "shooter.h"
 
 #include "bsp_gpio.h"
 #include "bsp_laser.h"
+#include "bsp_os.h"
 #include "cmsis_os.h"
 #include "dbus.h"
-#include "shooter.h"
-#include "bsp_os.h"
+#include "main.h"
 
 #define LASER_Pin GPIO_PIN_13
 #define LASER_GPIO_Port GPIOG
@@ -56,7 +56,7 @@ void RM_RTOS_Init() {
   shooter_data.left_flywheel_motor = left_flywheel_motor;
   shooter_data.right_flywheel_motor = right_flywheel_motor;
   shooter_data.load_motor = load_motor;
-  shooter_data.dial_direction = 1; // left shooter use 1(CCW), right shooter use -1(CW)
+  shooter_data.dial_direction = 1;  // left shooter use 1(CCW), right shooter use -1(CW)
   shooter_data.model = control::SHOOTER_STANDARD;
   shooter = new control::Shooter(shooter_data);
 }
@@ -76,7 +76,7 @@ void RM_RTOS_Default_Task(const void* args) {
       shooter->SetFlywheelSpeed(0);
     } else {
       shooter->SetFlywheelSpeed(482);
-    } 
+    }
 
     if (dbus->mouse.l || dbus->swr == remote::UP) {
       if ((bsp::GetHighresTickMicroSec() - start_time) / 1000 > DELAY) {

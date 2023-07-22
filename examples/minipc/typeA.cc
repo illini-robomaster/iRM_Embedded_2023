@@ -18,16 +18,15 @@
  *                                                                          *
  ****************************************************************************/
 
-#include "main.h"
-
 #include <cstring>
 #include <memory>
 
+#include "autoaim_protocol.h"
 #include "bsp_gpio.h"
 #include "bsp_print.h"
 #include "bsp_uart.h"
 #include "cmsis_os.h"
-#include "autoaim_protocol.h"
+#include "main.h"
 
 #define RX_SIGNAL (1 << 0)
 

@@ -18,16 +18,15 @@
  *                                                                          *
  ****************************************************************************/
 
-#include "main.h"
-
 #include <cstring>
 #include <memory>
 
+#include "autoaim_protocol.h"
 #include "bsp_gpio.h"
 #include "bsp_print.h"
 #include "bsp_uart.h"
 #include "cmsis_os.h"
-#include "autoaim_protocol.h"
+#include "main.h"
 #include "rgb.h"
 
 #define RX_SIGNAL (1 << 0)
@@ -85,12 +84,12 @@ void RM_RTOS_Default_Task(const void* argument) {
         osDelay(10000);
         // after 10 seconds, write 1000 alternating packets to Jetson
         communication::STMToJetsonData packet_to_send;
-        uint8_t my_color = 1; // blue
+        uint8_t my_color = 1;  // blue
         for (int i = 0; i < 1000; ++i) {
           if (i % 2 == 0) {
-            my_color = 1; // blue
+            my_color = 1;  // blue
           } else {
-            my_color = 0; // red
+            my_color = 0;  // red
           }
           miniPCreceiver.Send(&packet_to_send, my_color);
           uart->Write((uint8_t*)&packet_to_send, sizeof(communication::STMToJetsonData));

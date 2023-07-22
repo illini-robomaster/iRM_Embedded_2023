@@ -69,7 +69,7 @@ void RM_RTOS_Init() {
    *   Now the align angle is recorded:
    *   Press key once will turn the two motors to their angles.
    *   Press key again will turn them back to their align angles.
-  **/
+   **/
   key1 = new bsp::GPIO(KEY_GPIO_GROUP, KEY_GPIO_PIN);
   // GPIO L1 to align motor3. The switch should be wired from L1 pin to R2 pin (5V VCC)
   key3 = new bsp::GPIO(GPIOC, GPIO_PIN_2);
@@ -83,7 +83,7 @@ void RM_RTOS_Init() {
   steering_data.max_iout = 1000;
   steering_data.max_out = 13000;
   steering_data.calibrate_offset = 0;
-  //steering_data.calibrate_offset = PI/2;
+  // steering_data.calibrate_offset = PI/2;
 
   steering_data.align_detect_func = steering_align_detect1;
   steering1 = new control::SteeringMotor(steering_data);
@@ -100,10 +100,12 @@ void RM_RTOS_Default_Task(const void* args) {
 
   // Press Key to start aligning. Else sudden current change when power is switched on might break
   // the board.
-  while(!key1->Read());
+  while (!key1->Read())
+    ;
 
   // wait for release because align_detect also is key press here
-  while(key1->Read());
+  while (key1->Read())
+    ;
 
   print("Alignment Begin\r\n");
   steering1->SetMaxSpeed(ALIGN_SPEED);
@@ -139,7 +141,7 @@ void RM_RTOS_Default_Task(const void* args) {
 
   while (true) {
     key_detector.input(key1->Read());
-    if (key_detector.posEdge()){
+    if (key_detector.posEdge()) {
       if (dir == 1) {
         // Motor should turn the give angle
         steering1->TurnRelative(PI * 4 + PI / 4);
@@ -148,7 +150,7 @@ void RM_RTOS_Default_Task(const void* args) {
         // Motor should go to align angle
         print("motor1 align status: %d ", steering1->ReAlign());
         print("motor3 align status: %d\r\n", steering3->ReAlign());
-     }
+      }
       dir *= -1;
     }
 

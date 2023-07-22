@@ -27,8 +27,8 @@
 #include "bsp_print.h"
 #include "cmsis_os.h"
 #include "dbus.h"
-#include "steering.h"
 #include "motor.h"
+#include "steering.h"
 
 bsp::CAN* can1 = nullptr;
 bsp::CAN* can2 = nullptr;
@@ -47,7 +47,7 @@ constexpr float OFFSET_MOTOR4 = 0;
  * Working Steering Chassis Example
  * Left stick for translation, right stick for rotation
  * Right switch UP is to start an alignment (calibration)
-**/
+ **/
 
 control::MotorCANBase* motor1 = nullptr;
 control::MotorCANBase* motor2 = nullptr;
@@ -215,7 +215,7 @@ void RM_RTOS_Default_Task(const void* args) {
       v6 = 0;
       v7 = 0;
       v8 = 0;
-      chassis->SetWheelSpeed(0,0,0,0);
+      chassis->SetWheelSpeed(0, 0, 0, 0);
     } else {
       chassis->SetSpeed(vx, vy, vw);
       chassis->SteerUpdateTarget();

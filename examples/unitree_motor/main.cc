@@ -20,10 +20,10 @@
 
 #include "main.h"
 
-#include "unitree_motor.h"
 #include "bsp_print.h"
 #include "bsp_uart.h"
 #include "cmsis_os.h"
+#include "unitree_motor.h"
 
 static control::UnitreeMotor* A1 = nullptr;
 
@@ -41,7 +41,7 @@ const osThreadAttr_t A1TaskAttribute = {.name = "A1Task",
 
 osThreadId_t A1TaskHandle;
 
-class CustomUART: public bsp::UART {
+class CustomUART : public bsp::UART {
  public:
   using bsp::UART::UART;
 
@@ -94,7 +94,7 @@ void RM_RTOS_Default_Task(const void* arguments) {
   A1_uart->Write((uint8_t*)(&(A1->send.data)), A1->send_length);
   osDelay(3000);
 
-  A1->Control(0, 0.0, -1.0, 0.0, 0.0, 3.0); // constant speed mode
+  A1->Control(0, 0.0, -1.0, 0.0, 0.0, 3.0);  // constant speed mode
   for (int i = 0; i < 30; ++i) {
     A1_uart->Write((uint8_t*)(&(A1->send.data)), A1->send_length);
     set_cursor(0, 0);
@@ -110,7 +110,7 @@ void RM_RTOS_Default_Task(const void* arguments) {
     osDelay(100);
   }
 
-  A1->Control(0, 0.0, 0.0, 0.0, 0.0, 0.0); // zero torque mode
+  A1->Control(0, 0.0, 0.0, 0.0, 0.0, 0.0);  // zero torque mode
   while (true) {
     A1_uart->Write((uint8_t*)(&(A1->send.data)), A1->send_length);
     set_cursor(0, 0);

@@ -18,13 +18,14 @@
  *                                                                          *
  ****************************************************************************/
 
+#include "main.h"
+
 #include "bsp_print.h"
+#include "chassis.h"
 #include "cmsis_os.h"
 #include "controller.h"
-#include "main.h"
-#include "motor.h"
 #include "dbus.h"
-#include "chassis.h"
+#include "motor.h"
 
 #define TARGET_SPEED 30
 
@@ -43,7 +44,7 @@ control::Chassis* chassis = nullptr;
 static remote::DBUS* dbus;
 
 void RM_RTOS_Init() {
-//  print_use_uart(&huart1);
+  //  print_use_uart(&huart1);
   dbus = new remote::DBUS(&huart1);
   can1 = new bsp::CAN(&hcan1, 0x201, true);
   can2 = new bsp::CAN(&hcan2, 0x201, false);
@@ -87,7 +88,7 @@ void RM_RTOS_Default_Task(const void* args) {
 
     chassis->Update(false, 30, 20, 60);
 
-    if (dbus->swr == remote::UP){
+    if (dbus->swr == remote::UP) {
       float diff1 = right->GetOmegaDelta(3000);
       float diff2 = left->GetOmegaDelta(-3000);
       int16_t out1 = pid_right.ComputeConstrainedOutput(diff1);
@@ -95,8 +96,7 @@ void RM_RTOS_Default_Task(const void* args) {
       right->SetOutput(out1);
       left->SetOutput(out2);
       control::MotorCANBase::TransmitOutput(motors_flywheels, 2);
-    }
-    else if (dbus->swr == remote::DOWN){
+    } else if (dbus->swr == remote::DOWN) {
       float diff1 = right->GetOmegaDelta(0);
       float diff2 = left->GetOmegaDelta(0);
       int16_t out1 = pid_right.ComputeConstrainedOutput(diff1);

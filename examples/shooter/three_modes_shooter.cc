@@ -18,14 +18,13 @@
  *                                                                          *
  ****************************************************************************/
 
-#include "main.h"
-
 #include "bsp_gpio.h"
 #include "bsp_laser.h"
+#include "bsp_os.h"
 #include "cmsis_os.h"
 #include "dbus.h"
+#include "main.h"
 #include "shooter.h"
-#include "bsp_os.h"
 
 // #define LASER_Pin GPIO_PIN_13
 // #define LASER_GPIO_Port GPIOG
@@ -79,7 +78,7 @@ void RM_RTOS_Default_Task(const void* args) {
     }
     if (dbus->mouse.r) {
       shooter->FastContinueShoot();
-    } else if (dbus->swr == remote::UP || dbus->mouse.l){
+    } else if (dbus->swr == remote::UP || dbus->mouse.l) {
       if (bsp::GetHighresTickMicroSec() - start_time > DELAY) {
         shooter->SlowContinueShoot();
       } else {
@@ -97,6 +96,5 @@ void RM_RTOS_Default_Task(const void* args) {
     shooter->Update();
     control::MotorCANBase::TransmitOutput(motors, 3);
     osDelay(1);
-
   }
 }

@@ -39,4 +39,3 @@ void RM_RTOS_Default_Task(const void* args) {
     osDelay(500);
   }
 }
-

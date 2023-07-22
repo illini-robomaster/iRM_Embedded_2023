@@ -53,7 +53,7 @@ static const int KILLALL_DELAY = 100;
 static const int DEFAULT_TASK_DELAY = 100;
 static const int SOFT_START_CONSTANT = 300;
 static const int SOFT_KILL_CONSTANT = 200;
-static const float START_PITCH_POS = PI/5;
+static const float START_PITCH_POS = PI / 5;
 static const int INFANTRY_INITIAL_HP = 100;
 
 static bsp::CanBridge* send = nullptr;
@@ -145,7 +145,7 @@ const osThreadAttr_t gimbalTaskAttribute = {.name = "gimbalTask",
                                             .reserved = 0};
 osThreadId_t gimbalTaskHandle;
 
-//static control::MotorCANBase* pitch_motor = nullptr;
+// static control::MotorCANBase* pitch_motor = nullptr;
 static control::Motor4310* pitch_motor = nullptr;
 static control::MotorCANBase* yaw_motor = nullptr;
 static control::Gimbal* gimbal = nullptr;
@@ -181,7 +181,7 @@ void gimbalTask(void* arg) {
 
   // 4310 soft start
   float tmp_pos = 0;
-  for (int j = 0; j < SOFT_START_CONSTANT; j++){
+  for (int j = 0; j < SOFT_START_CONSTANT; j++) {
     gimbal->TargetAbsWOffset(0, 0);
     gimbal->Update();
     control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
@@ -243,12 +243,12 @@ void gimbalTask(void* arg) {
     float pitch_vel;
     pitch_vel = -1 * clip<float>(dbus->ch3 / 660.0, -15, 15);
     pitch_pos += pitch_vel / 200 + dbus->mouse.y / 32767.0;
-    pitch_pos = clip<float>(pitch_pos, 0.1, 1); // measured range
+    pitch_pos = clip<float>(pitch_pos, 0.1, 1);  // measured range
 
     if (pitch_reset) {
       // 4310 soft start
       tmp_pos = 0;
-      for (int j = 0; j < SOFT_START_CONSTANT; j++){
+      for (int j = 0; j < SOFT_START_CONSTANT; j++) {
         tmp_pos += START_PITCH_POS / SOFT_START_CONSTANT;  // increase position gradually
         pitch_motor->SetOutput(tmp_pos, 1, 115, 0.5, 0);
         pitch_motor->TransmitOutput(pitch_motor);
@@ -399,7 +399,7 @@ void shooterTask(void* arg) {
         slow_shoot_detect = false;
       }
     }
-      
+
     if (!send->shooter_power || dbus->keyboard.bit.Q || dbus->swr == remote::DOWN) {
       flywheelFlag = false;
       shooter->SetFlywheelSpeed(0);
@@ -525,14 +525,14 @@ static bsp::BuzzerNoteDelayed Mario[] = {
 
 static bsp::Buzzer* buzzer = nullptr;
 static display::OLED* OLED = nullptr;
-//simple bitmask function for chassis flag
+// simple bitmask function for chassis flag
 void selfTestTask(void* arg) {
   UNUSED(arg);
   osDelay(100);
-  //Try to make the chassis Flags initialized at first.
+  // Try to make the chassis Flags initialized at first.
 
-  //Could need more time to test it out.
-  //The self test task for chassis will not update after the first check.
+  // Could need more time to test it out.
+  // The self test task for chassis will not update after the first check.
   OLED->ShowIlliniRMLOGO();
   buzzer->SingSong(Mario, [](uint32_t milli) { osDelay(milli); });
   OLED->OperateGram(display::PEN_CLEAR);
@@ -553,13 +553,12 @@ void selfTestTask(void* arg) {
 
   OLED->ShowString(1, 12, (uint8_t*)"FL");
   OLED->ShowString(2, 12, (uint8_t*)"FR");
-//
+  //
   OLED->ShowString(3, 12, (uint8_t*)"BL");
   OLED->ShowString(4, 12, (uint8_t*)"BR");
 
   char temp[6] = "";
   while (true) {
-
     osDelay(100);
     pitch_motor->connection_flag_ = false;
     yaw_motor->connection_flag_ = false;
@@ -579,21 +578,21 @@ void selfTestTask(void* arg) {
     chassis_flag_bitmap = send->chassis_flag;
 
     fl_wheel_flag = (0x80 & chassis_flag_bitmap);
-    //motor 8
+    // motor 8
     fr_wheel_flag = (0x40 & chassis_flag_bitmap);
-    //motor 7
+    // motor 7
     bl_wheel_flag = (0x20 & chassis_flag_bitmap);
-    //motor 6
+    // motor 6
     br_wheel_flag = (0x10 & chassis_flag_bitmap);
-    //motor 5
+    // motor 5
     fl_steering_flag = (0x08 & chassis_flag_bitmap);
-    //motor 4
+    // motor 4
     fr_steering_flag = (0x04 & chassis_flag_bitmap);
-    //motor 3
+    // motor 3
     br_steering_flag = (0x02 & chassis_flag_bitmap);
-    //motor 2
+    // motor 2
     bl_steering_flag = (0x01 & chassis_flag_bitmap);
-    //motor 1
+    // motor 1
 
     //    fl_wheel_flag = send->selfCheck_flag;
     calibration_flag = imu->CaliDone();
@@ -614,19 +613,19 @@ void selfTestTask(void* arg) {
 
     OLED->ShowBlock(1, 18, fl_wheel_flag);
 
-    OLED->ShowBlock(1,15,fl_steering_flag);
+    OLED->ShowBlock(1, 15, fl_steering_flag);
 
     OLED->ShowBlock(2, 18, fr_wheel_flag);
 
-    OLED->ShowBlock(2,15,fr_steering_flag);
+    OLED->ShowBlock(2, 15, fr_steering_flag);
 
     OLED->ShowBlock(3, 18, bl_wheel_flag);
 
-    OLED->ShowBlock(3,15,bl_steering_flag);
+    OLED->ShowBlock(3, 15, bl_steering_flag);
 
     OLED->ShowBlock(4, 18, br_wheel_flag);
 
-    OLED->ShowBlock(4,15,br_steering_flag);
+    OLED->ShowBlock(4, 15, br_steering_flag);
 
     OLED->RefreshGram();
 
@@ -739,7 +738,7 @@ void KillAll() {
 
     // 4310 soft kill
     float tmp_pos = pitch_pos;
-    for (int j = 0; j < SOFT_KILL_CONSTANT; j++){
+    for (int j = 0; j < SOFT_KILL_CONSTANT; j++) {
       tmp_pos -= START_PITCH_POS / SOFT_KILL_CONSTANT;  // decrease position gradually
       pitch_motor->SetOutput(tmp_pos, 1, 115, 0.5, 0);
       pitch_motor->TransmitOutput(pitch_motor);
@@ -798,7 +797,6 @@ void RM_RTOS_Default_Task(const void* arg) {
 
       print("CH0: %-4d CH1: %-4d CH2: %-4d CH3: %-4d ", dbus->ch0, dbus->ch1, dbus->ch2, dbus->ch3);
       print("SWL: %d SWR: %d @ %d ms\r\n", dbus->swl, dbus->swr, dbus->timestamp);
-
     }
 
     osDelay(DEFAULT_TASK_DELAY);

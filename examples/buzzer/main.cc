@@ -26,10 +26,7 @@
 using Note = bsp::BuzzerNote;
 
 static bsp::BuzzerNoteDelayed Mario[] = {
-    {Note::Mi3M, 80}, {Note::Silent, 80},  {Note::Mi3M, 80}, {Note::Silent, 240},
-    {Note::Mi3M, 80}, {Note::Silent, 240}, {Note::Do1M, 80}, {Note::Silent, 80},
-    {Note::Mi3M, 80}, {Note::Silent, 240}, {Note::So5M, 80}, {Note::Silent, 560},
-    {Note::So5L, 80}, {Note::Silent, 0},   {Note::Finish, 0}};
+    {Note::Mi3M, 80}, {Note::Silent, 80}, {Note::Mi3M, 80}, {Note::Silent, 240}, {Note::Mi3M, 80}, {Note::Silent, 240}, {Note::Do1M, 80}, {Note::Silent, 80}, {Note::Mi3M, 80}, {Note::Silent, 240}, {Note::So5M, 80}, {Note::Silent, 560}, {Note::So5L, 80}, {Note::Silent, 0}, {Note::Finish, 0}};
 // uncomment to play the full song
 static bsp::BuzzerNoteDelayed War_Cant_of_Mars[] = {
     //    {Note::So5M, 400},   {Note::So5M, 200},  {Note::So5M, 200},
@@ -75,7 +72,3 @@ void RM_RTOS_Init(void) {
   buzzer.SingSong(Mario);
   buzzer.SingSong(War_Cant_of_Mars);
 }
-
-
-
-

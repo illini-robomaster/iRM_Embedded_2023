@@ -27,7 +27,8 @@
 
 namespace control {
 
-typedef enum { ELEVATOR, SPINNER } fortress_component_t;
+typedef enum { ELEVATOR,
+               SPINNER } fortress_component_t;
 
 typedef struct {
   bsp::GPIO* leftSwitch;

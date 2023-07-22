@@ -31,10 +31,10 @@ void jam_callback(control::ServoMotor* servo, const control::servo_jam_t data) {
   float servo_target = servo->GetTarget();
   int direction = servo->GetDirection();
   if (abs(servo_target) >= abs(servo->GetTheta())) {
-    float prev_target = servo->GetTheta() - (2 * PI/6 * direction);
+    float prev_target = servo->GetTheta() - (2 * PI / 6 * direction);
     servo->SetTarget(prev_target, true);
     // print("Antijam engage\r\n");
-  } 
+  }
   // else {
   //   // print("Antijam in operation\r\n");
   // }
@@ -86,7 +86,7 @@ Shooter::Shooter(shooter_t shooter) {
       left_pid_ = new PIDController(80, 3, 0.1);
       right_pid_ = new PIDController(80, 3, 0.1);
       flywheel_turning_detector_ = new BoolEdgeDetector(false);
-      
+
       // change the direction inside the constructor
       load_step_angle_ = (2 * PI / 8) * dial_direction_;
       load_double_angle_ = (2 * PI / 4) * dial_direction_;
@@ -95,7 +95,7 @@ Shooter::Shooter(shooter_t shooter) {
       dial_continue_fast_acceleration = 100 * PI;
       dial_continue_slowly_acceleration = 40 * PI;
       dial_double_acceleration = 100 * PI;
-      // test pid 
+      // test pid
       load_moter_pid_->Reinit(1, 1, 1, 9000, 20000);
       break;
 

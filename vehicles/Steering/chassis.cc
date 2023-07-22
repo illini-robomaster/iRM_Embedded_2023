@@ -18,6 +18,8 @@
  *                                                                          *
  ****************************************************************************/
 
+#include <cmath>
+
 #include "bsp_can_bridge.h"
 #include "bsp_gpio.h"
 #include "bsp_os.h"
@@ -31,7 +33,6 @@
 #include "rgb.h"
 #include "steering.h"
 #include "supercap.h"
-#include <cmath>
 
 static bsp::CAN* can1 = nullptr;
 static bsp::CAN* can2 = nullptr;
@@ -179,7 +180,7 @@ void chassisTask(void* arg) {
   chassis->SteerCalcOutput();
   chassis->SteerSetMaxSpeed(RUN_SPEED);
   chassis->SteerThetaReset();
-  chassis->SetWheelSpeed(0,0,0,0);
+  chassis->SetWheelSpeed(0, 0, 0, 0);
 
   while (true) {
     float relative_angle = receive->relative_angle;
@@ -190,8 +191,8 @@ void chassisTask(void* arg) {
     vx_set = -receive->vy;
     vy_set = receive->vx;
 
-    ReCali.input(receive->recalibrate);   // detect force recalibration
-    Revival.input(receive->dead);         // detect robot revival
+    ReCali.input(receive->recalibrate);  // detect force recalibration
+    Revival.input(receive->dead);        // detect robot revival
 
     // realign on revival OR when key 'R' is pressed
     if (Revival.negEdge() || ReCali.posEdge()) {
@@ -208,7 +209,7 @@ void chassisTask(void* arg) {
       chassis->SteerCalcOutput();
       chassis->SteerSetMaxSpeed(RUN_SPEED);
       chassis->SteerThetaReset();
-      chassis->SetWheelSpeed(0,0,0,0);
+      chassis->SetWheelSpeed(0, 0, 0, 0);
     }
 
     if (receive->mode == 1) {  // spin mode
@@ -232,7 +233,6 @@ void chassisTask(void* arg) {
       if (-CHASSIS_DEADZONE < relative_angle && relative_angle < CHASSIS_DEADZONE) wz = 0;
     }
 
-
     chassis->SetSpeed(vx / 10, vy / 10, wz);
     chassis->SteerUpdateTarget();
     constexpr float WHEEL_SPEED_FACTOR = 4;
@@ -242,7 +242,7 @@ void chassisTask(void* arg) {
                     referee->power_heat_data.chassis_power,
                     (float)referee->power_heat_data.chassis_power_buffer);
     if (Dead) {
-      chassis->SetSpeed(0,0,0);
+      chassis->SetSpeed(0, 0, 0);
       motor5->SetOutput(0);
       motor6->SetOutput(0);
       motor7->SetOutput(0);
@@ -281,7 +281,6 @@ void chassisTask(void* arg) {
     receive->TransmitOutput();
 
     osDelay(CHASSIS_TASK_DELAY);
-
   }
 }
 
@@ -290,14 +289,14 @@ void chassisTask(void* arg) {
 //==================================================================================================
 
 const osThreadAttr_t chassisTestingTask = {.name = "chassisTestTask",
-                                        .attr_bits = osThreadDetached,
-                                        .cb_mem = nullptr,
-                                        .cb_size = 0,
-                                        .stack_mem = nullptr,
-                                        .stack_size = 256 * 4,
-                                        .priority = (osPriority_t)osPriorityBelowNormal,
-                                        .tz_module = 0,
-                                        .reserved = 0};
+                                           .attr_bits = osThreadDetached,
+                                           .cb_mem = nullptr,
+                                           .cb_size = 0,
+                                           .stack_mem = nullptr,
+                                           .stack_size = 256 * 4,
+                                           .priority = (osPriority_t)osPriorityBelowNormal,
+                                           .tz_module = 0,
+                                           .reserved = 0};
 osThreadId_t chassisTestTaskHandle;
 
 static bool fl_steer_motor_flag = false;
@@ -311,10 +310,10 @@ static bool br_wheel_motor_flag = false;
 
 static bool transmission_flag = true;
 
-void chassisTestTask(void* arg){
+void chassisTestTask(void* arg) {
   UNUSED(arg);
 
-  while(true){
+  while (true) {
     osDelay(100);
     motor8->connection_flag_ = false;
     motor7->connection_flag_ = false;
@@ -333,16 +332,16 @@ void chassisTestTask(void* arg){
     fr_steer_motor_flag = motor3->connection_flag_;
     br_steer_motor_flag = motor2->connection_flag_;
     bl_steer_motor_flag = motor1->connection_flag_;
-    flag_summary = bl_steer_motor_flag|
-                   br_steer_motor_flag<<1|
-                   fr_steer_motor_flag<<2|
-                   fl_steer_motor_flag<<3|
-                   br_wheel_motor_flag<<4|
-                   bl_wheel_motor_flag<<5|
-                   fr_wheel_motor_flag<<6|
-                   fl_wheel_motor_flag<<7;
+    flag_summary = bl_steer_motor_flag |
+                   br_steer_motor_flag << 1 |
+                   fr_steer_motor_flag << 2 |
+                   fl_steer_motor_flag << 3 |
+                   br_wheel_motor_flag << 4 |
+                   bl_wheel_motor_flag << 5 |
+                   fr_wheel_motor_flag << 6 |
+                   fl_wheel_motor_flag << 7;
     osDelay(100);
-    if(transmission_flag){
+    if (transmission_flag) {
       receive->cmd.id = bsp::CHASSIS_FLAG;
       receive->cmd.data_uint = (unsigned int)flag_summary;
       receive->TransmitOutput();
@@ -435,7 +434,7 @@ void KillAll() {
 
   RGB->Display(display::color_blue);
 
-  chassis->SteerAlignFalse();   // set alignment status of each wheel to false
+  chassis->SteerAlignFalse();  // set alignment status of each wheel to false
 
   while (true) {
     if (!receive->dead) {

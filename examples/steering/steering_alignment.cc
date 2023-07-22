@@ -96,7 +96,7 @@ void RM_RTOS_Init() {
    *   Press key to start alignment, you should see four wheels turning to align.
    *   When alignment finishes, press key again to turn off motors' power.
    *   Now you can turn the motor manually. Align motors by hand to measure the offset of each motor.
-  **/
+   **/
   pe1 = new bsp::GPIO(IN1_GPIO_Port, IN1_Pin);
   pe2 = new bsp::GPIO(IN2_GPIO_Port, IN2_Pin);
   pe3 = new bsp::GPIO(IN3_GPIO_Port, IN3_Pin);
@@ -168,10 +168,12 @@ void RM_RTOS_Default_Task(const void* args) {
 
   // Press Key to start aligning. Else sudden current change when power is switched on might break
   // the board.
-  while(key1->Read());
+  while (key1->Read())
+    ;
 
   // wait for release because align_detect also is key press here
-  while(!key1->Read());
+  while (!key1->Read())
+    ;
 
   print("Alignment Begin\r\n");
 
@@ -190,7 +192,7 @@ void RM_RTOS_Default_Task(const void* args) {
 
   print("\r\nAlignment End\r\n");
 
-  while(1) {
+  while (1) {
     chassis->SteerCalcOutput();
     control::MotorCANBase::TransmitOutput(steer_motors, 4);
     osDelay(2);
@@ -199,9 +201,8 @@ void RM_RTOS_Default_Task(const void* args) {
     }
   }
 
-  while(1) {
+  while (1) {
     chassis->PrintData();
     osDelay(1000);
   }
-
 }

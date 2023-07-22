@@ -194,43 +194,43 @@ void gimbalTask(void* arg) {
 // Referee
 //==================================================================================================
 
-//#define REFEREE_RX_SIGNAL (1 << 1)
+// #define REFEREE_RX_SIGNAL (1 << 1)
 //
-// const osThreadAttr_t refereeTaskAttribute = {.name = "refereeTask",
-//                                             .attr_bits = osThreadDetached,
-//                                             .cb_mem = nullptr,
-//                                             .cb_size = 0,
-//                                             .stack_mem = nullptr,
-//                                             .stack_size = 1024 * 4,
-//                                             .priority = (osPriority_t)osPriorityAboveNormal,
-//                                             .tz_module = 0,
-//                                             .reserved = 0};
-// osThreadId_t refereeTaskHandle;
+//  const osThreadAttr_t refereeTaskAttribute = {.name = "refereeTask",
+//                                              .attr_bits = osThreadDetached,
+//                                              .cb_mem = nullptr,
+//                                              .cb_size = 0,
+//                                              .stack_mem = nullptr,
+//                                              .stack_size = 1024 * 4,
+//                                              .priority = (osPriority_t)osPriorityAboveNormal,
+//                                              .tz_module = 0,
+//                                              .reserved = 0};
+//  osThreadId_t refereeTaskHandle;
 //
-// class RefereeUART : public bsp::UART {
-// public:
-//  using bsp::UART::UART;
+//  class RefereeUART : public bsp::UART {
+//  public:
+//   using bsp::UART::UART;
 //
-// protected:
-//  void RxCompleteCallback() final { osThreadFlagsSet(refereeTaskHandle, REFEREE_RX_SIGNAL); }
-//};
+//  protected:
+//   void RxCompleteCallback() final { osThreadFlagsSet(refereeTaskHandle, REFEREE_RX_SIGNAL); }
+// };
 //
-// static communication::Referee* referee = nullptr;
-// static RefereeUART* referee_uart = nullptr;
+//  static communication::Referee* referee = nullptr;
+//  static RefereeUART* referee_uart = nullptr;
 //
-// void refereeTask(void* arg) {
-//  UNUSED(arg);
-//  uint32_t length;
-//  uint8_t* data;
+//  void refereeTask(void* arg) {
+//   UNUSED(arg);
+//   uint32_t length;
+//   uint8_t* data;
 //
-//  while (true) {
-//    uint32_t flags = osThreadFlagsWait(REFEREE_RX_SIGNAL, osFlagsWaitAll, osWaitForever);
-//    if (flags & REFEREE_RX_SIGNAL) {
-//      length = referee_uart->Read(&data);
-//      referee->Receive(communication::package_t{data, (int)length});
-//    }
-//  }
-//}
+//   while (true) {
+//     uint32_t flags = osThreadFlagsWait(REFEREE_RX_SIGNAL, osFlagsWaitAll, osWaitForever);
+//     if (flags & REFEREE_RX_SIGNAL) {
+//       length = referee_uart->Read(&data);
+//       referee->Receive(communication::package_t{data, (int)length});
+//     }
+//   }
+// }
 
 //==================================================================================================
 // Chassis

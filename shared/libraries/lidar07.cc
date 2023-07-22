@@ -167,8 +167,8 @@ bool LIDAR07_UART::crc32Check(uint8_t* buff, uint8_t len) {
     data = buffCheck[i];
     crc = crc ^ ((uint32_t)data << 24);  // 8 bits XOR higher than the crc original value
     for (uint8_t y = 0; y < 8; y++) {    // Cycle 8 bits
-      if (crc & 0x80000000)  // The bit shifted to the left is 1, and after shifting to the left, it
-                             // is XORed with the polynomial
+      if (crc & 0x80000000)              // The bit shifted to the left is 1, and after shifting to the left, it
+                                         // is XORed with the polynomial
         crc = (crc << 1) ^ 0x04C11DB7;
       else  // Or shift to left directly
         crc <<= 1;
@@ -343,8 +343,8 @@ bool LIDAR07_IIC::crc32Check(uint8_t* buff, uint8_t len) {
     data = buffCheck[i];
     crc = crc ^ ((uint32_t)data << 24);  // 8 bits XOR higher than the crc original value
     for (uint8_t y = 0; y < 8; y++) {    // Cycle 8 bits
-      if (crc & 0x80000000)  // The bit shifted to the left is 1, and after shifting to the left, it
-                             // is XORed with the polynomial
+      if (crc & 0x80000000)              // The bit shifted to the left is 1, and after shifting to the left, it
+                                         // is XORed with the polynomial
         crc = (crc << 1) ^ 0x04C11DB7;
       else  // Or shift to left directly
         crc <<= 1;

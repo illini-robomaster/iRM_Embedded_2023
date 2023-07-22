@@ -182,7 +182,7 @@ class FloatEdgeDetector {
 
 /**
  * @brief Converts a float to an unsigned int, given range and number of bits;
-   *      see m4310 V1.2 document for detail
+ *      see m4310 V1.2 document for detail
  * @param x value to be converted
  * @param x_min minimum value of the current parameter
  * @param x_max maximum value of the current parameter

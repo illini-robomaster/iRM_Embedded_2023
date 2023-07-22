@@ -110,7 +110,6 @@ void SteeringChassis::SetWSpeed(float _vw) { vw = _vw; }
 
 void SteeringChassis::Update(float _power_limit, float _chassis_power,
                              float _chassis_power_buffer) {
-
   // Update Wheels
   float PID_output[MOTOR_NUM];
   float output[MOTOR_NUM];
@@ -174,7 +173,7 @@ bool SteeringChassis::Calibrate() {
   bool alignment_complete_br = br_steer_motor->Calibrate();
 
   return alignment_complete_fl && alignment_complete_fr &&
-  alignment_complete_bl && alignment_complete_br;
+         alignment_complete_bl && alignment_complete_br;
 }
 
 int SteeringChassis::ReAlign() {
@@ -272,7 +271,7 @@ void SteeringChassis::SteerUpdateTarget() {
 void SteeringChassis::WheelUpdateSpeed(float wheel_speed_factor) {
   // Stay at current position when no command is given
   if (vx == 0 && vy == 0 && vw == 0) {
-    SetWheelSpeed(0,0,0,0);
+    SetWheelSpeed(0, 0, 0, 0);
   } else if (ret_bl_ == 0 && ret_br_ == 0 && ret_fr_ == 0 && ret_fl_ == 0) {
     // Wheels move only when all SteeringMotors are in position
     v_fl_ = wheel_dir_fl_ * sqrt(pow(vy + vw * cos(PI / 4), 2.0) + pow(vx - vw * sin(PI / 4), 2.0));
@@ -316,8 +315,7 @@ void SteeringChassis::SteerAlignFalse() {
 }
 
 bool SteeringChassis::SteerAlignCheck() {
-  return (fl_steer_motor->CheckAlignment() && fr_steer_motor->CheckAlignment()
-          && bl_steer_motor->CheckAlignment() && br_steer_motor->CheckAlignment());
+  return (fl_steer_motor->CheckAlignment() && fr_steer_motor->CheckAlignment() && bl_steer_motor->CheckAlignment() && br_steer_motor->CheckAlignment());
 }
 
 }  // namespace control
