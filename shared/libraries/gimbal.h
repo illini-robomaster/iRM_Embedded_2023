@@ -141,13 +141,6 @@ class Gimbal {
    */
   void RecordIMUStatus(bool status);
 
-  /**
-   * @brief Get IMU status(Calibrated or not)
-   * 
-   * @return bool 
-   */
-  bool GetIMUStatus();
-
  private:
   // acquired from user
   Motor4310* pitch_motor_4310_ = nullptr;

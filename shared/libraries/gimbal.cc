@@ -182,10 +182,6 @@ void Gimbal::RecordIMUStatus(bool status) {
   imu_calibrated_ = status;
 }
 
-bool Gimbal::GetIMUStatus() {
-  return imu_calibrated_;
-}
-
 void Gimbal::Update() {
   switch (model_) {
     case GIMBAL_STEERING_4310: {
