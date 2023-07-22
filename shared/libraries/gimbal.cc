@@ -99,7 +99,7 @@ Gimbal::Gimbal(gimbal_t gimbal)
         yaw_omega_max_out = 30000;
 
         yaw_theta_pid_param_ = new float[3]{100, 1, 10};
-        yaw_omega_pid_param_ = new float[3]{300, 1, 500};
+        yaw_omega_pid_param_ = new float[3]{2600, 50, 100};
         yaw_theta_pid_ =
             new ConstrainedPID(yaw_theta_pid_param_, yaw_theta_max_iout, yaw_theta_max_out);
         yaw_omega_pid_ =
@@ -136,6 +136,8 @@ Gimbal::Gimbal(gimbal_t gimbal)
 
   pitch_angle_ = data_.pitch_offset_;
   yaw_angle_ = data_.yaw_offset_;
+  yaw_speed_ = 0;
+  auto_aim_ = false;
 
   pitch_lower_limit_ = wrap<float>(data_.pitch_offset_ - data_.pitch_max_, 0, 2 * PI);
   pitch_upper_limit_ = wrap<float>(data_.pitch_offset_ + data_.pitch_max_, 0, 2 * PI);
@@ -187,7 +189,7 @@ void Gimbal::Update() {
     case GIMBAL_STEERING_4310: {
       if (imu_calibrated_) {
         // just use speed pid control
-        float yt_in = yaw_motor_->GetOmegaDelta(yaw_angle_);
+        float yt_in = yaw_motor_->GetOmegaDelta(yaw_speed_);
         float yo_out = yaw_omega_pid_->ComputeConstrainedOutput(yt_in);
         // print("yaw_angle_: %f, yt_in: %f, yo_out: %f\r\n", yaw_angle_, yt_in, yo_out);
         yaw_motor_->SetOutput(yo_out);
@@ -210,7 +212,7 @@ void Gimbal::Update() {
 
       if (imu_calibrated_) {
         // just use speed pid control
-        float yt_in = yaw_motor_->GetOmegaDelta(yaw_angle_);
+        float yt_in = yaw_motor_->GetOmegaDelta(yaw_speed_);
         float yo_out = yaw_omega_pid_->ComputeConstrainedOutput(yt_in);
         yaw_motor_->SetOutput(yo_out);
       } else {
@@ -226,16 +228,24 @@ void Gimbal::Update() {
 void Gimbal::TargetAbsWOffset(float abs_pitch, float abs_yaw) {
   switch (model_) {
     case GIMBAL_STEERING_4310: {
-      float clipped_yaw = clip<float>(abs_yaw, -data_.yaw_max_, data_.yaw_max_);
-      yaw_angle_ = wrap<float>(clipped_yaw + data_.yaw_offset_, 0, 2 * PI);
+      if (!auto_aim_) {
+        yaw_speed_ = abs_yaw;
+      } else {
+        float clipped_yaw = clip<float>(abs_yaw, -data_.yaw_max_, data_.yaw_max_);
+        yaw_angle_ = wrap<float>(clipped_yaw + data_.yaw_offset_, 0, 2 * PI);
+      }
       break;
     }
     default:
       float clipped_pitch = clip<float>(abs_pitch, -data_.pitch_max_, data_.pitch_max_);
-      float clipped_yaw = clip<float>(abs_yaw, -data_.yaw_max_, data_.yaw_max_);
       pitch_angle_ = wrapping_clip<float>(clipped_pitch + data_.pitch_offset_, pitch_lower_limit_,
                                           pitch_upper_limit_, 0, 2 * PI);
-      yaw_angle_ = wrapping_clip<float>(clipped_yaw + data_.yaw_offset_, yaw_lower_limit_,yaw_upper_limit_, 0, 2 * PI);
+      if (!auto_aim_) {
+        yaw_speed_ = abs_yaw;
+      } else {                                    
+        float clipped_yaw = clip<float>(abs_yaw, -data_.yaw_max_, data_.yaw_max_);
+        yaw_angle_ = wrapping_clip<float>(clipped_yaw + data_.yaw_offset_, yaw_lower_limit_,yaw_upper_limit_, 0, 2 * PI);
+      }
   }
 }
 
@@ -247,7 +257,11 @@ void Gimbal::TargetAbsNoOffset(float abs_pitch, float abs_yaw) {
 void Gimbal::TargetRel(float rel_pitch, float rel_yaw) {
   switch (model_) {
     case GIMBAL_STEERING_4310: {
-      yaw_angle_ = yaw_motor_->GetTheta() + rel_yaw;
+      if (!auto_aim_) {
+        yaw_speed_ = rel_yaw;
+      } else {
+        yaw_angle_ = yaw_motor_->GetTheta() + rel_yaw;
+      }
       break;
     }
     default:
@@ -269,5 +283,11 @@ float Gimbal::ComputeYawRel(float rel_yaw, float ref_yaw) {
 float Gimbal::GetTargetPitchAngle() { return pitch_angle_; }
 
 float Gimbal::GetTargetYawAngle() { return yaw_angle_; }
+
+void Gimbal::SetAutoAim(bool autoaim_) { 
+  auto_aim_ = autoaim_;
+}
+
+bool Gimbal::GetAutoAim() { return auto_aim_; }
 
 }  // namespace control

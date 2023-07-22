@@ -47,7 +47,7 @@ static bsp::CAN* can2 = nullptr;
 static remote::DBUS* dbus = nullptr;
 static display::RGB* RGB = nullptr;
 
-static const int GIMBAL_TASK_DELAY = 10;
+static const int GIMBAL_TASK_DELAY = 5;
 static const int CHASSIS_TASK_DELAY = 2;
 static const int SHOOTER_TASK_DELAY = 10;
 static const int SELFTEST_TASK_DELAY = 100;
@@ -211,12 +211,9 @@ void gimbalTask(void* arg) {
   gimbal->TargetAbsWOffset(0, 0);
   gimbal->Update();
   control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
-  print("%d\n", 1);
   imu->Calibrate();
-  print("%d\n", 2);
 
   while (!imu->DataReady() || !imu->CaliDone()) {
-    print("%d\n", 10);
     gimbal->TargetAbsWOffset(0, 0);
     gimbal->Update();
     control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
@@ -225,8 +222,6 @@ void gimbalTask(void* arg) {
     osDelay(GIMBAL_TASK_DELAY);
   }
 
-  print("%d\n", 3);
-  print("Calibration Done.\r\n");
   gimbal->RecordIMUStatus(imu->CaliDone() && imu->DataReady());
 
   print("Gimbal Begin!\r\n");
@@ -237,11 +232,11 @@ void gimbalTask(void* arg) {
   send->cmd.data_bool = true;
   send->TransmitOutput();
 
-  float pitch_ratio, yaw_ratio;
-  float pitch_curr, yaw_curr;
+  float pitch_ratio = 0, yaw_ratio = 0;
+  float pitch_curr = 0, yaw_curr = 0;
   float pitch_target = 0, yaw_target = 0;
   float pitch_vel = 0;
-  float pitch_diff, yaw_diff;
+  float pitch_diff = 0, yaw_diff = 0;
 
   while (true) {
     while (Dead || GimbalDead) osDelay(100);
@@ -268,15 +263,26 @@ void gimbalTask(void* arg) {
       }
     } else {
       pitch_ratio = dbus->mouse.y / 32767.0;
-      yaw_ratio = -dbus->mouse.x / 32767.0;
-
       pitch_ratio += -dbus->ch3 / 660.0 / 210.0;
-      yaw_ratio += -dbus->ch2 / 660.0 / 210.0;
 
+      if (gimbal->GetAutoAim()) {
+        yaw_ratio = -dbus->mouse.x / 32767.0;
+        yaw_ratio += -dbus->ch2 / 660.0 / 210.0;
+      } else {
+        // yaw speed control
+        yaw_ratio = -dbus->mouse.x / 32767.0;
+        yaw_ratio += -dbus->ch2 / 110.0;
+      }
+      
       pitch_target = clip<float>(pitch_target + pitch_ratio, -gimbal_param->pitch_max_,
                                 gimbal_param->pitch_max_);
-      yaw_target = wrap<float>(yaw_target + yaw_ratio, -PI, PI);
 
+      if (gimbal->GetAutoAim()) {
+        yaw_target = wrap<float>(yaw_target + yaw_ratio, -PI, PI);
+      } else {
+        // yaw speed control
+        yaw_target = wrap<float>(yaw_ratio, -2*PI, 2*PI);
+      }
       pitch_vel = -1 * clip<float>(dbus->ch3 / 660.0, -15, 15);
       pitch_pos += pitch_vel / 200 + dbus->mouse.y / 32767.0;
     }
@@ -295,10 +301,16 @@ void gimbalTask(void* arg) {
     }
 
     pitch_curr = imu->INS_angle[1];
-    yaw_curr = imu->INS_angle[0];
-
     pitch_diff = clip<float>(pitch_target - pitch_curr, -PI, PI);
-    yaw_diff = wrap<float>(yaw_target - yaw_curr, -PI, PI);
+
+    if (gimbal->GetAutoAim()) {
+      yaw_curr = imu->INS_angle[0];
+      yaw_diff = wrap<float>(yaw_target - yaw_curr, -PI, PI);
+    } else {
+      // yaw_speed control
+      yaw_curr = yaw_ratio;
+      yaw_diff = yaw_curr;
+    }
 
     pitch_pos = clip<float>(pitch_pos, 0.1, 1); // measured range
 
@@ -844,7 +856,7 @@ void RM_RTOS_Threads_Init(void) {
   gimbalTaskHandle = osThreadNew(gimbalTask, nullptr, &gimbalTaskAttribute);
   refereeTaskHandle = osThreadNew(refereeTask, nullptr, &refereeTaskAttribute);
   shooterTaskHandle = osThreadNew(shooterTask, nullptr, &shooterTaskAttribute);
-  chassisTaskHandle = osThreadNew(chassisTask, nullptr, &chassisTaskAttribute);
+  // chassisTaskHandle = osThreadNew(chassisTask, nullptr, &chassisTaskAttribute);
   selfTestTaskHandle = osThreadNew(selfTestTask, nullptr, &selfTestTaskAttribute);
   // jetsonCommTaskHandle = osThreadNew(jetsonCommTask, nullptr, &jetsonCommTaskAttribute);
 }
@@ -950,10 +962,10 @@ void RM_RTOS_Default_Task(const void* arg) {
     send->cmd.data_bool = false;
     send->TransmitOutput();
 
-    relative_angle = yaw_motor->GetThetaDelta(gimbal_param->yaw_offset_);
-    send->cmd.id = bsp::RELATIVE_ANGLE;
-    send->cmd.data_float = relative_angle;
-    send->TransmitOutput();
+    // relative_angle = yaw_motor->GetThetaDelta(gimbal_param->yaw_offset_);
+    // send->cmd.id = bsp::RELATIVE_ANGLE;
+    // send->cmd.data_float = relative_angle;
+    // send->TransmitOutput();
 
     if (debug) {
       set_cursor(0, 0);

@@ -141,6 +141,16 @@ class Gimbal {
    */
   void RecordIMUStatus(bool status);
 
+  /**
+   * @brief Set auto aim on/off
+   */
+  void SetAutoAim(bool autoaim_);
+
+  /**
+   * @brief Get auto aim on/off
+   */
+  bool GetAutoAim();
+
  private:
   // acquired from user
   Motor4310* pitch_motor_4310_ = nullptr;
@@ -163,10 +173,12 @@ class Gimbal {
   ConstrainedPID* yaw_theta_pid_ = nullptr;   /* yaw theta pid   */
   ConstrainedPID* yaw_omega_pid_ = nullptr;   /* yaw omega pid   */
   bool imu_calibrated_ = false;  /* if the IMU calibrated, we just need the speed pid control */
+  bool auto_aim_ = false;        
 
   // pitch and yaw angle
   float pitch_angle_; /* current TARGET gimbal pitch angle */
   float yaw_angle_;   /* current TARGET gimbal yaw angle   */
+  float yaw_speed_;   /* current gimbal yaw speed          */
 
   float pitch_lower_limit_; /* lower limit of pitch angle */
   float pitch_upper_limit_; /* upper limit of pitch angle */
