@@ -106,7 +106,6 @@ int16_t MotorCANBase::GetCurr() const { return 0; }
 
 uint16_t MotorCANBase::GetTemp() const { return 0; }
 
-float MotorCANBase::GetTorque() const { return 0.0f; }
 
 //==================================================================================================
 // Motor3508
@@ -161,14 +160,20 @@ uint16_t Motor3508::GetTemp() const { return raw_temperature_; }
   void Motor3510::UpdateData(const uint8_t data[]) {
     const int16_t raw_theta = data[0] << 8 | data[1];
     const int16_t raw_torque = data[2] << 8 | data[3]; 
-    raw_theta_= raw_theta;
-    raw_torque_ = raw_torque;
+    // UNUSED(data);
     
+    constexpr float THETA_SCALE = 2 * PI / 8192; 
+    //TODO:Read Torque Value
+    // print("Theta: %d, Torque: %d \r\n",raw_theta,raw_torque);
+    theta_ = (float)raw_theta * THETA_SCALE;
+    torque_ = (float)raw_torque;
+    
+    connection_flag_=true;
   }
   /* implements data printout */
   void Motor3510::PrintData() const{
-    print("theta: %3d ", raw_theta_);
-    print("raw_torque: %3d \r\n", raw_torque_);
+    print("theta: %.4f ", theta_);
+    print("raw_torque: %.4f \r\n", torque_);
   }
   /* override base implementation with max current protection */
   void Motor3510::SetOutput(int16_t val){
@@ -176,7 +181,6 @@ uint16_t Motor3508::GetTemp() const { return raw_temperature_; }
     output_ = clip<int16_t>(val,-MAX_ABS_CURRENT,MAX_ABS_CURRENT);
   }
 
-  float Motor3510::GetTorque() const{ return raw_torque_; }
 
 
 

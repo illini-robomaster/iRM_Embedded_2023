@@ -136,8 +136,6 @@ class MotorCANBase : public MotorBase {
 
   virtual uint16_t GetTemp() const;
 
-  virtual float GetTorque() const;
-
   /**
    * @brief transmit CAN message for setting motor outputs
    *
@@ -234,13 +232,12 @@ class Motor3510 : public MotorCANBase {
   /* override base implementation with max current protection */
   void SetOutput(int16_t val) override final;
 
-  float GetTorque() const override final;
 
  private:
   volatile int16_t raw_current_get_ = 0;
   volatile uint8_t raw_temperature_ = 0;
-  volatile int16_t raw_torque_ = 0;
-  volatile int16_t raw_theta_ = 0;
+  volatile float torque_ = 0;
+  //TODO: 
 };
 
 
