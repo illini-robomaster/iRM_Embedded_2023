@@ -680,6 +680,7 @@ void Motor4310::TransmitOutput(Motor4310* motors[], uint8_t num_motors) {
   for (uint8_t i = 0; i < num_motors; ++i) {
     uint8_t data[8] = {0};
     uint16_t kp_tmp, kd_tmp, pos_tmp, vel_tmp, torque_tmp;
+
     if (motors[i]->GetMode() == MIT) {
       // converting float to unsigned int before transmitting
       kp_tmp = float_to_uint(motors[i]->kp_set_, KP_MIN, KP_MAX, 12);
@@ -717,6 +718,7 @@ void Motor4310::TransmitOutput(Motor4310* motors[], uint8_t num_motors) {
     } else {
       RM_EXPECT_TRUE(false, "Invalid mode number!");
     }
+    
     motors[i]->can_->Transmit(motors[i]->tx_id_actual_, data, 8);
   }
 }
