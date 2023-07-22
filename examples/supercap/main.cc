@@ -1,6 +1,6 @@
 /****************************************************************************
  *                                                                          *
- *  Copyright (C) 2022 RoboMaster.                                          *
+ *  Copyright (C) 2023 RoboMaster.                                          *
  *  Illini RoboMaster @ University of Illinois at Urbana-Champaign          *
  *                                                                          *
  *  This program is free software: you can redistribute it and/or modify    *
@@ -32,7 +32,7 @@ static display::OLED* OLED = nullptr;
 void RM_RTOS_Init(void) {
   print_use_uart(&huart1);
 
-  can = new bsp::CAN(&hcan2, 0x301, false);
+  can = new bsp::CAN(&hcan2, false);
   supercap = new control::SuperCap(can, 0x301);
   OLED = new display::OLED(&hi2c2, 0x3C);
 }

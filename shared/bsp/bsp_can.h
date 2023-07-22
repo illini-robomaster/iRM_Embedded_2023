@@ -38,10 +38,10 @@ class CAN {
     /**
      * @brief constructor for bsp CAN instance
      *
-     * @param hcan     HAL can handle
-     * @param start_id lowest possible stdid for rx
+     * @param hcan        HAL can handle
+     * @param is_master   true for CAN1, false for CAN2
      */
-    CAN(CAN_HandleTypeDef* hcan, uint32_t start_id, bool is_master = true);
+    CAN(CAN_HandleTypeDef* hcan, bool is_master = true);
     /**
      * @brief check if it is associated with a given CAN handle
      *
@@ -86,7 +86,6 @@ class CAN {
     void ConfigureFilter(bool is_master);
 
     CAN_HandleTypeDef* hcan_;
-    const uint32_t start_id_;
 
     can_rx_callback_t rx_callbacks_[MAX_CAN_DEVICES] = {0};
     void* rx_args_[MAX_CAN_DEVICES] = {NULL};
