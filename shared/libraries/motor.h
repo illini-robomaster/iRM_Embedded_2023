@@ -239,7 +239,6 @@ class Motor3510 : public MotorCANBase {
   volatile float torque_ = 0; /* Torque Value*/
   volatile float previous_position_ = 0;
  
-  //TODO: 
 };
 
 
@@ -298,10 +297,6 @@ class Motor6623 : public MotorCANBase {
 
   static const int16_t CURRENT_CORRECTION = -1;  // current direction is reversed
 };
-
-
-
-
 
 //==================================================================================================
 // MotorPWMBase

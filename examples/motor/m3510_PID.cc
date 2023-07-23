@@ -101,7 +101,9 @@ void RM_RTOS_Default_Task(const void* args){
         //Check output
         print("target: %.4f, diff: %.4f \r\n",target,diff);
         motor->PrintData();
+#ifdef CONTROLLER
         print("CH0: %-4d CH1: %-4d CH2: %-4d CH3: %-4d ", dbus->ch0, dbus->ch1, dbus->ch2, dbus->ch3);
+#endif
         print("SWL: %d SWR: %d @ %d ms\r\n", dbus->swl, dbus->swr, dbus->timestamp);
         osDelay(100);
 
