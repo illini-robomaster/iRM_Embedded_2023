@@ -167,7 +167,8 @@ static control::Motor4310* yaw_motor = nullptr;
 static bsp::Laser* laser = nullptr;
 
 // 4310 PID
-static control::ConstrainedPID* yaw_pid = nullptr;
+static control::ConstrainedPID* yaw_pid_position = nullptr;
+static control::ConstrainedPID* yaw_pid_velocity = nullptr;
 
 void gimbalTask(void* arg) {
   UNUSED(arg);
@@ -212,7 +213,8 @@ void gimbalTask(void* arg) {
 
   float yaw_offset;
   float yaw_error;
-  float yaw_output;
+  float yaw_output_position;
+  float yaw_output_speed;
   yaw_offset = 0;
   float tmp_pitch_pos = 0;
   for (int j = 0; j < SOFT_START_CONSTANT; j++) {
@@ -221,8 +223,9 @@ void gimbalTask(void* arg) {
     pitch_motor->TransmitOutput(pitch_motor);
     // Caluclate the PID output of the yaw motor
     yaw_error = wrap<float>(-(yaw_motor->GetTheta() - yaw_offset), -PI, PI);
-    yaw_output = yaw_pid->ComputeOutput(yaw_error);
-    yaw_motor->SetOutput(yaw_output);
+    yaw_output_position = yaw_pid_position->ComputeOutput(yaw_error);
+    yaw_output_speed = yaw_pid_velocity->ComputeConstrainedOutput(yaw_output_position - yaw_motor->GetOmega());
+    yaw_motor->SetOutput(yaw_output_speed);
     yaw_motor->TransmitOutput(yaw_motor);
     osDelay(GIMBAL_TASK_DELAY);
   }
@@ -287,8 +290,6 @@ void gimbalTask(void* arg) {
     pitch_pos += pitch_vel / 200 + dbus->mouse.y / 32767.0;
     pitch_pos = clip<float>(pitch_pos, 0.05, 0.6);  // measured range
 
-
-
     // TODO: whether we need handle the reset case for yaw stuff ???
     if (pitch_reset) {
       // 4310 soft start
@@ -333,8 +334,9 @@ void gimbalTask(void* arg) {
     yaw_offset = wrap<float>(yaw_target + yaw_offset, -PI, PI);
     yaw_error = wrap<float>(yaw_offset - imu->INS_angle[0], -PI, PI);
     if (abs(yaw_error) <= 0.001) yaw_error = 0;
-    yaw_output = yaw_pid->ComputeOutput(yaw_error);
-    yaw_motor->SetOutput(yaw_output);
+    yaw_output_position = yaw_pid_position->ComputeOutput(yaw_error);
+    yaw_output_speed = yaw_pid_velocity->ComputeConstrainedOutput(yaw_output_position - yaw_motor->GetOmega());
+    yaw_motor->SetOutput(yaw_output_speed);
 
     //    yaw_pos = clip<float>(yaw_pos, -PI/4, PI/4);
     yaw_motor->TransmitOutput(yaw_motor);
@@ -918,10 +920,15 @@ void RM_RTOS_Init(void) {
   send = new bsp::CanBridge(can2, 0x20A, 0x20B);
 
   // 4310 PID Init
-  float yaw_pid_param[] = {2, 0, 0.01};
-  float yaw_max_iout = 0;
-  float yaw_max_out = 30;
-  yaw_pid = new control::ConstrainedPID(yaw_pid_param, yaw_max_iout, yaw_max_out);
+  float yaw_pid_param_position[] = {2, 0, 0.01};
+  float yaw_max_iout_position = 0;
+  float yaw_max_out_position = 30;
+  yaw_pid_position = new control::ConstrainedPID(yaw_pid_param_position, yaw_max_iout_position, yaw_max_out_position);
+
+  float yaw_pid_param_velocity[] = {2, 0, 0.01};
+  float yaw_max_iout_velocity = 0;
+  float yaw_max_out_velocity = 50;
+  yaw_pid_velocity = new control::ConstrainedPID(yaw_pid_param_velocity, yaw_max_iout_velocity, yaw_max_out_velocity);
 }
 
 //==================================================================================================
@@ -982,7 +989,7 @@ void KillAll() {
       pitch_motor->SetOutput(tmp_pos, 1, 115, 0.5, 0);
       pitch_motor->TransmitOutput(pitch_motor);
       yaw_motor->SetOutput(0);
-      yaw_motor->TransmitOutput();
+      yaw_motor->TransmitOutput(yaw_motor);
       osDelay(GIMBAL_TASK_DELAY);
     }
 
