@@ -75,3 +75,7 @@ irm_add_arm_executable(${PROJECT_NAME}_m4310_vel
 irm_add_arm_executable(${PROJECT_NAME}_m3510
         TARGET DJI_Board_TypeC
         SOURCES m3510.cc)
+
+irm_add_arm_executable(${PROJECT_NAME}_m3510_PID
+        TARGET DJI_Board_TypeC
+        SOURCES m3510_PID.cc)

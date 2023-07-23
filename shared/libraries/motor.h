@@ -207,6 +207,8 @@ class Motor3508 : public MotorCANBase {
 
   uint16_t GetTemp() const override final;
 
+  
+
  private:
   volatile int16_t raw_current_get_ = 0;
   volatile uint8_t raw_temperature_ = 0;
@@ -234,9 +236,9 @@ class Motor3510 : public MotorCANBase {
 
 
  private:
-  volatile int16_t raw_current_get_ = 0;
-  volatile uint8_t raw_temperature_ = 0;
-  volatile float torque_ = 0;
+  volatile float torque_ = 0; /* Torque Value*/
+  volatile float previous_position_ = 0;
+ 
   //TODO: 
 };
 
