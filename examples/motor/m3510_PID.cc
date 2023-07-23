@@ -34,7 +34,7 @@
 #define KEY_GPIO_GROUP GPIOB
 #define KEY_GPIO_PIN GPIO_PIN_2
 
-// #define CONTROLLER
+#define CONTROLLER
 
 bsp::CAN* can1 = nullptr;                   /*CAN*/
 control::MotorCANBase* motor = nullptr;     /* 3510Motor*/
@@ -57,7 +57,7 @@ void RM_RTOS_Init() {
     motor =  new control::Motor3510(can1,0x205);
 
 #ifdef CONTROLLER
-    dbus = new remote::DBUS(&huart1);
+    dbus = new remote::DBUS(&huart3);
 #endif
 
 
@@ -65,7 +65,7 @@ void RM_RTOS_Init() {
 
 void RM_RTOS_Default_Task(const void* args){
     UNUSED(args);
-    
+
     /* PID Controller */
     control::ConstrainedPID pid;  
     pid.Reinit(pid_params,3000,30000); 
@@ -87,7 +87,7 @@ void RM_RTOS_Default_Task(const void* args){
 
     while (true) {
 #ifdef CONTROLLER
-        target = float(dbus->ch1) / remote::DBUS::ROCKER_MAX * 6 * PI;
+        target = clip<float>(float(dbus->ch1) / remote::DBUS::ROCKER_MAX * PI,-PI,PI);
 #endif
 
         //Calculate error
@@ -101,6 +101,9 @@ void RM_RTOS_Default_Task(const void* args){
         //Check output
         print("target: %.4f, diff: %.4f \r\n",target,diff);
         motor->PrintData();
+        print("CH0: %-4d CH1: %-4d CH2: %-4d CH3: %-4d ", dbus->ch0, dbus->ch1, dbus->ch2, dbus->ch3);
+        print("SWL: %d SWR: %d @ %d ms\r\n", dbus->swl, dbus->swr, dbus->timestamp);
+        osDelay(100);
 
     }
 }
