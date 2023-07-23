@@ -167,8 +167,8 @@ void chassisTask(void* arg) {
     float sin_yaw, cos_yaw, vx_set, vy_set;
     float vx, vy, wz;
 
-    vx_set = receive->vx;
-    vy_set = receive->vy;
+    vx_set = -receive->vx;
+    vy_set = -receive->vy;
 
     if (receive->mode == 1) {  // spin mode
                                // need add the relative angle compensation for the board communication

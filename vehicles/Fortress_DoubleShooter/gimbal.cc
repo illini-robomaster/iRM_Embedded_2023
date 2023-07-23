@@ -425,9 +425,6 @@ static const int SHOOTER_MODE_DELAY = 350;
 void shooterTask(void* arg) {
   UNUSED(arg);
 
-  //  control::MotorCANBase* motors_can1_shooter[] = {left_top_flywheel, left_bottom_flywheel, left_dial,
-  //                                                  right_top_flywheel, right_bottom_flywheel, right_dial};
-
   control::MotorCANBase* motors_can1_shooter_left[] = {left_top_flywheel, left_bottom_flywheel, left_dial};
 
   control::MotorCANBase* motors_can1_shooter_right[] = {right_top_flywheel, right_bottom_flywheel, right_dial};
