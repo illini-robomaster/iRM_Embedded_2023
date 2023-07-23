@@ -70,9 +70,9 @@ void A1Task(void* arg) {
 }
 
 void RM_RTOS_Init(void) {
-  print_use_uart(&huart6);
+  print_use_uart(&huart8);
 
-  A1_uart = new CustomUART(&huart1);
+  A1_uart = new CustomUART(&huart6);
   A1_uart->SetupRx(300);
   A1_uart->SetupTx(300);
 

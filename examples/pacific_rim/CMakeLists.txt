@@ -1,6 +1,6 @@
 # ---------------------------------------------------------------------- #
 #                                                                        #
-#  Copyright (C) 2023                                                    #
+#  Copyright (C) 2022                                                    #
 #  Illini RoboMaster @ University of Illinois at Urbana-Champaign.       #
 #                                                                        #
 #  This program is free software: you can redistribute it and/or modify  #
@@ -18,7 +18,7 @@
 #                                                                        #
 # ---------------------------------------------------------------------- #
 
-project(example_unitree_motor ASM C CXX)
+project(example_pacific_rim ASM C CXX)
 
 irm_add_arm_executable(${PROJECT_NAME}
     TARGET DJI_Board_TypeA
