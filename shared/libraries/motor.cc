@@ -813,7 +813,8 @@ BRTEncoder::BRTEncoder(CAN* can, uint16_t rx_id) : can_(can), rx_id_(rx_id) {
 void BRTEncoder::UpdateData(const uint8_t data[]) {
   const uint32_t raw_angle = data[6] << 24 | data[5] << 16 | data[4] << 8 | data[3];
 
-  constexpr float THETA_SCALE = 2 * PI / 1024;  // digital -> rad
+  constexpr float THETA_SCALE = 2 * PI / 1024;  // digital -> rad 
+                                                // the maximum digital value range is [0 - 1023]
   angle_ = raw_angle * THETA_SCALE;
 
   connection_flag_ = true;
