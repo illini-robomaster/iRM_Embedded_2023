@@ -106,7 +106,6 @@ int16_t MotorCANBase::GetCurr() const { return 0; }
 
 uint16_t MotorCANBase::GetTemp() const { return 0; }
 
-
 //==================================================================================================
 // Motor3508
 //==================================================================================================
@@ -145,13 +144,9 @@ int16_t Motor3508::GetCurr() const { return raw_current_get_; }
 
 uint16_t Motor3508::GetTemp() const { return raw_temperature_; }
 
-
-
-
 //==================================================================================================
 // Motor 3510
 //==================================================================================================
-
 
   Motor3510::Motor3510(bsp::CAN* can, uint16_t rx_id):MotorCANBase(can, rx_id){
     can->RegisterRxCallback(rx_id, can_motor_callback, this);
@@ -179,9 +174,6 @@ uint16_t Motor3508::GetTemp() const { return raw_temperature_; }
     constexpr int16_t MAX_ABS_CURRENT = 29000;
     output_ = clip<int16_t>(val,-MAX_ABS_CURRENT,MAX_ABS_CURRENT);
   }
-
-
-
 
 //==================================================================================================
 // Motor6020
