@@ -40,14 +40,17 @@ typedef struct {
   uint16_t ch1 : 11;  //   C3-^       ^-C1
   uint16_t ch2 : 11;  // C2-<   >+ -<   >+C0
   uint16_t ch3 : 11;  //     +v       v+
+  
   /* left and right switch information */
   uint8_t swr : 2;
   uint8_t swl : 2;
   /* mouse movement and button information */
   remote::mouse_t mouse;
+
   /* keyboard key information */
   remote::keyboard_t keyboard;
-  remote::wheel_t wheel;
+  remote::wheel_t wheel;  // Analog range: Mid(steady state): 1024, Upmax: around 6960 Downmax: around 0
+                          // Digital range: Down: 1684 (below analog signal range) 
 } __packed dbus_t;
 
 DBUS::DBUS(UART_HandleTypeDef* huart) : bsp::UART(huart) { SetupRx(sizeof(dbus_t) + 1); }
