@@ -61,10 +61,10 @@ constexpr float ACCELERATION = (100 * PI);
 
 // speed for chassis rotation (no unit)
 // TODO: the speed for the fortress chassis
-// constexpr float SPIN_SPEED = 600;
-// constexpr float FOLLOW_SPEED = 400;
-constexpr float SPIN_SPEED = 80;
-constexpr float FOLLOW_SPEED = 40;
+constexpr float SPIN_SPEED = 500;
+constexpr float FOLLOW_SPEED = 360;
+// constexpr float SPIN_SPEED = 80;
+// constexpr float FOLLOW_SPEED = 40;
 
 //==================================================================================================
 // Referee

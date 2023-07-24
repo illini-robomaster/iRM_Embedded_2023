@@ -168,7 +168,6 @@ static bsp::Laser* laser = nullptr;
 
 // 4310 PID
 static control::ConstrainedPID* yaw_pid_position = nullptr;
-static control::ConstrainedPID* yaw_pid_velocity = nullptr;
 
 void gimbalTask(void* arg) {
   UNUSED(arg);
@@ -211,11 +210,9 @@ void gimbalTask(void* arg) {
   // whether the 4310 yaw motor need the soft start
   // (based on the start position of yaw motor)
 
-  float yaw_offset;
+  float yaw_offset = 0;
   float yaw_error;
   float yaw_output_position;
-  float yaw_output_speed;
-  yaw_offset = 0;
   float tmp_pitch_pos = 0;
   for (int j = 0; j < SOFT_START_CONSTANT; j++) {
     tmp_pitch_pos += START_PITCH_POS / SOFT_START_CONSTANT;  // increase position gradually
@@ -224,8 +221,7 @@ void gimbalTask(void* arg) {
     // Caluclate the PID output of the yaw motor
     yaw_error = wrap<float>(-(yaw_motor->GetTheta() - yaw_offset), -PI, PI);
     yaw_output_position = yaw_pid_position->ComputeOutput(yaw_error);
-    yaw_output_speed = yaw_pid_velocity->ComputeConstrainedOutput(yaw_output_position - yaw_motor->GetOmega());
-    yaw_motor->SetOutput(yaw_output_speed);
+    yaw_motor->SetOutput(yaw_output_position);
     yaw_motor->TransmitOutput(yaw_motor);
     osDelay(GIMBAL_TASK_DELAY);
   }
@@ -335,8 +331,7 @@ void gimbalTask(void* arg) {
     yaw_error = wrap<float>(yaw_offset - imu->INS_angle[0], -PI, PI);
     if (abs(yaw_error) <= 0.001) yaw_error = 0;
     yaw_output_position = yaw_pid_position->ComputeOutput(yaw_error);
-    yaw_output_speed = yaw_pid_velocity->ComputeConstrainedOutput(yaw_output_position - yaw_motor->GetOmega());
-    yaw_motor->SetOutput(yaw_output_speed);
+    yaw_motor->SetOutput(yaw_output_position);
 
     //    yaw_pos = clip<float>(yaw_pos, -PI/4, PI/4);
     yaw_motor->TransmitOutput(yaw_motor);
@@ -917,15 +912,10 @@ void RM_RTOS_Init(void) {
   send = new bsp::CanBridge(can2, 0x20A, 0x20B);
 
   // 4310 PID Init
-  float yaw_pid_param_position[] = {2, 0, 0.01};
+  float yaw_pid_param_position[] = {3.2, 0.9, 0.4};
   float yaw_max_iout_position = 0;
-  float yaw_max_out_position = 30;
+  float yaw_max_out_position = 30;                   
   yaw_pid_position = new control::ConstrainedPID(yaw_pid_param_position, yaw_max_iout_position, yaw_max_out_position);
-
-  float yaw_pid_param_velocity[] = {2, 0, 0.01};
-  float yaw_max_iout_velocity = 0;
-  float yaw_max_out_velocity = 50;
-  yaw_pid_velocity = new control::ConstrainedPID(yaw_pid_param_velocity, yaw_max_iout_velocity, yaw_max_out_velocity);
 }
 
 //==================================================================================================
@@ -949,10 +939,6 @@ void RM_RTOS_Threads_Init(void) {
 void KillAll() {
   RM_EXPECT_TRUE(false, "Operation Killed!\r\n");
   // TODO: change kill all for 4310 yaw motor
-  //  control::MotorCANBase* motors_can1_gimbal[] = {pitch_motor};
-  // control::MotorCANBase* motors_can2_gimbal[] = {yaw_motor};
-  //  control::MotorCANBase* motors_can1_shooter[] = {left_top_flywheel, left_bottom_flywheel, left_dial,
-  //                                                  right_top_flywheel, right_bottom_flywheel, right_dial};
 
   control::MotorCANBase* motors_can1_shooter_left[] = {left_top_flywheel, left_bottom_flywheel, left_dial};
 
