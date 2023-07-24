@@ -796,5 +796,33 @@ void Motor4310::SetRelativeTarget(float target) {
   relative_target_ = target;
 }
 
+//==================================================================================================
+// BRT Encoder
+//==================================================================================================
+
+static void can_encoder_callback(const uint8_t data[], void* args) {
+  BRTEncoder* encoder = reinterpret_cast<BRTEncoder*>(args);
+  encoder->UpdateData(data);
+}
+
+BRTEncoder::BRTEncoder(CAN* can, uint16_t rx_id) : can_(can), rx_id_(rx_id) {
+  can->RegisterRxCallback(rx_id, can_encoder_callback, this);
+  angle_ = 0;
+}
+
+void BRTEncoder::UpdateData(const uint8_t data[]) {
+  const uint32_t raw_angle = data[6] << 24 | data[5] << 16 | data[4] << 8 | data[3];
+
+  constexpr float THETA_SCALE = 2 * PI / 1024;  // digital -> rad
+  angle_ = raw_angle * THETA_SCALE;
+
+  connection_flag_ = true;
+}
+
+void BRTEncoder::PrintData() const {
+  set_cursor(0, 0);
+  clear_screen();
+  print("angle: % .4f\r\n", angle_);
+}
 
 } /* namespace control */
