@@ -20,10 +20,10 @@
 
 #include "main.h"
 
-#include "unitree_motor.h"
 #include "bsp_print.h"
 #include "bsp_uart.h"
 #include "cmsis_os.h"
+#include "unitree_motor.h"
 
 static control::UnitreeMotor* A1 = nullptr;
 
