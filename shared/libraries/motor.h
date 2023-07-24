@@ -853,27 +853,4 @@ class Motor4310 {
   constexpr static float T_MAX = 18;
 };
 
-//==================================================================================================
-// BRT Encoder
-//==================================================================================================
-
-/**
- * @brief BRT Encoder class
- */
-class BRTEncoder {
- public:
-  /* constructor wrapper over MotorCANBase */
-  BRTEncoder(bsp::CAN* can, uint16_t rx_id);
-  /* implements data update callback */
-  void UpdateData(const uint8_t data[]);
-  /* implements data printout */
-  void PrintData() const;
-
- private:
-  bsp::CAN* can_;
-  uint16_t rx_id_;
-  float angle_;
-  bool connection_flag_ = false;
-};
-
 } /* namespace control */
