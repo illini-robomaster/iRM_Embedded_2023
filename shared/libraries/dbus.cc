@@ -47,7 +47,7 @@ typedef struct {
   remote::mouse_t mouse;
   /* keyboard key information */
   remote::keyboard_t keyboard;
-  uint16_t reserved;
+  remote::wheel_t wheel;
 } __packed dbus_t;
 
 DBUS::DBUS(UART_HandleTypeDef* huart) : bsp::UART(huart) { SetupRx(sizeof(dbus_t) + 1); }
@@ -75,6 +75,7 @@ void DBUS::RxCompleteCallback() {
 
   memcpy(&this->mouse, &repr->mouse, sizeof(mouse_t));
   memcpy(&this->keyboard, &repr->keyboard, sizeof(keyboard_t));
+  memcpy(&this->wheel, &repr->wheel, sizeof(wheel_t));
 
   this->timestamp = HAL_GetTick();
 }

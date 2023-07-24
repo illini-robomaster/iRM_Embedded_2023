@@ -54,6 +54,10 @@ typedef union {
   } __packed bit;
 } __packed keyboard_t;
 
+typedef struct {
+  int16_t wheel;
+} __packed wheel_t;
+
 typedef enum {
   UP = 1,
   DOWN = 2,
@@ -85,6 +89,8 @@ class DBUS : public bsp::UART {
   mouse_t mouse;
   // keyboard key information
   keyboard_t keyboard;
+  // dial wheel information
+  wheel_t wheel;
   // timestamp of the update interrupt
   uint32_t timestamp;
 
