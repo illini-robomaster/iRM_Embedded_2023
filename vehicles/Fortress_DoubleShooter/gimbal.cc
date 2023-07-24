@@ -45,7 +45,7 @@ static bsp::CAN* can2 = nullptr;
 static remote::DBUS* dbus = nullptr;
 static display::RGB* RGB = nullptr;
 
-static const int GIMBAL_TASK_DELAY = 1;
+static const int GIMBAL_TASK_DELAY = 2;
 static const int CHASSIS_TASK_DELAY = 2;
 static const int SHOOTER_TASK_DELAY = 10;
 static const int SELFTEST_TASK_DELAY = 100;
