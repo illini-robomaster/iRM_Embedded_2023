@@ -271,14 +271,14 @@ void chassisTask(void* arg) {
                       referee->power_heat_data.chassis_power,
                       (float)referee->power_heat_data.chassis_power_buffer);
 
-        WHEEL_SPEED_FACTOR = (float)(7 + (4 / ((0.1 * maximum_energy))) * (power - 0.3 * maximum_energy));
+        WHEEL_SPEED_FACTOR = (float)(7 + (3 / ((0.1 * maximum_energy))) * (power - 0.3 * maximum_energy));
 
     } else if (power <= 0.7 * maximum_energy && power > 0.4 * maximum_energy) {
       //case when remaining power of capacitor is between 20% and 50%
       chassis->Update((float)(90.0 + (30 / 0.3 * maximum_energy) * (power - 0.4 * maximum_energy)),
                       referee->power_heat_data.chassis_power,
                       (float)referee->power_heat_data.chassis_power_buffer);
-        WHEEL_SPEED_FACTOR = (float)(11 + (3 / ((0.3 * maximum_energy))) * (power - 0.4 * maximum_energy));
+        WHEEL_SPEED_FACTOR = (float)(10 + (2 / ((0.3 * maximum_energy))) * (power - 0.4 * maximum_energy));
 
     }
     else if (power <= 0.9 * maximum_energy && power > 0.7 * maximum_energy) {
@@ -286,14 +286,14 @@ void chassisTask(void* arg) {
       chassis->Update((float)(120.0 + (20 / 0.2 * maximum_energy) * (power - 0.7 * maximum_energy)),
                       referee->power_heat_data.chassis_power,
                       (float)referee->power_heat_data.chassis_power_buffer);
-        WHEEL_SPEED_FACTOR = (float)(14 + (2 / ((0.2 * maximum_energy))) * (power - 0.7 * maximum_energy));
+        WHEEL_SPEED_FACTOR = (float)(12 + (1 / ((0.2 * maximum_energy))) * (power - 0.7 * maximum_energy));
     }
     else if (power > 0.9 * maximum_energy) {
       //case when remaining power of capacitor is above 90%
       chassis->Update((float)140.0,
                       referee->power_heat_data.chassis_power,
                       (float)referee->power_heat_data.chassis_power_buffer);
-        WHEEL_SPEED_FACTOR = (float)(16.0);
+        WHEEL_SPEED_FACTOR = (float)(13.0);
       // WHEEL SPEED FACTOR will be 16
     }
     SPIN_DOWN_SPEED_FACTOR = (float)(4.0 / WHEEL_SPEED_FACTOR);
@@ -305,9 +305,10 @@ void chassisTask(void* arg) {
     if (receive->mode == 1) {  // spin mode
       // delay compensation
       // based on rule-of-thumb formula SPIN_SPEED = 80 = ~30 degree of error
-      relative_angle = relative_angle - PI * 30.0 / 180.0 / 80.0 * SPIN_SPEED - PI / 6.0;
+      relative_angle = relative_angle - PI * 30.0 / 180.0 / 80.0 * SPIN_SPEED ;
 
       chassis->SteerSetMaxSpeed(RUN_SPEED * 3 / 2);
+      relative_angle = relative_angle - PI / 6.0;
       sin_yaw = sin(relative_angle);
       cos_yaw = cos(relative_angle);
       vx = cos_yaw * vx_set + sin_yaw * vy_set;
@@ -316,7 +317,7 @@ void chassisTask(void* arg) {
       vy = vy * 2 / 3;
       wz = SPIN_SPEED * 3 / 2;
     } else {
-      chassis->SteerSetMaxSpeed(RUN_SPEED);
+      chassis->SteerSetMaxSpeed(RUN_SPEED / SPIN_DOWN_SPEED_FACTOR);
       sin_yaw = sin(relative_angle);
       cos_yaw = cos(relative_angle);
       vx = cos_yaw * vx_set + sin_yaw * vy_set;
