@@ -796,5 +796,4 @@ void Motor4310::SetRelativeTarget(float target) {
   relative_target_ = target;
 }
 
-
 } /* namespace control */

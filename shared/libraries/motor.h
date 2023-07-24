@@ -593,8 +593,8 @@ typedef struct {
   float* omega_pid_param;           /* pid parameter used to control speed of motor       */
   float max_iout;
   float max_out;
-  align_detect_t align_detect_func = nullptr; /* function pointer for calibration function*/
-  float calibrate_offset = 0.0;     /* angle from calibration sensor to starting location */
+  align_detect_t align_detect_func; /* function pointer for calibration function*/
+  float calibrate_offset;           /* angle from calibration sensor to starting location */
 } steering_t;
 
 // mode that can turn relative angles in [rad]
@@ -852,6 +852,5 @@ class Motor4310 {
   constexpr static float T_MIN = -18;
   constexpr static float T_MAX = 18;
 };
-
 
 } /* namespace control */
