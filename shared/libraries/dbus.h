@@ -55,7 +55,7 @@ typedef union {
 } __packed keyboard_t;
 
 typedef struct {
-  int16_t wheel;
+  uint16_t wheel;
 } __packed wheel_t;
 
 typedef enum {
