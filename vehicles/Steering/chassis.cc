@@ -172,6 +172,9 @@ static control::SuperCap* supercap = nullptr;
 static const float CHASSIS_DEADZONE = 0.04;
 static float SPIN_DOWN_SPEED_FACTOR = 0.0;
 
+static bool CHARGE_CYCLE = false;
+static bool ACCELERATE = false;
+
 bool steering_align_detect1() { return pe1->Read() == 0; }
 
 bool steering_align_detect2() { return pe2->Read() == 0; }
@@ -206,6 +209,8 @@ void chassisTask(void* arg) {
   chassis->SteerSetMaxSpeed(RUN_SPEED);
   chassis->SteerThetaReset();
   chassis->SetWheelSpeed(0,0,0,0);
+
+  float WHEEL_SPEED_FACTOR = 0.0;
 
   while (true) {
     float relative_angle = receive->relative_angle;
@@ -248,58 +253,60 @@ void chassisTask(void* arg) {
 
     float power = pow(supercap_voltage,2) * 6 / 2;
 
-
-    float WHEEL_SPEED_FACTOR = 0.0;
     chassis->SteerCalcOutput();
 
 
     //consider using uart printing to check the power limit's value
     //log values out as files to obtain its trend
     //WHEEL_SPEED_FACTOR separated for two modes
-    if(power <= 0.3 * maximum_energy) {
-      // case when remaining power of capacitor is below 25%
-      chassis->Update((float)40.0,
-                      referee->power_heat_data.chassis_power,
-                      (float)referee->power_heat_data.chassis_power_buffer);
-
-        WHEEL_SPEED_FACTOR = (float)7.0;
-
-    } else if (power <= 0.4 * maximum_energy && power > 0.3 * maximum_energy) {
-
-      //case when remaining power of capacitor is between 20% and 50%
-      chassis->Update((float)(40.0 + (50 / 0.11 * maximum_energy) * (power - 0.3 * maximum_energy)),
-                      referee->power_heat_data.chassis_power,
-                      (float)referee->power_heat_data.chassis_power_buffer);
-
-        WHEEL_SPEED_FACTOR = (float)(7 + (3 / ((0.1 * maximum_energy))) * (power - 0.3 * maximum_energy));
-
-    } else if (power <= 0.7 * maximum_energy && power > 0.4 * maximum_energy) {
-      //case when remaining power of capacitor is between 20% and 50%
-      chassis->Update((float)(90.0 + (30 / 0.3 * maximum_energy) * (power - 0.4 * maximum_energy)),
-                      referee->power_heat_data.chassis_power,
-                      (float)referee->power_heat_data.chassis_power_buffer);
-        WHEEL_SPEED_FACTOR = (float)(10 + (2 / ((0.3 * maximum_energy))) * (power - 0.4 * maximum_energy));
-
+    if (CHARGE_CYCLE){
+      WHEEL_SPEED_FACTOR = 6.0;
+      if (power >= 0.75 * maximum_energy){
+        CHARGE_CYCLE = false;
+        ACCELERATE = true;
+      }
     }
-    else if (power <= 0.9 * maximum_energy && power > 0.7 * maximum_energy) {
-      //case when remaining power of capacitor is between 20% and 50%
-      chassis->Update((float)(120.0 + (20 / 0.2 * maximum_energy) * (power - 0.7 * maximum_energy)),
-                      referee->power_heat_data.chassis_power,
-                      (float)referee->power_heat_data.chassis_power_buffer);
-        WHEEL_SPEED_FACTOR = (float)(12 + (1 / ((0.2 * maximum_energy))) * (power - 0.7 * maximum_energy));
+    else if (ACCELERATE){
+      WHEEL_SPEED_FACTOR += 0.001;
+      if (WHEEL_SPEED_FACTOR == 14.0){
+        ACCELERATE = false;
+      }
     }
-    else if (power > 0.9 * maximum_energy) {
-      //case when remaining power of capacitor is above 90%
-      chassis->Update((float)140.0,
-                      referee->power_heat_data.chassis_power,
-                      (float)referee->power_heat_data.chassis_power_buffer);
-        WHEEL_SPEED_FACTOR = (float)(13.0);
-      // WHEEL SPEED FACTOR will be 16
+    else {
+      if (power <= 0.1 * maximum_energy) {
+        // case when remaining power of capacitor is below 25%
+        chassis->Update((float)40.0,
+                        referee->power_heat_data.chassis_power,
+                        (float)referee->power_heat_data.chassis_power_buffer);
+
+        WHEEL_SPEED_FACTOR = (float)6.0;
+        CHARGE_CYCLE = true;
+      } else if (power <= 0.2 * maximum_energy && power > 0.1 * maximum_energy) {
+        // case when remaining power of capacitor is between 20% and 50%
+        chassis->Update((float)(40.0 + (40 / 0.1 * maximum_energy) * (power - 0.1 * maximum_energy)),
+                        referee->power_heat_data.chassis_power,
+                        (float)referee->power_heat_data.chassis_power_buffer);
+
+        WHEEL_SPEED_FACTOR = (float)(6 + (5 / ((0.1 * maximum_energy))) * (power - 0.1 * maximum_energy));
+
+      } else if (power <= 0.3 * maximum_energy && power > 0.2 * maximum_energy) {
+        // case when remaining power of capacitor is between 20% and 50%
+        chassis->Update((float)(80.0 + (60.0 / 0.1 * maximum_energy) * (power - 0.2 * maximum_energy)),
+                        referee->power_heat_data.chassis_power,
+                        (float)referee->power_heat_data.chassis_power_buffer);
+        WHEEL_SPEED_FACTOR = (float)(11 + (3 / ((0.1 * maximum_energy))) * (power - 0.2 * maximum_energy));
+
+      } else if (power > 0.3 * maximum_energy) {
+        // case when remaining power of capacitor is above 30%
+        chassis->Update((float)120.0,
+                        referee->power_heat_data.chassis_power,
+                        (float)referee->power_heat_data.chassis_power_buffer);
+        WHEEL_SPEED_FACTOR = (float)(14.0);
+        // WHEEL SPEED FACTOR will be 14
+      }
     }
     SPIN_DOWN_SPEED_FACTOR = (float)(4.0 / WHEEL_SPEED_FACTOR);
-    if(receive->mode==1){
-        WHEEL_SPEED_FACTOR = 6.0;
-    }
+    WHEEL_SPEED_FACTOR = receive->mode==1 ? (float)(6.0) : WHEEL_SPEED_FACTOR;
     chassis->WheelUpdateSpeed(WHEEL_SPEED_FACTOR);
 
     if (receive->mode == 1) {  // spin mode
