@@ -444,13 +444,13 @@ static control::MotorCANBase* sl_motor = nullptr;
 static control::MotorCANBase* sr_motor = nullptr;
 static control::MotorCANBase* ld_motor = nullptr;
 static control::Shooter* shooter = nullptr;
-static control::Stepper* stepper = nullptr;
+//static control::Stepper* stepper = nullptr;
 
 static volatile bool flywheelFlag = false;
 
-static unsigned stepper_length = 700;
-static unsigned stepper_speed = 1000;
-static bool stepper_direction = true;
+// static unsigned stepper_length = 700;
+// static unsigned stepper_speed = 1000;
+// static bool stepper_direction = true;
 // The self defined delay for shooter mode
 static const int SHOOTER_MODE_DELAY = 350;
 
@@ -468,13 +468,13 @@ void shooterTask(void* arg) {
 
   while (!imu->CaliDone()) osDelay(100);
 
-  for (int i = 0; i < 2; ++i) {
-    stepper->Move(control::FORWARD, stepper_speed);
-    osDelay(stepper_length);
-    stepper->Move(control::BACKWARD, stepper_speed);
-    osDelay(stepper_length);
-  }
-  stepper->Stop();
+  // for (int i = 0; i < 2; ++i) {
+  //   stepper->Move(control::FORWARD, stepper_speed);
+  //   osDelay(stepper_length);
+  //   stepper->Move(control::BACKWARD, stepper_speed);
+  //   osDelay(stepper_length);
+  // }
+  // stepper->Stop();
 
   while (true) {
     while (Dead) osDelay(100);
@@ -485,16 +485,16 @@ void shooterTask(void* arg) {
       ld_motor->SetOutput(0);
       control::MotorCANBase::TransmitOutput(motors_can1_shooter, 3);
       osDelay(100);
-      if (stepper_direction) {
-        stepper->Move(control::FORWARD, stepper_speed);
-        osDelay(stepper_length);
-        stepper->Stop();
-      } else {
-        stepper->Move(control::BACKWARD, stepper_speed);
-        osDelay(stepper_length);
-        stepper->Stop();
-      }
-      stepper_direction = !stepper_direction;
+      // if (stepper_direction) {
+      //   stepper->Move(control::FORWARD, stepper_speed);
+      //   osDelay(stepper_length);
+      //   stepper->Stop();
+      // } else {
+      //   stepper->Move(control::BACKWARD, stepper_speed);
+      //   osDelay(stepper_length);
+      //   stepper->Stop();
+      // }
+      // stepper_direction = !stepper_direction;
     }
     
     if (GimbalDead) {
@@ -822,8 +822,8 @@ void RM_RTOS_Init(void) {
   shooter_data.load_motor = ld_motor;
   shooter_data.model = control::SHOOTER_STANDARD;
   shooter = new control::Shooter(shooter_data);
-  stepper = new control::Stepper(&htim1, 1, 1000000, DIR_GPIO_Port, DIR_Pin, ENABLE_GPIO_Port,
-                                 ENABLE_Pin);
+  // stepper = new control::Stepper(&htim1, 1, 1000000, DIR_GPIO_Port, DIR_Pin, ENABLE_GPIO_Port,
+  //                                ENABLE_Pin);
 
   buzzer = new bsp::Buzzer(&htim4, 3, 1000000);
   OLED = new display::OLED(&hi2c2, 0x3C);
