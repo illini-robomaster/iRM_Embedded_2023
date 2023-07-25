@@ -668,7 +668,7 @@ void selfTestTask(void* arg) {
   //Could need more time to test it out.
   //The self test task for chassis will not update after the first check.
   OLED->ShowIlliniRMLOGO();
-  buzzer->SingSong(Mario, [](uint32_t milli) { osDelay(milli); });
+
   OLED->OperateGram(display::PEN_CLEAR);
 
   OLED->ShowString(0, 0, (uint8_t*)"GP");
@@ -676,7 +676,8 @@ void selfTestTask(void* arg) {
   OLED->ShowString(1, 0, (uint8_t*)"SL");
   OLED->ShowString(1, 5, (uint8_t*)"SR");
   OLED->ShowString(2, 0, (uint8_t*)"LD");
-  //Super capacitor
+  OLED->ShowString(2,5, (uint8_t*)"VO");
+  //Super capacitor remaining voltage
   OLED->ShowString(3, 0, (uint8_t*)"Cal");
   OLED->ShowString(3, 6, (uint8_t*)"Dbs");
   OLED->ShowString(4, 0, (uint8_t*)"Temp:");
@@ -690,6 +691,8 @@ void selfTestTask(void* arg) {
 //
   OLED->ShowString(3, 12, (uint8_t*)"BL");
   OLED->ShowString(4, 12, (uint8_t*)"BR");
+
+  buzzer->SingSong(Mario, [](uint32_t milli) { osDelay(milli); });
 
   char temp[6] = "";
   char volt[6] = "";
@@ -748,7 +751,7 @@ void selfTestTask(void* arg) {
     //    OLED->ShowBlock(4, 3, referee_flag);
     uint16_t voltage = send->supercap_voltage;
     snprintf(volt, 6, "%u", voltage);
-    OLED->ShowString(2,4,(uint8_t*)volt);
+    OLED->ShowString(2,7,(uint8_t*)volt);
 
     OLED->ShowBlock(1, 18, fl_wheel_flag);
 

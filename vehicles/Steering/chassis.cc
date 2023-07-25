@@ -261,7 +261,7 @@ void chassisTask(void* arg) {
     //WHEEL_SPEED_FACTOR separated for two modes
     if (CHARGE_CYCLE){
       WHEEL_SPEED_FACTOR = 6.0;
-      if (power >= 0.75 * maximum_energy){
+      if (power >= 0.85 * maximum_energy){
         CHARGE_CYCLE = false;
         ACCELERATE = true;
       }
@@ -312,10 +312,10 @@ void chassisTask(void* arg) {
     if (receive->mode == 1) {  // spin mode
       // delay compensation
       // based on rule-of-thumb formula SPIN_SPEED = 80 = ~30 degree of error
-      relative_angle = relative_angle - PI * 30.0 / 180.0 / 80.0 * SPIN_SPEED ;
-
-      chassis->SteerSetMaxSpeed(RUN_SPEED * 3 / 2);
+      relative_angle = relative_angle - PI * 30.0 / 180.0 / 80.0 * SPIN_SPEED;
       relative_angle = relative_angle - PI / 6.0;
+      chassis->SteerSetMaxSpeed(RUN_SPEED * 3 / 2);
+
       sin_yaw = sin(relative_angle);
       cos_yaw = cos(relative_angle);
       vx = cos_yaw * vx_set + sin_yaw * vy_set;
