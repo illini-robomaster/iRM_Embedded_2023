@@ -18,7 +18,10 @@
 #                                                                        #
 # ---------------------------------------------------------------------- #
 
-add_subdirectory(Fortress)
-add_subdirectory(Sentry)
-add_subdirectory(Steering)
-add_subdirectory(Engineer)
+project(Engineer ASM C CXX)
+
+irm_add_arm_executable(Engineer_chassis
+    TARGET DJI_Board_TypeC
+    SOURCES chassis.cc)
+
+
