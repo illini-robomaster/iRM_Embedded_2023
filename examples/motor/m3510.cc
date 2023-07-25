@@ -18,32 +18,28 @@
  *                                                                          *
  ****************************************************************************/
 
-#include "main.h"
-
-#include "bsp_laser.h"
+#include "bsp_gpio.h"
 #include "bsp_print.h"
 #include "cmsis_os.h"
+#include "main.h"
+#include "motor.h"
 
-static bsp::Laser* laser = nullptr;
+static bsp::CAN* can = nullptr;
+static control::MotorCANBase* motor = nullptr;
 
-void RM_RTOS_Init(void) {
+void RM_RTOS_Init() {
   print_use_uart(&huart1);
-  laser = new bsp::Laser(LASER_GPIO_Port, LASER_Pin);
+  can = new bsp::CAN(&hcan1, true);
+  motor = new control::Motor3510(can, 0x205);
 }
 
 void RM_RTOS_Default_Task(const void* args) {
-  UNUSED(args);
-
-  while (true) {
-    set_cursor(0, 0);
-    clear_screen();
-    laser->On();
-    print("laser on\r\n");
-    osDelay(1000);
-    set_cursor(0, 0);
-    clear_screen();
-    laser->Off();
-    print("laser off\r\n");
-    osDelay(1000);
-  }
+    UNUSED(args);
+    control::MotorCANBase* motors[] = {motor};
+    while (true) {
+        motor->SetOutput(2000);
+        motor->PrintData();
+        control::MotorCANBase::TransmitOutput(motors, 1);
+        osDelay(100);
+    }
 }

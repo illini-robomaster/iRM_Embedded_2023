@@ -207,9 +207,36 @@ class Motor3508 : public MotorCANBase {
 
   uint16_t GetTemp() const override final;
 
+  
+
  private:
   volatile int16_t raw_current_get_ = 0;
   volatile uint8_t raw_temperature_ = 0;
+};
+
+//==================================================================================================
+// Motor 3510
+//==================================================================================================
+
+/**
+ * @brief DJI 3510 motor class
+ */
+class Motor3510 : public MotorCANBase {
+ public:
+  /* constructor wrapper over MotorCANBase */
+  Motor3510(bsp::CAN* can, uint16_t rx_id);
+  /* implements data update callback */
+  void UpdateData(const uint8_t data[]) override final;
+  /* implements data printout */
+  void PrintData() const override final;
+  /* override base implementation with max current protection */
+  void SetOutput(int16_t val) override final;
+
+
+ private:
+  volatile float torque_ = 0; /* Torque Value*/
+  volatile float previous_position_ = 0;
+ 
 };
 
 //==================================================================================================
@@ -566,8 +593,8 @@ typedef struct {
   float* omega_pid_param;           /* pid parameter used to control speed of motor       */
   float max_iout;
   float max_out;
-  align_detect_t align_detect_func = nullptr; /* function pointer for calibration function*/
-  float calibrate_offset = 0.0;     /* angle from calibration sensor to starting location */
+  align_detect_t align_detect_func; /* function pointer for calibration function*/
+  float calibrate_offset;           /* angle from calibration sensor to starting location */
 } steering_t;
 
 // mode that can turn relative angles in [rad]
@@ -825,6 +852,5 @@ class Motor4310 {
   constexpr static float T_MIN = -18;
   constexpr static float T_MAX = 18;
 };
-
 
 } /* namespace control */
