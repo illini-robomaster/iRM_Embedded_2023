@@ -24,14 +24,14 @@
 | can_bridge    | 2   | 0x20B  | 0x20A  |
 
 ## RC Switch Definition
-|                             | Function           |
-| ----------------------------| ------------------ |
-| swl-down                    | Toggle Kill        |
-| swl-up                      | Toggle spin mode   |
-| swr-down (pre-calibration)  | Calibrate          |
-| swr-down (post-calibration) | Do nothing         |
-| swr-mid                     | Turn on flywheels  |
-| swr-up                      | Turn on load motor |
+|                             | Function               |
+| ----------------------------|------------------------|
+| swl-down                    | Toggle Kill            |
+| swl-up                      | Toggle spin mode       |
+| swr-down (pre-calibration)  | Calibrate              |
+| swr-down (post-calibration) | Do nothing             |
+| swr-mid                     | Turn on flywheels      |
+| swr-up                      | Slow Continue Shooting |
 
 ## Key Definition
 |          | Function         |
@@ -41,3 +41,9 @@
 | SHIFT    | Toggle Spin      |
 | R        | Recalibrate steer motors  |
 | G        | Manual anti-jam  |
+
+## Wheel Definition
+|      | Function               |
+|------|------------------------|
+| Up   | Triple Shooting        |
+| Down | Fast Continue Shooting |
