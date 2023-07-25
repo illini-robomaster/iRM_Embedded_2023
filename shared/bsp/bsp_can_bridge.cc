@@ -91,7 +91,7 @@ void CanBridge::UpdateData(const uint8_t* data) {
       is_my_color_blue = cmd.data_bool;
       break;
     case SUPERCAP_VOLTAGE:
-      supercap_voltage = cmd.data_uint16;
+      supercap_voltage = cmd.data_float;
       break;
     default:;
   }

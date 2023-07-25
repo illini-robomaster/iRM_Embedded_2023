@@ -81,7 +81,7 @@ class CanBridge {
   unsigned int gimbal_power = 0;
   bool recalibrate = false;
   bool is_my_color_blue = false;
-  uint16_t supercap_voltage = 0;
+  float supercap_voltage = 0;
   // each bit represents a flag correspond to specific motor e.g.(at index 0, it represents the motor 1's connection flag)
  private:
   bsp::CAN* can_;

@@ -676,7 +676,7 @@ void selfTestTask(void* arg) {
   OLED->ShowString(1, 0, (uint8_t*)"SL");
   OLED->ShowString(1, 5, (uint8_t*)"SR");
   OLED->ShowString(2, 0, (uint8_t*)"LD");
-  OLED->ShowString(2,5, (uint8_t*)"VO");
+  OLED->ShowString(2,5, (uint8_t*)"VT:");
   //Super capacitor remaining voltage
   OLED->ShowString(3, 0, (uint8_t*)"Cal");
   OLED->ShowString(3, 6, (uint8_t*)"Dbs");
@@ -749,9 +749,9 @@ void selfTestTask(void* arg) {
     snprintf(temp, 6, "%.2f", imu->Temp);
     OLED->ShowString(4, 6, (uint8_t*)temp);
     //    OLED->ShowBlock(4, 3, referee_flag);
-    uint16_t voltage = send->supercap_voltage;
-    snprintf(volt, 6, "%u", voltage);
-    OLED->ShowString(2,7,(uint8_t*)volt);
+    float voltage = send->supercap_voltage;
+    snprintf(volt, 6, "%.2f", voltage);
+    OLED->ShowString(2,8,(uint8_t*)volt);
 
     OLED->ShowBlock(1, 18, fl_wheel_flag);
 

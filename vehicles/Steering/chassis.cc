@@ -248,8 +248,8 @@ void chassisTask(void* arg) {
 
 
 
-    uint16_t supercap_voltage = supercap->info.voltage / 1000;
-    float maximum_energy = 0.5 * pow(26.0,2) * 6.0;
+    float supercap_voltage = (float)(supercap->info.voltage / 1000.0);
+    float maximum_energy = 0.5 * pow(27.0,2) * 6.0;
 
     float power = pow(supercap_voltage,2) * 6 / 2;
 
@@ -287,27 +287,30 @@ void chassisTask(void* arg) {
                         referee->power_heat_data.chassis_power,
                         (float)referee->power_heat_data.chassis_power_buffer);
 
-        WHEEL_SPEED_FACTOR = (float)(6 + (5 / ((0.1 * maximum_energy))) * (power - 0.1 * maximum_energy));
-
+        WHEEL_SPEED_FACTOR = (float)(6.0 + (4.0 / ((0.1 * maximum_energy))) * (power - 0.1 * maximum_energy));
       } else if (power <= 0.3 * maximum_energy && power > 0.2 * maximum_energy) {
         // case when remaining power of capacitor is between 20% and 50%
         chassis->Update((float)(80.0 + (60.0 / 0.1 * maximum_energy) * (power - 0.2 * maximum_energy)),
                         referee->power_heat_data.chassis_power,
                         (float)referee->power_heat_data.chassis_power_buffer);
-        WHEEL_SPEED_FACTOR = (float)(11 + (3 / ((0.1 * maximum_energy))) * (power - 0.2 * maximum_energy));
-
+        WHEEL_SPEED_FACTOR = (float)(10.0 + (2.0 / ((0.1 * maximum_energy))) * (power - 0.2 * maximum_energy));
       } else if (power > 0.3 * maximum_energy) {
         // case when remaining power of capacitor is above 30%
         chassis->Update((float)120.0,
                         referee->power_heat_data.chassis_power,
                         (float)referee->power_heat_data.chassis_power_buffer);
-        WHEEL_SPEED_FACTOR = (float)(14.0);
-        // WHEEL SPEED FACTOR will be 14
+        WHEEL_SPEED_FACTOR = (float)(12.0);
+        // WHEEL SPEED FACTOR will be 12
       }
     }
     SPIN_DOWN_SPEED_FACTOR = (float)(4.0 / WHEEL_SPEED_FACTOR);
     WHEEL_SPEED_FACTOR = receive->mode==1 ? (float)(6.0) : WHEEL_SPEED_FACTOR;
     chassis->WheelUpdateSpeed(WHEEL_SPEED_FACTOR);
+
+//    print("chassis power: %f, voltage: %f, percentage: %f%%, "
+//        "WHEEL_SPEED_FACTOR: %f, CHA: %u, ACC: %u, vx: %f, vy: %f \r\n",referee->power_heat_data.chassis_power,
+//          supercap_voltage,power / maximum_energy * 100.0, WHEEL_SPEED_FACTOR, CHARGE_CYCLE, ACCELERATE,vx_set,vy_set);
+
 
     if (receive->mode == 1) {  // spin mode
       // delay compensation
@@ -415,7 +418,7 @@ void self_Check_Task(void* arg){
       receive->cmd.data_uint = (unsigned int)flag_summary;
       receive->TransmitOutput();
       receive->cmd.id = bsp :: SUPERCAP_VOLTAGE;
-      receive->cmd.data_uint16 = supercap->info.voltage / 1000;
+      receive->cmd.data_float = supercap->info.voltage / 1000;
       receive->TransmitOutput();
     }
     transmission_flag = !transmission_flag;
