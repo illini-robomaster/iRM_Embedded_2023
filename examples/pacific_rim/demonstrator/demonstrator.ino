@@ -1,25 +1,31 @@
 #include <analogWrite.h>
 
-const int testPin = A4;
+const int servoPin = A3;
+const int pwmPin = A4;
 
 void setup() {
-  pinMode(testPin, OUTPUT);
   Serial.begin(9600);
+
+  pinMode(pwmPin, OUTPUT);
   ledcSetup(8, 50, 16);
   ledcAttachPin(A4, 8);
 }
 
 int calculatePWM(int degree) {
-  const float deadZone = 0.5 / 20 * 4096;
-  const float max = 2.5 / 20 * 4096;
+  const float deadZone = 2880;
+  const float max = 7080;
 
-  return (int)(((max -  deadZone) / 180 * degree + deadZone));
+  return (int)(((max -  deadZone) / 360 * degree + deadZone));
 }
 
-// [12] 180, 311, 443
 // [16] 2880, 4940~5020, 7080
+int angle = 0;
 
 void loop() {
+  angle = analogRead(servoPin);
+  Serial.println(angle / 4096.0 * 360);
+  ledcWrite(8, calculatePWM(angle / 4096.0 * 360));
+
   // int pwm0 = 2880;
   // Serial.printf("PWM0: %d\n", pwm0);
   // ledcWrite(8, pwm0);
@@ -30,8 +36,10 @@ void loop() {
   // ledcWrite(8, pwm1);
   // delay(1000);
 
-  int pwm2 = 7080;
-  Serial.printf("PWM2: %d\n", pwm2);
-  ledcWrite(8, pwm2);
-  delay(1000);
+  // int pwm2 = 7080;
+  // Serial.printf("PWM2: %d\n", pwm2);
+  // ledcWrite(8, pwm2);
+  delay(10);
 }
+
+
