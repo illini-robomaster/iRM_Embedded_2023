@@ -22,6 +22,7 @@
 
 #include "controller.h"
 #include "motor.h"
+#include "dbus.h"
 
 namespace control {
 
@@ -88,11 +89,13 @@ class Shooter {
 
   void SlowContinueShoot();
 
-  void DoubleShoot();
+  void TripleShoot();
 
   void DialStop();
 
   void Antijam();
+
+  void TurnableShoot(uint16_t value);
 
  private:
   // acquired from user
@@ -106,7 +109,7 @@ class Shooter {
 
   BoolEdgeDetector* flywheel_turning_detector_; /* flywheel turning state detector */
   float load_step_angle_;                       /* angle rotated for every bullet loaded */
-  float load_double_angle_;                     /* angle rotated for every double bullet loaded */
+  float load_triple_angle_;                     /* angle rotated for every double bullet loaded */
   float load_antijam_angle_;                    /* angle rotated for antijam */
   float speed_;                                 /* current turning speed of flywheels */
   float dial_speed_;                            /* current turning speed of dial */

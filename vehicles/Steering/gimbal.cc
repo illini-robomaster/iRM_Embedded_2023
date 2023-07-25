@@ -456,6 +456,7 @@ void shooterTask(void* arg) {
   // timer control for dual shooting
   // uint32_t start_time = 0;
   // bool slow_shoot_detect = false;
+  bool triple_shoot_detect = false;
 
   while (true) {
     if (dbus->keyboard.bit.B || dbus->swr == remote::DOWN) break;
@@ -481,7 +482,7 @@ void shooterTask(void* arg) {
       if (send->shooter_power && send->cooling_heat1 < send->cooling_limit1 - 20) {
         // for manual antijam 
         Antijam.input(dbus->keyboard.bit.G || dbus->swl == remote::UP);
-
+        // slow shooting
         if (dbus->mouse.l || dbus->swr == remote::UP) {
           // if ((bsp::GetHighresTickMicroSec() - start_time) / 1000 > SHOOTER_MODE_DELAY) {
           shooter->SlowContinueShoot();
@@ -489,15 +490,30 @@ void shooterTask(void* arg) {
           //   slow_shoot_detect = true;
           //   shooter->DoubleShoot();
           // }
+        // fast shooting
         } else if (dbus->mouse.r) {
           shooter->FastContinueShoot();
+        // turnable shooting
+        } else if (dbus->wheel.wheel > remote::dbus_wheel_digital_lowerbound) {
+          shooter->TurnableShoot(dbus->wheel.wheel);
+        // triple shooting
+        } else if (dbus->wheel.wheel == remote::dbus_wheel_digital_lowerbound 
+                   && dbus->previous_wheel_value == remote::dbus_wheel_digital_lowerbound) {
+          if (triple_shoot_detect == false) {
+            triple_shoot_detect = true;          
+            shooter->TripleShoot();
+          }
+        // manual antijam
         } else if (Antijam.posEdge()) {
           shooter->Antijam();
-        }else {
+        // stop
+        } else {
           shooter->DialStop();
           // start_time = bsp::GetHighresTickMicroSec();
           // slow_shoot_detect = false;
+          triple_shoot_detect = false;
         }
+        dbus->previous_wheel_value = dbus->wheel.wheel;
       }
     }
 

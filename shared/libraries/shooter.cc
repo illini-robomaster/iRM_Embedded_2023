@@ -49,7 +49,7 @@ Shooter::Shooter(shooter_t shooter) {
       servo_data.max_out = 10000;
 
       load_step_angle_ = 2 * PI / 8;
-      load_double_angle_ = 2 * PI / 4;
+      load_triple_angle_ = 2 * PI / 8 * 3;
       load_antijam_angle_ = 2 * PI / 8;
       dial_speed_ = 6 * PI;
       dial_continue_fast_acceleration = 100 * PI;
@@ -70,7 +70,7 @@ Shooter::Shooter(shooter_t shooter) {
       right_pid_ = new PIDController(80, 3, 0.1);
       flywheel_turning_detector_ = new BoolEdgeDetector(false);
       load_step_angle_ = 2 * PI / 8;
-      load_double_angle_ = 2 * PI / 4;
+      load_triple_angle_ = 2 * PI / 8 * 3;
       load_antijam_angle_ = 2 * PI / 8;
       speed_ = 0;
       dial_speed_ = 20 * PI;
@@ -156,8 +156,8 @@ void Shooter::SlowContinueShoot() {
   load_servo_->SetMaxAcceleration(dial_continue_slowly_acceleration);
 }
 
-void Shooter::DoubleShoot() {
-  load_servo_->SetTarget(load_servo_->GetTarget() + load_double_angle_, false);
+void Shooter::TripleShoot() {
+  load_servo_->SetTarget(load_servo_->GetTarget() + load_triple_angle_, false);
   load_servo_->SetMaxSpeed(dial_speed_);
   load_servo_->SetMaxAcceleration(dial_double_acceleration);
 }
@@ -170,6 +170,16 @@ void Shooter::Antijam() {
   load_servo_->SetTarget(load_servo_->GetTarget() - load_antijam_angle_, true);
   load_servo_->SetMaxSpeed(dial_speed_);
   load_servo_->SetMaxAcceleration(dial_antijam_acceleration);
+}
+
+void Shooter::TurnableShoot(uint16_t value) {
+  load_servo_->SetTarget(load_servo_->GetTarget() + load_step_angle_, false);
+  print("max speed: %f", dial_speed_ * 5 * // original fast shooting speed
+                          ((value - remote::dbus_wheel_digital_lowerbound) / (remote::dbus_wheel_upperbound - remote::dbus_wheel_digital_lowerbound)));
+  load_servo_->SetMaxSpeed(dial_speed_ * 5 * // original fast shooting speed
+                          ((value - remote::dbus_wheel_digital_lowerbound) / (remote::dbus_wheel_upperbound - remote::dbus_wheel_digital_lowerbound)));
+                          // speed is proportional to the dbus wheel value
+  load_servo_->SetMaxAcceleration(dial_continue_fast_acceleration);
 }
 
 }  // namespace control
