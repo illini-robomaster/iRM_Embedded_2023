@@ -172,14 +172,4 @@ void Shooter::Antijam() {
   load_servo_->SetMaxAcceleration(dial_antijam_acceleration);
 }
 
-void Shooter::TurnableShoot(uint16_t value) {
-  load_servo_->SetTarget(load_servo_->GetTarget() + load_step_angle_, false);
-  print("max speed: %f", dial_speed_ * 5 * // original fast shooting speed
-                          ((value - remote::dbus_wheel_digital_lowerbound) / (remote::dbus_wheel_upperbound - remote::dbus_wheel_digital_lowerbound)));
-  load_servo_->SetMaxSpeed(dial_speed_ * 5 * // original fast shooting speed
-                          ((value - remote::dbus_wheel_digital_lowerbound) / (remote::dbus_wheel_upperbound - remote::dbus_wheel_digital_lowerbound)));
-                          // speed is proportional to the dbus wheel value
-  load_servo_->SetMaxAcceleration(dial_continue_fast_acceleration);
-}
-
 }  // namespace control

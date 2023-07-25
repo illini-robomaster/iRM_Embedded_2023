@@ -95,8 +95,6 @@ class Shooter {
 
   void Antijam();
 
-  void TurnableShoot(uint16_t value);
-
  private:
   // acquired from user
   MotorBase* left_flywheel_motor_;
