@@ -444,22 +444,18 @@ static control::MotorCANBase* sl_motor = nullptr;
 static control::MotorCANBase* sr_motor = nullptr;
 static control::MotorCANBase* ld_motor = nullptr;
 static control::Shooter* shooter = nullptr;
-//static control::Stepper* stepper = nullptr;
 
 static volatile bool flywheelFlag = false;
 
-// static unsigned stepper_length = 700;
-// static unsigned stepper_speed = 1000;
-// static bool stepper_direction = true;
-// The self defined delay for shooter mode
 static const int SHOOTER_MODE_DELAY = 350;
 
 void shooterTask(void* arg) {
   UNUSED(arg);
 
   control::MotorCANBase* motors_can1_shooter[] = {sl_motor, sr_motor, ld_motor};
-  uint32_t start_time = 0;
-  bool slow_shoot_detect = false;
+  // timer control for dual shooting
+  // uint32_t start_time = 0;
+  // bool slow_shoot_detect = false;
 
   while (true) {
     if (dbus->keyboard.bit.B || dbus->swr == remote::DOWN) break;
@@ -467,14 +463,6 @@ void shooterTask(void* arg) {
   }
 
   while (!imu->CaliDone()) osDelay(100);
-
-  // for (int i = 0; i < 2; ++i) {
-  //   stepper->Move(control::FORWARD, stepper_speed);
-  //   osDelay(stepper_length);
-  //   stepper->Move(control::BACKWARD, stepper_speed);
-  //   osDelay(stepper_length);
-  // }
-  // stepper->Stop();
 
   while (true) {
     while (Dead) osDelay(100);
@@ -485,16 +473,6 @@ void shooterTask(void* arg) {
       ld_motor->SetOutput(0);
       control::MotorCANBase::TransmitOutput(motors_can1_shooter, 3);
       osDelay(100);
-      // if (stepper_direction) {
-      //   stepper->Move(control::FORWARD, stepper_speed);
-      //   osDelay(stepper_length);
-      //   stepper->Stop();
-      // } else {
-      //   stepper->Move(control::BACKWARD, stepper_speed);
-      //   osDelay(stepper_length);
-      //   stepper->Stop();
-      // }
-      // stepper_direction = !stepper_direction;
     }
     
     if (GimbalDead) {
@@ -505,20 +483,20 @@ void shooterTask(void* arg) {
         Antijam.input(dbus->keyboard.bit.G || dbus->swl == remote::UP);
 
         if (dbus->mouse.l || dbus->swr == remote::UP) {
-          if ((bsp::GetHighresTickMicroSec() - start_time) / 1000 > SHOOTER_MODE_DELAY) {
-            shooter->SlowContinueShoot();
-          } else if (slow_shoot_detect == false) {
-            slow_shoot_detect = true;
-            shooter->DoubleShoot();
-          }
+          // if ((bsp::GetHighresTickMicroSec() - start_time) / 1000 > SHOOTER_MODE_DELAY) {
+          shooter->SlowContinueShoot();
+          // } else if (slow_shoot_detect == false) {
+          //   slow_shoot_detect = true;
+          //   shooter->DoubleShoot();
+          // }
         } else if (dbus->mouse.r) {
           shooter->FastContinueShoot();
         } else if (Antijam.posEdge()) {
           shooter->Antijam();
         }else {
           shooter->DialStop();
-          start_time = bsp::GetHighresTickMicroSec();
-          slow_shoot_detect = false;
+          // start_time = bsp::GetHighresTickMicroSec();
+          // slow_shoot_detect = false;
         }
       }
     }
