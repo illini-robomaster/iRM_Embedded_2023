@@ -31,7 +31,7 @@ namespace control {
 /**
  * @brief chassis models
  */
-typedef enum { CHASSIS_MECANUM_WHEEL, CHASSIS_ONE_WHEEL } chassis_model_t;
+typedef enum { CHASSIS_MECANUM_WHEEL, CHASSIS_ONE_WHEEL, CHASSIS_OMNI_WHEEL } chassis_model_t;
 
 /**
  * @brief structure used when chassis instance is initialized
@@ -42,7 +42,7 @@ typedef struct {
 } chassis_t;
 
 /**
- * @brief motor configs for four wheel vehicles
+ * @brief motor configs for wheel vehicles
  */
 struct FourWheel {
   enum { front_left, front_right, back_left, back_right, motor_num };

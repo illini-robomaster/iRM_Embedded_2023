@@ -18,32 +18,34 @@
  *                                                                          *
  ****************************************************************************/
 
-#include "main.h"
+#pragma once
 
-#include "bsp_laser.h"
-#include "bsp_print.h"
-#include "cmsis_os.h"
+#include "bsp_can.h"
+#include "controller.h"
 
-static bsp::Laser* laser = nullptr;
+namespace control {
 
-void RM_RTOS_Init(void) {
-  print_use_uart(&huart1);
-  laser = new bsp::Laser(LASER_GPIO_Port, LASER_Pin);
-}
+//==================================================================================================
+// BRT Encoder
+//==================================================================================================
 
-void RM_RTOS_Default_Task(const void* args) {
-  UNUSED(args);
+/**
+ * @brief BRT Encoder class
+ */
+class BRTEncoder {
+ public:
+  /* constructor wrapper over MotorCANBase */
+  BRTEncoder(bsp::CAN* can, uint16_t rx_id);
+  /* implements data update callback */
+  void UpdateData(const uint8_t data[]);
+  /* implements data printout */
+  void PrintData() const;
 
-  while (true) {
-    set_cursor(0, 0);
-    clear_screen();
-    laser->On();
-    print("laser on\r\n");
-    osDelay(1000);
-    set_cursor(0, 0);
-    clear_screen();
-    laser->Off();
-    print("laser off\r\n");
-    osDelay(1000);
-  }
-}
+ private:
+  bsp::CAN* can_;
+  uint16_t rx_id_;
+  float angle_;
+  bool connection_flag_ = false;
+};
+
+} /* namespace control */
