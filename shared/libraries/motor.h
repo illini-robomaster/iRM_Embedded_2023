@@ -236,35 +236,6 @@ class Motor3510 : public MotorCANBase {
   /* override base implementation with max current protection */
   void SetOutput(int16_t val) override final;
 
-  float GetTorque() const override final;
-
- private:
-  volatile int16_t raw_current_get_ = 0;
-  volatile uint8_t raw_temperature_ = 0;
-  volatile int16_t raw_torque_ = 0;
-  volatile int16_t raw_theta_ = 0;
-};
-
-
-
-//==================================================================================================
-// Motor 3510
-//==================================================================================================
-
-/**
- * @brief DJI 3510 motor class
- */
-class Motor3510 : public MotorCANBase {
- public:
-  /* constructor wrapper over MotorCANBase */
-  Motor3510(bsp::CAN* can, uint16_t rx_id);
-  /* implements data update callback */
-  void UpdateData(const uint8_t data[]) override final;
-  /* implements data printout */
-  void PrintData() const override final;
-  /* override base implementation with max current protection */
-  void SetOutput(int16_t val) override final;
-
 
  private:
   volatile float torque_ = 0; /* Torque Value*/

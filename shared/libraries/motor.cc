@@ -153,37 +153,6 @@ uint16_t Motor3508::GetTemp() const { return raw_temperature_; }
 // Motor 3510
 //==================================================================================================
 
-
-  Motor3510::Motor3510(bsp::CAN* can, uint16_t rx_id):MotorCANBase(can, rx_id){
-    can->RegisterRxCallback(rx_id, can_motor_callback, this);
-  }
-  /* implements data update callback */
-  void Motor3510::UpdateData(const uint8_t data[]) {
-    const int16_t raw_theta = data[0] << 8 | data[1];
-    const int16_t raw_torque = data[2] << 8 | data[3]; 
-    raw_theta_= raw_theta;
-    raw_torque_ = raw_torque;
-    
-  }
-  /* implements data printout */
-  void Motor3510::PrintData() const{
-    print("theta: %3d ", raw_theta_);
-    print("raw_torque: %3d \r\n", raw_torque_);
-  }
-  /* override base implementation with max current protection */
-  void Motor3510::SetOutput(int16_t val){
-    constexpr int16_t MAX_ABS_CURRENT = 29000;
-    output_ = clip<int16_t>(val,-MAX_ABS_CURRENT,MAX_ABS_CURRENT);
-  }
-
-  float Motor3510::GetTorque() const{ return raw_torque_; }
-
-
-
-//==================================================================================================
-// Motor 3510
-//==================================================================================================
-
   Motor3510::Motor3510(bsp::CAN* can, uint16_t rx_id):MotorCANBase(can, rx_id){
     can->RegisterRxCallback(rx_id, can_motor_callback, this);
   }
