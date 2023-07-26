@@ -676,7 +676,7 @@ void selfTestTask(void* arg) {
   OLED->ShowString(1, 0, (uint8_t*)"SL");
   OLED->ShowString(1, 5, (uint8_t*)"SR");
   OLED->ShowString(2, 0, (uint8_t*)"LD");
-  OLED->ShowString(2,5, (uint8_t*)"VT:");
+  OLED->ShowString(2,5, (uint8_t*)"V:");
   //Super capacitor remaining voltage
   OLED->ShowString(3, 0, (uint8_t*)"Cal");
   OLED->ShowString(3, 6, (uint8_t*)"Dbs");
