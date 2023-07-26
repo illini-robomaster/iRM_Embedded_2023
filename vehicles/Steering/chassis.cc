@@ -334,9 +334,9 @@ void chassisTask(void* arg) {
       vx = cos_yaw * vx_set + sin_yaw * vy_set;
       vy = -sin_yaw * vx_set + cos_yaw * vy_set;
       wz = (float)(std::min(FOLLOW_SPEED , FOLLOW_SPEED * relative_angle ) * SPIN_DOWN_SPEED_FACTOR);\
-      //When relative angle in deadzone, do not follow gimbal. 
+      //When relative angle in dead zone, do not follow gimbal.
       if (-CHASSIS_DEADZONE < relative_angle && relative_angle < CHASSIS_DEADZONE) wz = 0;
-      //If vx, vy are close to zero, deadzone is larger to avoid wheel to be 45 degree, leading to flipping.
+      //If vx, vy are close to zero, dead zone is larger to avoid wheel to be 45 degree, leading to flipping.
       else if (vx <= 0.1 && vy <= 0.1 && (-CHASSIS_DEADZONE2 < relative_angle && relative_angle < CHASSIS_DEADZONE2)) wz = 0;
     }  
 
