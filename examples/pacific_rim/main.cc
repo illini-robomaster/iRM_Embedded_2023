@@ -127,7 +127,7 @@ void RM_RTOS_Default_Task(const void* arguments) {
 //    print("CH12: %-4d CH13: %-4d CH14: %-4d CH15: %-4d ", sbus->ch[12], sbus->ch[13], sbus->ch[14], sbus->ch[15]);
 //    print("@ %d ms\r\n", sbus->timestamp);
 
-    A1->Control(0, 0.0, 0.0, (sbus->ch[0] + 1024.0f) / 2048 * 2*PI, 0.02, 0.1); // zero torque mode
+    A1->Control(0, 0.0, 0.0, (sbus->ch[0] + 1024.0f) / 2048 * 2*PI, 0.005, 5); // zero torque mode
     A1_uart->Write((uint8_t*)(&(A1->send.data)), A1->send_length);
 
 //    set_cursor(0, 0);
