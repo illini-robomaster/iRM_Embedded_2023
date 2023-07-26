@@ -170,6 +170,7 @@ static control::SteeringChassis* chassis;
 static control::SuperCap* supercap = nullptr;
 
 static const float CHASSIS_DEADZONE = 0.04;
+static const float CHASSIS_DEADZONE2 = 0.1;
 static float SPIN_DOWN_SPEED_FACTOR = 0.0;
 
 static bool CHARGE_CYCLE = false;
@@ -332,9 +333,12 @@ void chassisTask(void* arg) {
       cos_yaw = cos(relative_angle);
       vx = cos_yaw * vx_set + sin_yaw * vy_set;
       vy = -sin_yaw * vx_set + cos_yaw * vy_set;
-      wz = (float)(std::min(FOLLOW_SPEED , FOLLOW_SPEED * relative_angle ) * SPIN_DOWN_SPEED_FACTOR);
+      wz = (float)(std::min(FOLLOW_SPEED , FOLLOW_SPEED * relative_angle ) * SPIN_DOWN_SPEED_FACTOR);\
+      //When relative angle in deadzone, do not follow gimbal. 
       if (-CHASSIS_DEADZONE < relative_angle && relative_angle < CHASSIS_DEADZONE) wz = 0;
-    }
+      //If vx, vy are close to zero, deadzone is larger to avoid wheel to be 45 degree, leading to flipping.
+      else if (vx <= 0.1 && vy <= 0.1 && (-CHASSIS_DEADZONE2 < relative_angle && relative_angle < CHASSIS_DEADZONE2)) wz = 0;
+    }  
 
     chassis->SetSpeed(vx / 10, vy / 10, wz);
     chassis->SteerUpdateTarget();
