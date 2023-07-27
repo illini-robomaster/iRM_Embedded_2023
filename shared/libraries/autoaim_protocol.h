@@ -1,6 +1,6 @@
 /****************************************************************************
  *                                                                          *
- *  Copyright (C) 2022 RoboMaster.                                          *
+ *  Copyright (C) 2023 RoboMaster.                                          *
  *  Illini RoboMaster @ University of Illinois at Urbana-Champaign          *
  *                                                                          *
  *  This program is free software: you can redistribute it and/or modify    *
@@ -27,12 +27,15 @@
 
 namespace communication {
 
-struct STMToJetsonData {
+typedef struct {
   char header[2];
   uint8_t my_color; // RED is 0; BLUE is one
+  int32_t cur_yaw;
+  int32_t cur_pitch;
+  uint32_t additional_info;
   uint8_t crc8_checksum;
   char tail[2];
-};
+} __packed STMToJetsonData;
 
 // WARNING: THIS CLASS IS NOT THREAD SAFE!!!
 
@@ -41,7 +44,7 @@ class AutoaimProtocol {
   AutoaimProtocol();
   void Receive(const uint8_t* data, uint8_t len);
   // dummy send
-  void Send(STMToJetsonData* packet, uint8_t color);
+  void Send(STMToJetsonData* packet, uint8_t color, float cur_yaw, float cur_pitch, uint32_t additional_info);
   uint8_t get_valid_flag(void);
   float get_relative_yaw(void);
   float get_relative_pitch(void);
@@ -52,7 +55,7 @@ class AutoaimProtocol {
   // For definitions of constants, check out the documentation at either
   // https://github.com/illini-robomaster/iRM_Vision_2023/blob/roger/crc_comm/docs/comm_protocol.md
   // or https://github.com/illini-robomaster/iRM_Vision_2023/tree/docs/comm_protocol.md
-  static constexpr uint8_t PKG_LEN = 17;
+  static constexpr uint8_t PKG_LEN = 17;  // jetson to STM32 length
   static constexpr int32_t INT_FP_SCALE = 1000000;
   static constexpr uint8_t SEQNUM_OFFSET = 2;
   static constexpr uint8_t REL_YAW_OFFSET = SEQNUM_OFFSET + 4;

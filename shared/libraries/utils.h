@@ -1,6 +1,6 @@
 /****************************************************************************
  *                                                                          *
- *  Copyright (C) 2022 RoboMaster.                                          *
+ *  Copyright (C) 2023 RoboMaster.                                          *
  *  Illini RoboMaster @ University of Illinois at Urbana-Champaign          *
  *                                                                          *
  *  This program is free software: you can redistribute it and/or modify    *
@@ -190,3 +190,14 @@ class FloatEdgeDetector {
  * @return value converted from float to unsigned int
  */
 uint16_t float_to_uint(float x, float x_min, float x_max, int bits);
+
+/**
+ * @brief Converts an unsigned int to a float, given range and number of bits;
+ *      see m4310 V1.2 document for detail
+ * @param x value to be converted
+ * @param x_min minimum value of the current parameter
+ * @param x_max maximum value of the current parameter
+ * @param bits size in bits
+ * @return value converted from unsigned int to float
+ */
+float uint_to_float(int x_int, float x_min, float x_max, int bits);

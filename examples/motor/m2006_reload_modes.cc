@@ -69,7 +69,7 @@ void RM_RTOS_Init() {
   print_use_uart(&huart1);
   bsp::SetHighresClockTimer(&htim5);
 
-  can1 = new bsp::CAN(&hcan1, 0x201);
+  can1 = new bsp::CAN(&hcan1, true);
   motor = new control::Motor2006(can1, 0x202);
 
   control::servo_t servo_data;

@@ -1,6 +1,6 @@
 /****************************************************************************
  *                                                                          *
- *  Copyright (C) 2022 RoboMaster.                                          *
+ *  Copyright (C) 2023 RoboMaster.                                          *
  *  Illini RoboMaster @ University of Illinois at Urbana-Champaign          *
  *                                                                          *
  *  This program is free software: you can redistribute it and/or modify    *
@@ -58,10 +58,12 @@ Shooter::Shooter(shooter_t shooter) {
 
       load_step_angle_ = 2 * PI / 8;
       load_double_angle_ = 2 * PI / 4;
+      load_antijam_angle_ = 2 * PI / 8;
       dial_speed_ = 6 * PI;
-      dial_continue_fast_acceleration = 200 * PI;
+      dial_continue_fast_acceleration = 100 * PI;
       dial_continue_slowly_acceleration = 20 * PI;
       dial_double_acceleration = 100 * PI;
+      dial_antijam_acceleration = 100 * PI;
       break;
 
     case SHOOTER_STANDARD:
@@ -77,11 +79,13 @@ Shooter::Shooter(shooter_t shooter) {
       flywheel_turning_detector_ = new BoolEdgeDetector(false);
       load_step_angle_ = 2 * PI / 8;
       load_double_angle_ = 2 * PI / 4;
+      load_antijam_angle_ = 2 * PI / 8;
       speed_ = 0;
       dial_speed_ = 20 * PI;
       dial_continue_fast_acceleration = 100 * PI;
       dial_continue_slowly_acceleration = 40 * PI;
       dial_double_acceleration = 100 * PI;
+      dial_antijam_acceleration = 100 * PI;
       break;
 
     default:
@@ -168,6 +172,12 @@ void Shooter::DoubleShoot() {
 
 void Shooter::DialStop() {
   load_servo_->SetMaxSpeed(0);
+}
+
+void Shooter::Antijam() {
+  load_servo_->SetTarget(load_servo_->GetTarget() - load_antijam_angle_, true);
+  load_servo_->SetMaxSpeed(dial_speed_);
+  load_servo_->SetMaxAcceleration(dial_antijam_acceleration);
 }
 
 }  // namespace control

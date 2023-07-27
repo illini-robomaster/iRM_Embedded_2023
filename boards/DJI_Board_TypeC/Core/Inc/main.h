@@ -105,12 +105,15 @@ void RM_RTOS_Default_Task(const void *argument);
 #define PWM2_GPIO_Port GPIOE
 #define IN4_Pin GPIO_PIN_14
 #define IN4_GPIO_Port GPIOE
+#define RELAY_1_Pin GPIO_PIN_12
+#define RELAY_1_GPIO_Port GPIOB
 #define CS1_GYRO_Pin GPIO_PIN_0
 #define CS1_GYRO_GPIO_Port GPIOB
 #define DIR_Pin GPIO_PIN_14
 #define DIR_GPIO_Port GPIOB
 #define ENABLE_Pin GPIO_PIN_15
 #define ENABLE_GPIO_Port GPIOB
+
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */

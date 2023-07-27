@@ -1,6 +1,6 @@
 /****************************************************************************
  *                                                                          *
- *  Copyright (C) 2022 RoboMaster.                                          *
+ *  Copyright (C) 2023 RoboMaster.                                          *
  *  Illini RoboMaster @ University of Illinois at Urbana-Champaign          *
  *                                                                          *
  *  This program is free software: you can redistribute it and/or modify    *
@@ -54,6 +54,10 @@ typedef union {
   } __packed bit;
 } __packed keyboard_t;
 
+typedef struct {
+  uint16_t wheel;
+} __packed wheel_t;
+
 typedef enum {
   UP = 1,
   DOWN = 2,
@@ -85,6 +89,8 @@ class DBUS : public bsp::UART {
   mouse_t mouse;
   // keyboard key information
   keyboard_t keyboard;
+  // dial wheel information
+  wheel_t wheel;
   // timestamp of the update interrupt
   uint32_t timestamp;
 

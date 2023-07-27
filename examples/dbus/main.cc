@@ -1,6 +1,6 @@
 /****************************************************************************
  *                                                                          *
- *  Copyright (C) 2022 RoboMaster.                                          *
+ *  Copyright (C) 2023 RoboMaster.                                          *
  *  Illini RoboMaster @ University of Illinois at Urbana-Champaign          *
  *                                                                          *
  *  This program is free software: you can redistribute it and/or modify    *
@@ -27,8 +27,8 @@
 static remote::DBUS* dbus;
 
 void RM_RTOS_Init(void) {
-  print_use_uart(&huart1);
-  dbus = new remote::DBUS(&huart3);
+  print_use_uart(&huart8);
+  dbus = new remote::DBUS(&huart1);
 }
 
 void RM_RTOS_Default_Task(const void* arguments) {
@@ -39,7 +39,7 @@ void RM_RTOS_Default_Task(const void* arguments) {
     set_cursor(0, 0);
     clear_screen();
     print("CH0: %-4d CH1: %-4d CH2: %-4d CH3: %-4d ", dbus->ch0, dbus->ch1, dbus->ch2, dbus->ch3);
-    print("SWL: %d SWR: %d @ %d ms\r\n", dbus->swl, dbus->swr, dbus->timestamp);
+    print("SWL: %d SWR: %d DIAL: %d @ %d ms\r\n", dbus->swl, dbus->swr, dbus->wheel, dbus->timestamp);
     osDelay(100);
   }
 }
