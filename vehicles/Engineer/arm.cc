@@ -118,9 +118,9 @@ static joint_state_t current_joint_state = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 static control::MotorCANBase* m3508s[] = {motor1};
 
 // TODO fix transmitoutput for 4310 multi motors
-static control::Motor4310* forearm_motors = {forearm_rotate_motor};
-static control::Motor4310* wrist_motors = {wrist_rotate_motor};
-static control::Motor4310* hand_motors = {hand_rotate_motor};
+static control::Motor4310* forearm_motors[] = {forearm_rotate_motor};
+static control::Motor4310* wrist_motors[] = {wrist_rotate_motor};
+static control::Motor4310* hand_motors[] = {hand_rotate_motor};
 /**
  * define params ends
 **/
@@ -131,7 +131,7 @@ void RM_RTOS_Init() {
 
   control::steering_t steering_data;
 
-  can1 = new bsp::CAN(&hcan1, 0x201, true);
+  can1 = new bsp::CAN(&hcan1, true);
 
   // Init m3508 * 1
   motor1 = new control::Motor3508(can1, BASE_TRANSLATE_ID);
@@ -147,6 +147,8 @@ void RM_RTOS_Init() {
   steering_data.max_out = 13000;
   // TODO measure the calibrate offset for base translate motor
   steering_data.calibrate_offset = 0;
+  steering_data.align_detect_func = base_translate_align_detect;
+  base_translate_motor = new control::SteeringMotor(steering_data);
 
   // Init M4310 * 3
   /* rx_id = Master id
@@ -187,14 +189,14 @@ void RM_RTOS_Default_Task(const void* args) {
   bool base_translate_alignment_complete = false;
   while (!base_translate_alignment_complete) {
     base_translate_motor->CalcOutput();
-    control::MotorCANBase::TransmitOutput(motors, 1);
+    control::MotorCANBase::TransmitOutput(m3508s, 1);
     base_translate_alignment_complete = base_translate_motor->Calibrate();
     osDelay(2);
   }
 
   base_translate_motor->ReAlign();
   //base_translate_motor->SetMaxSpeed(RUN_SPEED);
-  control::MotorCANBase::TransmitOutput(motors, 1);
+  control::MotorCANBase::TransmitOutput(m3508s, 1);
 
   // 4310 init state
   // TODO: config zero pos with 4310 config assist

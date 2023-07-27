@@ -36,9 +36,9 @@
 
 // Motor enable list
 // TODO enable motors to test them
-//#define BASE_TRANSLATE_MOTOR_ENABLE
-//#define FOREARM_ROTATE_MOTOR_ENABLE
-//#define ELBOW_ROTATE_MOTOR_ENABLE
+#define BASE_TRANSLATE_MOTOR_ENABLE
+#define FOREARM_ROTATE_MOTOR_ENABLE
+#define ELBOW_ROTATE_MOTOR_ENABLE
 
 constexpr float RUN_SPEED = (2 * PI);
 constexpr float ALIGN_SPEED = (0.5 * PI);
@@ -86,6 +86,7 @@ bool base_translate_align_detect() {
 #ifdef FOREARM_ROTATE_MOTOR_ENABLE
 constexpr float M4310_VEL = 4.0; // magic number, see m4310_mit example
 static control::Motor4310* forearm_rotate_motor = nullptr;
+static control::Motor4310* forearm_rotate_motors[] = {forearm_rotate_motor};
 #endif
 
 #ifdef ELBOW_ROTATE_MOTOR_ENABLE
@@ -116,11 +117,11 @@ void RM_RTOS_Init() {
   **/
   key = new bsp::GPIO(KEY_GPIO_GROUP, KEY_GPIO_PIN);
 
-  control::steering_t steering_data;
 
-  can1 = new bsp::CAN(&hcan1, 0x201, true);
+  can1 = new bsp::CAN(&hcan1, true);
 
   #ifdef BASE_TRANSLATE_MOTOR_ENABLE
+  control::steering_t steering_data;
   motor1 = new control::Motor3508(can1, 0x201);
 
   // TODO assign a GPIO pin to the PE sensor
@@ -136,6 +137,8 @@ void RM_RTOS_Init() {
   steering_data.max_out = 13000;
   // TODO measure the calibrate offset for base translate motor
   steering_data.calibrate_offset = 0;
+  steering_data.align_detect_func = base_translate_align_detect;
+  base_translate_motor = new control::SteeringMotor(steering_data);
   #endif
 
   #ifdef FOREARM_ROTATE_MOTOR_ENABLE
@@ -214,8 +217,8 @@ void RM_RTOS_Default_Task(const void* args) {
   // forearm rotate motor calibrate
   #ifdef FOREARM_ROTATE_MOTOR_ENABLE
   // TODO: config zero pos with 4310 config assist
-  forearm_rotate_motor->SetZeroPos(forearm_rotate_motor);
-  forearm_rotate_motor->MotorEnable(forearm_rotate_motor);
+  forearm_rotate_motor->SetZeroPos();
+  forearm_rotate_motor->MotorEnable();
   #endif
 
 
@@ -282,7 +285,7 @@ void RM_RTOS_Default_Task(const void* args) {
     #endif
 
     #ifdef FOREARM_ROTATE_MOTOR_ENABLE
-    forearm_rotate_motor->TransmitOutput(forearm_rotate_motor);
+    forearm_rotate_motor->TransmitOutput(forearm_rotate_motors, 1);
     #endif
 
     control::MotorCANBase::TransmitOutput(motors, motor_num);
