@@ -1,6 +1,6 @@
 /****************************************************************************
  *                                                                          *
- *  Copyright (C) 2022 RoboMaster.                                          *
+ *  Copyright (C) 2023 RoboMaster.                                          *
  *  Illini RoboMaster @ University of Illinois at Urbana-Champaign          *
  *                                                                          *
  *  This program is free software: you can redistribute it and/or modify    *
@@ -30,10 +30,13 @@ AutoaimProtocol::AutoaimProtocol() {
   flag = 0;
 }
 
-void AutoaimProtocol::Send(STMToJetsonData* packet, uint8_t color) {
+void AutoaimProtocol::Send(STMToJetsonData* packet, uint8_t color, float cur_yaw, float cur_pitch, uint32_t additional_info) {
   packet->header[0] = 'H';
   packet->header[1] = 'D';
   packet->my_color = color;
+  packet->cur_yaw = (int32_t)(cur_yaw * INT_FP_SCALE);
+  packet->cur_pitch = (int32_t)(cur_pitch * INT_FP_SCALE);
+  packet->additional_info = additional_info;
 
   const int tail_offset = 3; // size of data minus uint8_t checksum and 2 uint8_t tail
   packet->crc8_checksum = get_crc8_check_sum((uint8_t*)packet,

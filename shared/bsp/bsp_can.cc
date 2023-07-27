@@ -64,8 +64,7 @@ namespace bsp {
         can->RxCallback();
     }
 
-    CAN::CAN(CAN_HandleTypeDef* hcan, uint32_t start_id, bool is_master)
-        : hcan_(hcan), start_id_(start_id) {
+    CAN::CAN(CAN_HandleTypeDef* hcan, bool is_master): hcan_(hcan){
         RM_ASSERT_FALSE(HandleExists(hcan), "Repeated CAN initialization");
         ConfigureFilter(is_master);
         // activate rx interrupt

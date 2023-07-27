@@ -1,6 +1,6 @@
 /****************************************************************************
  *                                                                          *
- *  Copyright (C) 2022 RoboMaster.                                          *
+ *  Copyright (C) 2023 RoboMaster.                                          *
  *  Illini RoboMaster @ University of Illinois at Urbana-Champaign          *
  *                                                                          *
  *  This program is free software: you can redistribute it and/or modify    *
@@ -40,14 +40,17 @@ typedef struct {
   uint16_t ch1 : 11;  //   C3-^       ^-C1
   uint16_t ch2 : 11;  // C2-<   >+ -<   >+C0
   uint16_t ch3 : 11;  //     +v       v+
+  
   /* left and right switch information */
   uint8_t swr : 2;
   uint8_t swl : 2;
   /* mouse movement and button information */
   remote::mouse_t mouse;
+
   /* keyboard key information */
   remote::keyboard_t keyboard;
-  uint16_t reserved;
+  remote::wheel_t wheel;  // Analog range: Mid(steady state): 1024, Upmax: around 6960 Downmax: around 0
+                          // Digital range: Down: 1684 (below analog signal range) 
 } __packed dbus_t;
 
 DBUS::DBUS(UART_HandleTypeDef* huart) : bsp::UART(huart) { SetupRx(sizeof(dbus_t) + 1); }
@@ -75,6 +78,7 @@ void DBUS::RxCompleteCallback() {
 
   memcpy(&this->mouse, &repr->mouse, sizeof(mouse_t));
   memcpy(&this->keyboard, &repr->keyboard, sizeof(keyboard_t));
+  memcpy(&this->wheel, &repr->wheel, sizeof(wheel_t));
 
   this->timestamp = HAL_GetTick();
 }
