@@ -453,9 +453,6 @@ void shooterTask(void* arg) {
   UNUSED(arg);
 
   control::MotorCANBase* motors_can1_shooter[] = {sl_motor, sr_motor, ld_motor};
-  // timer control for dual shooting
-  // uint32_t start_time = 0;
-  // bool slow_shoot_detect = false;
   bool triple_shoot_detect = false;
 
   while (true) {
@@ -468,31 +465,25 @@ void shooterTask(void* arg) {
   while (true) {
     while (Dead) osDelay(100);
 
-    if (send->shooter_power && send->cooling_heat1 > send->cooling_limit1 - 20) {
+    if (send->shooter_power && send->cooling_heat1 >= send->cooling_limit1 - 15) {
       sl_motor->SetOutput(0);
       sr_motor->SetOutput(0);
       ld_motor->SetOutput(0);
       control::MotorCANBase::TransmitOutput(motors_can1_shooter, 3);
       osDelay(100);
-    }
-    
-    if (GimbalDead) {
+    } else if (GimbalDead) {
       shooter->DialStop();
     } else {
-      if (send->shooter_power && send->cooling_heat1 < send->cooling_limit1 - 20) {
+      if (send->shooter_power) {
         // for manual antijam 
-        Antijam.input(dbus->keyboard.bit.G || dbus->swl == remote::UP);
+        Antijam.input(dbus->keyboard.bit.G);
         // slow shooting
         if (dbus->mouse.l || dbus->swr == remote::UP) {
-          // if ((bsp::GetHighresTickMicroSec() - start_time) / 1000 > SHOOTER_MODE_DELAY) {
           shooter->SlowContinueShoot();
-          // } else if (slow_shoot_detect == false) {
-          //   slow_shoot_detect = true;
-          //   shooter->DoubleShoot();
-          // }
         // fast shooting
-        } else if (dbus->mouse.r || dbus->wheel.wheel > remote::dbus_wheel_digital_lowerbound) {
-          shooter->FastContinueShoot();
+        } else if ((dbus->mouse.r || dbus->wheel.wheel > remote::dbus_wheel_digital_lowerbound)
+                  && send->cooling_heat1 < send->cooling_limit1 - 24) {
+          shooter->FastContinueShoot(); 
         // triple shooting
         } else if (dbus->wheel.wheel == remote::dbus_wheel_digital_lowerbound 
                    && dbus->previous_wheel_value == remote::dbus_wheel_digital_lowerbound) {
@@ -506,8 +497,6 @@ void shooterTask(void* arg) {
         // stop
         } else {
           shooter->DialStop();
-          // start_time = bsp::GetHighresTickMicroSec();
-          // slow_shoot_detect = false;
           triple_shoot_detect = false;
         }
         dbus->previous_wheel_value = dbus->wheel.wheel;
