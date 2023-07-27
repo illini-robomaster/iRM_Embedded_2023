@@ -26,9 +26,12 @@
 #include "cmsis_os.h"
 #include "unitree_motor.h"
 #include "sbus.h"
+#include "motor.h"
 
 static control::UnitreeMotor* A1 = nullptr;
 static remote::SBUS* sbus;
+static control::Motor4310* motor1 = nullptr;
+static bsp::CAN* can1 = nullptr;
 
 #define RX_SIGNAL (1 << 0)
 
@@ -80,6 +83,8 @@ void RM_RTOS_Init(void) {
   A1_uart->SetupTx(300);
 
   A1 = new control::UnitreeMotor();
+  can1 = new bsp::CAN(&hcan1, true);
+  motor1 = new control::Motor4310(can1, 0x02, 0x01, control::MIT);
 
   sbus = new remote::SBUS(&huart1);
 }
@@ -98,6 +103,11 @@ void RM_RTOS_Default_Task(const void* arguments) {
   A1->Stop(0);
   A1_uart->Write((uint8_t*)(&(A1->send.data)), A1->send_length);
   osDelay(3000);
+  float position = 0;
+  float velocity = 0;
+  control::Motor4310* motors[] = {motor1};
+  motor1->MotorEnable();
+
 //
 //  A1->Control(0, 0.0, -1.0, 0.0, 0.0, 3.0); // constant speed mode
 //  for (int i = 0; i < 30; ++i) {
@@ -130,6 +140,12 @@ void RM_RTOS_Default_Task(const void* arguments) {
     A1->Control(0, 0.0, 0.0, (sbus->ch[0] + 1024.0f) / 2048 * 2*PI, 0.005, 5); // zero torque mode
     A1_uart->Write((uint8_t*)(&(A1->send.data)), A1->send_length);
 
+    velocity = clip<float>((sbus->ch[1]  + 1024.0f) / 2048 * 2 * PI, -15, 15);
+    position += velocity / 200;
+    position = clip<float>(velocity, -PI, PI);
+
+    motor1->SetOutput(position, velocity, 30, 0.5, 0);
+    control::Motor4310::TransmitOutput(motors, 1);
 //    set_cursor(0, 0);
 //    clear_screen();
 //    print("Motor ID: %d\r\n", A1->recv.id);
