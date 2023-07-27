@@ -473,8 +473,7 @@ void shooterTask(void* arg) {
       osDelay(100);
     } else if (GimbalDead) {
       shooter->DialStop();
-    } else {
-      if (send->shooter_power) {
+    } else if (send->shooter_power) {
         // for manual antijam 
         Antijam.input(dbus->keyboard.bit.G);
         // slow shooting
@@ -500,7 +499,6 @@ void shooterTask(void* arg) {
           triple_shoot_detect = false;
         }
         dbus->previous_wheel_value = dbus->wheel.wheel;
-      }
     }
 
     if (GimbalDead) {
