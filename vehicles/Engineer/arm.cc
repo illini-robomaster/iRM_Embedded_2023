@@ -29,66 +29,69 @@
 #include "unitree_motor.h"
 #include "utils.h"
 
-#define KEY_GPIO_GROUP GPIOA
-#define KEY_GPIO_PIN GPIO_PIN_0
+#include "arm.h"
+#include "arm_config.h"
 
 #define RX_SIGNAL (1 << 0)
 
-// Motor enable list
-// TODO enable motors to test them
-//#define BASE_TRANSLATE_MOTOR_ENABLE
-//#define FOREARM_ROTATE_MOTOR_ENABLE
-//#define ELBOW_ROTATE_MOTOR_ENABLE
+namespace engineer {
 
-constexpr float RUN_SPEED = (2 * PI);
-constexpr float ALIGN_SPEED = (0.5 * PI);
-constexpr float ACCELERATION = (100 * PI);
+/* see arm_config.h */
+/* all constants subject to change should be defined in arm_config.h */
+extern const float BASE_TRANSLATE_MAX;
+extern const float BASE_VERT_ROTATE_MAX;
+extern const float BASE_HOR_ROTATE_MAX;
+extern const float ELBOW_ROTATE_MAX;
+extern const float FOREARM_ROTATE_MAX;
+extern const float WRIST_ROTATE_MAX;
+extern const float HAND_ROTATE_MAX;
+extern const float BASE_TRANSLATE_MIN;
+extern const float BASE_VERT_ROTATE_MIN;
+extern const float BASE_HOR_ROTATE_MIN;
+extern const float ELBOW_ROTATE_MIN;
+extern const float FOREARM_ROTATE_MIN;
+extern const float WRIST_ROTATE_MIN;
+extern const float HAND_ROTATE_MIN;
 
-bsp::CAN* can1 = nullptr;
+extern const int BASE_TRANSLATE_ID;
+extern GPIO_TypeDef* BASE_TRANSLATE_CALI_GPIO_PORT;
+extern const uint16_t BASE_TRANSLATE_CALI_GPIO_PIN;
+extern const float RUN_SPEED;
+extern const float ALIGN_SPEED;
+extern const float ACCELERATION;
 
-#ifdef BASE_TRANSLATE_MOTOR_ENABLE
-static int base_translate_motor_enable = 1;
-#else
-static int base_translate_motor_enable = 0;
-#endif
+extern const float M4310_VEL;
 
-#ifdef FOREARM_ROTATE_MOTOR_ENABLE
-static int forearm_rotate_motor_enable = 1;
-#else
-static int forearm_rotate_motor_enable = 0;
-#endif
+extern const int BASE_HOR_ROTATE_ID;
+extern const int BASE_VERT_ROTATE_ID;
+extern const int ELBOW_ROTATE_ID;
+extern UART_HandleTypeDef* BASE_HOR_ROTATE_UART;
+extern UART_HandleTypeDef* BASE_VERT_ROTATE_UART;
+extern UART_HandleTypeDef* ELBOW_ROTATE_UART;
 
-
-#ifdef ELBOW_ROTATE_MOTOR_ENABLE
-static int elbow_rotate_motor_enable = 1;
-#else
-static int elbow_rotate_motor_enable = 0;
-#endif
-
-bsp::GPIO* key = nullptr;
-BoolEdgeDetector key_detector(false);
+extern const int FOREARM_ROTATE_RX_ID;
+extern const int FOREARM_ROTATE_TX_ID;
+extern const int WRIST_ROTATE_RX_ID;
+extern const int WRIST_ROTATE_TX_ID;
+extern const int HAND_ROTATE_RX_ID;
+extern const int HAND_ROTATE_TX_ID;
 
 /**
- * define params for each motor
+ * define params start
 **/
-#ifdef BASE_TRANSLATE_MOTOR_ENABLE
+bsp::CAN* can1 = nullptr;
 
+// 3508
 control::MotorCANBase* motor1 = nullptr;
 control::SteeringMotor* base_translate_motor = nullptr;
 
 bsp::GPIO* base_translate_pe_sensor = nullptr;
-
 bool base_translate_align_detect() {
   return base_translate_pe_sensor->Read() == 1;
 }
-#endif
 
-#ifdef FOREARM_ROTATE_MOTOR_ENABLE
-constexpr float M4310_VEL = 4.0; // magic number, see m4310_mit example
-static control::Motor4310* forearm_rotate_motor = nullptr;
-#endif
 
-#ifdef ELBOW_ROTATE_MOTOR_ENABLE
+// A1
 // TODO this part is unstable
 extern osThreadId_t defaultTaskHandle;
 class CustomUART : public bsp::UART {
@@ -98,11 +101,26 @@ class CustomUART : public bsp::UART {
   /* notify application when rx data is pending read */
   void RxCompleteCallback() override final { osThreadFlagsSet(defaultTaskHandle, RX_SIGNAL); }
 };
-constexpr int ELBOW_MOTOR_ID = 0;
+static control::UnitreeMotor* base_vert_rotate_motor = nullptr;
+static control::UnitreeMotor* base_hor_rotate_motor = nullptr;
 static control::UnitreeMotor* elbow_rotate_motor = nullptr;
+static CustomUART* base_vert_rotate_motor_uart = nullptr;
+static CustomUART* base_hor_rotate_motor_uart = nullptr;
 static CustomUART* elbow_rotate_motor_uart = nullptr;
-#endif
 
+// 4310
+static control::Motor4310* forearm_rotate_motor = nullptr;
+static control::Motor4310* wrist_rotate_motor = nullptr;
+static control::Motor4310* hand_rotate_motor = nullptr;
+
+// entire arm
+static joint_state_t current_joint_state = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+static control::MotorCANBase* m3508s[] = {motor1};
+
+// TODO fix transmitoutput for 4310 multi motors
+static control::Motor4310* forearm_motors = {forearm_rotate_motor};
+static control::Motor4310* wrist_motors = {wrist_rotate_motor};
+static control::Motor4310* hand_motors = {hand_rotate_motor};
 /**
  * define params ends
 **/
@@ -111,21 +129,14 @@ void RM_RTOS_Init() {
   print_use_uart(&huart1);
   bsp::SetHighresClockTimer(&htim5);
 
-  /* Usage:
-   *   The 'key' is the white button on TypeC boards
-  **/
-  key = new bsp::GPIO(KEY_GPIO_GROUP, KEY_GPIO_PIN);
-
   control::steering_t steering_data;
 
   can1 = new bsp::CAN(&hcan1, 0x201, true);
 
-  #ifdef BASE_TRANSLATE_MOTOR_ENABLE
-  motor1 = new control::Motor3508(can1, 0x201);
-
-  // TODO assign a GPIO pin to the PE sensor
-  base_translate_pe_sensor = new bsp::GPIO(GPIOC, GPIO_PIN_2);
-
+  // Init m3508 * 1
+  motor1 = new control::Motor3508(can1, BASE_TRANSLATE_ID);
+  base_translate_pe_sensor = new bsp::GPIO(BASE_TRANSLATE_CALI_GPIO_PORT,
+                                           BASE_TRANSLATE_CALI_GPIO_PIN);
   steering_data.motor = motor1;
   steering_data.max_speed = RUN_SPEED;
   steering_data.max_acceleration = ACCELERATION;
@@ -136,158 +147,214 @@ void RM_RTOS_Init() {
   steering_data.max_out = 13000;
   // TODO measure the calibrate offset for base translate motor
   steering_data.calibrate_offset = 0;
-  #endif
 
-  #ifdef FOREARM_ROTATE_MOTOR_ENABLE
-  static const int RX_ID = 0x02;
-  static const int TX_ID = 0x01;
-
+  // Init M4310 * 3
   /* rx_id = Master id
    * tx_id = CAN id
    * see example/m4310_mit.cc
    */
-  forearm_rotate_motor = new control::Motor4310(can1, RX_ID, TX_ID, control::MIT);
-  #endif
+  forearm_rotate_motor = new control::Motor4310(
+    can1, FOREARM_ROTATE_RX_ID, FOREARM_ROTATE_TX_ID, control::MIT);
+  wrist_rotate_motor = new control::Motor4310(
+    can1, WRIST_ROTATE_RX_ID, WRIST_ROTATE_TX_ID, control::MIT);
+  hand_rotate_motor = new control::Motor4310(
+    can1, HAND_ROTATE_RX_ID, HAND_ROTATE_TX_ID, control::MIT);
 
+  // Init A1 * 3
+  base_vert_rotate_motor_uart = new CustomUART(BASE_HOR_ROTATE_UART);
+  base_hor_rotate_motor_uart = new CustomUART(BASE_VERT_ROTATE_UART);
+  elbow_rotate_motor_uart = new CustomUART(ELBOW_ROTATE_UART);
 
-  #ifdef ELBOW_ROTATE_MOTOR_ENABLE
-  elbow_rotate_motor_uart = new CustomUART(&huart6);
+  base_vert_rotate_motor_uart->SetupRx(300);
+  base_vert_rotate_motor_uart->SetupTx(300);
+  base_hor_rotate_motor_uart->SetupRx(300);
+  base_hor_rotate_motor_uart->SetupTx(300);
   elbow_rotate_motor_uart->SetupRx(300);
   elbow_rotate_motor_uart->SetupTx(300);
-  elbow_rotate_motor = new control::UnitreeMotor();
-  #endif
 
+  base_vert_rotate_motor = new control::UnitreeMotor();
+  base_hor_rotate_motor = new control::UnitreeMotor();
+  elbow_rotate_motor = new control::UnitreeMotor();
 }
 
 void RM_RTOS_Default_Task(const void* args) {
   UNUSED(args);
 
-  // 4310 doesn't follow this control pipeline
-  control::MotorCANBase* motors[] = {
-    #ifdef BASE_TRANSLATE_MOTOR_ENABLE
-    motor1,
-    #endif
-  };
-  int motor_num = base_translate_motor_enable;
 
-  // Press Key to start aligning. Else sudden current change when power is switched on might break
-  // the board.
-  while(!key->Read());
-
-  // wait for release because align_detect also is key press here
-  while(key->Read());
-
-  if (base_translate_motor_enable) {
-    print("base translate motor enabled\n");
-  }
-
-  if (forearm_rotate_motor_enable) {
-    print("forearm rotate motor enabled\n");
-  }
-
-  if (elbow_rotate_motor_enable) {
-    print("elbow rotate motor enabled\n");
-  }
-
-  print("total motor num = %d\n", motor_num
-    + forearm_rotate_motor_enable
-    + elbow_rotate_motor_enable);
-
-  // base translate motor calibrate
-  #ifdef BASE_TRANSLATE_MOTOR_ENABLE
   base_translate_motor->SetMaxSpeed(ALIGN_SPEED);
 
-  // Don't put Calibrate() in the while condition
+  // base translate calibration
   bool base_translate_alignment_complete = false;
   while (!base_translate_alignment_complete) {
     base_translate_motor->CalcOutput();
-    control::MotorCANBase::TransmitOutput(motors, motor_num);
+    control::MotorCANBase::TransmitOutput(motors, 1);
     base_translate_alignment_complete = base_translate_motor->Calibrate();
     osDelay(2);
   }
 
   base_translate_motor->ReAlign();
   //base_translate_motor->SetMaxSpeed(RUN_SPEED);
-  print("base translate motor alignment complete\n");
-  #endif
+  control::MotorCANBase::TransmitOutput(motors, 1);
 
-  // forearm rotate motor calibrate
-  #ifdef FOREARM_ROTATE_MOTOR_ENABLE
+  // 4310 init state
   // TODO: config zero pos with 4310 config assist
-  forearm_rotate_motor->SetZeroPos(forearm_rotate_motor);
-  forearm_rotate_motor->MotorEnable(forearm_rotate_motor);
-  #endif
+  forearm_rotate_motor->MotorEnable();
+  wrist_rotate_motor->MotorEnable();
+  hand_rotate_motor->MotorEnable();
 
 
-  #ifdef ELBOW_ROTATE_MOTOR_ENABLE
+  // A1 init state
+  base_hor_rotate_motor->Stop(0);
+  base_hor_rotate_motor_uart->Write((uint8_t*)(&(base_hor_rotate_motor->send.data)),
+                                base_hor_rotate_motor->send_length);
+
+  base_vert_rotate_motor->Stop(0);
+  base_vert_rotate_motor_uart->Write((uint8_t*)(&(base_vert_rotate_motor->send.data)),
+                                base_vert_rotate_motor->send_length);
+
   elbow_rotate_motor->Stop(0);
   elbow_rotate_motor_uart->Write((uint8_t*)(&(elbow_rotate_motor->send.data)),
                                 elbow_rotate_motor->send_length);
-  #endif
 
-  if (motor_num >= 1) {
-    control::MotorCANBase::TransmitOutput(motors, motor_num);
-  }
+  print("arm starts in 2 secs\r\n");
+  // wait for 2 seconds
+  osDelay(2000);
 
-  // Wait for key to release
-  osDelay(500);
+  joint_state_t target = {PI / 16, PI / 16, PI / 16, PI / 16, PI / 16, PI / 16, PI / 16};
 
-  int dir = 1;
-
-  while (motor_num >= 1) {
-    key_detector.input(key->Read());
-    if (key_detector.posEdge()){
-      if (dir == 1) {
-        #ifdef BASE_TRANSLATE_MOTOR_ENABLE
-        base_translate_motor->TurnRelative(PI / 4);
-        #endif
-
-        #ifdef FOREARM_ROTATE_MOTOR_ENABLE
-        forearm_rotate_motor->SetOutput(PI / 4, M4310_VEL, 30, 0.5, 0);
-        #endif
-
-
-        #ifdef ELBOW_ROTATE_MOTOR_ENABLE
-        // motor_id motor ID
-        // torque expect torque
-        // speed expect speed
-        // position expect position
-        // Kp Kp parameter for the PD controller
-        // Kd Kd parameter for the PD controller
-        elbow_rotate_motor->Control(ELBOW_MOTOR_ID, 0.0, 0.0, PI/4, 0.0, 3.0);
-        elbow_rotate_motor_uart->Write((uint8_t*)(&(elbow_rotate_motor->send.data)),
-                                      elbow_rotate_motor->send_length);
-        #endif
-
-      } else {
-        #ifdef BASE_TRANSLATE_MOTOR_ENABLE
-        base_translate_motor->ReAlign();
-        #endif
-
-        #ifdef FOREARM_ROTATE_MOTOR_ENABLE
-        forearm_rotate_motor->SetOutput(0, M4310_VEL, 30, 0.5, 0);
-        #endif
-
-        #ifdef ELBOW_ROTATE_MOTOR_ENABLE
-        elbow_rotate_motor->Control(ELBOW_MOTOR_ID, 0.0, 0.0, 0.0, 0.0, 3.0);
-        elbow_rotate_motor_uart->Write((uint8_t*)(&(elbow_rotate_motor->send.data)),
-                                      elbow_rotate_motor->send_length);
-        #endif
-     }
-      dir *= -1;
+  int i = 0;
+  // turn each motor for PI/16 degree every 2 seconds.
+  // Should stop at defined limitation, see arm_config.h
+  while (true) {
+    if (i <= 1000) {
+      i++;
+    } else {
+      ArmTurnRelative(&target);
+      ArmPrintData();
     }
-
-    #ifdef BASE_TRANSLATE_MOTOR_ENABLE
-    base_translate_motor->CalcOutput();
-    #endif
-
-    #ifdef FOREARM_ROTATE_MOTOR_ENABLE
-    forearm_rotate_motor->TransmitOutput(forearm_rotate_motor);
-    #endif
-
-    control::MotorCANBase::TransmitOutput(motors, motor_num);
+    ArmTransmitOutput();
     osDelay(2);
   }
 
+} // end default task
+
+
+
+int ArmTurnRelative(joint_state_t* target) {
+  joint_state_t* abs_target = new joint_state_t();
+  abs_target->base_translate = current_joint_state.base_translate + target->base_translate;
+  abs_target->base_vert_rotate = current_joint_state.base_vert_rotate + target->base_vert_rotate;
+  abs_target->base_hor_rotate = current_joint_state.base_hor_rotate + target->base_hor_rotate;
+  abs_target->elbow_rotate = current_joint_state.elbow_rotate + target->elbow_rotate;
+  abs_target->forearm_rotate = current_joint_state.forearm_rotate + target->forearm_rotate;
+  abs_target->wrist_rotate = current_joint_state.wrist_rotate + target->wrist_rotate;
+  abs_target->hand_rotate = current_joint_state.hand_rotate + target->hand_rotate;
+
+  return ArmTurnAbsolute(abs_target);
 }
+
+int ArmTurnAbsolute(joint_state_t* target) {
+  // M3508
+  if (target->base_translate >= BASE_TRANSLATE_MAX) {
+    base_translate_motor->TurnRelative(BASE_TRANSLATE_MAX-current_joint_state.base_translate);
+  } else if (target->base_translate <= BASE_TRANSLATE_MIN) {
+    base_translate_motor->TurnRelative(BASE_TRANSLATE_MIN-current_joint_state.base_translate);
+  } else {
+    base_translate_motor->TurnRelative(target->base_translate-current_joint_state.base_translate);
+  }
+  current_joint_state.base_translate = target->base_translate;
+
+  // A1
+  // motor_id motor ID
+  // torque expect torque
+  // speed expect speed
+  // position expect position
+  // Kp Kp parameter for the PD controller
+  // Kd Kd parameter for the PD controller
+  if (target->base_vert_rotate >= BASE_VERT_ROTATE_MAX) {
+    base_vert_rotate_motor->Control(BASE_VERT_ROTATE_ID, 0.0, 0.0, BASE_VERT_ROTATE_MAX, 0.0, 3.0);
+  } else if (target->base_vert_rotate <= BASE_VERT_ROTATE_MIN) {
+    base_vert_rotate_motor->Control(BASE_VERT_ROTATE_ID, 0.0, 0.0, BASE_VERT_ROTATE_MIN, 0.0, 3.0);
+  } else {
+    base_vert_rotate_motor->Control(BASE_VERT_ROTATE_ID, 0.0, 0.0, target->base_vert_rotate, 0.0, 3.0);
+  }
+  current_joint_state.base_vert_rotate = target->base_vert_rotate;
+
+  if (target->base_hor_rotate >= BASE_HOR_ROTATE_MAX) {
+    base_hor_rotate_motor->Control(BASE_HOR_ROTATE_ID, 0.0, 0.0, BASE_HOR_ROTATE_MAX, 0.0, 3.0);
+  } else if (target->base_hor_rotate <= BASE_HOR_ROTATE_MIN) {
+    base_hor_rotate_motor->Control(BASE_HOR_ROTATE_ID, 0.0, 0.0, BASE_HOR_ROTATE_MIN, 0.0, 3.0);
+  } else {
+    base_hor_rotate_motor->Control(BASE_HOR_ROTATE_ID, 0.0, 0.0, target->base_hor_rotate, 0.0, 3.0);
+  }
+  current_joint_state.base_hor_rotate = target->base_hor_rotate;
+
+  if (target->elbow_rotate >= ELBOW_ROTATE_MAX) {
+    elbow_rotate_motor->Control(ELBOW_ROTATE_ID, 0.0, 0.0, ELBOW_ROTATE_MAX, 0.0, 3.0);
+  } else if (target->elbow_rotate <= ELBOW_ROTATE_MIN) {
+    elbow_rotate_motor->Control(ELBOW_ROTATE_ID, 0.0, 0.0, ELBOW_ROTATE_MIN, 0.0, 3.0);
+  } else {
+    elbow_rotate_motor->Control(ELBOW_ROTATE_ID, 0.0, 0.0, target->elbow_rotate, 0.0, 3.0);
+  }
+  current_joint_state.elbow_rotate = target->elbow_rotate;
+
+  // M4310
+  if (target->forearm_rotate >= FOREARM_ROTATE_MAX) {
+    forearm_rotate_motor->SetOutput(FOREARM_ROTATE_MAX, M4310_VEL, 30, 0.5, 0);
+  } else if (target->forearm_rotate <= FOREARM_ROTATE_MIN) {
+    forearm_rotate_motor->SetOutput(FOREARM_ROTATE_MIN, M4310_VEL, 30, 0.5, 0);
+  } else {
+    forearm_rotate_motor->SetOutput(target->forearm_rotate, M4310_VEL, 30, 0.5, 0);
+  }
+  current_joint_state.forearm_rotate = target->forearm_rotate;
+
+  if (target->wrist_rotate >= WRIST_ROTATE_MAX) {
+    wrist_rotate_motor->SetOutput(WRIST_ROTATE_MAX, M4310_VEL, 30, 0.5, 0);
+  } else if (target->wrist_rotate <= WRIST_ROTATE_MIN) {
+    wrist_rotate_motor->SetOutput(WRIST_ROTATE_MIN, M4310_VEL, 30, 0.5, 0);
+  } else {
+    wrist_rotate_motor->SetOutput(target->wrist_rotate, M4310_VEL, 30, 0.5, 0);
+  }
+  current_joint_state.wrist_rotate = target->wrist_rotate;
+
+
+  if (target->hand_rotate >= HAND_ROTATE_MAX) {
+    hand_rotate_motor->SetOutput(HAND_ROTATE_MAX, M4310_VEL, 30, 0.5, 0);
+  } else if (target->hand_rotate <= HAND_ROTATE_MIN) {
+    hand_rotate_motor->SetOutput(HAND_ROTATE_MIN, M4310_VEL, 30, 0.5, 0);
+  } else {
+    hand_rotate_motor->SetOutput(target->hand_rotate, M4310_VEL, 30, 0.5, 0);
+  }
+  current_joint_state.hand_rotate = target->hand_rotate;
+
+  return 0;
+}
+
+void ArmTransmitOutput() {
+
+  control::MotorCANBase::TransmitOutput(m3508s, 1);
+
+  base_hor_rotate_motor_uart->Write((uint8_t*)(&(base_hor_rotate_motor->send.data)),
+                                base_hor_rotate_motor->send_length);
+  base_vert_rotate_motor_uart->Write((uint8_t*)(&(base_vert_rotate_motor->send.data)),
+                                base_vert_rotate_motor->send_length);
+  elbow_rotate_motor_uart->Write((uint8_t*)(&(elbow_rotate_motor->send.data)),
+                                elbow_rotate_motor->send_length);
+
+  control::Motor4310::TransmitOutput(forearm_motors, 1);
+  control::Motor4310::TransmitOutput(wrist_motors, 1);
+  control::Motor4310::TransmitOutput(hand_motors, 1);
+}
+
+void ArmPrintData() {
+  print("Base Translate   : %10.4f\r\n", current_joint_state.base_translate);
+  print("Base Vert Rotate : %10.4f\r\n", current_joint_state.base_vert_rotate);
+  print("Base Hor  Rotate : %10.4f\r\n", current_joint_state.base_hor_rotate);
+  print("Elbow Rotate     : %10.4f\r\n", current_joint_state.elbow_rotate);
+  print("Forearm Rotate   : %10.4f\r\n", current_joint_state.forearm_rotate);
+  print("Wrist Rotate     : %10.4f\r\n", current_joint_state.wrist_rotate);
+  print("Hand Rotate      : %10.4f\r\n", current_joint_state.hand_rotate);
+}
+
+} // end ns engineer
 
