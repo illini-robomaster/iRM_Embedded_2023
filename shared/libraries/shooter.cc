@@ -46,9 +46,6 @@ Shooter::Shooter(shooter_t shooter) {
   model_ = shooter.model;
   load_motor_ = shooter.load_motor;
   dial_direction_ = shooter.dial_direction;
-  violent_shooting_ = false;
-  // test speed
-  violent_shooting_speed_ = 20 * PI;
 
   servo_t servo_data;
   servo_data.motor = shooter.load_motor;
@@ -164,12 +161,7 @@ void Shooter::Update() {
       float right_diff = static_cast<MotorCANBase*>(right_flywheel_motor_)->GetOmegaDelta(-speed_ * dial_direction_);
       left_flywheel_motor_->SetOutput(left_pid_->ComputeConstrainedOutput(left_diff));
       right_flywheel_motor_->SetOutput(right_pid_->ComputeConstrainedOutput(right_diff));
-      if (violent_shooting_) {
-        float load_diff = static_cast<MotorCANBase*>(load_motor_)->GetOmegaDelta(violent_shooting_speed_ * dial_direction_);
-        load_motor_->SetOutput(load_moter_pid_->ComputeConstrainedOutput(load_diff));
-      } else {
-        load_servo_->CalcOutput();
-      }
+      load_servo_->CalcOutput();
       break;
   }
 }
@@ -194,10 +186,6 @@ void Shooter::DoubleShoot() {
 
 void Shooter::DialStop() {
   load_servo_->SetMaxSpeed(0);
-}
-
-void Shooter::SetViolentShoot(bool status) {
-  violent_shooting_ = status;
 }
 
 }  // namespace control

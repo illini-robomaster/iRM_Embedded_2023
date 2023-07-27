@@ -383,16 +383,10 @@ static control::Stepper* stepper = nullptr;
 static volatile bool leftflywheelFlag = false;
 static volatile bool rightflywheelFlag = false;
 
-// static unsigned stepper_length = 700;
-// static unsigned stepper_speed = 1000;
-// static bool stepper_direction = true;
 static const int SHOOTER_MODE_DELAY = 350;
 
 void shooterTask(void* arg) {
   UNUSED(arg);
-
-//  control::MotorCANBase* motors_can1_shooter[] = {left_top_flywheel, left_bottom_flywheel, left_dial,
-//                                                  right_top_flywheel, right_bottom_flywheel, right_dial};
 
   control::MotorCANBase* motors_can1_shooter_left[] = {left_top_flywheel, left_bottom_flywheel, left_dial};
 
@@ -413,7 +407,6 @@ void shooterTask(void* arg) {
 
   while (true) {
     while (Dead) osDelay(100);
-    // TODO: need both left and right shooter
 //    print("power1: %d, cooling heat: %.4f, cooling limit: %.4f\r\n", send->shooter_power, send->cooling_heat1, send->cooling_limit1);
 //    print("power2: %d, cooling heat: %.4f, cooling limit: %.4f\r\n", send->shooter_power, send->cooling_heat2, send->cooling_limit2);
 
@@ -447,13 +440,11 @@ void shooterTask(void* arg) {
             left_shooter->DoubleShoot();
           }
         } else if (dbus->mouse.r) {
-          // left_shooter->FastContinueShoot();
-          left_shooter->SetViolentShoot(true);
+           left_shooter->FastContinueShoot();
         } else {
           left_shooter->DialStop();
           start_time_left = bsp::GetHighresTickMicroSec();
           slow_shoot_detect_left = false;
-          left_shooter->SetViolentShoot(false);
         }
       }
       // right shooter(dial part)
@@ -466,13 +457,11 @@ void shooterTask(void* arg) {
             right_shooter->DoubleShoot();
           }
         } else if (dbus->mouse.r) {
-          right_shooter->SetViolentShoot(true);
-          // right_shooter->FastContinueShoot();
+           right_shooter->FastContinueShoot();
         } else {
           right_shooter->DialStop();
           start_time_right = bsp::GetHighresTickMicroSec();
           slow_shoot_detect_right = false;
-          right_shooter->SetViolentShoot(false);
         }
       }
     }
