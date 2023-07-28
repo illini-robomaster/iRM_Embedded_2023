@@ -751,7 +751,7 @@ void selfTestTask(void* arg) {
     //    OLED->ShowBlock(4, 3, referee_flag);
     float voltage = send->supercap_voltage;
     snprintf(volt, 6, "%.2f", voltage);
-    OLED->ShowString(2,8,(uint8_t*)volt);
+    OLED->ShowString(2,7,(uint8_t*)volt);
 
     OLED->ShowBlock(1, 18, fl_wheel_flag);
 
