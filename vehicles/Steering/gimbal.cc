@@ -480,12 +480,12 @@ void shooterTask(void* arg) {
         if (dbus->mouse.l || dbus->swr == remote::UP) {
           shooter->SlowContinueShoot();
         // fast shooting
-        } else if ((dbus->mouse.r || dbus->wheel.wheel > remote::dbus_wheel_digital_lowerbound)
+        } else if ((dbus->mouse.r || dbus->wheel.wheel > remote::WheelDigitalValue)
                   && send->cooling_heat1 < send->cooling_limit1 - 24) {
           shooter->FastContinueShoot(); 
         // triple shooting
-        } else if (dbus->wheel.wheel == remote::dbus_wheel_digital_lowerbound 
-                   && dbus->previous_wheel_value == remote::dbus_wheel_digital_lowerbound) {
+        } else if (dbus->wheel.wheel == remote::WheelDigitalValue
+                   && dbus->previous_wheel_value == remote::WheelDigitalValue) {
           if (!triple_shoot_detect) {
             triple_shoot_detect = true;          
             shooter->TripleShoot();

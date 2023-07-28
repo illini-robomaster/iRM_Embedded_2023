@@ -22,7 +22,6 @@
 
 #include "controller.h"
 #include "motor.h"
-#include "dbus.h"
 
 namespace control {
 

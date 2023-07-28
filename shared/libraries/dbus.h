@@ -24,9 +24,7 @@
 
 namespace remote {
 
-const uint16_t dbus_wheel_upperbound = 6960;
-const uint16_t dbus_wheel_digital_lowerbound = 1684;
-const uint16_t dbus_wheel_mid = 1024;
+const uint16_t WheelDigitalValue = 1684;
 
 typedef struct {
   int16_t x;
