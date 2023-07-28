@@ -73,7 +73,7 @@ static volatile bool SpinMode = false;
 static bsp::CanBridge* receive = nullptr;
 static unsigned int flag_summary = 0;
 static const int KILLALL_DELAY = 100;
-static const int DEFAULT_TASK_DELAY = 100;
+static const int DEFAULT_TASK_DELAY = 30;
 static const int CHASSIS_TASK_DELAY = 2;
 
 // speed for steering motors (rad/s)
