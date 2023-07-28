@@ -24,6 +24,8 @@
 
 namespace remote {
 
+const uint16_t WheelDigitalValue = 1684;
+
 typedef struct {
   int16_t x;
   int16_t y;
@@ -98,6 +100,7 @@ class DBUS : public bsp::UART {
 
   static const int16_t ROCKER_MIN = -660;
   static const int16_t ROCKER_MAX = 660;
+  uint16_t previous_wheel_value; 
 };
 
 } /* namespace remote */

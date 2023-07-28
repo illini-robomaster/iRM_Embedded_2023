@@ -85,7 +85,7 @@ void RM_RTOS_Default_Task(const void* args) {
       } else {
         if (slow_shoot_detect == false) {
           slow_shoot_detect = true;
-          shooter->DoubleShoot();
+          shooter->TripleShoot();
         }
       }
     } else {
