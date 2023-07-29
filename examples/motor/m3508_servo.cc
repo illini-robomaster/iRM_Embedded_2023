@@ -17,33 +17,21 @@
  *  along with this program. If not, see <http://www.gnu.org/licenses/>.    *
  *                                                                          *
  ****************************************************************************/
-
 #include "bsp_gpio.h"
 #include "bsp_os.h"
 #include "bsp_print.h"
 #include "cmsis_os.h"
 #include "controller.h"
-#include "dbus.h"
 #include "main.h"
 #include "motor.h"
-#include "utils.h"
 
 #define KEY_GPIO_GROUP GPIOB
 #define KEY_GPIO_PIN GPIO_PIN_2
 
-constexpr float RUN_SPEED = (10 * PI);
-constexpr float ACCELERATION = (100 * PI);
-
+bsp::GPIO* key1 = nullptr;
 bsp::CAN* can1 = nullptr;
 control::MotorCANBase* motor1 = nullptr;
 control::ServoMotor* servo1 = nullptr;
-
-BoolEdgeDetector key_detector(false);
-
-void jam_callback(control::ServoMotor* servo, const control::servo_jam_t data) {
-  UNUSED(data);
-  servo->SetTarget(servo->GetTheta() - (2 * PI/6), true);
-}
 
 void RM_RTOS_Init() {
   print_use_uart(&huart8);
@@ -57,22 +45,30 @@ void RM_RTOS_Init() {
   servo_data.max_speed = 2 * PI;
   servo_data.max_acceleration = 20 * PI;
   servo_data.transmission_ratio = M3508P19_RATIO;
-  servo_data.omega_pid_param = new float[3]{20, 2, 5};
+  servo_data.omega_pid_param = new float[3]{150, 1.2, 5};
   servo_data.max_iout = 1000;
-  servo_data.max_out = 10000;
+  servo_data.max_out = 13000;
 
   servo1 = new control::ServoMotor(servo_data);
-  servo1->RegisterJamCallback(jam_callback, 0.06);
+  key1 = new bsp::GPIO(KEY_GPIO_GROUP, KEY_GPIO_PIN);
 }
 
 void RM_RTOS_Default_Task(const void* args) {
   UNUSED(args);
   control::MotorCANBase* motors[] = {motor1};
+  bool stop_now = false;
 
-  // Wait for key to release
   while (true) {
-    servo1->SetTarget(servo1->GetTarget() + (PI / 4), false);
-    servo1->CalcOutput();
+    if (key1->Read()) {
+      stop_now = false;
+    }
+    if (abs(motor1->GetCurr()) > 10500 || stop_now) {
+      motor1->SetOutput(0);
+      stop_now = true;
+    } else {
+      servo1->SetTarget(servo1->GetTarget() + (PI / 4), false);
+      servo1->CalcOutput();
+    }
     control::MotorCANBase::TransmitOutput(motors, 1);
     osDelay(10);
   }
