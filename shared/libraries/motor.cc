@@ -309,6 +309,31 @@ void MotorPWMBase::SetOutput(int16_t val) {
 }
 
 //==================================================================================================
+// PDI_HV Servo
+//==================================================================================================
+PDIHV::PDIHV(TIM_HandleTypeDef* htim, uint8_t channel, uint32_t clock_freq,
+                   uint32_t output_freq, uint32_t idle_throttle)
+    : MotorPWMBase(htim, channel, clock_freq, output_freq, idle_throttle) {
+
+}
+
+void PDIHV::SetOutPutAngle(float degree) {
+        float slope = (1913.0-900.0) / 160.0;
+        int16_t val = int16_t (clip<float>(degree, -90, 70) * slope + 1500);
+        constexpr int16_t MIN_OUTPUT = 900;
+        constexpr int16_t MAX_OUTPUT = 1913;
+//        900 to 1913 for pulse width input u second
+//        -90 to 90 for angle input
+
+        this->SetOutput(clip<int16_t>(val, MIN_OUTPUT, MAX_OUTPUT));
+        this->SetOutput(val);
+}
+void PDIHV::SetOutput(int16_t val) {
+  constexpr int16_t MIN_OUTPUT = 900;
+  constexpr int16_t MAX_OUTPUT = 1913;
+  MotorPWMBase::SetOutput(clip<int16_t>(val, MIN_OUTPUT, MAX_OUTPUT));
+}
+//==================================================================================================
 // Motor2305
 //==================================================================================================
 
