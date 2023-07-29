@@ -32,6 +32,8 @@
 #include "supercap.h"
 #include <cmath>
 
+static remote::DBUS* dbus = nullptr;
+
 static bsp::CAN* can1 = nullptr;
 static bsp::CAN* can2 = nullptr;
 static display::RGB* RGB = nullptr;
@@ -121,15 +123,21 @@ static control::MotorCANBase* bl_motor = nullptr;
 static control::MotorCANBase* br_motor = nullptr;
 static control::Chassis* chassis = nullptr;
 
-static const float CHASSIS_DEADZONE = 0.04;
-
 void chassisTask(void* arg) {
  UNUSED(arg);
 
  control::MotorCANBase* motors[] = {fl_motor, fr_motor, bl_motor, br_motor};
+ float relative_angle = 0;
+ float sin_yaw = 0;
+ float cos_yaw = 0;
+ float vx_set = 0;
+ float vy_set = 0;
+ float vx = 0;
+ float vy = 0;
+ float wz = 0;
 
  // TODO NOT RECEIVING START SIGNAL?
- while (!receive->start) osDelay(100);
+// while (!receive->start) osDelay(100);
 
  while (true) {
 
@@ -142,28 +150,18 @@ void chassisTask(void* arg) {
      control::MotorCANBase::TransmitOutput(motors, 4);
      osDelay(100);
    }
-   float relative_angle = receive->relative_angle;
-   float sin_yaw, cos_yaw, vx_set, vy_set;
-   float vx, vy, wz;
 
-   vx_set = receive->vx;
-   vy_set = receive->vy;
+//   relative_angle = receive->relative_angle;
+//   vx_set = receive->vx;
+//   vy_set = receive->vy;
 
-   if (receive->mode == 1 || referee->game_status.game_progress == 0x3) {  // spin mode
-                                                                           // need add the relative angle compensation for the board communication
+//   if (dbus->swr == remote::UP || referee->game_status.game_progress == 0x3) {  // spin mode
      sin_yaw = arm_sin_f32(relative_angle);
      cos_yaw = arm_cos_f32(relative_angle);
      vx = cos_yaw * vx_set + sin_yaw * vy_set;
      vy = -sin_yaw * vx_set + cos_yaw * vy_set;
      wz = SPIN_SPEED;
-   } else {
-     sin_yaw = arm_sin_f32(relative_angle);
-     cos_yaw = arm_cos_f32(relative_angle);
-     vx = cos_yaw * vx_set + sin_yaw * vy_set;
-     vy = -sin_yaw * vx_set + cos_yaw * vy_set;
-     wz = std::min(FOLLOW_SPEED, FOLLOW_SPEED * relative_angle);
-     if (-CHASSIS_DEADZONE < relative_angle && relative_angle < CHASSIS_DEADZONE) wz = 0;
-   }
+//   }
 
    chassis->SetSpeed(vx, vy, wz);
    chassis->Update(true, (float)referee->game_robot_status.chassis_power_limit,
@@ -278,8 +276,8 @@ void RM_RTOS_Init() {
  can2 = new bsp::CAN(&hcan2, false);
  RGB = new display::RGB(&htim5, 3, 2, 1, 1000000);
 
- fl_motor = new control::Motor3508(can1, 0x201);
- fr_motor = new control::Motor3508(can1, 0x202);
+ fl_motor = new control::Motor3508(can1, 0x202);
+ fr_motor = new control::Motor3508(can1, 0x201);
  bl_motor = new control::Motor3508(can1, 0x203);
  br_motor = new control::Motor3508(can1, 0x204);
 
@@ -300,6 +298,8 @@ void RM_RTOS_Init() {
  referee = new communication::Referee;
 
  receive = new bsp::CanBridge(can2, 0x20B, 0x20A);
+
+ dbus = new remote::DBUS(&huart3);
 }
 
 //==================================================================================================
