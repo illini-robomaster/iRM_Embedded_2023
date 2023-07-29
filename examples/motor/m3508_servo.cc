@@ -57,12 +57,12 @@ void RM_RTOS_Init() {
   servo_data.max_speed = 2 * PI;
   servo_data.max_acceleration = 20 * PI;
   servo_data.transmission_ratio = M3508P19_RATIO;
-  servo_data.omega_pid_param = new float[3]{15, 1, 5};
+  servo_data.omega_pid_param = new float[3]{20, 2, 5};
   servo_data.max_iout = 1000;
   servo_data.max_out = 10000;
 
   servo1 = new control::ServoMotor(servo_data);
-  servo1->RegisterJamCallback(jam_callback, 0.15);
+  servo1->RegisterJamCallback(jam_callback, 0.06);
 }
 
 void RM_RTOS_Default_Task(const void* args) {
