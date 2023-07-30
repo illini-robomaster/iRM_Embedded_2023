@@ -33,5 +33,5 @@ irm_add_arm_executable(${PROJECT_NAME}_three_modes_shooter
         SOURCES three_modes_shooter.cc)
 
 irm_add_arm_executable(${PROJECT_NAME}_hero_load
-        TARGET DJI_Board_TypeC
+        TARGET DJI_Board_TypeA
         SOURCES m3508_hero_load.cc)
