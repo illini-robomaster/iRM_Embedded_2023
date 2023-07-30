@@ -423,7 +423,6 @@ void ServoMotor::CalcOutput() {
     detect_head_ = detect_head_ + 1 < detect_period_ ? detect_head_ + 1 : 0;
     // detect if motor is jammed
     // detect total is used as filter.
-    print("detect_total: %d\r\n", detect_total_);
     if (detect_total_ >= jam_threshold_) {
       omega_pid_.Reset();
       servo_jam_t data;

@@ -31,3 +31,7 @@ irm_add_arm_executable(${PROJECT_NAME}_flywheels
 irm_add_arm_executable(${PROJECT_NAME}_three_modes_shooter
         TARGET DJI_Board_TypeC
         SOURCES three_modes_shooter.cc)
+
+irm_add_arm_executable(${PROJECT_NAME}_hero_load
+        TARGET DJI_Board_TypeC
+        SOURCES m3508_hero_load.cc)
