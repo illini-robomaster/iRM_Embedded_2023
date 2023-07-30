@@ -93,8 +93,6 @@ class Shooter {
 
   void DialStop();
 
-  void SetViolentShoot(bool status);
-
  private:
   // acquired from user
   MotorBase* left_flywheel_motor_;
@@ -116,8 +114,6 @@ class Shooter {
   float dial_continue_slowly_acceleration;      /* acceleration for slowly continue shooting mode */
   float dial_double_acceleration;               /* acceleration for double shooting mode */
   int dial_direction_;
-  bool violent_shooting_;
-  float violent_shooting_speed_;
 };
 
 }  // namespace control

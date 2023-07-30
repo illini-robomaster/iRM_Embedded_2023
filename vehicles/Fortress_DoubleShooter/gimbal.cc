@@ -426,9 +426,6 @@ static control::Stepper* stepper = nullptr;
 static volatile bool leftflywheelFlag = false;
 static volatile bool rightflywheelFlag = false;
 
-// static unsigned stepper_length = 700;
-// static unsigned stepper_speed = 1000;
-// static bool stepper_direction = true;
 static const int SHOOTER_MODE_DELAY = 350;
 
 void shooterTask(void* arg) {
@@ -487,13 +484,11 @@ void shooterTask(void* arg) {
             left_shooter->DoubleShoot();
           }
         } else if (dbus->mouse.r) {
-          // left_shooter->FastContinueShoot();
-          left_shooter->SetViolentShoot(true);
+           left_shooter->FastContinueShoot();
         } else {
           left_shooter->DialStop();
           start_time_left = bsp::GetHighresTickMicroSec();
           slow_shoot_detect_left = false;
-          left_shooter->SetViolentShoot(false);
         }
       }
       // right shooter(dial part)
@@ -506,13 +501,11 @@ void shooterTask(void* arg) {
             right_shooter->DoubleShoot();
           }
         } else if (dbus->mouse.r) {
-          right_shooter->SetViolentShoot(true);
-          // right_shooter->FastContinueShoot();
+           right_shooter->FastContinueShoot();
         } else {
           right_shooter->DialStop();
           start_time_right = bsp::GetHighresTickMicroSec();
           slow_shoot_detect_right = false;
-          right_shooter->SetViolentShoot(false);
         }
       }
     }
