@@ -24,13 +24,10 @@
 #include "cmsis_os.h"
 #include "controller.h"
 #include "dbus.h"
-#include "main.h"
 #include "motor.h"
 #include "protocol.h"
 #include "rgb.h"
 #include "chassis.h"
-#include "supercap.h"
-#include <cmath>
 
 static remote::DBUS* dbus = nullptr;
 
@@ -38,7 +35,6 @@ static bsp::CAN* can1 = nullptr;
 static bsp::CAN* can2 = nullptr;
 static display::RGB* RGB = nullptr;
 
-//static BoolEdgeDetector FakeDeath(false);
 static volatile bool Dead = false;
 static volatile bool GameEnd = false;
 
@@ -57,7 +53,7 @@ constexpr float ACCELERATION = (100 * PI);
 // constexpr float SPIN_SPEED = 600;
 // constexpr float FOLLOW_SPEED = 400;
 constexpr float SPIN_SPEED = 80;
-constexpr float FOLLOW_SPEED = 40;
+//constexpr float FOLLOW_SPEED = 40;
 
 //==================================================================================================
 // Referee
@@ -143,10 +139,6 @@ void chassisTask(void* arg) {
 
    while (GameEnd) {
      chassis->SetSpeed(0, 0, 0);
-     fl_motor->SetOutput(0);
-     bl_motor->SetOutput(0);
-     fr_motor->SetOutput(0);
-     br_motor->SetOutput(0);
      control::MotorCANBase::TransmitOutput(motors, 4);
      osDelay(100);
    }
@@ -154,25 +146,26 @@ void chassisTask(void* arg) {
 //   relative_angle = receive->relative_angle;
 //   vx_set = receive->vx;
 //   vy_set = receive->vy;
-
-//   if (dbus->swr == remote::UP || referee->game_status.game_progress == 0x3) {  // spin mode
+   if (dbus->swr == remote::UP || referee->game_status.game_progress == 0x3) {  // spin mode
      sin_yaw = arm_sin_f32(relative_angle);
      cos_yaw = arm_cos_f32(relative_angle);
      vx = cos_yaw * vx_set + sin_yaw * vy_set;
      vy = -sin_yaw * vx_set + cos_yaw * vy_set;
      wz = SPIN_SPEED;
-//   }
+   }
 
    chassis->SetSpeed(vx, vy, wz);
+
+//   if (dbus->swr == remote::DOWN) {
+//     chassis->SetSpeed(0, 0, 0);
+//   }
+
    chassis->Update(true, (float)referee->game_robot_status.chassis_power_limit,
                    referee->power_heat_data.chassis_power,
                    (float)referee->power_heat_data.chassis_power_buffer);
 
    if (Dead) {
-     fl_motor->SetOutput(0);
-     fr_motor->SetOutput(0);
-     bl_motor->SetOutput(0);
-     br_motor->SetOutput(0);
+     chassis->SetSpeed(0, 0, 0);
    }
 
    control::MotorCANBase::TransmitOutput(motors, 4);
@@ -265,7 +258,7 @@ void self_Check_Task(void* arg){
 }
 
 //==================================================================================================
-// RM Init(TODO)
+// RM Init
 //==================================================================================================
 
 void RM_RTOS_Init() {
@@ -329,10 +322,7 @@ void KillAll() {
      RGB->Display(display::color_green);
      break;
    }
-   fl_motor->SetOutput(0);
-   bl_motor->SetOutput(0);
-   fr_motor->SetOutput(0);
-   br_motor->SetOutput(0);
+   chassis->SetSpeed(0, 0, 0);
    control::MotorCANBase::TransmitOutput(motors_can1_chassis, 4);
 
    osDelay(KILLALL_DELAY);
