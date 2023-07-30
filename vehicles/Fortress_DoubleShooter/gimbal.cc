@@ -226,26 +226,12 @@ void gimbalTask(void* arg) {
   print("Start Calibration.\r\n");
   RGB->Display(display::color_yellow);
   laser->Off();
-  // TODO:
-  // No motorcan base, same reason, whether need the gimbal stuff(both motors are 4310).
-  // gimbal->TargetAbsWOffset(0, 0);
-  // gimbal->Update();
-  // control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
   imu->Calibrate();
 
   while (!imu->DataReady() || !imu->CaliDone()) {
-    // TODO:
-    // No motorcan base, same reason, whether need the gimbal stuff(both motors are 4310).
-
-    // gimbal->TargetAbsWOffset(0, 0);
-    // gimbal->TargetAbsWOffset(0, 0);
-    // gimbal->Update();
-    // control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
     pitch_motor->SetOutput(tmp_pos, 1, 115, 0.5, 0);
     yaw_motor->SetOutput(0, 0);
     control::Motor4310::TransmitOutput(motors_can1_gimbal, 2);
-    // TODO:
-    // whether the yaw motor need to set to specific position???
     osDelay(GIMBAL_TASK_DELAY);
   }
 
@@ -837,9 +823,9 @@ void RM_RTOS_Init(void) {
   imu = new IMU(imu_init, false);
 
   laser = new bsp::Laser(LASER_GPIO_Port, LASER_Pin);
-  pitch_motor = new control::Motor4310(can2, 0x02, 0x02, control::MIT);
+  pitch_motor = new control::Motor4310(can2, 0x32, 0x33, control::MIT);
   // TODO: initialize the yaw motor
-  yaw_motor = new control::Motor4310(can2, 0x01, 0x01, control::MIT);
+  yaw_motor = new control::Motor4310(can2, 0x34, 0x35, control::POS_VEL);
 //  control::gimbal_t gimbal_data;
 //  gimbal_data.pitch_motor_4310_ = pitch_motor;
   // gimbal_data.yaw_motor = yaw_motor;
