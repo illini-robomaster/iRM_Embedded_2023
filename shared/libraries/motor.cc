@@ -106,6 +106,8 @@ int16_t MotorCANBase::GetCurr() const { return 0; }
 
 uint16_t MotorCANBase::GetTemp() const { return 0; }
 
+float MotorCANBase::GetTorque() const { return 0.0f; }
+
 //==================================================================================================
 // Motor3508
 //==================================================================================================
@@ -143,6 +145,40 @@ void Motor3508::SetOutput(int16_t val) {
 int16_t Motor3508::GetCurr() const { return raw_current_get_; }
 
 uint16_t Motor3508::GetTemp() const { return raw_temperature_; }
+
+
+
+
+//==================================================================================================
+// Motor 3510
+//==================================================================================================
+
+  Motor3510::Motor3510(bsp::CAN* can, uint16_t rx_id):MotorCANBase(can, rx_id){
+    can->RegisterRxCallback(rx_id, can_motor_callback, this);
+  }
+  /* implements data update callback */
+  void Motor3510::UpdateData(const uint8_t data[]) {
+    const int16_t raw_theta = data[0] << 8 | data[1];
+    const int16_t raw_torque = data[2] << 8 | data[3]; 
+    
+    constexpr float THETA_SCALE = 2 * PI / 8192; 
+    theta_ = (float)raw_theta * THETA_SCALE;
+    torque_ = (float)raw_torque;
+    
+    connection_flag_=true;
+  }
+
+  /* implements data printout */
+  void Motor3510::PrintData() const{
+    print("theta: %.4f ", theta_);
+    print("raw_torque: %.4f \r\n", torque_);
+  }
+  
+  /* override base implementation with max current protection */
+  void Motor3510::SetOutput(int16_t val){
+    constexpr int16_t MAX_ABS_CURRENT = 29000;
+    output_ = clip<int16_t>(val,-MAX_ABS_CURRENT,MAX_ABS_CURRENT);
+  }
 
 //==================================================================================================
 // Motor6020
@@ -388,8 +424,8 @@ void ServoMotor::CalcOutput() {
     detect_head_ = detect_head_ + 1 < detect_period_ ? detect_head_ + 1 : 0;
     // detect if motor is jammed
     // detect total is used as filter.
-    // need test the direction of the command
-    if (abs(detect_total_) >= jam_threshold_) {
+    if (detect_total_ >= jam_threshold_) {
+      omega_pid_.Reset();
       servo_jam_t data;
       data.speed = max_speed_;
       // this function is in shooter.cc called jam_callback.
@@ -620,7 +656,7 @@ Motor4310::Motor4310(bsp::CAN* can, uint16_t rx_id, uint16_t tx_id, mode_t mode)
   }
 }
 
-void Motor4310::MotorEnable(Motor4310* motor) {
+void Motor4310::MotorEnable() {
   uint8_t data[8] = {0};
   data[0] = 0xff;
   data[1] = 0xff;
@@ -630,10 +666,10 @@ void Motor4310::MotorEnable(Motor4310* motor) {
   data[5] = 0xff;
   data[6] = 0xff;
   data[7] = 0xfc;
-  motor->can_->Transmit(motor->tx_id_actual_, data, 8);
+  this->can_->Transmit(this->tx_id_actual_, data, 8);
 }
 
-void Motor4310::MotorDisable(control::Motor4310* motor) {
+void Motor4310::MotorDisable() {
   uint8_t data[8] = {0};
   data[0] = 0xff;
   data[1] = 0xff;
@@ -643,10 +679,10 @@ void Motor4310::MotorDisable(control::Motor4310* motor) {
   data[5] = 0xff;
   data[6] = 0xff;
   data[7] = 0xfd;
-  motor->can_->Transmit(motor->tx_id_actual_, data, 8);
+  this->can_->Transmit(this->tx_id_actual_, data, 8);
 }
 
-void Motor4310::SetZeroPos(control::Motor4310* motor) {
+void Motor4310::SetZeroPos() {
   uint8_t data[8] = {0};
   data[0] = 0xff;
   data[1] = 0xff;
@@ -656,7 +692,7 @@ void Motor4310::SetZeroPos(control::Motor4310* motor) {
   data[5] = 0xff;
   data[6] = 0xff;
   data[7] = 0xfe;
-  motor->can_->Transmit(motor->tx_id_actual_, data, 8);
+  this->can_->Transmit(this->tx_id_actual_, data, 8);
 }
 
 void Motor4310::SetOutput(float position, float velocity, float kp, float kd, float torque) {
@@ -676,49 +712,55 @@ void Motor4310::SetOutput(float velocity) {
   vel_set_ = velocity;
 }
 
-void Motor4310::TransmitOutput(Motor4310* motor) {
-  uint8_t data[8] = {0};
-  uint16_t kp_tmp, kd_tmp, pos_tmp, vel_tmp, torque_tmp;
+mode_t Motor4310::GetMode() const {
+  return mode_;
+}
 
-  if (mode_ == MIT) {
-    // converting float to unsigned int before transmitting
-    kp_tmp = float_to_uint(kp_set_, KP_MIN, KP_MAX, 12);
-    kd_tmp = float_to_uint(kd_set_, KD_MIN, KD_MAX, 12);
-    pos_tmp = float_to_uint(pos_set_, P_MIN, P_MAX, 16);
-    vel_tmp = float_to_uint(vel_set_, V_MIN, V_MAX, 12);
-    torque_tmp = float_to_uint(torque_set_, T_MIN, T_MAX, 12);
-    data[0] = pos_tmp >> 8;
-    data[1] = pos_tmp & 0x00ff;
-    data[2] = (vel_tmp >> 4) & 0x00ff;
-    data[3] = ((vel_tmp & 0x000f) << 4) | ((kp_tmp >> 8) & 0x000f);
-    data[4] = kp_tmp & 0x00ff;
-    data[5] = (kd_tmp >> 4) & 0x00ff;
-    data[6] = ((kd_tmp & 0x000f) << 4) | ((torque_tmp >> 8) & 0x000f);
-    data[7] = torque_tmp & 0x00ff;
-  } else if (mode_ == POS_VEL) {
-    uint8_t *pbuf, *vbuf;
-    pbuf = (uint8_t*)&pos_set_;
-    vbuf = (uint8_t*)&vel_set_;
-    data[0] = *pbuf;
-    data[1] = *(pbuf + 1);
-    data[2] = *(pbuf + 2);
-    data[3] = *(pbuf + 3);
-    data[4] = *vbuf;
-    data[5] = *(vbuf + 1);
-    data[6] = *(vbuf + 2);
-    data[7] = *(vbuf + 3);
-  } else if (mode_ == VEL) {
-    uint8_t* vbuf;
-    vbuf = (uint8_t*)&vel_set_;
-    data[0] = *vbuf;
-    data[1] = *(vbuf + 1);
-    data[2] = *(vbuf + 2);
-    data[3] = *(vbuf + 3);
-  } else {
-    RM_EXPECT_TRUE(false, "Invalid mode number!");
+void Motor4310::TransmitOutput(Motor4310* motors[], uint8_t num_motors) {
+  for (uint8_t i = 0; i < num_motors; ++i) {
+    uint8_t data[8] = {0};
+    uint16_t kp_tmp, kd_tmp, pos_tmp, vel_tmp, torque_tmp;
+
+    if (motors[i]->GetMode() == MIT) {
+      // converting float to unsigned int before transmitting
+      kp_tmp = float_to_uint(motors[i]->kp_set_, KP_MIN, KP_MAX, 12);
+      kd_tmp = float_to_uint(motors[i]->kd_set_, KD_MIN, KD_MAX, 12);
+      pos_tmp = float_to_uint(motors[i]->pos_set_, P_MIN, P_MAX, 16);
+      vel_tmp = float_to_uint(motors[i]->vel_set_, V_MIN, V_MAX, 12);
+      torque_tmp = float_to_uint(motors[i]->torque_set_, T_MIN, T_MAX, 12);
+      data[0] = pos_tmp >> 8;
+      data[1] = pos_tmp & 0x00ff;
+      data[2] = (vel_tmp >> 4) & 0x00ff;
+      data[3] = ((vel_tmp & 0x000f) << 4) | ((kp_tmp >> 8) & 0x000f);
+      data[4] = kp_tmp & 0x00ff;
+      data[5] = (kd_tmp >> 4) & 0x00ff;
+      data[6] = ((kd_tmp & 0x000f) << 4) | ((torque_tmp >> 8) & 0x000f);
+      data[7] = torque_tmp & 0x00ff;
+    } else if (motors[i]->GetMode() == POS_VEL) {
+      uint8_t *pbuf, *vbuf;
+      pbuf = (uint8_t*)&motors[i]->pos_set_;
+      vbuf = (uint8_t*)&motors[i]->vel_set_;
+      data[0] = *pbuf;
+      data[1] = *(pbuf + 1);
+      data[2] = *(pbuf + 2);
+      data[3] = *(pbuf + 3);
+      data[4] = *vbuf;
+      data[5] = *(vbuf + 1);
+      data[6] = *(vbuf + 2);
+      data[7] = *(vbuf + 3);
+    } else if (motors[i]->GetMode() == VEL) {
+      uint8_t* vbuf;
+      vbuf = (uint8_t*)&motors[i]->vel_set_;
+      data[0] = *vbuf;
+      data[1] = *(vbuf + 1);
+      data[2] = *(vbuf + 2);
+      data[3] = *(vbuf + 3);
+    } else {
+      RM_EXPECT_TRUE(false, "Invalid mode number!");
+    }
+    
+    motors[i]->can_->Transmit(motors[i]->tx_id_actual_, data, 8);
   }
-  motor->can_->Transmit(motor->tx_id_actual_, data, 8);
-  connection_flag_ = true;  // temp
 }
 
 void Motor4310::UpdateData(const uint8_t data[]) {
@@ -750,5 +792,12 @@ float Motor4310::GetTorque() const {
   return torque_;
 }
 
+float Motor4310::GetRelativeTarget() const{
+  return relative_target_;
+}
+
+void Motor4310::SetRelativeTarget(float target) {
+  relative_target_ = target;
+}
 
 } /* namespace control */

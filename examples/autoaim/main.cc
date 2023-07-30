@@ -1,6 +1,6 @@
 /****************************************************************************
  *                                                                          *
- *  Copyright (C) 2022 RoboMaster.                                          *
+ *  Copyright (C) 2023 RoboMaster.                                          *
  *  Illini RoboMaster @ University of Illinois at Urbana-Champaign          *
  *                                                                          *
  *  This program is free software: you can redistribute it and/or modify    *
@@ -29,6 +29,8 @@
 #include "bsp_gpio.h"
 #include "autoaim_protocol.h"
 #include "filtering.h"
+#include "i2c.h"
+#include "bsp_imu.h"
 
 /* Define Gimabal-related parameters */
 
@@ -78,6 +80,29 @@ class CustomUART : public bsp::UART {
 
 static display::RGB* led = nullptr;
 
+/* Initialize IMU parameters */
+
+const osThreadAttr_t imuTaskAttribute = {.name = "imuTask",
+                                         .attr_bits = osThreadDetached,
+                                         .cb_mem = nullptr,
+                                         .cb_size = 0,
+                                         .stack_mem = nullptr,
+                                         .stack_size = 256 * 4,
+                                         .priority = (osPriority_t)osPriorityNormal,
+                                         .tz_module = 0,
+                                         .reserved = 0};
+osThreadId_t imuTaskHandle;
+
+class IMU : public bsp::IMU_typeC {
+ public:
+  using bsp::IMU_typeC::IMU_typeC;
+
+ protected:
+  void RxCompleteCallback() final { osThreadFlagsSet(imuTaskHandle, RX_SIGNAL); }
+};
+
+static IMU* imu = nullptr;
+
 /* Initialize autoaim parameters */
 
 // TODO: this is NOT thread-safe!
@@ -86,7 +111,7 @@ float relative_pitch = 0;
 float last_timestamp = 0;  // in milliseconds
 
 void RM_RTOS_Init() {
-  can1 = new bsp::CAN(&hcan1, 0x205, true);
+  can1 = new bsp::CAN(&hcan1, true);
   pitch_motor = new control::Motor6020(can1, 0x205);
   yaw_motor = new control::Motor6020(can1, 0x206);
   gimbal_init_data.pitch_motor = pitch_motor;
@@ -98,6 +123,33 @@ void RM_RTOS_Init() {
   key = new bsp::GPIO(KEY_GPIO_GROUP, KEY_GPIO_PIN);
 
   led = new display::RGB(&htim5, 3, 2, 1, 1000000);
+
+  bsp::IST8310_init_t IST8310_init;
+  IST8310_init.hi2c = &hi2c3;
+  IST8310_init.int_pin = DRDY_IST8310_Pin;
+  IST8310_init.rst_group = GPIOG;
+  IST8310_init.rst_pin = GPIO_PIN_6;
+  bsp::BMI088_init_t BMI088_init;
+  BMI088_init.hspi = &hspi1;
+  BMI088_init.CS_ACCEL_Port = CS1_ACCEL_GPIO_Port;
+  BMI088_init.CS_ACCEL_Pin = CS1_ACCEL_Pin;
+  BMI088_init.CS_GYRO_Port = CS1_GYRO_GPIO_Port;
+  BMI088_init.CS_GYRO_Pin = CS1_GYRO_Pin;
+  bsp::heater_init_t heater_init;
+  heater_init.htim = &htim10;
+  heater_init.channel = 1;
+  heater_init.clock_freq = 1000000;
+  heater_init.temp = 45;
+  bsp::IMU_typeC_init_t imu_init;
+  imu_init.IST8310 = IST8310_init;
+  imu_init.BMI088 = BMI088_init;
+  imu_init.heater = heater_init;
+  imu_init.hspi = &hspi1;
+  imu_init.hdma_spi_rx = &hdma_spi1_rx;
+  imu_init.hdma_spi_tx = &hdma_spi1_tx;
+  imu_init.Accel_INT_pin_ = INT1_ACCEL_Pin;
+  imu_init.Gyro_INT_pin_ = INT1_GYRO_Pin;
+  imu = new IMU(imu_init, false);
 }
 
 void jetsonCommTask(void* arg) {
@@ -113,11 +165,19 @@ void jetsonCommTask(void* arg) {
   auto miniPCreceiver = communication::AutoaimProtocol();
   int total_processed_bytes = 0;
 
+  while (!imu->DataReady() || !imu->CaliDone()) {
+    osDelay(1);
+  }
+
   while (true) {
+    // pitch_curr = imu->INS_angle[1];
+    // yaw_curr = imu->INS_angle[0];
     /* wait until rx data is available */
     // led->Display(0xFF0000FF);
-    uint32_t flags = osThreadFlagsWait(RX_SIGNAL, osFlagsWaitAll, osWaitForever);
-    if (flags & RX_SIGNAL) {  // unnecessary check
+    
+    // uint32_t flags = osThreadFlagsWait(RX_SIGNAL, osFlagsWaitAll, osWaitForever);
+    uint32_t flags = osThreadFlagsGet();
+    if (flags & RX_SIGNAL) {
       /* time the non-blocking rx / tx calls (should be <= 1 osTick) */
 
       // max length of the UART buffer at 150Hz is ~50 bytes
@@ -133,12 +193,34 @@ void jetsonCommTask(void* arg) {
         last_timestamp = HAL_GetTick() / 1000.0;
       }
     }
-    osDelay(1);
+    // send IMU data anyway
+    communication::STMToJetsonData packet_to_send;
+    uint8_t my_color = 1; // blue
+    const float pitch_curr = imu->INS_angle[1];
+    const float yaw_curr = imu->INS_angle[0];
+    miniPCreceiver.Send(&packet_to_send, my_color, yaw_curr, pitch_curr, 0);
+    uart->Write((uint8_t*)&packet_to_send, sizeof(communication::STMToJetsonData));
+    osDelay(2);
   }
 }
 
+/* ========================= IMU Task ========================= */
+
+void imuTask(void* arg) {
+  UNUSED(arg);
+
+  while (true) {
+    uint32_t flags = osThreadFlagsWait(RX_SIGNAL, osFlagsWaitAll, osWaitForever);
+    if (flags & RX_SIGNAL) {  // unnecessary check
+      imu->Update();
+    }
+  }
+}
+/* ======================== End IMU Task =======================*/
+
 void RM_RTOS_Threads_Init(void) {
   jetsonCommTaskHandle = osThreadNew(jetsonCommTask, nullptr, &jetsonCommTaskAttribute);
+  imuTaskHandle = osThreadNew(imuTask, nullptr, &imuTaskAttribute);
 }
 
 // gimbal task
@@ -154,6 +236,27 @@ void RM_RTOS_Default_Task(const void* args) {
   while(key->Read());
 
   UNUSED(gimbal_data);
+
+  // set gimbal to initial position
+  int i = 0;
+  while (i < 1000 || !imu->DataReady()) {
+    gimbal->TargetAbsWOffset(0, 0);
+    gimbal->Update();
+    control::MotorCANBase::TransmitOutput(motors, 2);
+    osDelay(1);
+    ++i;
+  }
+  
+  // calibrate IMU with heater
+  imu->Calibrate();
+  while (!imu->DataReady() || !imu->CaliDone()) {
+    gimbal->TargetAbsWOffset(0, 0);
+    gimbal->Update();
+    control::MotorCANBase::TransmitOutput(motors, 2);
+    osDelay(1);
+  }
+
+  // IMU data assumed to be valid at this point
 
   float abs_autoaim_pitch = gimbal->GetTargetPitchAngle();
   float abs_autoaim_yaw = gimbal->GetTargetYawAngle();

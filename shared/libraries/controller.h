@@ -1,6 +1,6 @@
 /****************************************************************************
  *                                                                          *
- *  Copyright (C) 2022 RoboMaster.                                          *
+ *  Copyright (C) 2023 RoboMaster.                                          *
  *  Illini RoboMaster @ University of Illinois at Urbana-Champaign          *
  *                                                                          *
  *  This program is free software: you can redistribute it and/or modify    *
@@ -167,8 +167,8 @@ class ConstrainedPID {
  private:
   float last_err_;
 
-  float max_iout_;
-  float max_out_;
+  float max_iout_; // this is I (term) accumulated output(restriction for over-integral)
+  float max_out_; // final output
 };
 
 } /* namespace control */

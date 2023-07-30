@@ -55,8 +55,8 @@ static const int SOFT_START_CONSTANT = 300;
 static const int SOFT_KILL_CONSTANT = 200;
 static const float START_PITCH_POS = 0.45f;
 // TODO: the start position of the yaw motor
- static const float START_YAW_POS = 0;
-static const int INFANTRY_INITIAL_HP = 100;
+static const float START_YAW_POS = 0;
+static const int GIMBAL_START_DELAY = 1000;
 
 static bsp::CanBridge* send = nullptr;
 
@@ -69,6 +69,8 @@ static volatile bool SpinMode = false;
 // TODO: Fortress mode
 static BoolEdgeDetector ChangeFortressMode(false);
 static volatile bool FortressMode = false;
+
+static BoolEdgeDetector Antijam(false);
 
 static volatile float relative_angle = 0;
 
@@ -166,10 +168,13 @@ static control::Motor4310* yaw_motor = nullptr;
 //static control::gimbal_data_t* gimbal_param = nullptr;
 static bsp::Laser* laser = nullptr;
 
+// 4310 PID
+static control::ConstrainedPID* yaw_pid_position = nullptr;
+
 void gimbalTask(void* arg) {
   UNUSED(arg);
   // TODO: both are the 4310 whether still need this initialize
-  // control::MotorCANBase* motors_can1_gimbal[] = {yaw_motor};
+  control::Motor4310* motors_can1_gimbal[] = {pitch_motor, yaw_motor};
 
   print("Wait for beginning signal...\r\n");
   RGB->Display(display::color_red);
@@ -195,23 +200,26 @@ void gimbalTask(void* arg) {
     ++i;
   }
 
+  osDelay(GIMBAL_START_DELAY);
   // the start code for motor 4310
-  pitch_motor->SetZeroPos(pitch_motor);
-  pitch_motor->MotorEnable(pitch_motor);
+  pitch_motor->SetZeroPos();
+  pitch_motor->MotorEnable();
   // TODO:
-  yaw_motor->SetZeroPos(yaw_motor);
-  yaw_motor->MotorEnable(yaw_motor);
+  yaw_motor->SetZeroPos();
+  yaw_motor->MotorEnable();
   osDelay(GIMBAL_TASK_DELAY);
 
   // 4310 soft start (for pitch)
-  // TODO:
-  // whether the 4310 yaw motor need the soft start
-  // (based on the start position of yaw motor)
+  float yaw_offset = 0;
+  float yaw_error;
+  float yaw_output_position;
+
   float tmp_pos = 0;
   for (int j = 0; j < SOFT_START_CONSTANT; j++){
     tmp_pos += START_PITCH_POS / SOFT_START_CONSTANT;  // increase position gradually
     pitch_motor->SetOutput(tmp_pos, 1, 115, 0.5, 0);
-    pitch_motor->TransmitOutput(pitch_motor);
+    yaw_motor->SetOutput(0, 0);
+    control::Motor4310::TransmitOutput(motors_can1_gimbal, 2);
     osDelay(GIMBAL_TASK_DELAY);
   }
 
@@ -233,9 +241,9 @@ void gimbalTask(void* arg) {
     // gimbal->TargetAbsWOffset(0, 0);
     // gimbal->Update();
     // control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
-
     pitch_motor->SetOutput(tmp_pos, 1, 115, 0.5, 0);
-    pitch_motor->TransmitOutput(pitch_motor);
+    yaw_motor->SetOutput(0, 0);
+    control::Motor4310::TransmitOutput(motors_can1_gimbal, 2);
     // TODO:
     // whether the yaw motor need to set to specific position???
     osDelay(GIMBAL_TASK_DELAY);
@@ -249,18 +257,11 @@ void gimbalTask(void* arg) {
   send->cmd.data_bool = true;
   send->TransmitOutput();
 
-//  float pitch_ratio, yaw_ratio;
-//  float pitch_curr, yaw_curr;
-//  float pitch_target = 0, yaw_target = 0;
-//  float pitch_diff, yaw_diff;
-
   float pitch_vel_range = 5.0, yaw_vel_range = 5.0;
 
   while (true) {
     while (Dead || GimbalDead) osDelay(100);
 
-    // TODO:whether this for 4310 pitch motor ???
-    // if this is for 4310, whether we need the same stuff for the 4310 yaw motor.
     float pitch_vel, yaw_vel;
     pitch_vel = clip<float>(-dbus->ch3 / 660.0 * pitch_vel_range, -pitch_vel_range, pitch_vel_range);
     pitch_pos += pitch_vel / 200 + dbus->mouse.y / 32767.0;
@@ -268,44 +269,39 @@ void gimbalTask(void* arg) {
 
     yaw_vel = clip<float>(-dbus->ch2 / 660.0 * yaw_vel_range, -yaw_vel_range, yaw_vel_range);
     yaw_pos += yaw_vel / 200.0;
-//    yaw_pos = clip<float>(yaw_pos, -PI/4, PI/4);
 
-    // TODO: whether we need handle the reset case for yaw stuff ???
     if (pitch_reset) {
       // 4310 soft start
       tmp_pos = 0;
       for (int j = 0; j < SOFT_START_CONSTANT; j++){
         tmp_pos += START_PITCH_POS / SOFT_START_CONSTANT;  // increase position gradually
         pitch_motor->SetOutput(tmp_pos, 1, 115, 0.5, 0);
-        pitch_motor->TransmitOutput(pitch_motor);
+        yaw_motor->SetOutput(0, 0);
+        control::Motor4310::TransmitOutput(motors_can1_gimbal, 2);
         osDelay(GIMBAL_TASK_DELAY);
       }
       pitch_pos = tmp_pos;
       pitch_reset = false;
-      // yaw_reset = false;
     }
-    // TODO: whether we need to change the update function for both 4310 motor
-    // the below stuff is for motor can base, not for 4310 base
-//    gimbal->TargetRel(-pitch_diff, yaw_diff);
-//    gimbal->Update();
-//
-//    set_cursor(0, 0);
-//    clear_screen();
-//    print("Vel Set: %f  Pos Set: %f\r\n", yaw_vel, yaw_pos);
-//    print("actual pos: %.4f, actual vel: %.4f\r\n", yaw_motor->GetTheta(), yaw_motor->GetOmega());
 
     // TODO: the 4310 yaw motor need to set the new output
     pitch_motor->SetOutput(pitch_pos, pitch_vel, 115, 0.5, 0);
 
-    //    clear_screen();
-    //    set_cursor(0,0);
-    //    print("pos: %.4f, vel: %.4f\r\n", yaw_pos, yaw_vel);
-    //    print("actual pos: %.4f, actual vel: %.4f\r\n", yaw_motor->GetTheta(), yaw_motor->GetOmega());
-//    yaw_motor->SetOutput(yaw_pos, yaw_vel);
-    yaw_motor->SetOutput(yaw_pos, yaw_vel, 5, 0.5, 0);
+        // yaw calculation
+    float yaw_ratio, yaw_target;
+    yaw_ratio = -(dbus->ch2 / 18000.0 / 7.0);
+    yaw_target = clip<float>(yaw_ratio, -PI, PI);
+    yaw_offset = wrap<float>(yaw_target + yaw_offset, -PI, PI);
+    yaw_error = wrap<float>(yaw_offset - imu->INS_angle[0], -PI, PI);
+    if (abs(yaw_error) <= 0.001) yaw_error = 0;
+    yaw_output_position = yaw_pid_position->ComputeOutput(yaw_error);
 
-    pitch_motor->TransmitOutput(pitch_motor);
-    yaw_motor->TransmitOutput(yaw_motor);
+//    print("yaw_pos: %f, yaw_vel: %f\r\n", yaw_pos, yaw_vel);
+    print("yaw_tar: %f, yaw_offset: %f, yaw_error: %f, yaw_out_pos: %f\r\n", yaw_target, yaw_offset, yaw_error, yaw_output_position);
+
+   yaw_motor->SetOutput(yaw_pos, yaw_vel);
+    // yaw_motor->SetOutput(yaw_pos, yaw_vel, 5, 0.5, 0);
+    control::Motor4310::TransmitOutput(motors_can1_gimbal, 2);
     osDelay(5);
   }
 }
@@ -392,11 +388,9 @@ void shooterTask(void* arg) {
 
   control::MotorCANBase* motors_can1_shooter_right[] = {right_top_flywheel, right_bottom_flywheel, right_dial};
 
-  uint32_t start_time_left = 0;
-  uint32_t start_time_right = 0;
 
-  bool slow_shoot_detect_left = false;
-  bool slow_shoot_detect_right = false;
+  bool triple_shoot_detect_left = false;
+  bool triple_shoot_detect_right = false;
 
   while (true) {
     if (dbus->keyboard.bit.B || dbus->swr == remote::DOWN) break;
@@ -410,60 +404,76 @@ void shooterTask(void* arg) {
 //    print("power1: %d, cooling heat: %.4f, cooling limit: %.4f\r\n", send->shooter_power, send->cooling_heat1, send->cooling_limit1);
 //    print("power2: %d, cooling heat: %.4f, cooling limit: %.4f\r\n", send->shooter_power, send->cooling_heat2, send->cooling_limit2);
 
-    if (send->shooter_power && send->cooling_heat1 > send->cooling_limit1 - 20) {
+    // left shooter(dial part)
+    if (send->shooter_power && send->cooling_heat1 >= send->cooling_limit1 - 15) {
       left_top_flywheel->SetOutput(0);
       left_bottom_flywheel->SetOutput(0);
       left_dial->SetOutput(0);
-      control::MotorCANBase::TransmitOutput(motors_can1_shooter_left, 3);
       osDelay(100);
+    } else if (GimbalDead) {
+      left_shooter->DialStop();
+    } else if (send->shooter_power) {
+      // for manual antijam 
+      Antijam.input(dbus->keyboard.bit.G);
+      // slow shooting
+      if (dbus->mouse.l || dbus->swr == remote::UP) {
+        left_shooter->SlowContinueShoot();
+      // fast shooting
+      } else if ((dbus->mouse.r || dbus->wheel.wheel > remote::WheelDigitalValue)
+                && send->cooling_heat1 < send->cooling_limit1 - 24) {
+        left_shooter->FastContinueShoot(); 
+      // triple shooting
+      } else if (dbus->wheel.wheel == remote::WheelDigitalValue
+                  && dbus->previous_wheel_value == remote::WheelDigitalValue) {
+        if (!triple_shoot_detect_left) {
+          triple_shoot_detect_left = true;          
+          left_shooter->TripleShoot();
+        }
+      // manual antijam
+      } else if (Antijam.posEdge()) {
+        left_shooter->Antijam();
+      // stop
+      } else {
+        left_shooter->DialStop();
+        triple_shoot_detect_left = false;
+      }
+      dbus->previous_wheel_value = dbus->wheel.wheel;
     }
-    
-    if (send->shooter_power && send->cooling_heat2 > send->cooling_limit2 - 20) {
+
+    // right shooter(dial part)
+    if (send->shooter_power && send->cooling_heat2 >= send->cooling_heat2 - 15) {
       right_top_flywheel->SetOutput(0);
       right_bottom_flywheel->SetOutput(0);
       right_dial->SetOutput(0);
-      control::MotorCANBase::TransmitOutput(motors_can1_shooter_right, 3);
       osDelay(100);
-    }
-
-    if (GimbalDead) {
-      left_shooter->DialStop();
+    } else if (GimbalDead) {
       right_shooter->DialStop();
-    } else {
-      // left shooter(dial part)
-      if (send->shooter_power && send->cooling_heat1 < send->cooling_limit1 - 20) {
-        if (dbus->mouse.l || dbus->swr == remote::UP) {
-          if ((bsp::GetHighresTickMicroSec() - start_time_left) / 1000 > SHOOTER_MODE_DELAY) {
-            left_shooter->SlowContinueShoot();
-          } else if (slow_shoot_detect_left == false) {
-            slow_shoot_detect_left = true;
-            left_shooter->DoubleShoot();
-          }
-        } else if (dbus->mouse.r) {
-           left_shooter->FastContinueShoot();
-        } else {
-          left_shooter->DialStop();
-          start_time_left = bsp::GetHighresTickMicroSec();
-          slow_shoot_detect_left = false;
+    } else if (send->shooter_power) {
+      // for manual antijam 
+      Antijam.input(dbus->keyboard.bit.G);
+      // slow shooting
+      if (dbus->mouse.l || dbus->swr == remote::UP) {
+        right_shooter->SlowContinueShoot();
+      // fast shooting
+      } else if ((dbus->mouse.r || dbus->wheel.wheel > remote::WheelDigitalValue)
+                && send->cooling_heat1 < send->cooling_heat2 - 24) {
+        right_shooter->FastContinueShoot(); 
+      // triple shooting
+      } else if (dbus->wheel.wheel == remote::WheelDigitalValue
+                  && dbus->previous_wheel_value == remote::WheelDigitalValue) {
+        if (!triple_shoot_detect_right) {
+          triple_shoot_detect_right = true;          
+          right_shooter->TripleShoot();
         }
+      // manual antijam
+      } else if (Antijam.posEdge()) {
+        right_shooter->Antijam();
+      // stop
+      } else {
+        right_shooter->DialStop();
+        triple_shoot_detect_right = false;
       }
-      // right shooter(dial part)
-      if (send->shooter_power && send->cooling_heat2 < send->cooling_limit2 - 20) {
-        if (dbus->mouse.l || dbus->swr == remote::UP) {
-          if ((bsp::GetHighresTickMicroSec() - start_time_right) / 1000 > SHOOTER_MODE_DELAY) {
-            right_shooter->SlowContinueShoot();
-          } else if (slow_shoot_detect_right == false) {
-            slow_shoot_detect_right = true;
-            right_shooter->DoubleShoot();
-          }
-        } else if (dbus->mouse.r) {
-           right_shooter->FastContinueShoot();
-        } else {
-          right_shooter->DialStop();
-          start_time_right = bsp::GetHighresTickMicroSec();
-          slow_shoot_detect_right = false;
-        }
-      }
+      dbus->previous_wheel_value = dbus->wheel.wheel;
     }
 
     if (GimbalDead) {
@@ -514,7 +524,6 @@ void shooterTask(void* arg) {
     osDelay(SHOOTER_TASK_DELAY);
   }
 }
-
 //==================================================================================================
 // Chassis(TODO:)
 //==================================================================================================
@@ -795,8 +804,8 @@ void RM_RTOS_Init(void) {
   print_use_uart(&huart1);
   bsp::SetHighresClockTimer(&htim5);
 
-  can1 = new bsp::CAN(&hcan1, 0x201, true);
-  can2 = new bsp::CAN(&hcan2, 0x201, false);
+  can1 = new bsp::CAN(&hcan1, true);
+  can2 = new bsp::CAN(&hcan2, false);
   dbus = new remote::DBUS(&huart3);
   RGB = new display::RGB(&htim5, 3, 2, 1, 1000000);
 
@@ -903,8 +912,8 @@ void KillAll() {
 //                                                  right_top_flywheel, right_bottom_flywheel, right_dial};
 
   control::MotorCANBase* motors_can1_shooter_left[] = {left_top_flywheel, left_bottom_flywheel, left_dial};
-
   control::MotorCANBase* motors_can1_shooter_right[] = {right_top_flywheel, right_bottom_flywheel, right_dial};
+  control::Motor4310* motor[] = {pitch_motor};
 
   RGB->Display(display::color_blue);
   laser->Off();
@@ -920,7 +929,7 @@ void KillAll() {
       Dead = false;
       RGB->Display(display::color_green);
       laser->On();
-      pitch_motor->MotorEnable(pitch_motor);
+      pitch_motor->MotorEnable();
       // TODO: whether the 4310 yaw motor need to enable ???
       // yaw_motor->MotorEnable(yaw_motor);
       break;
@@ -932,12 +941,12 @@ void KillAll() {
     for (int j = 0; j < SOFT_KILL_CONSTANT; j++){
       tmp_pos -= START_PITCH_POS / SOFT_KILL_CONSTANT;  // decrease position gradually
       pitch_motor->SetOutput(tmp_pos, 1, 115, 0.5, 0);
-      pitch_motor->TransmitOutput(pitch_motor);
+      control::Motor4310::TransmitOutput(motor, 1);
       osDelay(GIMBAL_TASK_DELAY);
     }
 
     pitch_reset = true;
-    pitch_motor->MotorDisable(pitch_motor);
+    pitch_motor->MotorDisable();
     // TODO:
     // yaw_motor->MotorDisable(yaw_motor);
 
@@ -959,12 +968,14 @@ void KillAll() {
 }
 
 void KillGimbal() {
+  control::Motor4310* motor[] = {pitch_motor};
+
   while (true) {
     GimbalDead = true;
     GimbalDeath.input(send->gimbal_power);
     if (GimbalDeath.posEdge() && robot_hp_begin) {
       GimbalDead = false;
-      pitch_motor->MotorEnable(pitch_motor);
+      pitch_motor->MotorEnable();
       break;
     }
     print("gimbal killed\r\n");
@@ -974,12 +985,12 @@ void KillGimbal() {
     for (int j = 0; j < SOFT_KILL_CONSTANT; j++){
       tmp_pos -= START_PITCH_POS / SOFT_KILL_CONSTANT;  // decrease position gradually
       pitch_motor->SetOutput(tmp_pos, 1, 115, 0.5, 0);
-      pitch_motor->TransmitOutput(pitch_motor);
+      control::Motor4310::TransmitOutput(motor, 1);
       osDelay(GIMBAL_TASK_DELAY);
     }
 
     pitch_reset = true;
-    pitch_motor->MotorDisable(pitch_motor);
+    pitch_motor->MotorDisable();
 
     osDelay(KILLALL_DELAY);
   }
