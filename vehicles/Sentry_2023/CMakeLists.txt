@@ -28,6 +28,3 @@ irm_add_arm_executable(Sentry_gimbal
     TARGET DJI_Board_TypeC
     SOURCES gimbal.cc)
 
-irm_add_arm_executable(Sentry_basic_chassis
-    TARGET DJI_Board_TypeC
-    SOURCES basic_chassis.cc)
