@@ -114,9 +114,7 @@ class CustomUART : public bsp::UART {
 static control::UnitreeMotor* base_vert_rotate_motor = nullptr;
 static control::UnitreeMotor* base_hor_rotate_motor = nullptr;
 static control::UnitreeMotor* elbow_rotate_motor = nullptr;
-static CustomUART* base_vert_rotate_motor_uart = nullptr;
-static CustomUART* base_hor_rotate_motor_uart = nullptr;
-static CustomUART* elbow_rotate_motor_uart = nullptr;
+static CustomUART* joint_uart = nullptr;
 
 // 4310
 static control::Motor4310* forearm_rotate_motor = nullptr;
@@ -173,16 +171,11 @@ void RM_RTOS_Init() {
     can1, HAND_ROTATE_RX_ID, HAND_ROTATE_TX_ID, control::MIT);
 
   // Init A1 * 3
-  base_vert_rotate_motor_uart = new CustomUART(BASE_HOR_ROTATE_UART);
-  base_hor_rotate_motor_uart = new CustomUART(BASE_VERT_ROTATE_UART);
-  elbow_rotate_motor_uart = new CustomUART(ELBOW_ROTATE_UART);
+  joint_uart = new CustomUART(BASE_HOR_ROTATE_UART);
+  
 
-  base_vert_rotate_motor_uart->SetupRx(300);
-  base_vert_rotate_motor_uart->SetupTx(300);
-  base_hor_rotate_motor_uart->SetupRx(300);
-  base_hor_rotate_motor_uart->SetupTx(300);
-  elbow_rotate_motor_uart->SetupRx(300);
-  elbow_rotate_motor_uart->SetupTx(300);
+  joint_uart->SetupRx(300);
+  joint_uart->SetupTx(300);
 
   base_vert_rotate_motor = new control::UnitreeMotor();
   base_hor_rotate_motor = new control::UnitreeMotor();
@@ -217,15 +210,15 @@ void RM_RTOS_Default_Task(const void* args) {
 
   // A1 init state
   base_hor_rotate_motor->Stop(0);
-  base_hor_rotate_motor_uart->Write((uint8_t*)(&(base_hor_rotate_motor->send.data)),
+  joint_uart->Write((uint8_t*)(&(base_hor_rotate_motor->send.data)),
                                 base_hor_rotate_motor->send_length);
 
   base_vert_rotate_motor->Stop(0);
-  base_vert_rotate_motor_uart->Write((uint8_t*)(&(base_vert_rotate_motor->send.data)),
+   joint_uart->Write((uint8_t*)(&(base_vert_rotate_motor->send.data)),
                                 base_vert_rotate_motor->send_length);
 
   elbow_rotate_motor->Stop(0);
-  elbow_rotate_motor_uart->Write((uint8_t*)(&(elbow_rotate_motor->send.data)),
+  joint_uart->Write((uint8_t*)(&(elbow_rotate_motor->send.data)),
                                 elbow_rotate_motor->send_length);
 
   print("arm starts in 2 secs\r\n");
@@ -283,30 +276,37 @@ int ArmTurnAbsolute(joint_state_t* target) {
   // position expect position
   // Kp Kp parameter for the PD controller
   // Kd Kd parameter for the PD controller
+  
   if (target->base_vert_rotate >= BASE_VERT_ROTATE_MAX) {
-    base_vert_rotate_motor->Control(BASE_VERT_ROTATE_ID, 0.0, 0.0, BASE_VERT_ROTATE_MAX, 0.0, 3.0);
+    base_vert_rotate_motor->Control(BASE_VERT_ROTATE_ID, 0.0, 0.0, BASE_VERT_ROTATE_MAX, 0.0025, 0.004);
+    target->base_vert_rotate = BASE_VERT_ROTATE_MAX;
   } else if (target->base_vert_rotate <= BASE_VERT_ROTATE_MIN) {
-    base_vert_rotate_motor->Control(BASE_VERT_ROTATE_ID, 0.0, 0.0, BASE_VERT_ROTATE_MIN, 0.0, 3.0);
+    base_vert_rotate_motor->Control(BASE_VERT_ROTATE_ID, 0.0, 0.0, BASE_VERT_ROTATE_MIN,  0.0025, 0.004);
+    target->base_vert_rotate = BASE_VERT_ROTATE_MIN;
   } else {
-    base_vert_rotate_motor->Control(BASE_VERT_ROTATE_ID, 0.0, 0.0, target->base_vert_rotate, 0.0, 3.0);
+    base_vert_rotate_motor->Control(BASE_VERT_ROTATE_ID, 0.0, 0.0, target->base_vert_rotate,  0.0025, 0.004);
   }
   current_joint_state.base_vert_rotate = target->base_vert_rotate;
 
   if (target->base_hor_rotate >= BASE_HOR_ROTATE_MAX) {
-    base_hor_rotate_motor->Control(BASE_HOR_ROTATE_ID, 0.0, 0.0, BASE_HOR_ROTATE_MAX, 0.003, 0.003);
+    base_hor_rotate_motor->Control(BASE_HOR_ROTATE_ID, 0.0, 0.0, BASE_HOR_ROTATE_MAX,  0.0025, 0.004);
+    target->base_hor_rotate = BASE_HOR_ROTATE_MAX;
   } else if (target->base_hor_rotate <= BASE_HOR_ROTATE_MIN) {
-    base_hor_rotate_motor->Control(BASE_HOR_ROTATE_ID, 0.0, 0.0, BASE_HOR_ROTATE_MIN, 0.003, 0.003);
+    base_hor_rotate_motor->Control(BASE_HOR_ROTATE_ID, 0.0, 0.0, BASE_HOR_ROTATE_MIN,  0.0025, 0.004);
+    target->base_hor_rotate = BASE_HOR_ROTATE_MIN;
   } else {
-    base_hor_rotate_motor->Control(BASE_HOR_ROTATE_ID, 0.0, 0.0, target->base_hor_rotate, 0.003, 0.003);
+    base_hor_rotate_motor->Control(BASE_HOR_ROTATE_ID, 0.0, 0.0, target->base_hor_rotate,  0.0025, 0.004);
   }
   current_joint_state.base_hor_rotate = target->base_hor_rotate;
 
   if (target->elbow_rotate >= ELBOW_ROTATE_MAX) {
-    elbow_rotate_motor->Control(ELBOW_ROTATE_ID, 0.0, 0.0, ELBOW_ROTATE_MAX, 0.003, 0.003);
+    elbow_rotate_motor->Control(ELBOW_ROTATE_ID, 0.0, 0.0, ELBOW_ROTATE_MAX,  0.0025, 0.004);
+    target->elbow_rotate = ELBOW_ROTATE_MAX;
   } else if (target->elbow_rotate <= ELBOW_ROTATE_MIN) {
-    elbow_rotate_motor->Control(ELBOW_ROTATE_ID, 0.0, 0.0, ELBOW_ROTATE_MIN, 0.003, 0.003);
+    elbow_rotate_motor->Control(ELBOW_ROTATE_ID, 0.0, 0.0, ELBOW_ROTATE_MIN,  0.0025, 0.004);
+    target->elbow_rotate = ELBOW_ROTATE_MIN;
   } else {
-    elbow_rotate_motor->Control(ELBOW_ROTATE_ID, 0.0, 0.0, target->elbow_rotate, 0.003, 0.003);
+    elbow_rotate_motor->Control(ELBOW_ROTATE_ID, 0.0, 0.0, target->elbow_rotate,  0.0025, 0.004);
   }
   current_joint_state.elbow_rotate = target->elbow_rotate;
 
@@ -347,11 +347,11 @@ void ArmTransmitOutput() {
 
   control::MotorCANBase::TransmitOutput(m3508s, 1);
 
-  base_hor_rotate_motor_uart->Write((uint8_t*)(&(base_hor_rotate_motor->send.data)),
+  joint_uart->Write((uint8_t*)(&(base_hor_rotate_motor->send.data)),
                                 base_hor_rotate_motor->send_length);
-  base_vert_rotate_motor_uart->Write((uint8_t*)(&(base_vert_rotate_motor->send.data)),
+  joint_uart->Write((uint8_t*)(&(base_vert_rotate_motor->send.data)),
                                 base_vert_rotate_motor->send_length);
-  elbow_rotate_motor_uart->Write((uint8_t*)(&(elbow_rotate_motor->send.data)),
+  joint_uart->Write((uint8_t*)(&(elbow_rotate_motor->send.data)),
                                 elbow_rotate_motor->send_length);
 
   control::Motor4310::TransmitOutput(forearm_motors, 1);

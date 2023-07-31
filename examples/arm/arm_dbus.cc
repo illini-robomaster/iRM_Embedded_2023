@@ -15,7 +15,6 @@
 #include "arm_config.h"
 
 #define RX_SIGNAL (1 << 0)
-#define A1_CONTROL_DELAY 100
 
 
 
@@ -43,6 +42,7 @@ extern const float ACCELERATION;
 
 extern const float M4310_VEL;
 
+extern const int A1_CONTROL_DELAY;
 extern const int BASE_HOR_ROTATE_ID;
 extern const int BASE_VERT_ROTATE_ID;
 extern const int ELBOW_ROTATE_ID;
@@ -110,14 +110,13 @@ void RM_RTOS_Init(void) {
 static joint_state_t current_joint_state = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 static joint_state_t target_state = {0.0,0.0,0.0,0.0,0.0,0.0,0.0};
 
-static int dataSend = 0;
 
 void RM_RTOS_Default_Task(const void* args) {
 
     UNUSED(args);
     // A1 init state
     base_hor_rotate_motor->Stop( BASE_HOR_ROTATE_ID);
-    dataSend = A1->Write((uint8_t*)(&(base_hor_rotate_motor->send.data)),
+    A1->Write((uint8_t*)(&(base_hor_rotate_motor->send.data)),
                                     base_hor_rotate_motor->send_length);
     osDelay(A1_CONTROL_DELAY);
     base_vert_rotate_motor->Stop(BASE_VERT_ROTATE_ID);
@@ -172,30 +171,37 @@ int ArmTurnAbsolute(joint_state_t* target) {
   // position expect position
   // Kp Kp parameter for the PD controller
   // Kd Kd parameter for the PD controller
+  
   if (target->base_vert_rotate >= BASE_VERT_ROTATE_MAX) {
-    base_vert_rotate_motor->Control(BASE_VERT_ROTATE_ID, 0.0, 0.0, BASE_VERT_ROTATE_MAX, 0.003, 0.003);
+    base_vert_rotate_motor->Control(BASE_VERT_ROTATE_ID, 0.0, 0.0, BASE_VERT_ROTATE_MAX, 0.0025, 0.004);
+    target->base_vert_rotate = BASE_VERT_ROTATE_MAX;
   } else if (target->base_vert_rotate <= BASE_VERT_ROTATE_MIN) {
-    base_vert_rotate_motor->Control(BASE_VERT_ROTATE_ID, 0.0, 0.0, BASE_VERT_ROTATE_MIN, 0.003, 0.003);
+    base_vert_rotate_motor->Control(BASE_VERT_ROTATE_ID, 0.0, 0.0, BASE_VERT_ROTATE_MIN,  0.0025, 0.004);
+    target->base_vert_rotate = BASE_VERT_ROTATE_MIN;
   } else {
-    base_vert_rotate_motor->Control(BASE_VERT_ROTATE_ID, 0.0, 0.0, target->base_vert_rotate, 0.003, 0.003);
+    base_vert_rotate_motor->Control(BASE_VERT_ROTATE_ID, 0.0, 0.0, target->base_vert_rotate,  0.0025, 0.004);
   }
   current_joint_state.base_vert_rotate = target->base_vert_rotate;
 
   if (target->base_hor_rotate >= BASE_HOR_ROTATE_MAX) {
-    base_hor_rotate_motor->Control(BASE_HOR_ROTATE_ID, 0.0, 0.0, BASE_HOR_ROTATE_MAX, 0.003, 0.003);
+    base_hor_rotate_motor->Control(BASE_HOR_ROTATE_ID, 0.0, 0.0, BASE_HOR_ROTATE_MAX,  0.0025, 0.004);
+    target->base_hor_rotate = BASE_HOR_ROTATE_MAX;
   } else if (target->base_hor_rotate <= BASE_HOR_ROTATE_MIN) {
-    base_hor_rotate_motor->Control(BASE_HOR_ROTATE_ID, 0.0, 0.0, BASE_HOR_ROTATE_MIN, 0.003, 0.003);
+    base_hor_rotate_motor->Control(BASE_HOR_ROTATE_ID, 0.0, 0.0, BASE_HOR_ROTATE_MIN,  0.0025, 0.004);
+    target->base_hor_rotate = BASE_HOR_ROTATE_MIN;
   } else {
-    base_hor_rotate_motor->Control(BASE_HOR_ROTATE_ID, 0.0, 0.0, target->base_hor_rotate, 0.003, 0.003);
+    base_hor_rotate_motor->Control(BASE_HOR_ROTATE_ID, 0.0, 0.0, target->base_hor_rotate,  0.0025, 0.004);
   }
   current_joint_state.base_hor_rotate = target->base_hor_rotate;
 
   if (target->elbow_rotate >= ELBOW_ROTATE_MAX) {
-    elbow_rotate_motor->Control(ELBOW_ROTATE_ID, 0.0, 0.0, ELBOW_ROTATE_MAX, 0.003, 0.003);
+    elbow_rotate_motor->Control(ELBOW_ROTATE_ID, 0.0, 0.0, ELBOW_ROTATE_MAX,  0.0025, 0.004);
+    target->elbow_rotate = ELBOW_ROTATE_MAX;
   } else if (target->elbow_rotate <= ELBOW_ROTATE_MIN) {
-    elbow_rotate_motor->Control(ELBOW_ROTATE_ID, 0.0, 0.0, ELBOW_ROTATE_MIN, 0.003, 0.003);
+    elbow_rotate_motor->Control(ELBOW_ROTATE_ID, 0.0, 0.0, ELBOW_ROTATE_MIN,  0.0025, 0.004);
+    target->elbow_rotate = ELBOW_ROTATE_MIN;
   } else {
-    elbow_rotate_motor->Control(ELBOW_ROTATE_ID, 0.0, 0.0, target->elbow_rotate, 0.003, 0.003);
+    elbow_rotate_motor->Control(ELBOW_ROTATE_ID, 0.0, 0.0, target->elbow_rotate,  0.0025, 0.004);
   }
   current_joint_state.elbow_rotate = target->elbow_rotate;
 
