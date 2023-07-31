@@ -91,6 +91,16 @@ bool base_translate_align_detect() {
 }
 
 
+/**
+ * forearm_rotate_motor     RX=0x02 TX=0x01
+ * wrist_rotate_motor       RX=0x04 TX=0x03
+ * hand_rotete_motor        RX=0x06 TX=0x05
+ * 
+ * elbow_rortate_motor      ID=0
+ * upper_arm_motor          ID=1
+ * base_motor               ID=2
+*/
+
 // A1
 // TODO this part is unstable
 extern osThreadId_t defaultTaskHandle;
@@ -283,24 +293,25 @@ int ArmTurnAbsolute(joint_state_t* target) {
   current_joint_state.base_vert_rotate = target->base_vert_rotate;
 
   if (target->base_hor_rotate >= BASE_HOR_ROTATE_MAX) {
-    base_hor_rotate_motor->Control(BASE_HOR_ROTATE_ID, 0.0, 0.0, BASE_HOR_ROTATE_MAX, 0.0, 3.0);
+    base_hor_rotate_motor->Control(BASE_HOR_ROTATE_ID, 0.0, 0.0, BASE_HOR_ROTATE_MAX, 0.003, 0.003);
   } else if (target->base_hor_rotate <= BASE_HOR_ROTATE_MIN) {
-    base_hor_rotate_motor->Control(BASE_HOR_ROTATE_ID, 0.0, 0.0, BASE_HOR_ROTATE_MIN, 0.0, 3.0);
+    base_hor_rotate_motor->Control(BASE_HOR_ROTATE_ID, 0.0, 0.0, BASE_HOR_ROTATE_MIN, 0.003, 0.003);
   } else {
-    base_hor_rotate_motor->Control(BASE_HOR_ROTATE_ID, 0.0, 0.0, target->base_hor_rotate, 0.0, 3.0);
+    base_hor_rotate_motor->Control(BASE_HOR_ROTATE_ID, 0.0, 0.0, target->base_hor_rotate, 0.003, 0.003);
   }
   current_joint_state.base_hor_rotate = target->base_hor_rotate;
 
   if (target->elbow_rotate >= ELBOW_ROTATE_MAX) {
-    elbow_rotate_motor->Control(ELBOW_ROTATE_ID, 0.0, 0.0, ELBOW_ROTATE_MAX, 0.0, 3.0);
+    elbow_rotate_motor->Control(ELBOW_ROTATE_ID, 0.0, 0.0, ELBOW_ROTATE_MAX, 0.003, 0.003);
   } else if (target->elbow_rotate <= ELBOW_ROTATE_MIN) {
-    elbow_rotate_motor->Control(ELBOW_ROTATE_ID, 0.0, 0.0, ELBOW_ROTATE_MIN, 0.0, 3.0);
+    elbow_rotate_motor->Control(ELBOW_ROTATE_ID, 0.0, 0.0, ELBOW_ROTATE_MIN, 0.003, 0.003);
   } else {
-    elbow_rotate_motor->Control(ELBOW_ROTATE_ID, 0.0, 0.0, target->elbow_rotate, 0.0, 3.0);
+    elbow_rotate_motor->Control(ELBOW_ROTATE_ID, 0.0, 0.0, target->elbow_rotate, 0.003, 0.003);
   }
   current_joint_state.elbow_rotate = target->elbow_rotate;
 
   // M4310
+  //TODO: Adjust VALUE For TESTING
   if (target->forearm_rotate >= FOREARM_ROTATE_MAX) {
     forearm_rotate_motor->SetOutput(FOREARM_ROTATE_MAX, M4310_VEL, 30, 0.5, 0);
   } else if (target->forearm_rotate <= FOREARM_ROTATE_MIN) {
