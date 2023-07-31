@@ -1,4 +1,4 @@
-/****************************************************************************
+ /****************************************************************************
  *                                                                          *
  *  Copyright (C) 2023 RoboMaster.                                          *
  *  Illini RoboMaster @ University of Illinois at Urbana-Champaign          *
@@ -387,6 +387,7 @@ void jetsonCommTask(void* arg) {
 
   while (!imu->CaliDone()) {
     osDelay(10);
+    // printf("Waiting for IMU calibration...\n"); // Debug: IMU calibration status
   }
 
   int total_receive_count = 0;
@@ -394,20 +395,25 @@ void jetsonCommTask(void* arg) {
   while (true) {
     uint32_t flags = osThreadFlagsGet();
     if (flags & JETSON_RX_SIGNAL) {
-      /* time the non-blocking rx / tx calls (should be <= 1 osTick) */
+      // printf("Received RX signal from Jetson.\n"); // Debug: RX signal received
 
       // max length of the UART buffer at 150Hz is ~50 bytes
       length = uart->Read(&data);
 
-      miniPCreceiver.Receive(data, length);
+      // printf("Read %lu bytes from UART.\n", length); // Debug: Length of data read
 
+      miniPCreceiver.Receive(data, length);
       if (miniPCreceiver.get_valid_flag()) {
         // there is at least one unprocessed valid packet
         abs_yaw_jetson = miniPCreceiver.get_relative_yaw();
         abs_pitch_jetson = miniPCreceiver.get_relative_pitch();
         total_receive_count++;
+        // printf("Received valid packet. Total count: %d\n", total_receive_count); // Debug: Valid packet received
+      } else {
+        // printf("Received invalid packet.\n"); // Debug: Invalid packet received
       }
     }
+
     // send IMU data anyway
     communication::STMToJetsonData packet_to_send;
     uint8_t my_color; // 1 for blue; 0 for red
@@ -420,9 +426,11 @@ void jetsonCommTask(void* arg) {
     const float yaw_curr = imu->INS_angle[0];
     miniPCreceiver.Send(&packet_to_send, my_color, yaw_curr, pitch_curr, 0);
     uart->Write((uint8_t*)&packet_to_send, sizeof(communication::STMToJetsonData));
+    // printf("Sent packet to Jetson.\n"); // Debug: Packet sent to Jetson
     osDelay(2);
   }
 }
+
 
 //==================================================================================================
 // Shooter
@@ -741,7 +749,7 @@ void selfTestTask(void* arg) {
 }
 
 void RM_RTOS_Init(void) {
-  print_use_uart(&huart1);
+  // print_use_uart(&huart1);
   bsp::SetHighresClockTimer(&htim5);
 
   can1 = new bsp::CAN(&hcan1, true);
@@ -816,7 +824,7 @@ void RM_RTOS_Threads_Init(void) {
   shooterTaskHandle = osThreadNew(shooterTask, nullptr, &shooterTaskAttribute);
   chassisTaskHandle = osThreadNew(chassisTask, nullptr, &chassisTaskAttribute);
   selfTestTaskHandle = osThreadNew(selfTestTask, nullptr, &selfTestTaskAttribute);
-  // jetsonCommTaskHandle = osThreadNew(jetsonCommTask, nullptr, &jetsonCommTaskAttribute);
+  jetsonCommTaskHandle = osThreadNew(jetsonCommTask, nullptr, &jetsonCommTaskAttribute);
 }
 
 void KillAll() {
