@@ -1,6 +1,6 @@
 /****************************************************************************
  *                                                                          *
- *  Copyright (C) 2022 RoboMaster.                                          *
+ *  Copyright (C) 2023 RoboMaster.                                          *
  *  Illini RoboMaster @ University of Illinois at Urbana-Champaign          *
  *                                                                          *
  *  This program is free software: you can redistribute it and/or modify    *
@@ -23,6 +23,8 @@
 #include "bsp_uart.h"
 
 namespace remote {
+
+const uint16_t WheelDigitalValue = 1684;
 
 typedef struct {
   int16_t x;
@@ -53,6 +55,10 @@ typedef union {
     uint16_t B : 1;
   } __packed bit;
 } __packed keyboard_t;
+
+typedef struct {
+  uint16_t wheel;
+} __packed wheel_t;
 
 typedef enum {
   UP = 1,
@@ -85,6 +91,8 @@ class DBUS : public bsp::UART {
   mouse_t mouse;
   // keyboard key information
   keyboard_t keyboard;
+  // dial wheel information
+  wheel_t wheel;
   // timestamp of the update interrupt
   uint32_t timestamp;
 
@@ -92,6 +100,7 @@ class DBUS : public bsp::UART {
 
   static const int16_t ROCKER_MIN = -660;
   static const int16_t ROCKER_MAX = 660;
+  uint16_t previous_wheel_value; 
 };
 
 } /* namespace remote */

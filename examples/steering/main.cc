@@ -99,8 +99,8 @@ void RM_RTOS_Init() {
   pe3 = new bsp::GPIO(IN3_GPIO_Port, IN3_Pin);
   pe4 = new bsp::GPIO(IN4_GPIO_Port, IN4_Pin);
 
-  can1 = new bsp::CAN(&hcan1, 0x201, true);
-  can2 = new bsp::CAN(&hcan2, 0x201, false);
+  can1 = new bsp::CAN(&hcan1, true);
+  can2 = new bsp::CAN(&hcan2, false);
 
   // init steerings
   motor1 = new control::Motor3508(can1, 0x201);

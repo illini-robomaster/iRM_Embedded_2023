@@ -418,8 +418,8 @@ void RM_RTOS_Init() {
   print_use_uart(&huart1);
   bsp::SetHighresClockTimer(&htim5);
 
-  can1 = new bsp::CAN(&hcan1, 0x201, true);
-  can2 = new bsp::CAN(&hcan2, 0x201, false);
+  can1 = new bsp::CAN(&hcan1, true);
+  can2 = new bsp::CAN(&hcan2, false);
   RGB = new display::RGB(&htim5, 3, 2, 1, 1000000);
 
   fl_motor = new control::Motor3508(can1, 0x201);

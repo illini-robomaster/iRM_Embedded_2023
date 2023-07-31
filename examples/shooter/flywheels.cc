@@ -33,7 +33,7 @@ static remote::DBUS* dbus;
 void RM_RTOS_Init() {
   //  print_use_uart(&huart1);
   dbus = new remote::DBUS(&huart1);
-  can = new bsp::CAN(&hcan1, 0x201, true);
+  can = new bsp::CAN(&hcan1, true);
   right = new control::Motor3508(can, 0x201);
   left = new control::Motor3508(can, 0x202);
 }

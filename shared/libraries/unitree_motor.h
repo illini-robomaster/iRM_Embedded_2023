@@ -32,14 +32,16 @@ typedef union {
   uint8_t u8[4];
   uint16_t u16[2];
   uint32_t u32;
-  float F;
-} COMData32_t;
+  float    F;
+} COMData32_t; 
+
 // data head
 typedef struct {
   unsigned char start[2];  // fixed to be 0xFE and OxEE
   unsigned char motorID;   // motor ID: 0, 1, or 2; 0xBB is for motor broadcasting (reset motor ID)
   unsigned char reserved;  // ignored
 } __packed COMHead_t;
+
 // send data body
 typedef struct {
   uint8_t mode;       // 0 for stop running; 5 for slowly running with open-loop control; 10 for FOC closed-loop control
@@ -61,12 +63,14 @@ typedef struct {
 
   COMData32_t Res[1];  // ignored
 } __packed MasterComd_t;
+
 // send data package including data head and data body
 typedef struct {
   COMHead_t head;       // data head
   MasterComd_t Mdata;   // data body
   COMData32_t CRCdata;  // CRC32 verification
 } __packed MasterComdData_t;
+
 // recv data body
 typedef struct {
   uint8_t mode;     // current mode
@@ -103,12 +107,14 @@ typedef struct {
 
   int8_t Res[1];  // ignored
 } __packed ServoComd_t;
+
 // recv data package including data head and data body
 typedef struct {
   COMHead_t head;       // data head
   ServoComd_t Mdata;    // data body
   COMData32_t CRCdata;  // CRC32 verification
 } __packed ServoComdData_t;
+
 // send storage structure
 typedef struct {
   MasterComdData_t data;  // send data package
@@ -121,6 +127,7 @@ typedef struct {
   float K_W;              // Kd
   COMData32_t Res;        // ignored
 } motor_send_t;
+
 // recv storage structure
 typedef struct {
   ServoComdData_t data;  // recv data package
@@ -148,6 +155,7 @@ class UnitreeMotor {
    * @brief zip the send data package
    */
   void ModifyData();
+
   /**
    * @brief unzip the recv data package
    *
@@ -155,18 +163,21 @@ class UnitreeMotor {
    * @return completeness of data package
    */
   bool ExtractData(const communication::package_t package);
+
   /**
    * @brief stop running
    *
    * @param motor_id motor ID
    */
   void Stop(const unsigned short motor_id);
+
   /**
    * @brief slowly running with open-loop control for testing motors
    *
    * @param motor_id motor ID
    */
   void Test(const unsigned short motor_id);
+
   /**
    * @brief FOC closed-loop control
    * @note T = Tff + Kp * (Pdes - P) + Kd * (Wdes - W)
@@ -183,9 +194,10 @@ class UnitreeMotor {
   motor_send_t send;  // send storage structure instance
   motor_recv_t recv;  // recv storage structure instance
 
-  const int send_length = 34;  // send data package length
-  const int recv_length = 78;  // recv data package length
- private:
+  const int send_length = 34; // send data package length
+  const int recv_length = 78; // recv data package length
+  
+private:
   /**
    * @brief CRC32 verification function
    *

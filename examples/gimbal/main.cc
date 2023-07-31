@@ -1,6 +1,6 @@
 /****************************************************************************
  *                                                                          *
- *  Copyright (C) 2022 RoboMaster.                                          *
+ *  Copyright (C) 2023 RoboMaster.                                          *
  *  Illini RoboMaster @ University of Illinois at Urbana-Champaign          *
  *                                                                          *
  *  This program is free software: you can redistribute it and/or modify    *
@@ -46,7 +46,7 @@ bool status = false;
 
 void RM_RTOS_Init() {
   print_use_uart(&huart1);
-  can1 = new bsp::CAN(&hcan1, 0x205, true);
+  can1 = new bsp::CAN(&hcan1, true);
   pitch_motor = new control::Motor6020(can1, 0x205);
   yaw_motor = new control::Motor6020(can1, 0x206);
   gimbal_init_data.pitch_motor = pitch_motor;

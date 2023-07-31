@@ -58,6 +58,11 @@ function(irm_add_arm_executable name)
     add_custom_target(flash-${name}
         COMMAND st-flash --reset write ${BIN_FILE} 0x8000000
         DEPENDS ${name}.elf)
+    
+    add_custom_target(rflash-${name}
+        COMMENT "Flashing ${BIN_FILE}"
+        COMMAND openocd -f ${CMAKE_SOURCE_DIR}/debug/OpenOCD/cmsis-dap.cfg -c "program ${BIN_FILE} reset exit 0x08000000"
+        DEPENDS ${name}.elf)
 
     if (NOT CMAKE_BUILD_TYPE STREQUAL "Release")
         find_program(ARM_GDB arm-none-eabi-gdb REQUIRED)

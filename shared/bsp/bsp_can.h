@@ -34,24 +34,24 @@ namespace bsp {
 typedef void (*can_rx_callback_t)(const uint8_t data[], void* args);
 
 class CAN {
- public:
-  /**
-   * @brief constructor for bsp CAN instance
-   *
-   * @param hcan     HAL can handle
-   * @param start_id lowest possible stdid for rx
-   */
-  CAN(CAN_HandleTypeDef* hcan, uint32_t start_id, bool is_master = true);
-  /**
-   * @brief check if it is associated with a given CAN handle
-   *
-   * @param hcan  HAL can handle to be checked
-   *
-   * @return true if associated, otherwise false
-   */
-  bool Uses(CAN_HandleTypeDef* hcan) {
-    return hcan_ == hcan;
-  }
+  public:
+    /**
+     * @brief constructor for bsp CAN instance
+     *
+     * @param hcan        HAL can handle
+     * @param is_master   true for CAN1, false for CAN2
+     */
+    CAN(CAN_HandleTypeDef* hcan, bool is_master = true);
+    /**
+     * @brief check if it is associated with a given CAN handle
+     *
+     * @param hcan  HAL can handle to be checked
+     *
+     * @return true if associated, otherwise false
+     */
+    bool Uses(CAN_HandleTypeDef* hcan) {
+      return hcan_ == hcan;
+    }
 
   /**
    * @brief register callback function for a specific ID on this CAN line
@@ -85,8 +85,7 @@ class CAN {
  private:
   void ConfigureFilter(bool is_master);
 
-  CAN_HandleTypeDef* hcan_;
-  const uint32_t start_id_;
+    CAN_HandleTypeDef* hcan_;
 
   can_rx_callback_t rx_callbacks_[MAX_CAN_DEVICES] = {0};
   void* rx_args_[MAX_CAN_DEVICES] = {NULL};

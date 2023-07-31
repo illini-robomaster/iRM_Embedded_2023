@@ -1,6 +1,6 @@
 /****************************************************************************
  *                                                                          *
- *  Copyright (C) 2022 RoboMaster.                                          *
+ *  Copyright (C) 2023 RoboMaster.                                          *
  *  Illini RoboMaster @ University of Illinois at Urbana-Champaign          *
  *                                                                          *
  *  This program is free software: you can redistribute it and/or modify    *
@@ -18,14 +18,14 @@
  *                                                                          *
  ****************************************************************************/
 
-#include "shooter.h"
+#include "main.h"
 
 #include "bsp_gpio.h"
 #include "bsp_laser.h"
-#include "bsp_os.h"
 #include "cmsis_os.h"
 #include "dbus.h"
-#include "main.h"
+#include "shooter.h"
+#include "bsp_os.h"
 
 #define LASER_Pin GPIO_PIN_13
 #define LASER_GPIO_Port GPIOG
@@ -47,8 +47,8 @@ void RM_RTOS_Init() {
   dbus = new remote::DBUS(&huart3);
   bsp::SetHighresClockTimer(&htim5);
 
-  can = new bsp::CAN(&hcan1, 0x201);
-  left_flywheel_motor = new control::Motor3508(can, 0x201);
+  can = new bsp::CAN(&hcan1, true);
+  left_flywheel_motor = new control::Motor3508(can, 0x203);
   right_flywheel_motor = new control::Motor3508(can, 0x202);
   load_motor = new control::Motor2006(can, 0x203);
 
@@ -56,7 +56,7 @@ void RM_RTOS_Init() {
   shooter_data.left_flywheel_motor = left_flywheel_motor;
   shooter_data.right_flywheel_motor = right_flywheel_motor;
   shooter_data.load_motor = load_motor;
-  shooter_data.dial_direction = 1;  // left shooter use 1(CCW), right shooter use -1(CW)
+  shooter_data.dial_direction = 1; // left shooter use 1(CCW), right shooter use -1(CW)
   shooter_data.model = control::SHOOTER_STANDARD;
   shooter = new control::Shooter(shooter_data);
 }
@@ -76,14 +76,14 @@ void RM_RTOS_Default_Task(const void* args) {
       shooter->SetFlywheelSpeed(0);
     } else {
       shooter->SetFlywheelSpeed(482);
-    }
+    } 
 
     if (dbus->mouse.l || dbus->swr == remote::UP) {
       if ((bsp::GetHighresTickMicroSec() - start_time) / 1000 > DELAY) {
         shooter->SlowContinueShoot();
       } else if (slow_shoot_detect == false) {
         slow_shoot_detect = true;
-        shooter->DoubleShoot();
+        shooter->TripleShoot();
       }
     } else if (dbus->mouse.r) {
       shooter->FastContinueShoot();

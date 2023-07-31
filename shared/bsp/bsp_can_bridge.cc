@@ -1,6 +1,6 @@
 /****************************************************************************
  *                                                                          *
- *  Copyright (C) 2022 RoboMaster.                                          *
+ *  Copyright (C) 2023 RoboMaster.                                          *
  *  Illini RoboMaster @ University of Illinois at Urbana-Champaign          *
  *                                                                          *
  *  This program is free software: you can redistribute it and/or modify    *
@@ -87,11 +87,8 @@ void CanBridge::UpdateData(const uint8_t* data) {
     case RECALIBRATE:
       recalibrate = cmd.data_bool;
       break;
-    case FORTRESS_MODE:
-      fortress_mode = cmd.data_bool;
-      break;
-    case FORTRESS_CALIBRATED:
-      fortress_calibrated = cmd.data_bool;
+    case IS_MY_COLOR_BLUE:
+      is_my_color_blue = cmd.data_bool;
       break;
     default:;
   }

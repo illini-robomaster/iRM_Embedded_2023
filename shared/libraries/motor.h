@@ -137,6 +137,8 @@ class MotorCANBase : public MotorBase {
 
   virtual uint16_t GetTemp() const;
 
+  virtual float GetTorque() const;
+
   /**
    * @brief transmit CAN message for setting motor outputs
    *
@@ -208,9 +210,38 @@ class Motor3508 : public MotorCANBase {
 
   uint16_t GetTemp() const override final;
 
+  
+
  private:
   volatile int16_t raw_current_get_ = 0;
   volatile uint8_t raw_temperature_ = 0;
+};
+
+
+
+//==================================================================================================
+// Motor 3510
+//==================================================================================================
+
+/**
+ * @brief DJI 3510 motor class
+ */
+class Motor3510 : public MotorCANBase {
+ public:
+  /* constructor wrapper over MotorCANBase */
+  Motor3510(bsp::CAN* can, uint16_t rx_id);
+  /* implements data update callback */
+  void UpdateData(const uint8_t data[]) override final;
+  /* implements data printout */
+  void PrintData() const override final;
+  /* override base implementation with max current protection */
+  void SetOutput(int16_t val) override final;
+
+
+ private:
+  volatile float torque_ = 0; /* Torque Value*/
+  volatile float previous_position_ = 0;
+ 
 };
 
 //==================================================================================================
@@ -267,6 +298,10 @@ class Motor6623 : public MotorCANBase {
 
   static const int16_t CURRENT_CORRECTION = -1;  // current direction is reversed
 };
+
+
+
+
 
 //==================================================================================================
 // MotorPWMBase
@@ -576,8 +611,8 @@ typedef struct {
   float* omega_pid_param;   /* pid parameter used to control speed of motor       */
   float max_iout;
   float max_out;
-  align_detect_t align_detect_func = nullptr; /* function pointer for calibration function*/
-  float calibrate_offset = 0.0;               /* angle from calibration sensor to starting location */
+  align_detect_t align_detect_func; /* function pointer for calibration function*/
+  float calibrate_offset;           /* angle from calibration sensor to starting location */
 } steering_t;
 
 // mode that can turn relative angles in [rad]
@@ -697,13 +732,13 @@ class Motor4310 {
   void UpdateData(const uint8_t data[]);
 
   /* enable m4310; MUST be called after motor is powered up, otherwise SetOutput commands are ignored */
-  void MotorEnable(Motor4310* motor);
+  void MotorEnable();
   /* disable m4310 */
-  void MotorDisable(Motor4310* motor);
+  void MotorDisable();
 
   /** sets current motor position as zero position (when motor is powered). M4310 remembers this position
    * when powered off. */
-  void SetZeroPos(Motor4310* motor);
+  void SetZeroPos();
 
   /**
    * implements transmit output specifically for 4310
@@ -713,7 +748,7 @@ class Motor4310 {
    *                1: position-velocity
    *                2: velocity
    */
-  void TransmitOutput(control::Motor4310* motor);
+  static void TransmitOutput(control::Motor4310* motors[], uint8_t num_motors);
 
   /* implements data printout */
   void PrintData();
@@ -781,6 +816,19 @@ class Motor4310 {
    */
   float GetTorque() const;
 
+  mode_t GetMode() const;
+
+  /**
+   * @brief get motor target angle, in [rad]
+   * @return motor target angle
+   */
+  float GetRelativeTarget() const;
+
+  /**
+   * @brief Set motor target position, in [rad]
+   */
+  void SetRelativeTarget(float target);
+
   volatile bool connection_flag_ = false;
 
  private:
@@ -804,6 +852,7 @@ class Motor4310 {
   volatile float theta_ = 0;            // actual angular position
   volatile float omega_ = 0;            // actual angular velocity
   volatile float torque_ = 0;           // actual torque
+  float relative_target_ = 0;           // target position
 
   // P control
   constexpr static float KP_MIN = 0;

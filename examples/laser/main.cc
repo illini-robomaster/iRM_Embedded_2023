@@ -1,6 +1,6 @@
 /****************************************************************************
  *                                                                          *
- *  Copyright (C) 2022 RoboMaster.                                          *
+ *  Copyright (C) 2023 RoboMaster.                                          *
  *  Illini RoboMaster @ University of Illinois at Urbana-Champaign          *
  *                                                                          *
  *  This program is free software: you can redistribute it and/or modify    *
@@ -31,8 +31,8 @@ void RM_RTOS_Init(void) {
   laser = new bsp::Laser(LASER_GPIO_Port, LASER_Pin);
 }
 
-void RM_RTOS_Default_Task(const void* arguments) {
-  UNUSED(arguments);
+void RM_RTOS_Default_Task(const void* args) {
+  UNUSED(args);
 
   while (true) {
     set_cursor(0, 0);

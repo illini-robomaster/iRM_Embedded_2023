@@ -1,6 +1,6 @@
 /****************************************************************************
  *                                                                          *
- *  Copyright (C) 2022 RoboMaster.                                          *
+ *  Copyright (C) 2023 RoboMaster.                                          *
  *  Illini RoboMaster @ University of Illinois at Urbana-Champaign          *
  *                                                                          *
  *  This program is free software: you can redistribute it and/or modify    *
@@ -35,7 +35,7 @@ control::MotorCANBase* motor2 = NULL;
 void RM_RTOS_Init() {
   print_use_uart(&huart1);
 
-  can1 = new bsp::CAN(&hcan1, 0x205, true);
+  can1 = new bsp::CAN(&hcan1, true);
   motor1 = new control::Motor6020(can1, 0x205);
   motor2 = new control::Motor6020(can1, 0x207);
   key = new bsp::GPIO(KEY_GPIO_GROUP, KEY_GPIO_PIN);

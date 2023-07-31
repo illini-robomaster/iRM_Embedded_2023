@@ -1,6 +1,6 @@
 /****************************************************************************
  *                                                                          *
- *  Copyright (C) 2022 RoboMaster.                                          *
+ *  Copyright (C) 2023 RoboMaster.                                          *
  *  Illini RoboMaster @ University of Illinois at Urbana-Champaign          *
  *                                                                          *
  *  This program is free software: you can redistribute it and/or modify    *
@@ -43,6 +43,7 @@ typedef enum {
   FORTRESS_MODE,
   FORTRESS_CALIBRATED,
   RECALIBRATE,
+  IS_MY_COLOR_BLUE,
 } can_bridge_cmd;
 
 typedef struct {
@@ -81,6 +82,7 @@ class CanBridge {
   bool fortress_mode = false;
   bool fortress_calibrated = false;
   bool recalibrate = false;
+  bool is_my_color_blue = false;
   // each bit represents a flag correspond to specific motor e.g.(at index 0, it represents the motor 1's connection flag)
  private:
   bsp::CAN* can_;

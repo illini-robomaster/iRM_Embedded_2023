@@ -1,6 +1,6 @@
 /****************************************************************************
  *                                                                          *
- *  Copyright (C) 2022 RoboMaster.                                          *
+ *  Copyright (C) 2023 RoboMaster.                                          *
  *  Illini RoboMaster @ University of Illinois at Urbana-Champaign          *
  *                                                                          *
  *  This program is free software: you can redistribute it and/or modify    *
@@ -30,7 +30,8 @@ Chassis::Chassis(const chassis_t chassis) : pids_() {
 
   // data initialization using acquired model
   switch (chassis.model) {
-    case CHASSIS_MECANUM_WHEEL: {
+    case CHASSIS_MECANUM_WHEEL:
+    case CHASSIS_OMNI_WHEEL: {
       motors_ = new MotorCANBase*[FourWheel::motor_num];
       motors_[FourWheel::front_left] = chassis.motors[FourWheel::front_left];
       motors_[FourWheel::front_right] = chassis.motors[FourWheel::front_right];
@@ -73,7 +74,8 @@ Chassis::Chassis(const chassis_t chassis) : pids_() {
 
 Chassis::~Chassis() {
   switch (model_) {
-    case CHASSIS_MECANUM_WHEEL: {
+    case CHASSIS_MECANUM_WHEEL:
+    case CHASSIS_OMNI_WHEEL: {
       motors_[FourWheel::front_left] = nullptr;
       motors_[FourWheel::front_right] = nullptr;
       motors_[FourWheel::back_left] = nullptr;
@@ -101,7 +103,8 @@ Chassis::~Chassis() {
 
 void Chassis::SetSpeed(const float x_speed, const float y_speed, const float turn_speed) {
   switch (model_) {
-    case CHASSIS_MECANUM_WHEEL: {
+    case CHASSIS_MECANUM_WHEEL:
+    case CHASSIS_OMNI_WHEEL: {
       constexpr int MAX_ABS_CURRENT = 12288;  // refer to MotorM3508 for details
       float move_sum = fabs(x_speed) + fabs(y_speed) + fabs(turn_speed);
       float scale = move_sum >= MAX_ABS_CURRENT ? MAX_ABS_CURRENT / move_sum : 1;
@@ -124,7 +127,8 @@ void Chassis::SetSpeed(const float x_speed, const float y_speed, const float tur
 void Chassis::Update(bool power_limit_on, float power_limit, float chassis_power,
                      float chassis_power_buffer) {
   switch (model_) {
-    case CHASSIS_MECANUM_WHEEL: {
+    case CHASSIS_MECANUM_WHEEL:
+    case CHASSIS_OMNI_WHEEL: {
       power_limit_info_.power_limit = power_limit;
       power_limit_info_.WARNING_power = power_limit * 0.9;
       power_limit_info_.WARNING_power_buff = 50;

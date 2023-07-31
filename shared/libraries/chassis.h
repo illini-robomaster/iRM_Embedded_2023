@@ -1,6 +1,6 @@
 /****************************************************************************
  *                                                                          *
- *  Copyright (C) 2022 RoboMaster.                                          *
+ *  Copyright (C) 2023 RoboMaster.                                          *
  *  Illini RoboMaster @ University of Illinois at Urbana-Champaign          *
  *                                                                          *
  *  This program is free software: you can redistribute it and/or modify    *
@@ -31,8 +31,7 @@ namespace control {
 /**
  * @brief chassis models
  */
-typedef enum { CHASSIS_MECANUM_WHEEL,
-               CHASSIS_ONE_WHEEL } chassis_model_t;
+typedef enum { CHASSIS_MECANUM_WHEEL, CHASSIS_ONE_WHEEL, CHASSIS_OMNI_WHEEL } chassis_model_t;
 
 /**
  * @brief structure used when chassis instance is initialized
@@ -43,7 +42,7 @@ typedef struct {
 } chassis_t;
 
 /**
- * @brief motor configs for four wheel vehicles
+ * @brief motor configs for wheel vehicles
  */
 struct FourWheel {
   enum { front_left,

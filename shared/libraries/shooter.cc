@@ -1,6 +1,6 @@
 /****************************************************************************
  *                                                                          *
- *  Copyright (C) 2022 RoboMaster.                                          *
+ *  Copyright (C) 2023 RoboMaster.                                          *
  *  Illini RoboMaster @ University of Illinois at Urbana-Champaign          *
  *                                                                          *
  *  This program is free software: you can redistribute it and/or modify    *
@@ -28,16 +28,7 @@ static auto step_angles_ = std::unordered_map<ServoMotor*, float>();
 
 void jam_callback(control::ServoMotor* servo, const control::servo_jam_t data) {
   UNUSED(data);
-  float servo_target = servo->GetTarget();
-  int direction = servo->GetDirection();
-  if (abs(servo_target) >= abs(servo->GetTheta())) {
-    float prev_target = servo->GetTheta() - (2 * PI / 6 * direction);
-    servo->SetTarget(prev_target, true);
-    // print("Antijam engage\r\n");
-  }
-  // else {
-  //   // print("Antijam in operation\r\n");
-  // }
+  servo->SetTarget(servo->GetTheta() - (2 * PI/6), true);
 }
 
 Shooter::Shooter(shooter_t shooter) {
@@ -60,22 +51,21 @@ Shooter::Shooter(shooter_t shooter) {
       servo_data.max_out = 10000;
       servo_data.direction = shooter.dial_direction;
 
-      // change the direction inside the constructor
-      load_step_angle_ = (2 * PI / 8) * dial_direction_;
-      load_double_angle_ = (2 * PI / 4) * dial_direction_;
+      load_step_angle_ = 2 * PI / 8;
+      load_triple_angle_ = 2 * PI / 8 * 3;
+      load_antijam_angle_ = 2 * PI / 8;
       dial_speed_ = 6 * PI;
-      dial_continue_fast_acceleration = 200 * PI;
+      dial_continue_fast_acceleration = 100 * PI;
       dial_continue_slowly_acceleration = 20 * PI;
       dial_double_acceleration = 100 * PI;
-      // test pid
-      load_moter_pid_->Reinit(1, 1, 1, 1000, 10000);
+      dial_antijam_acceleration = 100 * PI;
       break;
 
     case SHOOTER_STANDARD:
       servo_data.max_speed = 100 * PI;
       servo_data.max_acceleration = 80 * PI;
       servo_data.transmission_ratio = M2006P36_RATIO;
-      servo_data.omega_pid_param = new float[3]{30, 1, 7};
+      servo_data.omega_pid_param = new float[3]{80, 1.5, 5};
       servo_data.max_iout = 9000;
       servo_data.max_out = 20000;
       servo_data.direction = shooter.dial_direction;
@@ -83,17 +73,15 @@ Shooter::Shooter(shooter_t shooter) {
       left_pid_ = new PIDController(80, 3, 0.1);
       right_pid_ = new PIDController(80, 3, 0.1);
       flywheel_turning_detector_ = new BoolEdgeDetector(false);
-
-      // change the direction inside the constructor
-      load_step_angle_ = (2 * PI / 8) * dial_direction_;
-      load_double_angle_ = (2 * PI / 4) * dial_direction_;
+      load_step_angle_ = 2 * PI / 8;
+      load_triple_angle_ = 2 * PI / 8 * 3;
+      load_antijam_angle_ = 2 * PI / 8;
       speed_ = 0;
       dial_speed_ = 20 * PI;
       dial_continue_fast_acceleration = 100 * PI;
       dial_continue_slowly_acceleration = 40 * PI;
       dial_double_acceleration = 100 * PI;
-      // test pid
-      load_moter_pid_->Reinit(1, 1, 1, 9000, 20000);
+      dial_antijam_acceleration = 100 * PI;
       break;
 
     default:
@@ -102,7 +90,7 @@ Shooter::Shooter(shooter_t shooter) {
   // Initialize servomotor instance using data provided and register default jam callback
   load_servo_ = new control::ServoMotor(servo_data);
   // the callback function is at the start of the shooter.cc file.
-  load_servo_->RegisterJamCallback(jam_callback, 0.304);
+  load_servo_->RegisterJamCallback(jam_callback, 0.29);
 
   // Register in step_angles_ so callback function can find step angle corresponding to
   // specific servomotor instance.
@@ -178,14 +166,20 @@ void Shooter::SlowContinueShoot() {
   load_servo_->SetMaxAcceleration(dial_continue_slowly_acceleration);
 }
 
-void Shooter::DoubleShoot() {
-  load_servo_->SetTarget(load_servo_->GetTarget() + load_double_angle_, false);
+void Shooter::TripleShoot() {
+  load_servo_->SetTarget(load_servo_->GetTarget() + load_triple_angle_, false);
   load_servo_->SetMaxSpeed(dial_speed_);
   load_servo_->SetMaxAcceleration(dial_double_acceleration);
 }
 
 void Shooter::DialStop() {
   load_servo_->SetMaxSpeed(0);
+}
+
+void Shooter::Antijam() {
+  load_servo_->SetTarget(load_servo_->GetTarget() - load_antijam_angle_, true);
+  load_servo_->SetMaxSpeed(dial_speed_);
+  load_servo_->SetMaxAcceleration(dial_antijam_acceleration);
 }
 
 }  // namespace control

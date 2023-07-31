@@ -64,17 +64,16 @@ void CAN::RxFIFO0MessagePendingCallback(CAN_HandleTypeDef* hcan) {
   can->RxCallback();
 }
 
-CAN::CAN(CAN_HandleTypeDef* hcan, uint32_t start_id, bool is_master)
-    : hcan_(hcan), start_id_(start_id) {
-  RM_ASSERT_FALSE(HandleExists(hcan), "Repeated CAN initialization");
-  ConfigureFilter(is_master);
-  // activate rx interrupt
-  RM_ASSERT_HAL_OK(HAL_CAN_RegisterCallback(hcan, HAL_CAN_RX_FIFO0_MSG_PENDING_CB_ID,
-                                            RxFIFO0MessagePendingCallback),
-                   "Cannot register CAN rx callback");
-  RM_ASSERT_HAL_OK(HAL_CAN_ActivateNotification(hcan, CAN_IT_RX_FIFO0_MSG_PENDING),
-                   "Cannot activate CAN rx message pending notification");
-  RM_ASSERT_HAL_OK(HAL_CAN_Start(hcan), "Cannot start CAN");
+    CAN::CAN(CAN_HandleTypeDef* hcan, bool is_master): hcan_(hcan){
+        RM_ASSERT_FALSE(HandleExists(hcan), "Repeated CAN initialization");
+        ConfigureFilter(is_master);
+        // activate rx interrupt
+        RM_ASSERT_HAL_OK(HAL_CAN_RegisterCallback(hcan, HAL_CAN_RX_FIFO0_MSG_PENDING_CB_ID,
+                                                  RxFIFO0MessagePendingCallback),
+                         "Cannot register CAN rx callback");
+        RM_ASSERT_HAL_OK(HAL_CAN_ActivateNotification(hcan, CAN_IT_RX_FIFO0_MSG_PENDING),
+                         "Cannot activate CAN rx message pending notification");
+        RM_ASSERT_HAL_OK(HAL_CAN_Start(hcan), "Cannot start CAN");
 
   // save can instance as global pointer
   ptr_map[hcan] = this;
