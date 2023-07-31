@@ -239,7 +239,7 @@ void gimbalTask(void* arg) {
     while (Dead || GimbalDead) osDelay(100);
 
     // autoaim comflict with spinmode control
-    if (dbus->keyboard.bit.F /*|| dbus->swl == remote::UP*/ || dbus->keyboard.bit.CTRL) {
+    if (dbus->keyboard.bit.F || dbus->swl == remote::UP || dbus->keyboard.bit.CTRL) {
       float abs_pitch_buffer = abs_pitch_jetson;
       float abs_yaw_buffer = abs_yaw_jetson;
 
@@ -424,7 +424,7 @@ void jetsonCommTask(void* arg) {
     }
     const float pitch_curr = pitch_pos;
     const float yaw_curr = imu->INS_angle[0];
-    miniPCreceiver.Send(&packet_to_send, my_color, yaw_curr, pitch_curr, 0);
+    miniPCreceiver.Send(&packet_to_send, my_color, yaw_curr, pitch_curr, last_execution_timestamp);
     uart->Write((uint8_t*)&packet_to_send, sizeof(communication::STMToJetsonData));
     // printf("Sent packet to Jetson.\n"); // Debug: Packet sent to Jetson
     osDelay(2);
