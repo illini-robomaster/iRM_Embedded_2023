@@ -404,6 +404,7 @@ typedef struct {
   float* omega_pid_param;   /* pid parameter used to control speed of motor      */
   float max_iout;
   float max_out;
+  int direction;
 } servo_t;
 
 /**
