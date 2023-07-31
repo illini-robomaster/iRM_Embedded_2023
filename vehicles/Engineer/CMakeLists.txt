@@ -24,6 +24,4 @@ irm_add_arm_executable(Engineer
     TARGET DJI_Board_TypeC
     SOURCES arm.cc)
 
-irm_add_arm_executable(ArmTest
-    TARGET DJI_Board_TypeC
-    SOURCES arm_test.cc)
+
