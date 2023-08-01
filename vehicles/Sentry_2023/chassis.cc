@@ -29,7 +29,7 @@
 #include "rgb.h"
 #include "chassis.h"
 
-static remote::DBUS* dbus = nullptr;
+//static remote::DBUS* dbus = nullptr;  // dbus is for test
 
 static bsp::CAN* can1 = nullptr;
 static bsp::CAN* can2 = nullptr;
@@ -43,14 +43,8 @@ static const int KILLALL_DELAY = 100;
 static const int DEFAULT_TASK_DELAY = 100;
 static const int CHASSIS_TASK_DELAY = 2;
 
-// speed for steering motors (rad/s)
-constexpr float RUN_SPEED = (4 * PI);
-constexpr float ACCELERATION = (100 * PI);
-
 // speed for chassis rotation (no unit)
-// TODO: the speed for the Sentry chassis
-// constexpr float SPIN_SPEED = 600;
-// constexpr float FOLLOW_SPEED = 400;
+// TODO: the speed for the Sentry chassis(by server)
 constexpr float SPIN_SPEED = 160;
 //constexpr float FOLLOW_SPEED = 40;
 
@@ -140,8 +134,9 @@ void chassisTask(void* arg) {
 //   vx_set = receive->vx;
 //   vy_set = receive->vy;
 
+   // may be need add the move
    // auto start
-   if (dbus->swr == remote::UP || referee->game_status.game_progress == 0x3 || referee->game_status.game_progress == 0x4) {  // spin mode
+   if (/*dbus->swr == remote::UP ||*/ referee->game_status.game_progress == 0x3 || referee->game_status.game_progress == 0x4) {  // spin mode
      sin_yaw = arm_sin_f32(relative_angle);
      cos_yaw = arm_cos_f32(relative_angle);
      vx = cos_yaw * vx_set + sin_yaw * vy_set;
@@ -149,7 +144,7 @@ void chassisTask(void* arg) {
      wz = SPIN_SPEED;
 
      // stop the chassis
-   } else if (dbus->swr == remote::DOWN || (referee->game_status.game_progress != 0x3 && referee->game_status.game_progress != 0x4)) {
+   } else if (/*dbus->swr == remote::DOWN ||*/ (referee->game_status.game_progress != 0x3 && referee->game_status.game_progress != 0x4) || Dead) {
      vx = 0;
      vy = 0;
      wz = 0;
@@ -159,10 +154,6 @@ void chassisTask(void* arg) {
    chassis->Update(true, (float)referee->game_robot_status.chassis_power_limit,
                    referee->power_heat_data.chassis_power,
                    (float)referee->power_heat_data.chassis_power_buffer);
-
-   if (Dead) {
-     chassis->SetSpeed(0, 0, 0);
-   }
 
    control::MotorCANBase::TransmitOutput(motors, 4);
 
@@ -288,7 +279,7 @@ void RM_RTOS_Init() {
 
  receive = new bsp::CanBridge(can2, 0x20B, 0x20A);
 
- dbus = new remote::DBUS(&huart3);
+// dbus = new remote::DBUS(&huart3);
 }
 
 //==================================================================================================
