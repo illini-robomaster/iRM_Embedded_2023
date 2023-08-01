@@ -170,7 +170,7 @@ static control::Motor4310* yaw_motor = nullptr;
 static bsp::Laser* laser = nullptr;
 
 // 4310 PID
-static control::ConstrainedPID* yaw_pid_position = nullptr;
+//static control::ConstrainedPID* yaw_pid_position = nullptr;
 
 void gimbalTask(void* arg) {
   UNUSED(arg);
@@ -206,7 +206,7 @@ void gimbalTask(void* arg) {
   pitch_motor->SetZeroPos();
   pitch_motor->MotorEnable();
   // TODO:
-//  yaw_motor->SetZeroPos(yaw_motor);
+  yaw_motor->SetZeroPos();
   yaw_motor->MotorEnable();
   osDelay(GIMBAL_TASK_DELAY);
 
@@ -215,19 +215,19 @@ void gimbalTask(void* arg) {
   // whether the 4310 yaw motor need the soft start
   // (based on the start position of yaw motor)
 
-  float yaw_offset = 0;
+//  float yaw_offset = 0;
   float yaw_error;
-  float yaw_output_position;
+//  float yaw_output_position;
   float tmp_pitch_pos = 0;
   for (int j = 0; j < SOFT_START_CONSTANT; j++) {
     tmp_pitch_pos += START_PITCH_POS / SOFT_START_CONSTANT;  // increase position gradually
     pitch_motor->SetOutput(tmp_pitch_pos, 1, 115, 0.5, 0);
-    control::Motor4310::TransmitOutput(motors_can1_gimbal, 2);
     // Caluclate the PID output of the yaw motor
 //    yaw_error = wrap<float>(-(yaw_motor->GetTheta() - yaw_offset), -PI, PI);
 //    yaw_output_position = yaw_pid_position->ComputeOutput(yaw_error);
-//    yaw_motor->SetOutput(yaw_output_position);
-//    yaw_motor->TransmitOutput(yaw_motor);
+    yaw_motor->SetOutput(0, 0.5);
+//    yaw_motor->SetOutput(0, 0);
+    control::Motor4310::TransmitOutput(motors_can1_gimbal, 2);
     osDelay(GIMBAL_TASK_DELAY);
   }
 
@@ -235,15 +235,17 @@ void gimbalTask(void* arg) {
   RGB->Display(display::color_yellow);
   laser->Off();
   pitch_motor->SetOutput(tmp_pitch_pos, 1, 115, 0.5, 0);
-  yaw_motor->SetOutput(0);
+//  yaw_motor->SetOutput(0);
+  yaw_motor->SetOutput(0,0.5);
+  control::Motor4310::TransmitOutput(motors_can1_gimbal, 2);
 
-  osDelay(200);
+  osDelay(500);
   imu->Calibrate();
 
   while (!imu->DataReady() || !imu->CaliDone()) {
     pitch_motor->SetOutput(tmp_pitch_pos, 1, 115, 0.5, 0);
-//    yaw_motor->SetOutput(0, 0);
-    yaw_motor->SetOutput(0);
+    yaw_motor->SetOutput(0, 0.5);
+//    yaw_motor->SetOutput(0);
     control::Motor4310::TransmitOutput(motors_can1_gimbal, 2);
     osDelay(GIMBAL_TASK_DELAY);
   }
@@ -262,20 +264,23 @@ void gimbalTask(void* arg) {
   //  float pitch_diff, yaw_diff;
 
   float pitch_vel_range = 5.0;
-  float yaw_pos = 0.0;
+  float yaw_offset = 0.0;
 
   while (true) {
     while (Dead || GimbalDead) osDelay(100);
 
     // TODO:whether this for 4310 pitch motor ???
     // if this is for 4310, whether we need the same stuff for the 4310 yaw motor.
-    float pitch_vel, yaw_vel;
+    float pitch_vel, yaw_target;
     pitch_vel = clip<float>(dbus->ch3 / 660.0 * pitch_vel_range, -pitch_vel_range, pitch_vel_range);
     pitch_pos += pitch_vel / 200 + dbus->mouse.y / 32767.0;
     pitch_pos = clip<float>(pitch_pos, 0.05, 0.6);  // measured range
 
-    yaw_vel = clip<float>(-dbus->ch2 / 660.0 * PI, -PI, PI);
-    yaw_pos += yaw_vel / 200.0;
+    yaw_target = clip<float>(-dbus->ch2 / 660.0 * PI, -PI, PI);
+    yaw_offset = wrap<float>(yaw_offset + yaw_target / 100.0, -PI, PI);
+//    yaw_pos += wrap<float>(yaw_vel / 100.0, -PI, PI);
+    yaw_error = wrap<float>(yaw_offset - imu->INS_angle[0], -PI, PI);
+    if (abs(yaw_error) <= 0.001) yaw_error = 0;
 
     if (pitch_reset) {
       // 4310 soft start
@@ -283,8 +288,8 @@ void gimbalTask(void* arg) {
       for (int j = 0; j < SOFT_START_CONSTANT; j++){
         tmp_pitch_pos += START_PITCH_POS / SOFT_START_CONSTANT;  // increase position gradually
         pitch_motor->SetOutput(tmp_pitch_pos, 1, 115, 0.5, 0);
-//        yaw_motor->SetOutput(0, 0);
-        yaw_motor->SetOutput(0);
+//        yaw_motor->SetOutput(0);
+        yaw_motor->SetOutput(0,0);
         control::Motor4310::TransmitOutput(motors_can1_gimbal, 2);
         osDelay(GIMBAL_TASK_DELAY);
       }
@@ -295,19 +300,22 @@ void gimbalTask(void* arg) {
     pitch_motor->SetOutput(pitch_pos, pitch_vel, 115, 0.5, 0);
 
     // yaw calculation
-    float yaw_ratio, yaw_target;
-    yaw_ratio = -(dbus->ch2 / 18000.0 / 7.0);
-    yaw_target = clip<float>(yaw_ratio, -PI, PI);
-    yaw_offset = wrap<float>(yaw_target + yaw_offset, -PI, PI);
-    yaw_error = wrap<float>(yaw_offset - imu->INS_angle[0], -PI, PI);
-    if (abs(yaw_error) <= 0.001) yaw_error = 0;
-    yaw_output_position = yaw_pid_position->ComputeOutput(yaw_error);
+//    float yaw_ratio, yaw_target;
+//    yaw_ratio = -(dbus->ch2 / 18000.0);
+//    yaw_target = clip<float>(yaw_ratio, -PI, PI);
+//    yaw_offset = wrap<float>(yaw_target + yaw_offset, -PI, PI);
+//    yaw_error = wrap<float>(yaw_offset - imu->INS_angle[0], -PI, PI);
+//    if (abs(yaw_error) <= 0.001) yaw_error = 0;
+//    yaw_output_position = yaw_pid_position->ComputeOutput(yaw_error);
 
 //    print("yaw_pos: %f, yaw_vel: %f\r\n", yaw_pos, yaw_vel);
-    print("yaw_tar: %f, yaw_offset: %f, yaw_error: %f, yaw_out_pos: %f\r\n", yaw_target, yaw_offset, yaw_error, yaw_output_position);
+//    print("yaw_tar: %f, yaw_offset: %f, yaw_error: %f, yaw_out_pos: %f\r\n", yaw_target, yaw_offset, yaw_error, yaw_output_position);
 //
-    yaw_motor->SetOutput(yaw_output_position);
-    // yaw_motor->SetOutput(yaw_pos, yaw_vel);
+//    yaw_motor->SetOutput(yaw_output_position);
+//     print("theta: %f, omega: %f\r\n", yaw_motor->GetTheta(), yaw_motor->GetOmega());
+//     print("yaw_offset: %.4f, yaw_tar: %.4f\r\n", yaw_offset, yaw_target);
+     print("yaw_offset: %.4f, yaw_err: %.4f, imu_angle: %.4f\r\n", yaw_offset, yaw_error, imu->INS_angle[0]);
+     yaw_motor->SetOutput(yaw_error, 30.0);
 //    yaw_motor->SetOutput(yaw_pos, yaw_vel, 5, 0.5, 0);
 
     control::Motor4310::TransmitOutput(motors_can1_gimbal, 2);
@@ -610,9 +618,9 @@ void chassisTask(void* arg) {
     // the angle difference between the gimbal and the chassis
     relative_angle = wrap<float>(yaw_motor->GetTheta(),-PI,PI);
 
-    send->cmd.id = bsp::RELATIVE_ANGLE;
-   send->cmd.data_float = -relative_angle;
-    send->TransmitOutput();
+//    send->cmd.id = bsp::RELATIVE_ANGLE;
+//    send->cmd.data_float = -relative_angle;
+//    send->TransmitOutput();
 
     osDelay(CHASSIS_TASK_DELAY);
   }
@@ -848,7 +856,7 @@ void RM_RTOS_Init(void) {
   laser = new bsp::Laser(LASER_GPIO_Port, LASER_Pin);
   pitch_motor = new control::Motor4310(can2, 0x32, 0x33, control::MIT);
   // TODO: initialize the yaw motor
- yaw_motor = new control::Motor4310(can2, 0x34, 0x35, control::VEL);
+  yaw_motor = new control::Motor4310(can2, 0x34, 0x35, control::POS_VEL);
   // yaw_motor = new control::Motor4310(can2, 0x34, 0x35, control::POS_VEL);
 //  yaw_motor = new control::Motor4310(can2, 0x34, 0x35, control::MIT);
   //  control::gimbal_t gimbal_data;
@@ -896,10 +904,11 @@ void RM_RTOS_Init(void) {
   send = new bsp::CanBridge(can2, 0x20A, 0x20B);
 
   // 4310 PID Init
-  float yaw_pid_param_position[] = {3.2, 0.9, 0.4};
-  float yaw_max_iout_position = 0;
-  float yaw_max_out_position = 30;                   
-  yaw_pid_position = new control::ConstrainedPID(yaw_pid_param_position, yaw_max_iout_position, yaw_max_out_position);
+//  float yaw_pid_param_position[] = {3.2, 0.9, 0.4};
+//  float yaw_pid_param_position[] = {2.7, 10.0, 3.0};
+//  float yaw_max_iout_position = 0;
+//  float yaw_max_out_position = 30;
+//  yaw_pid_position = new control::ConstrainedPID(yaw_pid_param_position, yaw_max_iout_position, yaw_max_out_position);
 }
 
 //==================================================================================================
@@ -913,7 +922,7 @@ void RM_RTOS_Threads_Init(void) {
   shooterTaskHandle = osThreadNew(shooterTask, nullptr, &shooterTaskAttribute);
   chassisTaskHandle = osThreadNew(chassisTask, nullptr, &chassisTaskAttribute);
   selfTestTaskHandle = osThreadNew(selfTestTask, nullptr, &selfTestTaskAttribute);
-  //  fortressTaskHandle = osThreadNew(fortressTask, nullptr, &fortressTaskAttribute);
+//  fortressTaskHandle = osThreadNew(fortressTask, nullptr, &fortressTaskAttribute);
 }
 
 //==================================================================================================
