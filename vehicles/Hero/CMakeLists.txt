@@ -18,7 +18,9 @@
 #                                                                        #
 # ---------------------------------------------------------------------- #
 
-add_subdirectory(Fortress)
-add_subdirectory(Sentry)
-add_subdirectory(Steering)
-add_subdirectory(Hero)
+project(Hero ASM C CXX)
+
+irm_add_arm_executable(Hero
+    TARGET DJI_Board_TypeC
+    SOURCES main.cc)
+
