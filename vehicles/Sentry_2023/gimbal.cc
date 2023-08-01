@@ -84,6 +84,13 @@ static volatile unsigned int gimbal_alive = 0;
 // TODO: need to measure the specific angle
 // static volatile float yaw_pos = START_YAW_POS;
 
+// autoaim
+float abs_yaw_jetson = 0;
+float abs_pitch_jetson = START_PITCH_POS;
+// uint32_t last_timestamp = 100;  // in milliseconds
+const uint32_t AUTOAIM_INTERVAL = 1;  // in milliseconds
+uint32_t last_execution_timestamp = 0;
+
 //==================================================================================================
 // IMU
 //==================================================================================================
@@ -310,6 +317,90 @@ void refereeTask(void* arg) {
      referee->Receive(communication::package_t{data, (int)length});
    }
  }
+}
+
+//==================================================================================================
+// Autoaim (communication w/ Jetson)
+//==================================================================================================
+
+#define JETSON_RX_SIGNAL (1 << 2)
+
+const osThreadAttr_t jetsonCommTaskAttribute = {.name = "jetsonCommTask",
+                                             .attr_bits = osThreadDetached,
+                                             .cb_mem = nullptr,
+                                             .cb_size = 0,
+                                             .stack_mem = nullptr,
+                                             .stack_size = 512 * 4,
+                                             .priority = (osPriority_t)osPriorityHigh,
+                                             .tz_module = 0,
+                                             .reserved = 0};
+osThreadId_t jetsonCommTaskHandle;
+
+class CustomUART : public bsp::UART {
+ public:
+  using bsp::UART::UART;
+
+ protected:
+  /* notify application when rx data is pending read */
+  void RxCompleteCallback() override final { osThreadFlagsSet(jetsonCommTaskHandle, JETSON_RX_SIGNAL); }
+};
+
+void jetsonCommTask(void* arg) {
+  UNUSED(arg);
+
+  uint32_t length;
+  uint8_t* data;
+
+  auto uart = std::make_unique<CustomUART>(&huart1);  // see cmake for which uart
+  uart->SetupRx(50);
+  uart->SetupTx(50);
+
+  auto miniPCreceiver = communication::AutoaimProtocol();
+
+  while (!imu->CaliDone()) {
+    osDelay(10);
+    // printf("Waiting for IMU calibration...\n"); // Debug: IMU calibration status
+  }
+
+  int total_receive_count = 0;
+
+  while (true) {
+    uint32_t flags = osThreadFlagsGet();
+    if (flags & JETSON_RX_SIGNAL) {
+      // printf("Received RX signal from Jetson.\n"); // Debug: RX signal received
+
+      // max length of the UART buffer at 150Hz is ~50 bytes
+      length = uart->Read(&data);
+
+      // printf("Read %lu bytes from UART.\n", length); // Debug: Length of data read
+
+      miniPCreceiver.Receive(data, length);
+      if (miniPCreceiver.get_valid_flag()) {
+        // there is at least one unprocessed valid packet
+        abs_yaw_jetson = miniPCreceiver.get_relative_yaw();
+        abs_pitch_jetson = miniPCreceiver.get_relative_pitch();
+        total_receive_count++;
+        // printf("Received valid packet. Total count: %d\n", total_receive_count); // Debug: Valid packet received
+      } else {
+        // printf("Received invalid packet.\n"); // Debug: Invalid packet received
+      }
+    }
+
+    // send IMU data anyway
+    communication::STMToJetsonData packet_to_send;
+    uint8_t my_color; // 1 for blue; 0 for red
+    if (send->is_my_color_blue) {
+      my_color = 1;
+    } else {
+      my_color = 0;
+    }
+    const float pitch_curr = pitch_pos;
+    const float yaw_curr = imu->INS_angle[0];
+    miniPCreceiver.Send(&packet_to_send, my_color, yaw_curr, pitch_curr, last_execution_timestamp);
+    uart->Write((uint8_t*)&packet_to_send, sizeof(communication::STMToJetsonData));
+    // printf("Sent packet to Jetson.\n"); // Debug: Packet sent to Jetson
+    osDelay(2);
+  }
 }
 
 //==================================================================================================
@@ -830,6 +921,7 @@ void RM_RTOS_Threads_Init(void) {
  shooterTaskHandle = osThreadNew(shooterTask, nullptr, &shooterTaskAttribute);
  chassisTaskHandle = osThreadNew(chassisTask, nullptr, &chassisTaskAttribute);
  selfTestTaskHandle = osThreadNew(selfTestTask, nullptr, &selfTestTaskAttribute);
+ jetsonCommTaskHandle = osThreadNew(jetsonCommTask, nullptr, &jetsonCommTaskAttribute);
 }
 
 //==================================================================================================
