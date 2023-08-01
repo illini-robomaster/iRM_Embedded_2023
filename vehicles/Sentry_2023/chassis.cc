@@ -36,7 +36,6 @@ static bsp::CAN* can2 = nullptr;
 static display::RGB* RGB = nullptr;
 
 static volatile bool Dead = false;
-static volatile bool GameEnd = false;
 
 static bsp::CanBridge* receive = nullptr;
 static unsigned int flag_summary = 0;
@@ -52,7 +51,7 @@ constexpr float ACCELERATION = (100 * PI);
 // TODO: the speed for the Sentry chassis
 // constexpr float SPIN_SPEED = 600;
 // constexpr float FOLLOW_SPEED = 400;
-constexpr float SPIN_SPEED = 80;
+constexpr float SPIN_SPEED = 160;
 //constexpr float FOLLOW_SPEED = 40;
 
 //==================================================================================================
@@ -137,29 +136,26 @@ void chassisTask(void* arg) {
 
  while (true) {
 
-   while (GameEnd) {
-     chassis->SetSpeed(0, 0, 0);
-     control::MotorCANBase::TransmitOutput(motors, 4);
-     osDelay(100);
-   }
-
 //   relative_angle = receive->relative_angle;
 //   vx_set = receive->vx;
 //   vy_set = receive->vy;
-   if (dbus->swr == remote::UP || referee->game_status.game_progress == 0x3) {  // spin mode
+
+   // auto start
+   if (dbus->swr == remote::UP || referee->game_status.game_progress == 0x3 || referee->game_status.game_progress == 0x4) {  // spin mode
      sin_yaw = arm_sin_f32(relative_angle);
      cos_yaw = arm_cos_f32(relative_angle);
      vx = cos_yaw * vx_set + sin_yaw * vy_set;
      vy = -sin_yaw * vx_set + cos_yaw * vy_set;
      wz = SPIN_SPEED;
+
+     // stop the chassis
+   } else if (dbus->swr == remote::DOWN || (referee->game_status.game_progress != 0x3 && referee->game_status.game_progress != 0x4)) {
+     vx = 0;
+     vy = 0;
+     wz = 0;
    }
 
    chassis->SetSpeed(vx, vy, wz);
-
-//   if (dbus->swr == remote::DOWN) {
-//     chassis->SetSpeed(0, 0, 0);
-//   }
-
    chassis->Update(true, (float)referee->game_robot_status.chassis_power_limit,
                    referee->power_heat_data.chassis_power,
                    (float)referee->power_heat_data.chassis_power_buffer);
@@ -342,10 +338,6 @@ void RM_RTOS_Default_Task(const void* args) {
    if (receive->dead) {
      Dead = true;
      KillAll();
-   }
-
-   if (referee->game_status.game_progress == 0x5) {
-     GameEnd = true;
    }
 
    receive->cmd.id = bsp::GIMBAL_POWER;
