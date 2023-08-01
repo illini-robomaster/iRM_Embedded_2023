@@ -46,7 +46,8 @@ static const int CHASSIS_TASK_DELAY = 2;
 // speed for chassis rotation (no unit)
 // TODO: the speed for the Sentry chassis(by server)
 constexpr float SPIN_SPEED = 160;
-//constexpr float FOLLOW_SPEED = 40;
+constexpr float FOLLOW_SPEED = 200;
+static const float CHASSIS_DEADZONE = 0.04;
 
 //==================================================================================================
 // Referee
@@ -116,38 +117,47 @@ void chassisTask(void* arg) {
  UNUSED(arg);
 
  control::MotorCANBase* motors[] = {fl_motor, fr_motor, bl_motor, br_motor};
- float relative_angle = 0;
- float sin_yaw = 0;
- float cos_yaw = 0;
- float vx_set = 0;
- float vy_set = 0;
- float vx = 0;
- float vy = 0;
- float wz = 0;
 
  // TODO NOT RECEIVING START SIGNAL?
 // while (!receive->start) osDelay(100);
 
  while (true) {
+   float relative_angle = receive->relative_angle;
+   float sin_yaw, cos_yaw, vx_set, vy_set;
+   float vx, vy, wz;
 
-//   relative_angle = receive->relative_angle;
-//   vx_set = receive->vx;
-//   vy_set = receive->vy;
+   vx_set = -receive->vy;
+   vy_set = receive->vx;
 
    // may be need add the move
    // auto start
-   if (/*dbus->swr == remote::UP ||*/ referee->game_status.game_progress == 0x3 || referee->game_status.game_progress == 0x4) {  // spin mode
+//   if (/*dbus->swr == remote::UP ||*/ referee->game_status.game_progress == 0x3 || referee->game_status.game_progress == 0x4) {  // spin mode
+//     sin_yaw = arm_sin_f32(relative_angle);
+//     cos_yaw = arm_cos_f32(relative_angle);
+//     vx = cos_yaw * vx_set + sin_yaw * vy_set;
+//     vy = -sin_yaw * vx_set + cos_yaw * vy_set;
+//     wz = SPIN_SPEED;
+//
+//     // stop the chassis
+//   } else if (/*dbus->swr == remote::DOWN ||*/ (referee->game_status.game_progress != 0x3 && referee->game_status.game_progress != 0x4) || Dead) {
+//     vx = 0;
+//     vy = 0;
+//     wz = 0;
+//   }
+
+   if (receive->mode == 1) {  // spin mode
      sin_yaw = arm_sin_f32(relative_angle);
      cos_yaw = arm_cos_f32(relative_angle);
      vx = cos_yaw * vx_set + sin_yaw * vy_set;
      vy = -sin_yaw * vx_set + cos_yaw * vy_set;
      wz = SPIN_SPEED;
-
-     // stop the chassis
-   } else if (/*dbus->swr == remote::DOWN ||*/ (referee->game_status.game_progress != 0x3 && referee->game_status.game_progress != 0x4) || Dead) {
-     vx = 0;
-     vy = 0;
-     wz = 0;
+   } else {
+     sin_yaw = arm_sin_f32(relative_angle);
+     cos_yaw = arm_cos_f32(relative_angle);
+     vx = cos_yaw * vx_set + sin_yaw * vy_set;
+     vy = -sin_yaw * vx_set + cos_yaw * vy_set;
+     wz = std::min(FOLLOW_SPEED, FOLLOW_SPEED * relative_angle);
+     if (-CHASSIS_DEADZONE < relative_angle && relative_angle < CHASSIS_DEADZONE) wz = 0;
    }
 
    chassis->SetSpeed(vx, vy, wz);

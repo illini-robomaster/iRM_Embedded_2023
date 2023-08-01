@@ -45,7 +45,7 @@ static bsp::CAN* can2 = nullptr;
 static remote::DBUS* dbus = nullptr;
 static display::RGB* RGB = nullptr;
 
-static const int GIMBAL_TASK_DELAY = 2;
+static const int GIMBAL_TASK_DELAY = 5;
 static const int CHASSIS_TASK_DELAY = 2;
 static const int SHOOTER_TASK_DELAY = 10;
 static const int SELFTEST_TASK_DELAY = 100;
@@ -55,7 +55,6 @@ static const int SOFT_START_CONSTANT = 500;
 static const int SOFT_KILL_CONSTANT = 200;
 static const float START_PITCH_POS = 0.30f;
 // TODO: the start position of the yaw motor
-static const float START_YAW_POS = 0;
 static const int GIMBAL_START_DELAY = 1000;
 
 static bsp::CanBridge* send = nullptr;
@@ -76,13 +75,37 @@ static unsigned int chassis_flag_bitmap = 0;
 static volatile float pitch_pos = START_PITCH_POS;
 //static volatile float yaw_pos = 0;
 
+static volatile unsigned int gimbal_alive = 0;
+// TODO: need to measure the specific angle
+// static volatile float yaw_pos = START_YAW_POS;
+
+// do we need to move this below? just self test use.
+static volatile bool pitch_motor_flag = false;
+static volatile bool yaw_motor_flag = false;
+static volatile bool left_top_flywheel_flag = false;
+static volatile bool left_bottom_flywheel_flag = false;
+static volatile bool left_dial_flag = false;
+static volatile bool right_top_flywheel_flag = false;
+static volatile bool right_bottom_flywheel_flag = false;
+static volatile bool right_dial_flag = false;
+static volatile bool fl_motor_flag = false;
+static volatile bool fr_motor_flag = false;
+static volatile bool bl_motor_flag = false;
+static volatile bool br_motor_flag = false;
+static volatile bool elevator_left_motor_flag = false;
+static volatile bool elevator_right_motor_flag = false;
+static volatile bool fortress_motor_flag = false;
+static volatile bool calibration_flag = false;
+// static volatile bool referee_flag = false;
+static volatile bool dbus_flag = false;
+static volatile bool lidar_flag = false;
 static volatile bool pitch_reset = false;
 // TODO:
 // static volatile bool yaw_reset = false;
 
-static volatile unsigned int gimbal_alive = 0;
-// TODO: need to measure the specific angle
-// static volatile float yaw_pos = START_YAW_POS;
+static volatile bool selftestStart = false;
+
+static volatile bool robot_hp_begin = false;
 
 //==================================================================================================
 // IMU
@@ -138,6 +161,7 @@ osThreadId_t gimbalTaskHandle;
 static control::Motor4310* pitch_motor = nullptr;
 static control::Motor4310* yaw_motor = nullptr;
 static bsp::Laser* laser = nullptr;
+
 // 4310 PID
 static control::ConstrainedPID* yaw_pid_position = nullptr;
 
@@ -155,23 +179,13 @@ void gimbalTask(void* arg) {
    osDelay(100);
  }
 
- // TODO: whether to remove(need test)
- int i = 0;
- while (i < 1000 || !imu->DataReady()) {
-   osDelay(GIMBAL_TASK_DELAY);
-   ++i;
- }
-
  osDelay(GIMBAL_START_DELAY);
+
  // the start code for motor 4310
  pitch_motor->SetZeroPos();
  pitch_motor->MotorEnable();
- // for change the position of yaw start(manually)
- //  yaw_motor->SetZeroPos(yaw_motor);
+ yaw_motor->SetZeroPos();
  yaw_motor->MotorEnable();
- osDelay(GIMBAL_TASK_DELAY);
-
- // 4310 soft start (for pitch and yaw)
 
  float yaw_offset = 0;
  float yaw_error;
@@ -180,12 +194,11 @@ void gimbalTask(void* arg) {
  for (int j = 0; j < SOFT_START_CONSTANT; j++) {
    tmp_pitch_pos += START_PITCH_POS / SOFT_START_CONSTANT;  // increase position gradually
    pitch_motor->SetOutput(tmp_pitch_pos, 1, 115, 0.5, 0);
-   control::Motor4310::TransmitOutput(motors_can1_gimbal, 2);
    // Caluclate the PID output of the yaw motor
-   //    yaw_error = wrap<float>(-(yaw_motor->GetTheta() - yaw_offset), -PI, PI);
-   //    yaw_output_position = yaw_pid_position->ComputeOutput(yaw_error);
-   //    yaw_motor->SetOutput(yaw_output_position);
-   //    yaw_motor->TransmitOutput(yaw_motor);
+   yaw_error = wrap<float>(-(yaw_motor->GetTheta() - yaw_offset), -PI, PI);
+   yaw_output_position = yaw_pid_position->ComputeOutput(yaw_error);
+   yaw_motor->SetOutput(yaw_output_position);
+   control::Motor4310::TransmitOutput(motors_can1_gimbal, 2);
    osDelay(GIMBAL_TASK_DELAY);
  }
 
@@ -194,13 +207,13 @@ void gimbalTask(void* arg) {
  laser->Off();
  pitch_motor->SetOutput(tmp_pitch_pos, 1, 115, 0.5, 0);
  yaw_motor->SetOutput(0);
+ control::Motor4310::TransmitOutput(motors_can1_gimbal, 2);
 
- osDelay(200);
+ osDelay(GIMBAL_START_DELAY);
  imu->Calibrate();
 
  while (!imu->DataReady() || !imu->CaliDone()) {
    pitch_motor->SetOutput(tmp_pitch_pos, 1, 115, 0.5, 0);
-   //    yaw_motor->SetOutput(0, 0);
    yaw_motor->SetOutput(0);
    control::Motor4310::TransmitOutput(motors_can1_gimbal, 2);
    osDelay(GIMBAL_TASK_DELAY);
@@ -214,26 +227,16 @@ void gimbalTask(void* arg) {
  send->cmd.data_bool = true;
  send->TransmitOutput();
 
- //  float pitch_ratio, yaw_ratio;
- //  float pitch_curr, yaw_curr;
- //  float pitch_target = 0, yaw_target = 0;
- //  float pitch_diff, yaw_diff;
-
  float pitch_vel_range = 5.0;
- float yaw_pos = 0.0;
 
  while (true) {
    while (Dead || GimbalDead) osDelay(100);
 
-   // TODO:whether this for 4310 pitch motor ???
-   // if this is for 4310, whether we need the same stuff for the 4310 yaw motor.
-   float pitch_vel, yaw_vel;
+   // pitch calculation
+   float pitch_vel;
    pitch_vel = clip<float>(dbus->ch3 / 660.0 * pitch_vel_range, -pitch_vel_range, pitch_vel_range);
    pitch_pos += pitch_vel / 200 + dbus->mouse.y / 32767.0;
    pitch_pos = clip<float>(pitch_pos, 0.05, 0.6);  // measured range
-
-   yaw_vel = clip<float>(-dbus->ch2 / 660.0 * PI, -PI, PI);
-   yaw_pos += yaw_vel / 200.0;
 
    if (pitch_reset) {
      // 4310 soft start
@@ -241,7 +244,6 @@ void gimbalTask(void* arg) {
      for (int j = 0; j < SOFT_START_CONSTANT; j++){
        tmp_pitch_pos += START_PITCH_POS / SOFT_START_CONSTANT;  // increase position gradually
        pitch_motor->SetOutput(tmp_pitch_pos, 1, 115, 0.5, 0);
-       //        yaw_motor->SetOutput(0, 0);
        yaw_motor->SetOutput(0);
        control::Motor4310::TransmitOutput(motors_can1_gimbal, 2);
        osDelay(GIMBAL_TASK_DELAY);
@@ -254,7 +256,7 @@ void gimbalTask(void* arg) {
 
    // yaw calculation
    float yaw_ratio, yaw_target;
-   yaw_ratio = -(dbus->ch2 / 18000.0 / 7.0);
+   yaw_ratio = -(dbus->ch2 / 18000.0);
    yaw_target = clip<float>(yaw_ratio, -PI, PI);
    yaw_offset = wrap<float>(yaw_target + yaw_offset, -PI, PI);
    yaw_error = wrap<float>(yaw_offset - imu->INS_angle[0], -PI, PI);
@@ -262,11 +264,9 @@ void gimbalTask(void* arg) {
    yaw_output_position = yaw_pid_position->ComputeOutput(yaw_error);
 
    yaw_motor->SetOutput(yaw_output_position);
-   // yaw_motor->SetOutput(yaw_pos, yaw_vel);
-   //    yaw_motor->SetOutput(yaw_pos, yaw_vel, 5, 0.5, 0);
 
    control::Motor4310::TransmitOutput(motors_can1_gimbal, 2);
-   osDelay(5);
+   osDelay(GIMBAL_TASK_DELAY);
  }
 }
 
@@ -592,29 +592,7 @@ static bsp::BuzzerNoteDelayed Mario[] = {
 
 static bsp::Buzzer* buzzer = nullptr;
 static display::OLED* OLED = nullptr;
-
-static volatile bool pitch_motor_flag = false;
-static volatile bool yaw_motor_flag = false;
-static volatile bool left_top_flywheel_flag = false;
-static volatile bool left_bottom_flywheel_flag = false;
-static volatile bool left_dial_flag = false;
-static volatile bool right_top_flywheel_flag = false;
-static volatile bool right_bottom_flywheel_flag = false;
-static volatile bool right_dial_flag = false;
-static volatile bool fl_motor_flag = false;
-static volatile bool fr_motor_flag = false;
-static volatile bool bl_motor_flag = false;
-static volatile bool br_motor_flag = false;
-
-static volatile bool calibration_flag = false;
-// static volatile bool referee_flag = false;
-static volatile bool dbus_flag = false;
-static volatile bool lidar_flag = false;
-
-static volatile bool selftestStart = false;
-
-static volatile bool robot_hp_begin = false;
-
+// simple bitmask function for chassis flag
 void selfTestTask(void* arg) {
  UNUSED(arg);
  osDelay(100);
@@ -651,7 +629,7 @@ void selfTestTask(void* arg) {
    // gimbal
    pitch_motor->connection_flag_ = false;
    // TODO
-   // yaw_motor->connection_flag_ = false;
+   //    yaw_motor->connection_flag_ = false;
 
    // left shooter
    left_top_flywheel->connection_flag_ = false;
@@ -670,7 +648,7 @@ void selfTestTask(void* arg) {
    // gimbal
    pitch_motor_flag = pitch_motor->connection_flag_;
    // TODO
-   // yaw_motor_flag = yaw_motor->connection_flag_;
+   //    yaw_motor_flag = yaw_motor->connection_flag_;
 
    // left shooter
    left_top_flywheel_flag = left_top_flywheel->connection_flag_;
@@ -769,8 +747,7 @@ void RM_RTOS_Init(void) {
  pitch_motor = new control::Motor4310(can2, 0x32, 0x33, control::MIT);
  // TODO: initialize the yaw motor
  yaw_motor = new control::Motor4310(can2, 0x34, 0x35, control::VEL);
- // yaw_motor = new control::Motor4310(can2, 0x34, 0x35, control::POS_VEL);
- //  yaw_motor = new control::Motor4310(can2, 0x34, 0x35, control::MIT);
+
  //  control::gimbal_t gimbal_data;
  //  gimbal_data.pitch_motor_4310_ = pitch_motor;
  // gimbal_data.yaw_motor = yaw_motor;
@@ -813,7 +790,7 @@ void RM_RTOS_Init(void) {
  send = new bsp::CanBridge(can2, 0x20A, 0x20B);
 
  // 4310 PID Init
- float yaw_pid_param_position[] = {3.2, 0.9, 0.4};
+ float yaw_pid_param_position[] = {2.5, 10.0, 3.0};
  float yaw_max_iout_position = 0;
  float yaw_max_out_position = 30;
  yaw_pid_position = new control::ConstrainedPID(yaw_pid_param_position, yaw_max_iout_position, yaw_max_out_position);

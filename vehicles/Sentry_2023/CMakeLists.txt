@@ -18,7 +18,7 @@
 #                                                                        #
 # ---------------------------------------------------------------------- #
 
-project(Steering ASM C CXX)
+project(Sentry_2023 ASM C CXX)
 
 irm_add_arm_executable(Sentry_chassis
     TARGET DJI_Board_TypeC
