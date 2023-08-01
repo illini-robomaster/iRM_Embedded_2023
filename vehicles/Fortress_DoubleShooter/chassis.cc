@@ -254,93 +254,106 @@ osThreadId_t fortressTaskHandle;
 
 static control::MotorCANBase* elevator_left_motor = nullptr;
 static control::MotorCANBase* elevator_right_motor = nullptr;
-static control::MotorCANBase* fortress_motor = nullptr;
-static control::Fortress* fortress = nullptr;
+static control::Motor4310* fortress_motor = nullptr;
+//static control::Fortress* fortress = nullptr;
 
 void fortressTask(void* arg) {
   UNUSED(arg);
 
-  control::MotorCANBase* motors_can2_fortress[] = {elevator_left_motor, elevator_right_motor,
-                                                   fortress_motor};
+//  control::MotorCANBase* motors_can2_fortress[] = {elevator_left_motor, elevator_right_motor};
+  control::Motor4310* spin_motor[] = {fortress_motor};
 
   while (!receive->start) osDelay(100);
 
-  // fortress calibration(part 1)
-  while (!fortress->Calibrate()) {
-    while (Dead) osDelay(100);
-    if (fortress->Error()) {
-      while (true) {
-        fortress->Stop(control::ELEVATOR);
-        fortress->Stop(control::SPINNER);
-        control::MotorCANBase::TransmitOutput(motors_can2_fortress, 3);
-        osDelay(100);
-      }
-    }
-    fortress->Stop(control::SPINNER);
-    // Calibrate use elevator motors
-    control::MotorCANBase::TransmitOutput(motors_can2_fortress, 3);
-    osDelay(FORTRESS_TASK_DELAY);
-  }
-  // transform back to the normal mode (calibration part 2)
-  if (fortress->Error()) {
-    while (true) {
-      fortress->Stop(control::ELEVATOR);
-      fortress->Stop(control::SPINNER);
-      control::MotorCANBase::TransmitOutput(motors_can2_fortress, 3);
-      osDelay(100);
-    }
-  }
-  fortress->Transform(false, true);
-  fortress->Stop(control::SPINNER);
-  control::MotorCANBase::TransmitOutput(motors_can2_fortress, 3);
-  osDelay(FORTRESS_TASK_DELAY);
+  osDelay(1000);
 
-  // finish fortress calibration
-  receive->cmd.id = bsp::FORTRESS_CALIBRATED;
-  receive->cmd.data_bool = true;
-  receive->TransmitOutput();
+//  fortress_motor->SetZeroPos();
+  fortress_motor->MotorEnable();
 
+  // for testing
   while (true) {
-    if (receive->fortress_mode) {  // fortress mode
-      int i = 0;
-      while (true) {
-        // let the code run at least 0.1s
-        if (++i > 100 / FORTRESS_TASK_DELAY && fortress->Finished()) break;
-        if (fortress->Error()) {
-          while (true) {
-            fortress->Stop(control::ELEVATOR);
-            fortress->Stop(control::SPINNER);
-            control::MotorCANBase::TransmitOutput(motors_can2_fortress, 3);
-            osDelay(100);
-          }
-        }
-        fortress->Transform(true, false);
-        fortress->Spin(true, (float)referee->game_robot_status.chassis_power_limit,
-                       referee->power_heat_data.chassis_power,
-                       (float)referee->power_heat_data.chassis_power_buffer);
-        control::MotorCANBase::TransmitOutput(motors_can2_fortress, 3);
-        osDelay(FORTRESS_TASK_DELAY);
-      }
-    } else {
-      int i = 0;
-      while (true) {
-        // let the code run at least 0.1s
-        if (++i > 100 / FORTRESS_TASK_DELAY && fortress->Finished()) break;
-        if (fortress->Error()) {
-          while (true) {
-            fortress->Stop(control::ELEVATOR);
-            fortress->Stop(control::SPINNER);
-            control::MotorCANBase::TransmitOutput(motors_can2_fortress, 3);
-            osDelay(100);
-          }
-        }
-        fortress->Transform(false, false);
-        fortress->Stop(control::SPINNER);
-        control::MotorCANBase::TransmitOutput(motors_can2_fortress, 3);
-        osDelay(FORTRESS_TASK_DELAY);
-      }
-    }
+    fortress_motor->SetOutput(0, 1);  // fix the motor
+    control::Motor4310::TransmitOutput(spin_motor, 1);
   }
+
+  // TODO: CHANGE SPIN MOTOR
+
+//  // fortress calibration(part 1)
+//  while (!fortress->Calibrate()) {
+//    while (Dead) osDelay(100);
+//    if (fortress->Error()) {
+//      while (true) {
+//        fortress->Stop(control::ELEVATOR);
+//        fortress->Stop(control::SPINNER);
+//        control::MotorCANBase::TransmitOutput(motors_can2_fortress, 2);
+//        osDelay(100);
+//      }
+//    }
+//    fortress->Stop(control::SPINNER);
+//    // Calibrate use elevator motors
+//    control::MotorCANBase::TransmitOutput(motors_can2_fortress, 2);
+//    osDelay(FORTRESS_TASK_DELAY);
+//  }
+//  // transform back to the normal mode (calibration part 2)
+//  if (fortress->Error()) {
+//    while (true) {
+//      fortress->Stop(control::ELEVATOR);
+//      fortress->Stop(control::SPINNER);
+//      control::MotorCANBase::TransmitOutput(motors_can2_fortress, 2);
+//      osDelay(100);
+//    }
+//  }
+//  fortress->Transform(false, true);
+//  fortress->Stop(control::SPINNER);
+//  control::MotorCANBase::TransmitOutput(motors_can2_fortress, 2);
+//  osDelay(FORTRESS_TASK_DELAY);
+//
+//  // finish fortress calibration
+//  receive->cmd.id = bsp::FORTRESS_CALIBRATED;
+//  receive->cmd.data_bool = true;
+//  receive->TransmitOutput();
+//
+//  while (true) {
+//    if (receive->fortress_mode) {  // fortress mode
+//      int i = 0;
+//      while (true) {
+//        // let the code run at least 0.1s
+//        if (++i > 100 / FORTRESS_TASK_DELAY && fortress->Finished()) break;
+//        if (fortress->Error()) {
+//          while (true) {
+//            fortress->Stop(control::ELEVATOR);
+//            fortress->Stop(control::SPINNER);
+//            control::MotorCANBase::TransmitOutput(motors_can2_fortress, 2);
+//            osDelay(100);
+//          }
+//        }
+//        fortress->Transform(true, false);
+//        fortress->Spin(true, (float)referee->game_robot_status.chassis_power_limit,
+//                       referee->power_heat_data.chassis_power,
+//                       (float)referee->power_heat_data.chassis_power_buffer);
+//        control::MotorCANBase::TransmitOutput(motors_can2_fortress, 2);
+//        osDelay(FORTRESS_TASK_DELAY);
+//      }
+//    } else {
+//      int i = 0;
+//      while (true) {
+//        // let the code run at least 0.1s
+//        if (++i > 100 / FORTRESS_TASK_DELAY && fortress->Finished()) break;
+//        if (fortress->Error()) {
+//          while (true) {
+//            fortress->Stop(control::ELEVATOR);
+//            fortress->Stop(control::SPINNER);
+//            control::MotorCANBase::TransmitOutput(motors_can2_fortress, 2);
+//            osDelay(100);
+//          }
+//        }
+//        fortress->Transform(false, false);
+//        fortress->Stop(control::SPINNER);
+//        control::MotorCANBase::TransmitOutput(motors_can2_fortress, 2);
+//        osDelay(FORTRESS_TASK_DELAY);
+//      }
+//    }
+//  }
 }
 
 //==================================================================================================
@@ -427,6 +440,8 @@ void RM_RTOS_Init() {
   bl_motor = new control::Motor3508(can1, 0x203);
   br_motor = new control::Motor3508(can1, 0x204);
 
+  fortress_motor = new control::Motor4310(can1, 0x36, 0x37, control::POS_VEL);
+
   control::MotorCANBase* motors[control::FourWheel::motor_num];
   motors[control::FourWheel::front_left] = fl_motor;
   motors[control::FourWheel::front_right] = fr_motor;
@@ -472,7 +487,7 @@ void RM_RTOS_Threads_Init(void) {
   refereeTaskHandle = osThreadNew(refereeTask, nullptr, &refereeTaskAttribute);
   chassisTaskHandle = osThreadNew(chassisTask, nullptr, &chassisTaskAttribute);
   selfTestTaskHandle = osThreadNew(self_Check_Task, nullptr, &selfTestingTask);
-  //  fortressTaskHandle = osThreadNew(fortressTask, nullptr, &fortressTaskAttribute);
+//  fortressTaskHandle = osThreadNew(fortressTask, nullptr, &fortressTaskAttribute);
 }
 
 //==================================================================================================
