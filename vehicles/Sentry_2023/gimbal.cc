@@ -184,7 +184,6 @@ void gimbalTask(void* arg) {
  // the start code for motor 4310
  pitch_motor->SetZeroPos();
  pitch_motor->MotorEnable();
- yaw_motor->SetZeroPos();
  yaw_motor->MotorEnable();
 
  float yaw_offset = 0;
@@ -345,9 +344,7 @@ void shooterTask(void* arg) {
  UNUSED(arg);
 
  control::MotorCANBase* motors_can1_shooter_left[] = {left_top_flywheel, left_bottom_flywheel, left_dial};
-
  control::MotorCANBase* motors_can1_shooter_right[] = {right_top_flywheel, right_bottom_flywheel, right_dial};
-
 
  bool triple_shoot_detect_left = false;
  bool triple_shoot_detect_right = false;
@@ -361,10 +358,10 @@ void shooterTask(void* arg) {
 
  while (true) {
    while (Dead) osDelay(100);
-   //    print("power1: %d, cooling heat: %.4f, cooling limit: %.4f\r\n", send->shooter_power, send->cooling_heat1, send->cooling_limit1);
-   //    print("power2: %d, cooling heat: %.4f, cooling limit: %.4f\r\n", send->shooter_power, send->cooling_heat2, send->cooling_limit2);
+//       print("power1: %d, cooling heat: %.4f, cooling limit: %.4f\r\n", send->shooter_power, send->cooling_heat1, send->cooling_limit1);
+//       print("power2: %d, cooling heat: %.4f, cooling limit: %.4f\r\n", send->shooter_power, send->cooling_heat2, send->cooling_limit2);
 
-   // left shooter(dial part)
+//    left shooter(dial part)
    if (send->shooter_power && send->cooling_heat1 >= send->cooling_limit1 - 15) {
      left_top_flywheel->SetOutput(0);
      left_bottom_flywheel->SetOutput(0);
@@ -401,7 +398,7 @@ void shooterTask(void* arg) {
    }
 
    // right shooter(dial part)
-   if (send->shooter_power && send->cooling_heat2 >= send->cooling_heat2 - 15) {
+   if (send->shooter_power && send->cooling_heat2 >= send->cooling_limit2 - 15) {
      right_top_flywheel->SetOutput(0);
      right_bottom_flywheel->SetOutput(0);
      right_dial->SetOutput(0);
@@ -416,7 +413,7 @@ void shooterTask(void* arg) {
        right_shooter->SlowContinueShoot();
        // fast shooting
      } else if ((dbus->mouse.r || dbus->wheel.wheel > remote::WheelDigitalValue)
-                && send->cooling_heat1 < send->cooling_heat2 - 24) {
+                && send->cooling_heat2 < send->cooling_heat2 - 24) {
        right_shooter->FastContinueShoot();
        // triple shooting
      } else if (dbus->wheel.wheel == remote::WheelDigitalValue
@@ -466,7 +463,7 @@ void shooterTask(void* arg) {
        if (14 < send->speed_limit2 && send->speed_limit2 < 16) {
          rightflywheelFlag = true;
          right_shooter->SetFlywheelSpeed(437);  // 445 MAX
-       } else if (send->speed_limit1 >= 18) {
+       } else if (send->speed_limit2 >= 18) {
          rightflywheelFlag = true;
          right_shooter->SetFlywheelSpeed(482);  // 490 MAX
        } else {
