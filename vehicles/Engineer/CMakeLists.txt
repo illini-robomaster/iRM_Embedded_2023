@@ -20,12 +20,4 @@
 
 project(Engineer ASM C CXX)
 
-irm_add_arm_executable(Engineer_arm
-    TARGET DJI_Board_TypeC
-    SOURCES arm.cc)
-
-
-irm_add_arm_executable(Engineer_chassis
-    TARGET DJI_Board_TypeC
-    SOURCES chassis.cc
-)
+add_subdirectory(arm)

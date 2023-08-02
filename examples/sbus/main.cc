@@ -24,7 +24,7 @@
 #include "cmsis_os.h"
 #include "sbus.h"
 
-static remote::SBUS* sbus;
+static remote::SBUS* sbus = nullptr;
 
 void RM_RTOS_Init(void) {
   print_use_uart(&huart1);
@@ -34,7 +34,7 @@ void RM_RTOS_Init(void) {
 void RM_RTOS_Default_Task(const void* arguments) {
   UNUSED(arguments);
 
-  // NOTE(alvin): print is split because of stack usage is almost reaching limits
+  // NOTE(Neo): print is split because of stack usage is almost reaching limits
   while (true) {
     set_cursor(0, 0);
     clear_screen();

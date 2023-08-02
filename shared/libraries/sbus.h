@@ -44,6 +44,9 @@ class SBUS : public bsp::UART {
   uint32_t timestamp;
 
   volatile bool connection_flag_ = false;
+
+  static const int16_t CHANNEL_MIN = -1024;
+  static const int16_t CHANNEL_MAX = 1024;
 };
 
 } /* namespace remote */

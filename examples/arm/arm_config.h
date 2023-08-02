@@ -28,10 +28,9 @@
  *  Axis can be omitted if no 2 motors sharing the same position
 **/
 
-
 /* M3508 params start */
 const int BASE_TRANSLATE_ID = 0x201;
-GPIO_TypeDef* BASE_TRANSLATE_CALI_GPIO_PORT = GPIOC;
+const GPIO_TypeDef* BASE_TRANSLATE_CALI_GPIO_PORT = GPIOC;
 const uint16_t BASE_TRANSLATE_CALI_GPIO_PIN = GPIO_PIN_2;
 
 // M3508 steering params. (translate 3508 motor) */
@@ -40,9 +39,7 @@ const float BASE_TRANSLATE_MIN = -PI;
 const float RUN_SPEED = (1 * PI);
 const float ALIGN_SPEED = (0.5 * PI);
 const float ACCELERATION = (100 * PI);
-
 /* M3508 params end */
-
 
 
 /* A1 params start */
@@ -50,7 +47,6 @@ const int BASE_HOR_ROTATE_ID = 2;
 const int BASE_VERT_ROTATE_ID = 1;
 const int ELBOW_ROTATE_ID = 0;
 const int A1_CONTROL_DELAY = 2;
-
 
 UART_HandleTypeDef* BASE_HOR_ROTATE_UART = &huart1;
 UART_HandleTypeDef* BASE_VERT_ROTATE_UART = &huart1;
@@ -67,9 +63,7 @@ const float BASE_HOR_ROTATE_MIN = -PI/8;
 // elbow rotation motor param (rotate the forearm on a horizontal axis)
 const float ELBOW_ROTATE_MAX = PI/8;
 const float ELBOW_ROTATE_MIN = -PI/8;
-
 /* A1 params end */
-
 
 
 /* M4310 params start */
@@ -93,6 +87,4 @@ const float WRIST_ROTATE_MIN = -PI;
 // hand rotation motor params (rotate the hand on its axis)
 const float HAND_ROTATE_MAX = PI;
 const float HAND_ROTATE_MIN = -PI;
-
 /* M4310 params end */
-

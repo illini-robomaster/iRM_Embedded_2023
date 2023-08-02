@@ -21,10 +21,10 @@
 project(example_Engineer ASM C CXX)
 
 irm_add_arm_executable(${PROJECT_NAME}_test
-    TARGET DJI_Board_TypeC
+    TARGET DJI_Board_TypeA
     SOURCES arm_test.cc)
 
 irm_add_arm_executable(${PROJECT_NAME}_dbus
-    TARGET DJI_Board_TypeC
+    TARGET DJI_Board_TypeA
     SOURCES arm_dbus.cc
     INCLUDES ./)

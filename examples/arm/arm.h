@@ -18,14 +18,13 @@
  *                                                                          *
  ****************************************************************************/
 
-
 typedef struct {
   float base_translate;     /* translate 3508 motor                           */
   float base_vert_rotate;   /* rotate the entire arm around an vertical axis  */
   float base_hor_rotate;    /* rotate the entire arm around a horizontal axis */
   float elbow_rotate;       /* rotate the forearm on a horizontal axis        */
   float forearm_rotate;     /* rotate the forearm on its axis                 */
-  float wrist_rotate;       /* rotate the hand around an vertical axis        */
+  float wrist_rotate;       /* rotate the hand around a vertical axis        */
   float hand_rotate;        /* rotate the hand on its axis                    */
 } joint_state_t;
 
@@ -42,7 +41,6 @@ int ArmTurnRelative(joint_state_t* target_joint_state);
  * @return 0 when the command is accepted, 1 otherwise
  */
 int ArmTurnAbsolute(joint_state_t* target_joint_state);
-
 
 /**
  * @brief Call all TransmitOutput() or equivalent function for each motor
