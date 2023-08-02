@@ -16,7 +16,7 @@ void UITask(void* arg){
     communication::graphic_data_t graphCrosshair6;
     communication::graphic_data_t graphCrosshair7;
 
-    char msgBuffer1[30] = "TEST";
+    // char msgBuffer1[30] = "TEST";
 
     // Initialize crosshair GUI
 

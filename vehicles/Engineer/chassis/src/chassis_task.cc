@@ -55,15 +55,18 @@ void chassisTask(void* arg){
         vx_set = -dbus->ch3;
         vy_set = dbus->ch2;
 
+       
+
         chassis->SteerSetMaxSpeed(RUN_SPEED);
         sin_yaw = sin(relative_angle);
         cos_yaw = cos(relative_angle);
         vx = cos_yaw * vx_set + sin_yaw * vy_set;
         vy = -sin_yaw * vx_set + cos_yaw * vy_set;
         wz = std::min(FOLLOW_SPEED, FOLLOW_SPEED * relative_angle);       /* TODO : ASK IF GIMBAL EXIST, HOW CHASSIS MOVE */
-        if (-CHASSIS_DEADZONE < relative_angle && relative_angle < CHASSIS_DEADZONE) wz = 0;
+        wz = dbus ->ch0;
+        // if (-CHASSIS_DEADZONE < relative_angle && relative_angle < CHASSIS_DEADZONE) wz = 0;
 
-        chassis->SetSpeed(vx / 10, vy / 10, wz);
+        chassis->SetSpeed(vx / 10, vy / 10, wz/10);
         chassis->SteerUpdateTarget();
         constexpr float WHEEL_SPEED_FACTOR = 4;
         chassis->WheelUpdateSpeed(WHEEL_SPEED_FACTOR);
@@ -151,14 +154,19 @@ void init_chassis(){
   servo_data.omega_pid_param = new float[3]{13000, 300, 300};
   servo_data.max_iout = 30000;
   servo_data.max_out = 20000;
+  servo_data.install_offset = BL_MOTOR_OFFSET;
+
 
   /*ALIGNMENT IS NOT APPLICABLE IN THIS VEHICLE*/
   steering_motor1 = new control::Steering6020(servo_data);
   servo_data.motor = motor2;
+  servo_data.install_offset = BR_MOTOR_OFFSET;
   steering_motor2 = new control::Steering6020(servo_data);
   servo_data.motor = motor3;
+  servo_data.install_offset = FR_MOTOR_OFFSET;
   steering_motor3 = new control::Steering6020(servo_data);
   servo_data.motor = motor4;
+  servo_data.install_offset = FL_MOTOR_OFFSET;
   steering_motor4 = new control::Steering6020(servo_data);
 
   chassis_data = new control::engineer_steering_chassis_t();

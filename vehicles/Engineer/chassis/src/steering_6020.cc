@@ -41,7 +41,7 @@ namespace control{
         motor_->UpdateData(data);
 
         current_angle_ = motor_->GetTheta();
-        corrected_current_angle_ = current_angle_ + install_offset_;
+        corrected_current_angle_ = current_angle_ - install_offset_;
     }
 
     void Steering6020::CalcOutput(){
@@ -56,9 +56,9 @@ namespace control{
     }
 
     servo_status_t Steering6020::SetTarget(float target, bool override){
-        if(motor_->GetThetaDelta(target_angle_ + install_offset_) < 0.1 || override) {
-            corrected_current_angle_ = target;
-            target_angle_ = target + install_offset_;
+        if(motor_->GetThetaDelta(wrap<float>(target_angle_ + install_offset_,-PI,PI)) < 0.1 || override) {
+            corrected_current_angle_ = 2*PI-target;
+            target_angle_ = wrap<float>(2*PI - target + install_offset_,0,2*PI);
             return TURNING_CLOCKWISE;
         }
         return INPUT_REJECT;

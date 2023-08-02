@@ -25,14 +25,23 @@
 #include "dbus.h"
 #include "rgb.h"
 #include "chassis_task.h"
+// #include "ui_task.h"
+// #include "referee_task.h"
 
 osThreadId_t chassisTaskHandle;
+// osThreadId_t UITaskHandle;
+// osThreadId_t refereeTaskHandle;
+
 
 bsp::CAN* can1 = nullptr;
 bsp::CAN* can2 = nullptr;
 
 remote::DBUS* dbus = nullptr;
-display::RGB* RGB = nullptr;
+// display::RGB* RGB = nullptr;
+
+// RefereeUART* referee_uart = nullptr;
+// communication::Referee* referee = nullptr;
+
 
 
 
@@ -44,7 +53,12 @@ void RM_RTOS_Init() {
 
     can1 = new bsp::CAN(&hcan1, true);
     can2 = new bsp::CAN(&hcan2, false);
-    RGB = new display::RGB(&htim5, 3, 2, 1, 1000000);
+    // RGB = new display::RGB(&htim5, 3, 2, 1, 1000000);
+
+    // referee_uart = new RefereeUART(&huart6);
+    // referee = new communication::Referee();
+
+
 
     init_chassis();
 }
@@ -52,6 +66,8 @@ void RM_RTOS_Init() {
 
 void RM_RTOS_Threads_Init(void) {
     chassisTaskHandle = osThreadNew(chassisTask,nullptr,&chassisTaskAttribute);
+    // refereeTaskHandle = osThreadNew(refereeTask,nullptr,&refereeTaskAttribute);
+    // UITaskHandle = osThreadNew(UITask,nullptr,&UITaskAttribute);
 }
 
 

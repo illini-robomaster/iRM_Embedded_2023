@@ -24,5 +24,8 @@ const osThreadAttr_t refereeTaskAttribute = {.name = "refereeTask",
                                             .tz_module = 0,
                                             .reserved = 0};
 
+
+void refereeTask(void* args);
+
 static communication::Referee* referee = nullptr;
 static RefereeUART* referee_uart = nullptr;
