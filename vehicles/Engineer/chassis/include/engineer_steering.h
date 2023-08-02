@@ -6,15 +6,21 @@
 #include "cmsis_os.h"
 #include "steering_6020.h"
 
+//MAGIC NUMBERS, Represent motor physical install angle offsets.
+#define FL_MOTOR_OFFSET 4.76 
+#define FR_MOTOR_OFFSET 0.77
+#define BL_MOTOR_OFFSET 6.26
+#define BR_MOTOR_OFFSET 5.96
+
 namespace control {
 
 constexpr uint16_t MOTOR_NUM = 4;
 
 typedef struct {
-  control::ServoMotor* fl_steer_motor = nullptr;
-  control::ServoMotor* fr_steer_motor = nullptr;
-  control::ServoMotor* bl_steer_motor = nullptr;
-  control::ServoMotor* br_steer_motor = nullptr;
+  control::Steering6020* fl_steer_motor = nullptr;
+  control::Steering6020* fr_steer_motor = nullptr;
+  control::Steering6020* bl_steer_motor = nullptr;
+  control::Steering6020* br_steer_motor = nullptr;
 
   control::MotorCANBase* fl_steer_motor_raw = nullptr;
   control::MotorCANBase* fr_steer_motor_raw = nullptr;
@@ -55,12 +61,6 @@ public:
   void SetSpeed(const float _vx, const float _vy, const float _vw);
 
   /**
-   * @brief reset theta to 0
-   * use after ReAlign()
-   */
-  void SteerThetaReset();
-
-  /**
    * @brief set the speed for chassis wheel motors
    * Only change values, need to call WheelSetOutput()
    */
@@ -77,14 +77,6 @@ public:
    */
   bool Calibrate();
 
-  /**
-   * @brief Call ReAlign() for all four SteeringMotor
-   *        Turn the motor to the aligned position
-   *        Do nothing if the motor doesn't have an aligned position
-   * @return sum of all returned values
-   *         0 if success
-   */
-  int ReAlign();
 
   /**
    * @brief Call SteeringMotor::CalcOutput() for all 4 Steering Motors
@@ -121,15 +113,12 @@ public:
   void PrintData();
 
   /**
-   * @brief Set align_complete_ of all 4 Steering Motor to False
+   * @brief Check whether steerings are in intended position.
    */
-  void SteerAlignFalse();
+  bool SteerInPosition();
 
-  /**
-   * @brief Check align_complete_ flag for all 4 Steering Motors
-   * @return True if all 4 align_complete_ flags are true; false otherwise
-   */
-  bool SteerAlignCheck();
+
+  
 
   // speed of four wheels
   float v_fl_;
@@ -138,10 +127,10 @@ public:
   float v_br_;
 
  private:
-  control::ServoMotor* fl_steer_motor;
-  control::ServoMotor* fr_steer_motor;
-  control::ServoMotor* bl_steer_motor;
-  control::ServoMotor* br_steer_motor;
+  control::Steering6020* fl_steer_motor;
+  control::Steering6020* fr_steer_motor;
+  control::Steering6020* bl_steer_motor;
+  control::Steering6020* br_steer_motor;
 
   control::MotorCANBase* fl_steer_motor_raw;
   control::MotorCANBase* fr_steer_motor_raw;
@@ -179,12 +168,8 @@ public:
   float wheel_dir_bl_;
   float wheel_dir_br_;
 
-  // ret values of TurnRelative(), used to sync steer and wheels
-  // ret_**_ == 0 means the corresponding steer motor is in position so the wheels can turn
-  int ret_fl_;
-  int ret_fr_;
-  int ret_bl_;
-  int ret_br_;
+  bool in_position;
+  BoolEdgeDetector* in_position_detector;
 
   // same as class Chassis
   ConstrainedPID pids[4];

@@ -1,10 +1,9 @@
-    
-#include "engineer_steering.h"
+ #include "engineer_steering.h"
 
 template <typename T>
 bool equal(T value, T number) {
   const T diff = value-number;
-  return abs(diff) < 0.1 ? true : false;
+  return abs(diff) < 0.5 ? true : false;
 }
     
 namespace control{
@@ -32,7 +31,6 @@ namespace control{
   bl_steer_motor_raw = _chassis->bl_steer_motor_raw;
   br_steer_motor_raw = _chassis->br_steer_motor_raw;
 
-  
   // Init Wheel Motors
   fl_wheel_motor = _chassis->fl_wheel_motor;
   fr_wheel_motor = _chassis->fr_wheel_motor;
@@ -59,10 +57,26 @@ namespace control{
   v_fr_ = 0.0;
   v_bl_ = 0.0;
   v_br_ = 0.0;
+
+  in_position = false;
+  in_position_detector = new BoolEdgeDetector(false);
+
+
+  delta_angle_fl_ = wrap<double>(FL_MOTOR_OFFSET,0,2*PI);
+  delta_angle_fr_ = wrap<double>(FR_MOTOR_OFFSET,0,2*PI);
+  delta_angle_bl_ = wrap<double>(BL_MOTOR_OFFSET,0,2*PI);
+  delta_angle_br_ = wrap<double>(BR_MOTOR_OFFSET,0,2*PI);
+
+  theta_fl_ = wrap<double>(FL_MOTOR_OFFSET,0,2*PI);
+  theta_fr_ = wrap<double>(FR_MOTOR_OFFSET,0,2*PI);
+  theta_bl_ = wrap<double>(BL_MOTOR_OFFSET,0,2*PI);
+  theta_br_ = wrap<double>(BR_MOTOR_OFFSET,0,2*PI);
+
+
   // Init private variables ends
 //   SteerThetaReset();
   // just for wheel speed pid (not for steer motor)
-  float* pid_params = new float[3]{120, 3, 1};
+  float* pid_params = new float[3]{12, 3, 1};
   float motor_max_iout = 2000;
   float motor_max_out = 20000;
   for (int i = 0; i < MOTOR_NUM; i++) {
@@ -113,7 +127,6 @@ EngineerSteeringChassis::~EngineerSteeringChassis() {
     power_limit->Output(true, power_limit_info, _chassis_power, _chassis_power_buffer, PID_output,
                         output);
 
-
     // set final output
     fl_wheel_motor->SetOutput(PID_output[0]);
     fr_wheel_motor->SetOutput(PID_output[1]);
@@ -135,26 +148,18 @@ EngineerSteeringChassis::~EngineerSteeringChassis() {
   } 
 
   bool EngineerSteeringChassis::Calibrate(){
-    // bool alignment_complete_fl = fl_steer_motor->SetTarget(delta_angle_fl_);
-    // bool alignment_complete_fr = fr_steer_motor->SetTarget(delta_angle_fr_);
-    // bool alignment_complete_bl = bl_steer_motor->SetTarget(delta_angle_bl_);
-    // bool alignment_complete_br = br_steer_motor->SetTarget(delta_angle_br_);
-
     fl_steer_motor->SetTarget(delta_angle_fl_,true);
     fr_steer_motor->SetTarget(delta_angle_fr_,true);
     bl_steer_motor->SetTarget(delta_angle_bl_,true);
     br_steer_motor->SetTarget(delta_angle_br_,true);
-    print("%04f\r\n",fl_steer_motor_raw->GetTheta());
-    print("%04f\r\n",fr_steer_motor_raw->GetTheta());
-    bl_steer_motor->PrintData();
-    print("%04f\r\n",br_steer_motor->GetTheta());
 
+    bool calibrate_done = SteerInPosition();
+    if(calibrate_done){
+      in_position = true;
+      in_position_detector->input(in_position);
+    }
 
-
-    return equal<float>(fl_steer_motor->GetTheta(),delta_angle_fl_) &&
-             equal<float>(fr_steer_motor->GetTheta(),delta_angle_fr_) && 
-             equal<float>(bl_steer_motor->GetTheta(),delta_angle_bl_) &&
-             equal<float>(br_steer_motor->GetTheta(),delta_angle_br_) ;
+    return calibrate_done;
 
   }
 
@@ -167,83 +172,44 @@ EngineerSteeringChassis::~EngineerSteeringChassis() {
 
   void EngineerSteeringChassis::SteerUpdateTarget(){
     if (vx == 0 && vy == 0 && vw == 0) {
-        ret_fl_ = fl_steer_motor->SetTarget(theta_fl_ + delta_angle_fl_) == INPUT_REJECT ? 0 :1 ;
-        ret_fr_ = fr_steer_motor->SetTarget(theta_fr_ + delta_angle_fr_) == INPUT_REJECT ? 0 :1 ;
-        ret_bl_ = bl_steer_motor->SetTarget(theta_bl_ + delta_angle_bl_) == INPUT_REJECT ? 0 :1 ;
-        ret_br_ = br_steer_motor->SetTarget(theta_br_ + delta_angle_br_) == INPUT_REJECT ? 0 :1 ;
-
+     bool ret1 = fl_steer_motor->SetTarget(theta_fl_) == 0 ? false : true;
+     bool ret2 = fr_steer_motor->SetTarget(theta_fr_) == 0 ? false : true;
+     bool ret3 = bl_steer_motor->SetTarget(theta_bl_) == 0 ? false : true;
+     bool ret4 = br_steer_motor->SetTarget(theta_br_) == 0 ? false : true;
+     in_position = ret1 && ret2 && ret3 && ret4;
+     in_position_detector->input(in_position);
     } else {
-    // Compute 2 position proposals, theta and theta + PI.
-    double _theta_fl = atan2(vy + vw * cos(PI / 4), vx - vw * sin(PI / 4));
-    double _theta_fr = atan2(vy + vw * cos(PI / 4), vx + vw * sin(PI / 4));
-    double _theta_bl = atan2(vy - vw * cos(PI / 4), vx - vw * sin(PI / 4));
-    double _theta_br = atan2(vy - vw * cos(PI / 4), vx + vw * sin(PI / 4));
 
-    double _theta_fl_alt = wrap<double>(_theta_fl + PI, -PI, PI);
-    double _theta_fr_alt = wrap<double>(_theta_fr + PI, -PI, PI);
-    double _theta_bl_alt = wrap<double>(_theta_bl + PI, -PI, PI);
-    double _theta_br_alt = wrap<double>(_theta_br + PI, -PI, PI);
+    // Compute 2 position proposals, theta and theta + PI.
+    theta_fl_ = wrap<double>(atan2(vy + vw * cos(PI / 4), vx - vw * sin(PI / 4))+delta_angle_fl_,-PI,PI);
+    theta_fr_ = wrap<double>(atan2(vy + vw * cos(PI / 4), vx + vw * sin(PI / 4))+delta_angle_fr_,-PI,PI);
+    theta_bl_ = wrap<double>(atan2(vy - vw * cos(PI / 4), vx - vw * sin(PI / 4))+delta_angle_bl_,-PI,PI);
+    theta_br_ = wrap<double>(atan2(vy - vw * cos(PI / 4), vx + vw * sin(PI / 4))+delta_angle_br_,-PI,PI);
+    
+    //in_position logic might not working here.
+    bool ret1 = fl_steer_motor->SetTarget(theta_fl_) == 0 ? false : true;
+    bool ret2 = fr_steer_motor->SetTarget(theta_fr_) == 0 ? false : true;
+    bool ret3 = bl_steer_motor->SetTarget(theta_bl_) == 0 ? false : true;
+    bool ret4 = br_steer_motor->SetTarget(theta_br_) == 0 ? false : true;
+
+    in_position = ret1 && ret2 && ret3 && ret4;
+    in_position_detector->input(in_position);
 
     wheel_dir_fl_ = 1.0;
     wheel_dir_fr_ = 1.0;
     wheel_dir_bl_ = 1.0;
     wheel_dir_br_ = 1.0;
-
-    // Go to the closer proposal and change wheel direction accordingly
-    if (abs(wrap<double>(_theta_bl - theta_bl_, -PI, PI)) <
-        abs(wrap<double>(_theta_bl_alt - theta_bl_, -PI, PI))) {
-      wheel_dir_bl_ = 1.0;
-      ret_bl_ = bl_steer_motor->SetTarget(wrap<double>(_theta_bl - theta_bl_, -PI, PI) + delta_angle_bl_);
-    } else {
-      wheel_dir_bl_ = -1.0;
-      ret_bl_ = bl_steer_motor->SetTarget(wrap<double>(_theta_bl_alt - theta_bl_, -PI, PI) + delta_angle_bl_);
     }
-    if (abs(wrap<double>(_theta_br - theta_br_, -PI, PI)) <
-        abs(wrap<double>(_theta_br_alt - theta_br_, -PI, PI))) {
-      wheel_dir_br_ = 1.0;
-      ret_br_ = br_steer_motor->SetTarget(wrap<double>(_theta_br - theta_br_, -PI, PI) + delta_angle_br_);
-    } else {
-      wheel_dir_br_ = -1.0;
-      ret_br_ = br_steer_motor->SetTarget(wrap<double>(_theta_br_alt - theta_br_, -PI, PI) + delta_angle_br_);
-    }
-    if (abs(wrap<double>(_theta_fr - theta_fr_, -PI, PI)) <
-        abs(wrap<double>(_theta_fr_alt - theta_fr_, -PI, PI))) {
-      wheel_dir_fr_ = 1.0;
-      ret_fr_ = fr_steer_motor->SetTarget(wrap<double>(_theta_fr - theta_fr_, -PI, PI) + delta_angle_fr_);
-    } else {
-      wheel_dir_fr_ = -1.0;
-      ret_fr_ = fr_steer_motor->SetTarget(wrap<double>(_theta_fr_alt - theta_fr_, -PI, PI) + delta_angle_fr_);
-    }
-    if (abs(wrap<double>(_theta_fl - theta_fl_, -PI, PI)) <
-        abs(wrap<double>(_theta_fl_alt - theta_fl_, -PI, PI))) {
-      wheel_dir_fl_ = 1.0;
-      ret_fl_ = fl_steer_motor->SetTarget(wrap<double>(_theta_fl - theta_fl_, -PI, PI) + delta_angle_fl_);
-    } else {
-      wheel_dir_fl_ = -1.0;
-      ret_fl_ = fl_steer_motor->SetTarget(wrap<double>(_theta_fl_alt - theta_fl_, -PI, PI) + delta_angle_fl_);
-    }
-
-    // Update theta when TurnRelative complete
-    if (ret_bl_ == 0) {
-      theta_bl_ = wheel_dir_bl_ == 1.0 ? _theta_bl : _theta_bl_alt;
-    }
-    if (ret_br_ == 0) {
-      theta_br_ = wheel_dir_br_ == 1.0 ? _theta_br : _theta_br_alt;
-    }
-    if (ret_fr_ == 0) {
-      theta_fr_ = wheel_dir_fr_ == 1.0 ? _theta_fr : _theta_fr_alt;
-    }
-    if (ret_fl_ == 0) {
-      theta_fl_ = wheel_dir_fl_ == 1.0 ? _theta_fl : _theta_fl_alt;
-    }
-  }
 }
 
   void EngineerSteeringChassis::WheelUpdateSpeed(float wheel_speed_factor){
      // Stay at current position when no command is given
     if (vx == 0 && vy == 0 && vw == 0) {
         SetWheelSpeed(0,0,0,0);
-    } else if (ret_bl_ == 0 && ret_br_ == 0 && ret_fr_ == 0 && ret_fl_ == 0) {
+    // TODO: Potential bug, wheel will rotate during turning.
+    // } else if (in_position_detector->posEdge()) {
+    } else {
+
         // Wheels move only when all SteeringMotors are in position
         v_fl_ = wheel_dir_fl_ * sqrt(pow(vy + vw * cos(PI / 4), 2.0) + pow(vx - vw * sin(PI / 4), 2.0));
         v_fr_ = wheel_dir_fr_ * sqrt(pow(vy + vw * cos(PI / 4), 2.0) + pow(vx + vw * sin(PI / 4), 2.0));
@@ -269,17 +235,29 @@ EngineerSteeringChassis::~EngineerSteeringChassis() {
     set_cursor(0, 0);
 
     print("fl_steer_motor: \r\n");
-    fl_steer_motor_raw->PrintData();
+    fl_steer_motor->PrintData();
     osDelay(10);
     print("fr_steer_motor: \r\n");
-    fr_steer_motor_raw->PrintData();
+    fr_steer_motor->PrintData();
     osDelay(10);
     print("bl_steer_motor: \r\n");
-    bl_steer_motor_raw->PrintData();
+    bl_steer_motor->PrintData();
     osDelay(10);
     print("br_steer_motor: \r\n");
-    br_steer_motor_raw->PrintData();
+    br_steer_motor->PrintData();
   }
+
+  bool EngineerSteeringChassis::SteerInPosition(){
+    bool result = fl_steer_motor->inPosition() && 
+            fr_steer_motor->inPosition() &&
+            bl_steer_motor->inPosition() &&
+            br_steer_motor->inPosition();
+    in_position = result;
+    in_position_detector->input(in_position);
+    return in_position;
+  }
+
+
 
 
 

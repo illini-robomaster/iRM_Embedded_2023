@@ -25,7 +25,6 @@
 #include "dbus.h"
 #include "rgb.h"
 #include "chassis_task.h"
-#include "engineer_steering.h"
 
 osThreadId_t chassisTaskHandle;
 

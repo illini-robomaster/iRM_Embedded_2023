@@ -3,9 +3,11 @@
 #include "cmsis_os.h"
 #include "motor.h"
 #include "engineer_steering.h"
+#include "steering_6020.h"
 #include "dbus.h"
 #include "can.h"
 #include "rgb.h"
+
 
 extern osThreadId_t chassisTaskHandle;
 const osThreadAttr_t chassisTaskAttribute = {.name = "chassisTask",

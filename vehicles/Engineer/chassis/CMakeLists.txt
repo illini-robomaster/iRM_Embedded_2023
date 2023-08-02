@@ -20,20 +20,14 @@
 
 project(Engineer ASM C CXX)
 
-
 irm_add_arm_executable(Engineer_chassis
-    TARGET DJI_Board_TypeC
-    SOURCES 
-    src/chassis.cc 
-    INCLUDES include
-)
-
-irm_add_arm_executable(Engineer_chassis_new
     TARGET DJI_Board_TypeC
     SOURCES
     src/main.cc
     src/chassis_task.cc
     src/engineer_steering.cc
     src/steering_6020.cc
+    src/referee_task.cc
+    src/selfcheck_task.cc
     INCLUDES include
 )

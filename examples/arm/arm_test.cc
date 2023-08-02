@@ -37,7 +37,7 @@
 // Motor enable list
 // TODO enable motors to test them
 // #define BASE_TRANSLATE_MOTOR_ENABLE
-// #define FOREARM_ROTATE_MOTOR_ENABLE
+#define FOREARM_ROTATE_MOTOR_ENABLE
 #define ELBOW_ROTATE_MOTOR_ENABLE
 
 constexpr float RUN_SPEED = (2 * PI);

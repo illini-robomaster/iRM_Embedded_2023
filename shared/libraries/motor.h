@@ -150,6 +150,7 @@ class MotorCANBase : public MotorBase {
    *        many of the private parameters of MotorCANBase.
    */
   friend class ServoMotor;
+  friend class Steering6020;
 
   volatile bool connection_flag_ = false;
 

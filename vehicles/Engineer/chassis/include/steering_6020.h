@@ -1,6 +1,10 @@
+#pragma once 
+
 #include "motor.h"
 #include "power_limit.h"
 #include "controller.h"
+#include "bsp_os.h" 
+#include "utils.h"
 
 
 namespace control{
@@ -13,43 +17,56 @@ typedef struct{
     float* omega_pid_param;   /* pid parameter used to control speed of motor      */
     float max_iout;
     float max_out;
-
 }steering6020_t;
 
 class Steering6020{
 public:
+
     Steering6020(steering6020_t data);
+
     ~Steering6020();
 
-    void Update();
+    void UpdateData(const uint8_t data[]);
+
     void CalcOutput();
 
-    void SetTarget();
-    void SetMaxSpeed();
-    void SetMaxAcceleration();
+    servo_status_t SetTarget(float target ,bool override=true);
 
-    void GetTarget();
-    void Holding();
+    void SetMaxSpeed(float max_speed);
+
+    void SetMaxAcceleration(float max_acceleration);
+
+    float GetTarget();
+    float GetTheta();
+
+    //TODO: Tried to used in detecting turing behavior, might be useful in future.
+    bool inPosition();
+
+    void PrintData();
+
 
 
 
 private:
-    control::MotorCANBase* motor;
+    MotorCANBase* motor_;
     float target_angle_;
     float current_angle_;
 
-
     bool hold_;
+    uint32_t start_time_;
 
 
-    float max_speed;
-    float max_acceleration;
-    float max_iout;
-    float max_out;
-    float transmission_ratio; /* transmission ratio of motor                       */
+    float max_speed_;
+    float max_acceleration_;
+    float max_iout_;
+    float max_out_;
+    float transmission_ratio_; /* transmission ratio of motor                       */
+    float proximity_in_;
+    float proximity_out_;
 
-   
+    ConstrainedPID omega_pid_;
 
+    BoolEdgeDetector* hold_detector_;
 };
 
 }
