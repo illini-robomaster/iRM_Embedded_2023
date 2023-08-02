@@ -29,5 +29,6 @@ irm_add_arm_executable(Engineer_chassis
     src/steering_6020.cc
     src/referee_task.cc
     src/selfcheck_task.cc
+    src/ui_task.cc
     INCLUDES include
 )
