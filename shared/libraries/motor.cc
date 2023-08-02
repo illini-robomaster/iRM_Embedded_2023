@@ -328,6 +328,7 @@ void PDIHV::SetOutPutAngle(float degree) {
         this->SetOutput(clip<int16_t>(val, MIN_OUTPUT, MAX_OUTPUT));
         this->SetOutput(val);
 }
+
 void PDIHV::SetOutput(int16_t val) {
   constexpr int16_t MIN_OUTPUT = 972;
   constexpr int16_t MAX_OUTPUT = 1947;

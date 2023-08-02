@@ -42,6 +42,8 @@ static display::RGB* RGB = nullptr;
 
 // Special Modes
 static BoolEdgeDetector FakeDeath(false);
+static BoolEdgeDetector LoadDetect(false);
+static BoolEdgeDetector ForceDetect(false);
 static volatile bool Dead = false;
 static volatile bool GimbalDead = false;
 static volatile bool Elevation = true;
@@ -56,6 +58,9 @@ static const int SELFTEST_TASK_DELAY = 100;
 // Params used in both chassis and gimbal task
 static volatile float yaw_sum = 0;
 static control::Motor4310* yaw_motor = nullptr;
+// Params used in both gimbal and shooter task
+static volatile bool force_flag = false;
+static volatile bool force_transforming = false;
 
 //==================================================================================================
 // Referee
@@ -308,10 +313,105 @@ osThreadId_t shooterTaskHandle;
 static control::MotorCANBase* force_motor = nullptr;
 static control::MotorCANBase* load_motor = nullptr;
 static control::MotorCANBase* reload_motor = nullptr;
+static control::PDIHV* trigger = nullptr; // CCW for positive angle, CW for negative angle (trigger angle is 100 degree)
+static control::ServoMotor* load_servo = nullptr;
+static control::ServoMotor* reload_servo = nullptr;
+static control::ServoMotor* force_servo = nullptr;
 
 void shooterTask(void* arg) {
   UNUSED(arg);
+  // motors initialization
+  control::MotorCANBase* motors_can2_shooter[] = {force_motor, load_motor, reload_motor};
+  // Variable initialization (params need test)
+  // reload variables
+  bool reload_pull = false;
+  bool reload_push = false;
+  float reload_pos = 10 * PI;
+  // load variable
+  bool loading = false;
+  float load_angle = PI;
 
+  // waiting for the start signal
+  while (true) {
+    if (dbus->keyboard.bit.B || dbus->swr == remote::DOWN) break;
+    osDelay(100);
+  }
+
+  while (true) {
+    // Dead
+    while (Dead || GimbalDead) osDelay(100);
+
+    // the shoot and load process is automatic
+    // 1. using servo pull the trigger (shooting process)
+    // 2. reload motor pull the bullet board to the desire position (load process below)
+    // 3. using servo push the trigger the hold the bullet board
+    // 4. load motor load one bullet on the board
+    // 5. reload motor release to the original position to prepare for the next load
+    // 6. optional: determine whether we need to change the force motor position
+    // 7. repeat 1-6
+
+    // Load Detector
+    LoadDetect.input(dbus->mouse.l);
+    if (LoadDetect.posEdge()) {
+      // step 1
+      trigger->SetOutPutAngle(20);
+      osDelay(1000); // need test the delay time(wait for the)
+      // step 2
+      while (true) {
+        // break condition (reach the desire position)
+        if (reload_servo->GetOmega() <= 0.0001) break;
+        // set target pull position once
+        if (!reload_pull) {
+          reload_pull = true;
+          reload_servo->SetTarget(reload_pos, true);
+        }
+        reload_servo->CalcOutput();
+        control::MotorCANBase::TransmitOutput(motors_can2_shooter, 3);
+        osDelay(2);
+      }
+      // after reload pulling
+      reload_pull = false;
+      osDelay(1000); // need test the delay time(wait for the)
+      // step 3
+      trigger->SetOutPutAngle(-80);
+      osDelay(300); // need test the delay time(wait for the)
+      // step 4
+      while (true) {
+        // break condition (loading)
+        if (load_servo->GetOmega() <= 0.0001) break;
+        // loading once
+        if (!loading) {
+          loading = true;
+          load_servo->SetTarget(load_angle, true);
+        }
+        load_servo->CalcOutput();
+        control::MotorCANBase::TransmitOutput(motors_can2_shooter, 3);
+        osDelay(2);
+
+      }
+      // after loading
+      loading = false;
+      osDelay(300); // need test the delay time(wait for the)
+      // step 5
+        while (true) {
+          // break condition (reach the desire position)
+          if (reload_servo->GetOmega() <= 0.0001) break;
+          // set target push position once
+          if (!reload_push) {
+            reload_push = true;
+            reload_servo->SetTarget(0, true);
+          }
+          reload_servo->CalcOutput();
+          control::MotorCANBase::TransmitOutput(motors_can2_shooter, 3);
+          osDelay(2);
+        }
+      // after reload pushing
+      reload_push = false;
+      osDelay(300); // need test the delay time(wait for the)
+      // step 6(TODO)
+    }
+    osDelay(10);
+  }
 }
 
 //==================================================================================================
@@ -450,6 +550,31 @@ void RM_RTOS_Init() {
   load_motor = new control::Motor3508(can2, 0x201);
   reload_motor = new control::Motor3508(can2, 0x202);
   force_motor = new control::Motor3508(can2, 0x203);
+  // magic number from the data test for this servo
+  trigger = new control::PDIHV(&htim1, 1, 1980000, 500, 1500);
+
+  // Servo control for each shooter motor
+  control::servo_t servo_data;
+  servo_data.motor = load_motor;
+  servo_data.max_speed = 6 * PI; // params need test
+  servo_data.max_acceleration = 8 * PI;
+  servo_data.transmission_ratio = M3508P19_RATIO;
+  servo_data.omega_pid_param = new float [3] {30, 5, 2}; // pid need test
+  servo_data.max_iout = 1000;
+  servo_data.max_out = 13000;
+  load_servo = new control::ServoMotor(servo_data);
+
+  servo_data.motor = reload_motor;
+  servo_data.max_speed = 6 * PI; // params need test
+  servo_data.max_acceleration = 8 * PI;
+  servo_data.omega_pid_param = new float [3] {30, 5, 2}; // pid need test
+  reload_servo = new control::ServoMotor(servo_data);
+
+  servo_data.motor = force_motor;
+  servo_data.max_speed = 6 * PI; // params need test
+  servo_data.max_acceleration = 8 * PI;
+  servo_data.omega_pid_param = new float [3] {30, 5, 2}; // pid need test
+  force_servo = new control::ServoMotor(servo_data);
 
   // Referee initialization
   referee_uart = new RefereeUART(&huart6);
@@ -478,6 +603,7 @@ void KillAll() {
   RM_EXPECT_TRUE(false, "Operation Killed!\r\n");
 
   control::MotorCANBase* motors_can1_chassis[] = {fl_motor, fr_motor, bl_motor, br_motor};
+  control::MotorCANBase* motors_can2_shooter[] = {load_motor, reload_motor, force_motor};
   RGB->Display(display::color_blue);
 
   while (true) {
@@ -501,6 +627,11 @@ void KillAll() {
     fr_motor->SetOutput(0);
     br_motor->SetOutput(0);
     control::MotorCANBase::TransmitOutput(motors_can1_chassis, 4);
+    // shooter motors
+    load_motor->SetOutput(0);
+    reload_motor->SetOutput(0);
+    force_motor->SetOutput(0);
+    control::MotorCANBase::TransmitOutput(motors_can2_shooter, 3);
 
     osDelay(KILLALL_DELAY);
   }
@@ -518,6 +649,7 @@ void RM_RTOS_Default_Task(const void* args) {
   while (true) {
     // Emergency stop
     FakeDeath.input(dbus->swl == remote::DOWN);
+    ForceDetect.input(dbus->keyboard.bit.F);
     if (FakeDeath.posEdge()) {
       Dead = true;
       KillAll();
