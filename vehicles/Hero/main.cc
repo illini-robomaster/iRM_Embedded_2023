@@ -46,7 +46,7 @@ static BoolEdgeDetector LoadDetect(false);
 static BoolEdgeDetector ForceDetect(false);
 static volatile bool Dead = false;
 static volatile bool GimbalDead = false;
-static volatile bool Elevation = true;
+static volatile bool Elevation = false;
 
 // Delays
 static const int KILLALL_DELAY = 100;
@@ -108,7 +108,7 @@ void refereeTask(void* arg) {
 }
 
 //==================================================================================================
-// Chassis(TODO)
+// Chassis
 //==================================================================================================
 
 const osThreadAttr_t chassisTaskAttribute = {.name = "chassisTask",
@@ -121,6 +121,8 @@ const osThreadAttr_t chassisTaskAttribute = {.name = "chassisTask",
                                              .tz_module = 0,
                                              .reserved = 0};
 osThreadId_t chassisTaskHandle;
+// TODO:
+// 1. test keyboard and mouse data
 
 // Params Initialization
 static control::MotorCANBase* fl_motor = nullptr;
@@ -191,7 +193,7 @@ void chassisTask(void* arg) {
 }
 
 //==================================================================================================
-// Gimbal(TODO:need test 4310 connection)
+// Gimbal
 //==================================================================================================
 
 const osThreadAttr_t gimbalTaskAttribute = {.name = "gimbalTask",
@@ -204,6 +206,9 @@ const osThreadAttr_t gimbalTaskAttribute = {.name = "gimbalTask",
                                             .tz_module = 0,
                                             .reserved = 0};
 osThreadId_t gimbalTaskHandle;
+// TODO:
+// 1. test keyboard and mouse data
+// 2. test pitch start cali
 
 // Params Initialization
 static control::Motor4310* pitch_motor = nullptr;
@@ -212,7 +217,7 @@ static control::Motor4310* pitch_motor = nullptr;
 void gimbalTask(void* arg) {
   UNUSED(arg);
   // motor pointer initialization
-//  control::Motor4310* motors_can2_gimbal[] = {pitch_motor};
+  control::Motor4310* motors_can2_gimbal[] = {pitch_motor};
   control::Motor4310* motors_can1_gimbal[] = {yaw_motor};
 
   print("Wait for beginning signal...\r\n");
@@ -229,7 +234,7 @@ void gimbalTask(void* arg) {
   osDelay(1000); // wait for 4310s enable
 
   // the start code for motor 4310s
-//  pitch_motor->MotorEnable();
+  pitch_motor->MotorEnable();
   yaw_motor->MotorEnable();
   osDelay(GIMBAL_TASK_DELAY);
 
@@ -237,11 +242,11 @@ void gimbalTask(void* arg) {
   RGB->Display(display::color_yellow);
 //  laser->Off();
   // need test Pos_Vel mode params
-//  pitch_motor->SetOutput(0, 3);
+  pitch_motor->SetOutput(0, 3);
   // need test MIT mode params
   yaw_motor->SetOutput(0, 0, 8, 1.5, 0);
   control::Motor4310::TransmitOutput(motors_can1_gimbal, 1);
-//  control::Motor4310::TransmitOutput(motors_can2_gimbal, 1);
+  control::Motor4310::TransmitOutput(motors_can2_gimbal, 1);
   osDelay(200);
 
   print("Gimbal Begin!\r\n");
@@ -252,7 +257,6 @@ void gimbalTask(void* arg) {
   float pitch_mouse = 0, yaw_mouse = 0;
   float pitch_remote = 0, yaw_remote = 0;
   float pitch_sum = 0;
-  float pitch_target = 0;
   float pitch_pos = 0, yaw_pos = 0;
   while (true) {
     // Dead
@@ -260,12 +264,12 @@ void gimbalTask(void* arg) {
 
     // Data Collection
     // pitch data from keyboard
-    if (dbus->keyboard.bit.E) pitch_keyboard += (3 * PI); // offset need test
-    if (dbus->keyboard.bit.Q) pitch_keyboard -= (3 * PI); // offset need test
+    if (dbus->keyboard.bit.E) pitch_keyboard -= (10 * PI); // offset need test
+    if (dbus->keyboard.bit.Q) pitch_keyboard += (10 * PI); // offset need test
     // pitch data from mouse (direction and offset need test)
     pitch_mouse = dbus->mouse.y / 32767.0 * 0.05 * PI;
     // pitch data from remote controller (offset and data need test)
-    pitch_remote = -dbus->ch3 / 660.0 / 210 * PI;
+    pitch_remote = -dbus->ch3 / 660.0 * 30 * PI;
     // sum whole pitch data
     pitch_sum = pitch_keyboard + pitch_mouse + pitch_remote;
 
@@ -277,11 +281,10 @@ void gimbalTask(void* arg) {
 
     // Data Processing and Update(yaw clip range need test)
     // pitch processing
-    pitch_target = clip<float>(pitch_target + pitch_sum, 0, 100 * PI);
-    pitch_pos = clip<float>(pitch_pos + pitch_target, 0, 100 * PI);
+    pitch_pos = clip<float>(pitch_pos + pitch_sum, -70 * PI, 70 * PI);
     // pitch update
-//    pitch_motor->SetOutput(pitch_pos, 30);
-//    control::Motor4310::TransmitOutput(motors_can2_gimbal, 1);
+    pitch_motor->SetOutput(pitch_pos, pitch_sum);
+    control::Motor4310::TransmitOutput(motors_can2_gimbal, 1);
     // if not elevation, update the yaw position in the chassis
     if (Elevation) {
       // yaw processing (gear ratio 1 : 4)
@@ -310,6 +313,10 @@ const osThreadAttr_t shooterTaskAttribute = {.name = "shooterTask",
 
 osThreadId_t shooterTaskHandle;
 
+// TODO:
+// All test params
+
+// Params Initialization
 static control::MotorCANBase* force_motor = nullptr;
 static control::MotorCANBase* load_motor = nullptr;
 static control::MotorCANBase* reload_motor = nullptr;
@@ -321,15 +328,18 @@ static control::ServoMotor* force_servo = nullptr;
 void shooterTask(void* arg) {
   UNUSED(arg);
   // motors initialization
-  control::MotorCANBase* motors_can2_shooter[] = {force_motor, load_motor, reload_motor};
-  // Variable initialization (params need test)
+  control::MotorCANBase* can2_reloader[] = { reload_motor};
+  control::MotorCANBase* can2_loader[] = { load_motor};
+  //  control::MotorCANBase* can2_force[] = { force_motor};  // Variable initialization (params need test)
   // reload variables
   bool reload_pull = false;
   bool reload_push = false;
   float reload_pos = 10 * PI;
   // load variable
   bool loading = false;
-  float load_angle = PI;
+  // 99.506 is the ratio of the load servo and devide the 3508 ratio to load one bullet
+  float load_angle = 2 * PI / 6 * 99.506 / M3508P19_RATIO;
+  int i= 0;
 
   // waiting for the start signal
   while (true) {
@@ -349,66 +359,82 @@ void shooterTask(void* arg) {
     // 5. reload motor release to the original position to prepare for the next load
     // 6. optional: determine whether we need to change the force motor position
     // 7. repeat 1-6
-
+    i = 0;
     // Load Detector
-    LoadDetect.input(dbus->mouse.l);
+    LoadDetect.input(dbus->swr == remote::UP);
     if (LoadDetect.posEdge()) {
       // step 1
       trigger->SetOutPutAngle(20);
-      osDelay(1000); // need test the delay time(wait for the)
+      osDelay(1000); // wait for the bullet out
       // step 2
       while (true) {
         // break condition (reach the desire position)
-        if (reload_servo->GetOmega() <= 0.0001) break;
+        if (++i > 20 / 2 && abs(reload_servo->GetOmega()) <= 0.001) break;
+        // set the speed and acceleration for the reload motor
         // set target pull position once
         if (!reload_pull) {
           reload_pull = true;
-          reload_servo->SetTarget(reload_pos, true);
+          reload_servo->SetTarget(reload_pos);
         }
+        print("reload theta: %f\n", reload_servo->GetTheta());
         reload_servo->CalcOutput();
-        control::MotorCANBase::TransmitOutput(motors_can2_shooter, 3);
+        control::MotorCANBase::TransmitOutput(can2_reloader, 1);
         osDelay(2);
       }
       // after reload pulling
+      i = 0;
+      reload_motor->SetOutput(0);
+      print("omega %f", reload_servo->GetOmega());
+      control::MotorCANBase::TransmitOutput(can2_reloader, 1);
       reload_pull = false;
-      osDelay(1000); // need test the delay time(wait for the)
+      osDelay(100); // need test the delay time(wait for the)
       // step 3
       trigger->SetOutPutAngle(-80);
-      osDelay(300); // need test the delay time(wait for the)
+      osDelay(100); // need test the delay time(wait for the)
       // step 4
       while (true) {
         // break condition (loading)
-        if (load_servo->GetOmega() <= 0.0001) break;
+        if (++i > 20 / 2 && abs(load_servo->GetOmega()) <= 0.001) break;
         // loading once
         if (!loading) {
           loading = true;
-          load_servo->SetTarget(load_angle, true);
+          load_servo->SetTarget(load_servo->GetTarget() + load_angle);
+          print("load target: %f\n", load_servo->GetTarget());
         }
+        print("load Theta: %f\n", load_servo->GetTheta());
         load_servo->CalcOutput();
-        control::MotorCANBase::TransmitOutput(motors_can2_shooter, 3);
+        control::MotorCANBase::TransmitOutput(can2_loader, 1);
         osDelay(2);
-
       }
       // after loading
+      i = 0;
+      load_motor->SetOutput(0);
+      control::MotorCANBase::TransmitOutput(can2_loader, 1);
       loading = false;
-      osDelay(300); // need test the delay time(wait for the)
+      osDelay(100); // need test the delay time
       // step 5
-        while (true) {
-          // break condition (reach the desire position)
-          if (reload_servo->GetOmega() <= 0.0001) break;
-          // set target push position once
-          if (!reload_push) {
-            reload_push = true;
-            reload_servo->SetTarget(0, true);
-          }
-          reload_servo->CalcOutput();
-          control::MotorCANBase::TransmitOutput(motors_can2_shooter, 3);
-          osDelay(2);
+      while (true) {
+        // break condition (reach the desire position)
+        if (++i > 20 / 2 && abs(reload_servo->GetOmega()) <= 0.001) break;
+        // set target push position once
+        if (!reload_push) {
+          reload_push = true;
+          reload_servo->SetTarget(0, true);
+          print("reload target: %f\n", reload_servo->GetTarget());
+          print("reload theta: %f\n", reload_servo->GetTheta());
         }
+        reload_servo->CalcOutput();
+        control::MotorCANBase::TransmitOutput(can2_reloader, 1);
+        osDelay(2);
+      }
       // after reload pushing
+      i = 0;
+      reload_motor->SetOutput(0);
+      control::MotorCANBase::TransmitOutput(can2_reloader, 1);
       reload_push = false;
-      osDelay(300); // need test the delay time(wait for the)
+      osDelay(100);
       // step 6(TODO)
+
     }
     osDelay(10);
   }
@@ -556,24 +582,24 @@ void RM_RTOS_Init() {
   // Servo control for each shooter motor
   control::servo_t servo_data;
   servo_data.motor = load_motor;
-  servo_data.max_speed = 6 * PI; // params need test
-  servo_data.max_acceleration = 8 * PI;
+  servo_data.max_speed = 4 * PI; // params need test
+  servo_data.max_acceleration = 10 * PI;
   servo_data.transmission_ratio = M3508P19_RATIO;
-  servo_data.omega_pid_param = new float [3] {30, 5, 2}; // pid need test
+  servo_data.omega_pid_param = new float [3] {150, 1.2, 5};
   servo_data.max_iout = 1000;
   servo_data.max_out = 13000;
   load_servo = new control::ServoMotor(servo_data);
 
   servo_data.motor = reload_motor;
-  servo_data.max_speed = 6 * PI; // params need test
-  servo_data.max_acceleration = 8 * PI;
-  servo_data.omega_pid_param = new float [3] {30, 5, 2}; // pid need test
+  servo_data.max_speed = 4 * PI; // params need test
+  servo_data.max_acceleration = 10 * PI;
+  servo_data.omega_pid_param = new float [3] {150, 1.2, 5};
   reload_servo = new control::ServoMotor(servo_data);
 
   servo_data.motor = force_motor;
-  servo_data.max_speed = 6 * PI; // params need test
-  servo_data.max_acceleration = 8 * PI;
-  servo_data.omega_pid_param = new float [3] {30, 5, 2}; // pid need test
+  servo_data.max_speed = 4 * PI; // params need test
+  servo_data.max_acceleration = 10 * PI;
+  servo_data.omega_pid_param = new float [3] {150, 1.2, 5};
   force_servo = new control::ServoMotor(servo_data);
 
   // Referee initialization
