@@ -17,6 +17,7 @@ typedef struct{
     float* omega_pid_param;   /* pid parameter used to control speed of motor      */
     float max_iout;
     float max_out;
+    float install_offset;
 }steering6020_t;
 
 class Steering6020{
@@ -51,10 +52,13 @@ private:
     MotorCANBase* motor_;
     float target_angle_;
     float current_angle_;
+    float corrected_current_angle_;
+    float corrected_target_angle_;
 
     bool hold_;
     uint32_t start_time_;
 
+    float install_offset_;
 
     float max_speed_;
     float max_acceleration_;

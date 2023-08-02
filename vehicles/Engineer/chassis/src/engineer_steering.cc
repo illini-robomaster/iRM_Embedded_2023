@@ -62,15 +62,10 @@ namespace control{
   in_position_detector = new BoolEdgeDetector(false);
 
 
-  delta_angle_fl_ = wrap<double>(FL_MOTOR_OFFSET,0,2*PI);
-  delta_angle_fr_ = wrap<double>(FR_MOTOR_OFFSET,0,2*PI);
-  delta_angle_bl_ = wrap<double>(BL_MOTOR_OFFSET,0,2*PI);
-  delta_angle_br_ = wrap<double>(BR_MOTOR_OFFSET,0,2*PI);
-
-  theta_fl_ = wrap<double>(FL_MOTOR_OFFSET,0,2*PI);
-  theta_fr_ = wrap<double>(FR_MOTOR_OFFSET,0,2*PI);
-  theta_bl_ = wrap<double>(BL_MOTOR_OFFSET,0,2*PI);
-  theta_br_ = wrap<double>(BR_MOTOR_OFFSET,0,2*PI);
+  theta_fl_ = wrap<double>(0,0,2*PI);
+  theta_fr_ = wrap<double>(0,0,2*PI);
+  theta_bl_ = wrap<double>(0,0,2*PI);
+  theta_br_ = wrap<double>(0,0,2*PI);
 
 
   // Init private variables ends
@@ -148,10 +143,10 @@ EngineerSteeringChassis::~EngineerSteeringChassis() {
   } 
 
   bool EngineerSteeringChassis::Calibrate(){
-    fl_steer_motor->SetTarget(delta_angle_fl_,true);
-    fr_steer_motor->SetTarget(delta_angle_fr_,true);
-    bl_steer_motor->SetTarget(delta_angle_bl_,true);
-    br_steer_motor->SetTarget(delta_angle_br_,true);
+    fl_steer_motor->SetTarget(0,true);
+    fr_steer_motor->SetTarget(0,true);
+    bl_steer_motor->SetTarget(0,true);
+    br_steer_motor->SetTarget(0,true);
 
     bool calibrate_done = SteerInPosition();
     if(calibrate_done){
@@ -179,26 +174,71 @@ EngineerSteeringChassis::~EngineerSteeringChassis() {
      in_position = ret1 && ret2 && ret3 && ret4;
      in_position_detector->input(in_position);
     } else {
-
-    // Compute 2 position proposals, theta and theta + PI.
-    theta_fl_ = wrap<double>(atan2(vy + vw * cos(PI / 4), vx - vw * sin(PI / 4))+delta_angle_fl_,-PI,PI);
-    theta_fr_ = wrap<double>(atan2(vy + vw * cos(PI / 4), vx + vw * sin(PI / 4))+delta_angle_fr_,-PI,PI);
-    theta_bl_ = wrap<double>(atan2(vy - vw * cos(PI / 4), vx - vw * sin(PI / 4))+delta_angle_bl_,-PI,PI);
-    theta_br_ = wrap<double>(atan2(vy - vw * cos(PI / 4), vx + vw * sin(PI / 4))+delta_angle_br_,-PI,PI);
     
-    //in_position logic might not working here.
-    bool ret1 = fl_steer_motor->SetTarget(theta_fl_) == 0 ? false : true;
-    bool ret2 = fr_steer_motor->SetTarget(theta_fr_) == 0 ? false : true;
-    bool ret3 = bl_steer_motor->SetTarget(theta_bl_) == 0 ? false : true;
-    bool ret4 = br_steer_motor->SetTarget(theta_br_) == 0 ? false : true;
+    double _theta_fl = atan2(vy + vw * cos(PI / 4), vx - vw * sin(PI / 4));
+    double _theta_fr = atan2(vy + vw * cos(PI / 4), vx + vw * sin(PI / 4));
+    double _theta_bl = atan2(vy - vw * cos(PI / 4), vx - vw * sin(PI / 4));
+    double _theta_br = atan2(vy - vw * cos(PI / 4), vx + vw * sin(PI / 4));
 
-    in_position = ret1 && ret2 && ret3 && ret4;
-    in_position_detector->input(in_position);
+    double _theta_fl_alt = wrap<double>(_theta_fl + PI, -PI, PI);
+    double _theta_fr_alt = wrap<double>(_theta_fr + PI, -PI, PI);
+    double _theta_bl_alt = wrap<double>(_theta_bl + PI, -PI, PI);
+    double _theta_br_alt = wrap<double>(_theta_br + PI, -PI, PI);
+
+    bool ret_fl = false;
+    bool ret_fr = false;
+    bool ret_bl = false;
+    bool ret_br = false;
 
     wheel_dir_fl_ = 1.0;
     wheel_dir_fr_ = 1.0;
     wheel_dir_bl_ = 1.0;
     wheel_dir_br_ = 1.0;
+
+    // Compute 2 position proposals, theta and theta + PI.
+    if (abs(wrap<double>(_theta_bl - theta_bl_, -PI, PI)) <
+        abs(wrap<double>(_theta_bl_alt - theta_bl_, -PI, PI))) {
+      wheel_dir_bl_ = 1.0;
+      ret_bl = bl_steer_motor->SetTarget(wrap<double>(_theta_bl - theta_bl_, -PI, PI)) == 0 ? false : true;
+
+    } else {
+      wheel_dir_bl_ = -1.0;
+      ret_bl = bl_steer_motor->SetTarget(wrap<double>(_theta_bl_alt - theta_bl_, -PI, PI)) == 0 ? false : true;
+    }
+    if (abs(wrap<double>(_theta_br - theta_br_, -PI, PI)) <
+        abs(wrap<double>(_theta_br_alt - theta_br_, -PI, PI))) {
+      wheel_dir_br_ = 1.0;
+      ret_br = br_steer_motor->SetTarget(wrap<double>(_theta_br - theta_br_, -PI, PI)) == 0 ? false : true;
+
+    } else {
+      wheel_dir_br_ = -1.0;
+      ret_br = br_steer_motor->SetTarget(wrap<double>(_theta_br_alt - theta_br_, -PI, PI)) == 0 ? false : true;
+    }
+    if (abs(wrap<double>(_theta_fr - theta_fr_, -PI, PI)) <
+        abs(wrap<double>(_theta_fr_alt - theta_fr_, -PI, PI))) {
+      wheel_dir_fr_ = 1.0;
+      ret_fr = fr_steer_motor->SetTarget(wrap<double>(_theta_fr - theta_fr_, -PI, PI)) == 0 ? false : true;
+
+    } else {
+      wheel_dir_fr_ = -1.0;
+      ret_fr = fr_steer_motor->SetTarget(wrap<double>(_theta_fr_alt - theta_fr_, -PI, PI)) == 0 ? false : true;
+    }
+    if (abs(wrap<double>(_theta_fl - theta_fl_, -PI, PI)) <
+        abs(wrap<double>(_theta_fl_alt - theta_fl_, -PI, PI))) {
+      wheel_dir_fl_ = 1.0;
+      ret_fl = fl_steer_motor->SetTarget(wrap<double>(_theta_fl - theta_fl_, -PI, PI)) == 0 ? false : true;
+
+    } else {
+      wheel_dir_fl_ = -1.0;
+      ret_fl = fl_steer_motor->SetTarget(wrap<double>(_theta_fl_alt - theta_fl_, -PI, PI)) == 0 ? false : true;
+    }
+
+
+
+    //in_position logic might not working here.
+    in_position = ret_fl && ret_fr && ret_bl && ret_br;
+    in_position_detector->input(in_position);
+
     }
 }
 

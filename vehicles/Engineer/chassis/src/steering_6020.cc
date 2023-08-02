@@ -9,20 +9,22 @@ namespace control{
 
     Steering6020::Steering6020(steering6020_t data){
         motor_ = data.motor;
-
+        install_offset_ = data.install_offset;
         max_speed_= data.max_speed;
         max_acceleration_ = data.max_acceleration;
         max_iout_ = data.max_iout;
         max_out_ = data.max_out;
         transmission_ratio_ = data.transmission_ratio;
-        target_angle_ = 0;
         current_angle_ = motor_->GetTheta();
+        corrected_current_angle_ = current_angle_ - install_offset_;
+    
         //TODO: CHEKC THESE TWO VALUES
         proximity_in_ = 0.1;
         proximity_out_ = 0.1;
 
         hold_ = true;
-        target_angle_ = 0;
+        target_angle_ = install_offset_;
+        corrected_current_angle_ = 0;
         hold_detector_ = new BoolEdgeDetector(false);
 
         omega_pid_.Reinit(data.omega_pid_param, data.max_iout, data.max_out);
@@ -39,6 +41,7 @@ namespace control{
         motor_->UpdateData(data);
 
         current_angle_ = motor_->GetTheta();
+        corrected_current_angle_ = current_angle_ + install_offset_;
     }
 
     void Steering6020::CalcOutput(){
@@ -53,8 +56,9 @@ namespace control{
     }
 
     servo_status_t Steering6020::SetTarget(float target, bool override){
-        if(motor_->GetThetaDelta(target_angle_) < 0.1 || override) {
-            target_angle_ = target;
+        if(motor_->GetThetaDelta(target_angle_ + install_offset_) < 0.1 || override) {
+            corrected_current_angle_ = target;
+            target_angle_ = target + install_offset_;
             return TURNING_CLOCKWISE;
         }
         return INPUT_REJECT;
@@ -64,15 +68,15 @@ namespace control{
 
     void Steering6020::SetMaxAcceleration(float max_acceleration){max_acceleration_ = max_acceleration;};
 
-    float Steering6020::GetTarget(){return target_angle_;}
+    float Steering6020::GetTarget(){return corrected_target_angle_;}
 
-    float Steering6020::GetTheta(){return current_angle_;}
+    float Steering6020::GetTheta(){return corrected_current_angle_;}
 
 
     bool Steering6020::inPosition(){return abs(target_angle_- motor_->GetTheta())<0.1;}
 
     void Steering6020::PrintData(){
-        print("Current: %04f, Target: %04f", current_angle_,target_angle_);
+        print("Current: %04f, Target: %04f", GetTheta(),target_angle_);
     }
 
 

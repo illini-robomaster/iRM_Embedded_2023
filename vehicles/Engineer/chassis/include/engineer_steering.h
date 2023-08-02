@@ -6,11 +6,6 @@
 #include "cmsis_os.h"
 #include "steering_6020.h"
 
-//MAGIC NUMBERS, Represent motor physical install angle offsets.
-#define FL_MOTOR_OFFSET 4.76 
-#define FR_MOTOR_OFFSET 0.77
-#define BL_MOTOR_OFFSET 6.26
-#define BR_MOTOR_OFFSET 5.96
 
 namespace control {
 
@@ -150,12 +145,6 @@ public:
   float vx;
   float vy;
   float vw;
-
-  //angle offset for 6020
-  double delta_angle_fl_;
-  double delta_angle_fr_;
-  double delta_angle_bl_;
-  double delta_angle_br_;
 
   // current angle of 4 steers motors
   double theta_fl_;
