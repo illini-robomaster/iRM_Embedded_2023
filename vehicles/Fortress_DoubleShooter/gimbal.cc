@@ -189,6 +189,7 @@ void gimbalTask(void* arg) {
   // the start code for motor 4310
   pitch_motor->SetZeroPos();
   pitch_motor->MotorEnable();
+  // yaw_motor->SetZeroPos();
   yaw_motor->MotorEnable();
 //  osDelay(GIMBAL_TASK_DELAY);
 
