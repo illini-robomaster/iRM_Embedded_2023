@@ -44,7 +44,7 @@ static display::RGB* RGB = nullptr;
 static BoolEdgeDetector FakeDeath(false);
 static volatile bool Dead = false;
 static volatile bool GimbalDead = false;
-static volatile bool Elevation = false;
+static volatile bool Elevation = true;
 
 // Delays
 static const int KILLALL_DELAY = 100;
@@ -166,7 +166,7 @@ void chassisTask(void* arg) {
     vx = vx_keyboard + vx_remote;
     vy = vy_keyboard + vy_remote;
     // rotation velocity calculation
-    wz = yaw_sum * 0.5;
+    wz = yaw_sum * 10000; // 10000 is magic number
 
     // Update the speed by power limit from refree
     if (!Dead && !Elevation) {
@@ -174,18 +174,19 @@ void chassisTask(void* arg) {
     } else {
       chassis->SetSpeed(0, 0, 0);
     }
+    print("vel: vx: %f, vy: %f, wz: %f\r\n", vx, vy, wz);
+    print("power limit: %d\r\n", referee->game_robot_status.chassis_power_limit);
     chassis->Update(true, (float)referee->game_robot_status.chassis_power_limit,
                     referee->power_heat_data.chassis_power,
                     (float)referee->power_heat_data.chassis_power_buffer);
 
     control::MotorCANBase::TransmitOutput(motors_can1_chassis, 4);
-
     osDelay(CHASSIS_TASK_DELAY);
   }
 }
 
 //==================================================================================================
-// Gimbal(TODO:need test)
+// Gimbal(TODO:need test 4310 connection)
 //==================================================================================================
 
 const osThreadAttr_t gimbalTaskAttribute = {.name = "gimbalTask",
@@ -201,17 +202,17 @@ osThreadId_t gimbalTaskHandle;
 
 // Params Initialization
 static control::Motor4310* pitch_motor = nullptr;
-static bsp::Laser* laser = nullptr;
+//static bsp::Laser* laser = nullptr;
 
 void gimbalTask(void* arg) {
   UNUSED(arg);
   // motor pointer initialization
-  control::Motor4310* motors_can2_gimbal[] = {pitch_motor};
+//  control::Motor4310* motors_can2_gimbal[] = {pitch_motor};
   control::Motor4310* motors_can1_gimbal[] = {yaw_motor};
 
   print("Wait for beginning signal...\r\n");
   RGB->Display(display::color_red);
-  laser->On();
+//  laser->On(); // has some problem.
   // waiting for start signal
   while (true) {
     if (dbus->keyboard.bit.B || dbus->swr == remote::DOWN) break;
@@ -219,33 +220,35 @@ void gimbalTask(void* arg) {
   }
 
 //  pitch_motor->SetZeroPos(); //（for test）
+//  yaw_motor->SetZeroPos(); // for test
+  osDelay(1000); // wait for 4310s enable
+
   // the start code for motor 4310s
-  pitch_motor->MotorEnable();
+//  pitch_motor->MotorEnable();
   yaw_motor->MotorEnable();
   osDelay(GIMBAL_TASK_DELAY);
 
   // initialize start position
   RGB->Display(display::color_yellow);
-  laser->Off();
+//  laser->Off();
   // need test Pos_Vel mode params
-  pitch_motor->SetOutput(0, 3);
+//  pitch_motor->SetOutput(0, 3);
   // need test MIT mode params
-  yaw_motor->SetOutput(0, 0, 5, 0.5, 0);
+  yaw_motor->SetOutput(0, 0, 8, 1.5, 0);
   control::Motor4310::TransmitOutput(motors_can1_gimbal, 1);
-  control::Motor4310::TransmitOutput(motors_can2_gimbal, 1);
+//  control::Motor4310::TransmitOutput(motors_can2_gimbal, 1);
   osDelay(200);
 
   print("Gimbal Begin!\r\n");
   RGB->Display(display::color_green);
-  laser->On();
+//  laser->On();
 
   float pitch_keyboard = 0; // E is lifting, Q is lowering
   float pitch_mouse = 0, yaw_mouse = 0;
   float pitch_remote = 0, yaw_remote = 0;
   float pitch_sum = 0;
-  float pitch_target = 0, yaw_target = 0;
+  float pitch_target = 0;
   float pitch_pos = 0, yaw_pos = 0;
-
   while (true) {
     // Dead
     while (Dead || GimbalDead) osDelay(100);
@@ -262,8 +265,8 @@ void gimbalTask(void* arg) {
     pitch_sum = pitch_keyboard + pitch_mouse + pitch_remote;
 
     // yaw data from mouse(direction and offset need test)
-    yaw_mouse = -dbus->mouse.x / 32767.0 * 0.1 * PI;
-    yaw_remote = -dbus->ch2 / 660.0 / 210.0 * PI;
+    yaw_mouse = dbus->mouse.x / 32767.0 * 0.1 * PI;
+    yaw_remote = dbus->ch2 / 660.0 / 210.0 / 5 * PI;
     // sum whole yaw data
     yaw_sum = yaw_mouse + yaw_remote;
 
@@ -272,20 +275,43 @@ void gimbalTask(void* arg) {
     pitch_target = clip<float>(pitch_target + pitch_sum, 0, 100 * PI);
     pitch_pos = clip<float>(pitch_pos + pitch_target, 0, 100 * PI);
     // pitch update
-    pitch_motor->SetOutput(pitch_pos, 30);
-    control::Motor4310::TransmitOutput(motors_can2_gimbal, 1);
+//    pitch_motor->SetOutput(pitch_pos, 30);
+//    control::Motor4310::TransmitOutput(motors_can2_gimbal, 1);
     // if not elevation, update the yaw position in the chassis
     if (Elevation) {
       // yaw processing (gear ratio 1 : 4)
-      yaw_target = clip<float>(yaw_target + yaw_sum, -PI / 2, PI / 2);
-      yaw_pos = clip<float>(yaw_pos + yaw_target, -PI / 2, PI / 2);
+      yaw_pos = clip<float>(yaw_pos + yaw_sum, -PI / 3, PI / 3);
       // yaw update
-      yaw_motor->SetOutput(yaw_pos, 0, 5, 0.5, 0);
+      yaw_motor->SetOutput(yaw_pos, 5, 20, 1, 0);
       control::Motor4310::TransmitOutput(motors_can1_gimbal, 1);
     }
 
     osDelay(GIMBAL_TASK_DELAY);
   }
+}
+
+//==================================================================================================
+// Shooter(TODO)
+//==================================================================================================
+const osThreadAttr_t shooterTaskAttribute = {.name = "shooterTask",
+                                             .attr_bits = osThreadDetached,
+                                             .cb_mem = nullptr,
+                                             .cb_size = 0,
+                                             .stack_mem = nullptr,
+                                             .stack_size = 256 * 4,
+                                             .priority = (osPriority_t)osPriorityNormal,
+                                             .tz_module = 0,
+                                             .reserved = 0};
+
+osThreadId_t shooterTaskHandle;
+
+static control::MotorCANBase* force_motor = nullptr;
+static control::MotorCANBase* load_motor = nullptr;
+static control::MotorCANBase* reload_motor = nullptr;
+
+void shooterTask(void* arg) {
+  UNUSED(arg);
+
 }
 
 //==================================================================================================
@@ -400,10 +426,10 @@ void RM_RTOS_Init() {
 
   // Chassis class initialization
   // motor initialization
-  fl_motor = new control::Motor3508(can1, 0x201);
-  fr_motor = new control::Motor3508(can1, 0x202);
-  br_motor = new control::Motor3508(can1, 0x203);
-  bl_motor = new control::Motor3508(can1, 0x204);
+  fl_motor = new control::Motor3508(can1, 0x202);
+  fr_motor = new control::Motor3508(can1, 0x201);
+  bl_motor = new control::Motor3508(can1, 0x203);
+  br_motor = new control::Motor3508(can1, 0x204);
   // motor distribution
   control::MotorCANBase* motors[control::FourWheel::motor_num];
   motors[control::FourWheel::front_left] = fl_motor;
@@ -420,6 +446,11 @@ void RM_RTOS_Init() {
   pitch_motor = new control::Motor4310(can2, 0x02, 0x01, control::POS_VEL);
   yaw_motor = new control::Motor4310(can1, 0x04, 0x03, control::MIT);
 
+  //Shooter initialization
+  load_motor = new control::Motor3508(can2, 0x201);
+  reload_motor = new control::Motor3508(can2, 0x202);
+  force_motor = new control::Motor3508(can2, 0x203);
+
   // Referee initialization
   referee_uart = new RefereeUART(&huart6);
   referee_uart->SetupRx(300);
@@ -435,7 +466,8 @@ void RM_RTOS_Threads_Init(void) {
   refereeTaskHandle = osThreadNew(refereeTask, nullptr, &refereeTaskAttribute);
   chassisTaskHandle = osThreadNew(chassisTask, nullptr, &chassisTaskAttribute);
   gimbalTaskHandle = osThreadNew(gimbalTask, nullptr, &gimbalTaskAttribute);
-  selfTestTaskHandle = osThreadNew(self_Check_Task, nullptr, &selfTestingTask);
+//  shooterTaskHandle = osThreadNew(shooterTask, nullptr, &shooterTaskAttribute);
+//  selfTestTaskHandle = osThreadNew(self_Check_Task, nullptr, &selfTestingTask);
 }
 
 //==================================================================================================
@@ -454,7 +486,7 @@ void KillAll() {
     if (FakeDeath.posEdge()) {
       Dead = false;
       RGB->Display(display::color_green);
-      laser->On();
+//      laser->On();
       pitch_motor->MotorEnable();
       yaw_motor->MotorEnable();
       break;
