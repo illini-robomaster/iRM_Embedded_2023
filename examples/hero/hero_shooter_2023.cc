@@ -42,7 +42,6 @@ static display::RGB* RGB = nullptr;
 
 // Special Modes
 static BoolEdgeDetector LoadDetect(false);
-static BoolEdgeDetector ForceDetect(false);
 
 static control::MotorCANBase* force_motor = nullptr;
 static control::MotorCANBase* load_motor = nullptr;
@@ -51,6 +50,9 @@ static control::PDIHV* trigger = nullptr; // CCW for positive angle, CW for nega
 static control::ServoMotor* load_servo = nullptr;
 static control::ServoMotor* reload_servo = nullptr;
 static control::ServoMotor* force_servo = nullptr;
+
+static BoolEdgeDetector ForceWeakDetect(false);
+static BoolEdgeDetector ForceStrongDetect(false);
 
 void RM_RTOS_Init() {
   // peripherals initialization
@@ -65,7 +67,7 @@ void RM_RTOS_Init() {
   RGB = new display::RGB(&htim5, 3, 2, 1, 1000000);
 
   //Shooter initialization
-  load_motor = new control::Motor3508(can2, 0x201);
+  load_motor = new control::Motor3508(can1, 0x201);
   reload_motor = new control::Motor3508(can1, 0x202);
   force_motor = new control::Motor3508(can1, 0x203);
   // magic number from the data test for this servo
@@ -99,7 +101,7 @@ void RM_RTOS_Default_Task(const void* args) {
   UNUSED(args);
 //  control::MotorCANBase* can2_reloader[] = { reload_motor};
   control::MotorCANBase* can2_loader[] = { load_motor};
-//  control::MotorCANBase* can2_force[] = { force_motor};
+  control::MotorCANBase* can2_force[] = { force_motor};
 
   // Variable initialization (params need test)
   // reload variables
@@ -110,6 +112,12 @@ void RM_RTOS_Default_Task(const void* args) {
   bool loading = false;
   float load_angle = 2 * PI / 6 * 99.506 / M3508P19_RATIO; // 99.506 is the ratio of the load servo, devide the 3508 ratio
   int i = 0;
+  // force variable
+  bool force_week = false;
+  bool force_strong = false;
+  bool force_transforming = false;
+  float force_pos = 0;
+  float force_angle = 10 * PI;
 
 //   waiting for the start signal
   while (true) {
@@ -121,6 +129,46 @@ void RM_RTOS_Default_Task(const void* args) {
     // Dead
 //    while (Dead || GimbalDead) osDelay(100);
 
+    // whether change the force motor position
+    ForceWeakDetect.input(dbus->keyboard.bit.F || dbus->swr == remote::UP);
+    ForceStrongDetect.input(dbus->keyboard.bit.C || dbus->swr == remote::UP);
+    // just execute force transform once
+    if (ForceWeakDetect.posEdge() && !ForceStrongDetect.posEdge() && !force_week) {
+      force_transforming = true;
+      force_week = true;
+      force_strong = false;
+    } else if (ForceStrongDetect.posEdge() && !ForceWeakDetect.posEdge() && !force_strong) {
+      force_transforming = true;
+      force_week = false;
+      force_strong = true;
+    }
+    // force transforming
+    if (force_transforming) {
+      while (true) {
+        // break condition (reach the desire position)
+        if (++i > 10 && abs(force_motor->GetOmega()) <= 0.001) break;
+        // set the speed and acceleration for the reload motor
+        // set target pull position once
+        if (i == 1) {
+          // direction need test
+          if (force_week && !force_strong) {
+            force_pos += force_angle;
+          } else if (force_strong && !force_week) {
+            force_pos -= force_angle;
+          }
+          force_servo->SetTarget(force_pos);
+        }
+        force_servo->CalcOutput();
+        control::MotorCANBase::TransmitOutput(can2_force, 1);
+        osDelay(2);
+      }
+      // after changing the force motor position
+      i = 0;
+      force_transforming = false;
+      force_motor->SetOutput(0);
+      control::MotorCANBase::TransmitOutput(can2_force, 1);
+      osDelay(100); // need test the delay time(wait for the)
+    }
     // the shoot and load process is automatic
     // 1. using servo pull the trigger (shooting process)
     // 2. reload motor pull the bullet board to the desire position (load process below)
