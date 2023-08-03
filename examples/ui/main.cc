@@ -26,6 +26,7 @@
 #include "bsp_print.h"
 #include "bsp_uart.h"
 #include "cmsis_os.h"
+#include "dbus.h"
 #include "protocol.h"
 #include "user_interface.h"
 
@@ -71,10 +72,13 @@ void refereeTask(void* arg) {
 }
 
 static communication::UserInterface* UI = nullptr;
-static communication::StringGUI* uptimeGUI = nullptr;
+
+static remote::DBUS* dbus = nullptr;
 
 void RM_RTOS_Init(void) {
   print_use_uart(&huart1);
+
+  dbus = new remote::DBUS(&huart3);
 
   referee_uart = new CustomUART(&huart6);
   referee_uart->SetupRx(300);
@@ -89,32 +93,55 @@ void RM_RTOS_Threads_Init(void) {
   refereeTaskHandle = osThreadNew(refereeTask, nullptr, &refereeTaskAttribute);
 }
 
+static communication::Bar* pitchBar = nullptr;
+static communication::CrossairGUI* crossairGUI = nullptr;
+static communication::CapGUI* forceGUI = nullptr;
+static communication::CapGUI* reloadGUI = nullptr;
+static communication::StringGUI* modeGUI = nullptr;
+
 void RM_RTOS_Default_Task(const void* argument) {
   UNUSED(argument);
-  osDelay(10000);
+  osDelay(3000);
   UI->SetID(referee->game_robot_status.robot_id);
   osDelay(120);
-  char tmp[15] = "Hello";
-  uptimeGUI = new communication::StringGUI(UI, tmp, 300, 800);
-  uptimeGUI->Init();
-  osDelay(200);
-  uptimeGUI->InitString();
-  osDelay(1000);
+  communication::graphic_data_t data[7];
+  char tmp[15] = "PITCH         ";
+  pitchBar = new communication::Bar(1830, 440, 30, 400,
+                                           UI_Color_Green, UI_Color_Pink, true);
+  data[0] = pitchBar->Init();
+  data[1] = pitchBar->InitFrame();
+  UI->FloatDraw(&data[2],"PI",UI_Graph_Add,1,UI_Color_Cyan,20,3,4,1600,800,114514);
+  UI->GraphRefresh(5,data[0],data[1],data[2],data[0],data[1]);
+  osDelay(110);
+  crossairGUI = new communication::CrossairGUI(UI);
+  osDelay(110);
+  strcpy(tmp, "FORCE         ");
+  forceGUI = new communication::CapGUI(UI,tmp,1500,460,310,20);
+  osDelay(110);
+  forceGUI->InitName();
+  osDelay(110);
+  strcpy(tmp, "RELOAD        ");
+  reloadGUI = new communication::CapGUI(UI,tmp,1500,405,310,20);
+  osDelay(110);
+  reloadGUI->InitName();
+  osDelay(110);
+  strcpy(tmp, "MODE          ");
+  modeGUI = new communication::StringGUI(UI,tmp,1550,370,UI_Color_Orange,20);
+  modeGUI->Init();
+  osDelay(110);
+  modeGUI->InitString();
+  osDelay(110);
 
   while (true) {
     set_cursor(0, 0);
     clear_screen();
-    print("Chassis Volt: %.3f\r\n", referee->power_heat_data.chassis_volt / 1000.0);
-    print("Chassis Curr: %.3f\r\n", referee->power_heat_data.chassis_current / 1000.0);
-    print("Chassis Power: %.3f\r\n", referee->power_heat_data.chassis_power);
-    print("\r\n");
-    print("Shooter Cooling Heat: %hu\r\n", referee->power_heat_data.shooter_id1_17mm_cooling_heat);
-    print("Bullet Frequency: %hhu\r\n", referee->shoot_data.bullet_freq);
-    print("Bullet Speed: %.3f\r\n", referee->shoot_data.bullet_speed);
-    float uptime = HAL_GetTick() * 1.0f / 1000;
-    memset(tmp, ' ', 15);
-    snprintf(tmp, 15, "Uptime: %.3f", uptime);
-    uptimeGUI->Update(tmp);
-    osDelay(100);
+    float pitch_val = dbus->ch2 / 660.0f / 2.0f + 0.5f;
+    data[0] = pitchBar->Update(pitch_val);
+    float reload_val = dbus->ch1 / 660.0f / 2.0f + 0.5f;
+    reloadGUI->UpdateBulk(reload_val,&data[1],&data[2]);
+    float force_val = dbus->ch3 / 660.0f / 2.0f + 0.5f;
+    forceGUI->UpdateBulk(force_val,&data[3],&data[4]);
+    UI->GraphRefresh(5,data[0],data[1],data[2],data[3],data[4]);
+    osDelay(110);
   }
 }
