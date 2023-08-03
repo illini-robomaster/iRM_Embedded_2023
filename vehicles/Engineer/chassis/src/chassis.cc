@@ -354,7 +354,7 @@ void RM_RTOS_Init() {
   steering_motor_data.max_speed = RUN_SPEED;
   steering_motor_data.max_acceleration = ACCELERATION;
   steering_motor_data.transmission_ratio = 8;
-  steering_motor_data.omega_pid_param = new float[3]{200, 7, 1};
+  steering_motor_data.omega_pid_param = new float[3]{2000, 7, 1};
   steering_motor_data.max_iout = 1000;
   steering_motor_data.max_out = 13000;
   steering_motor_data.calibrate_offset = 0;

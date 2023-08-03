@@ -52,6 +52,9 @@ void chassisTask(void* arg){
         float sin_yaw, cos_yaw, vx_set, vy_set;
         float vx, vy, wz; 
 
+        // vx_set = -receive->vx;
+        // vy_set = receive->vy;
+
         vx_set = -dbus->ch3;
         vy_set = dbus->ch2;
 
@@ -63,7 +66,7 @@ void chassisTask(void* arg){
         vx = cos_yaw * vx_set + sin_yaw * vy_set;
         vy = -sin_yaw * vx_set + cos_yaw * vy_set;
         wz = std::min(FOLLOW_SPEED, FOLLOW_SPEED * relative_angle);       /* TODO : ASK IF GIMBAL EXIST, HOW CHASSIS MOVE */
-        wz = dbus ->ch0;
+        wz = dbus->ch0;
         // if (-CHASSIS_DEADZONE < relative_angle && relative_angle < CHASSIS_DEADZONE) wz = 0;
 
         chassis->SetSpeed(vx / 10, vy / 10, wz/10);
@@ -151,7 +154,7 @@ void init_chassis(){
   servo_data.max_speed = RUN_SPEED;
   servo_data.max_acceleration = ACCELERATION;
   servo_data.transmission_ratio = 1;
-  servo_data.omega_pid_param = new float[3]{13000, 300, 300};
+  servo_data.omega_pid_param = new float[3]{20000, 100, 500};
   servo_data.max_iout = 30000;
   servo_data.max_out = 20000;
   servo_data.install_offset = BL_MOTOR_OFFSET;

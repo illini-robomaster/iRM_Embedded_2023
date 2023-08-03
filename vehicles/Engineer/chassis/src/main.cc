@@ -29,8 +29,8 @@
 // #include "referee_task.h"
 
 osThreadId_t chassisTaskHandle;
-// osThreadId_t UITaskHandle;
-// osThreadId_t refereeTaskHandle;
+osThreadId_t UITaskHandle;
+osThreadId_t refereeTaskHandle;
 
 
 bsp::CAN* can1 = nullptr;

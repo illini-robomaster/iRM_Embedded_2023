@@ -154,7 +154,7 @@ public:
   /**
    * @brief zip the send data package
    */
-  void ModifyData();
+  void ModifyData(const unsigned short motor_id);
 
   /**
    * @brief unzip the recv data package
@@ -191,8 +191,8 @@ public:
    */
   void Control(const unsigned short motor_id, const float torque, const float speed, const float position, const float Kp, const float Kd);
 
-  motor_send_t send; // send storage structure instance
-  motor_recv_t recv; // recv storage structure instance
+  motor_send_t send[3]; // send storage structure instance
+  motor_recv_t recv[3]; // recv storage structure instance
 
   const int send_length = 34; // send data package length
   const int recv_length = 78; // recv data package length

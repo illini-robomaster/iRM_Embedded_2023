@@ -7,6 +7,8 @@
 #include "dbus.h"
 #include "can.h"
 #include "rgb.h"
+#include "protocol.h"
+#include "bsp_can_bridge.h"
 
 //MAGIC NUMBERS, Represent motor physical install angle offsets.
 #define FL_MOTOR_OFFSET 4.76
@@ -38,6 +40,8 @@ extern remote::DBUS* dbus;
 extern bsp::CAN* can1;
 extern bsp::CAN* can2;
 extern display::RGB* RGB;
+extern communication::Referee* referee;
+extern bsp::CanBridge* receive;
 
 
 // speed for steering motors (rad/s)

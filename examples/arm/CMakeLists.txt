@@ -26,5 +26,5 @@ irm_add_arm_executable(${PROJECT_NAME}_test
 
 irm_add_arm_executable(${PROJECT_NAME}_dbus
     TARGET DJI_Board_TypeC
-    SOURCES arm_dbus.cc
+    SOURCES arm_controller.cc
     INCLUDES ./)

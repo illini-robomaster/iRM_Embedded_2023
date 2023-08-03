@@ -18,8 +18,6 @@
  *                                                                          *
  ****************************************************************************/
 
-namespace engineer {
-
 typedef struct {
   float base_translate;     /* translate 3508 motor                           */
   float base_vert_rotate;   /* rotate the entire arm around an vertical axis  */
@@ -44,7 +42,6 @@ int ArmTurnRelative(joint_state_t* target_joint_state);
  */
 int ArmTurnAbsolute(joint_state_t* target_joint_state);
 
-
 /**
  * @brief Call all TransmitOutput() or equivalent function for each motor
  */
@@ -54,5 +51,3 @@ void ArmTransmitOutput();
  * @brief print arm data
  */
 void ArmPrintData();
-
-} // end ns engineer

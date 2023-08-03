@@ -17,3 +17,11 @@ void refereeTask(void* arg) {
    }
  }
 }
+
+void init_referee(){
+
+}
+
+void kill_referee(){
+  
+}

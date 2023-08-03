@@ -44,7 +44,6 @@ osThreadId_t A1TaskHandle;
 class CustomUART: public bsp::UART {
  public:
   using bsp::UART::UART;
-
  protected:
   /* notify application when rx data is pending read */
   void RxCompleteCallback() override final { osThreadFlagsSet(A1TaskHandle, RX_SIGNAL); }
