@@ -4,18 +4,34 @@
 DFRobot_ADS1115 ads1(&Wire);
 DFRobot_ADS1115 ads2(&Wire);
 
-const int pwm1Pin = A4;
-const int pwm2Pin = A3;
+const int pwm0Pin = D9;
+const int pwm1Pin = D7;
+const int pwm2Pin = D6;
+const int pwm3Pin = D5;
+const int pwm4Pin = D3;
+const int pwm5Pin = D2;
 
 void setup() {
   Serial.begin(115200);
 
+  pinMode(pwm0Pin, OUTPUT);
   pinMode(pwm1Pin, OUTPUT);
   pinMode(pwm2Pin, OUTPUT);
+  pinMode(pwm3Pin, OUTPUT);
+  pinMode(pwm4Pin, OUTPUT);
+  pinMode(pwm5Pin, OUTPUT);
   ledcSetup(0, 50, 16);
   ledcSetup(1, 50, 16);
-  ledcAttachPin(pwm1Pin, 0);
-  ledcAttachPin(pwm2Pin, 1);
+  ledcSetup(2, 50, 16);
+  ledcSetup(3, 50, 16);
+  ledcSetup(4, 50, 16);
+  ledcSetup(5, 50, 16);
+  ledcAttachPin(pwm0Pin, 0);
+  ledcAttachPin(pwm1Pin, 1);
+  ledcAttachPin(pwm2Pin, 2);
+  ledcAttachPin(pwm3Pin, 3);
+  ledcAttachPin(pwm4Pin, 4);
+  ledcAttachPin(pwm5Pin, 5);
 
   ads1.setAddr_ADS1115(ADS1115_IIC_ADDRESS0);
   ads1.setGain(eGAIN_TWOTHIRDS);
@@ -32,25 +48,32 @@ void setup() {
   ads2.init();
 }
 
-int calculatePWM(int degree) {
+/* 2880, 4940~5020, 7080 */
+int calculatePWM(float degree) {
   const float deadZone = 2880;
   const float max = 7080;
-  return (int)(((max -  deadZone) / 360 * degree + deadZone));
+  return (int)(((max -  deadZone) / 360.0 * degree + deadZone));
 }
-
-// [16] 2880, 4940~5020, 7080
 
 void loop() {
+  int adc0 = 0, adc1 = 0, adc2 = 0, adc3 = 0, adc4 = 0, adc5 = 0;
   if (ads1.checkADS1115()) {
-    int16_t adc0, adc1, adc2, adc3;
     adc0 = ads1.readVoltage(0);
     adc1 = ads1.readVoltage(1);
-    // Serial.println(adc0);
-    ledcWrite(0, calculatePWM(adc0 / 3297.0 * 360));
-    ledcWrite(1, calculatePWM(adc1 / 3297.0 * 360));
-
+    adc2 = ads1.readVoltage(2);
+    adc3 = ads1.readVoltage(3);
+    ledcWrite(0, calculatePWM(adc0 / 3300.0 * 360.0));
+    ledcWrite(1, calculatePWM(adc1 / 3300.0 * 360.0));
+    ledcWrite(2, calculatePWM(adc2 / 3300.0 * 360.0));
+    ledcWrite(3, calculatePWM(adc3 / 3300.0 * 360.0));
   } else
-    Serial.println("ADS1115 Disconnected!");
+    Serial.println("ADS1 Disconnected!");
+  if (ads2.checkADS1115()) {
+    adc4 = ads2.readVoltage(0);
+    adc5 = ads2.readVoltage(1);
+    ledcWrite(4, calculatePWM(adc4 / 2050.0 * 180.0));
+    ledcWrite(5, calculatePWM(adc5 / 2800.0 * 180.0));
+  } else
+    Serial.println("ADS2 Disconnected!");
+  Serial.println(adc0);
 }
-
-
