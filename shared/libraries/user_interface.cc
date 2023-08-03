@@ -273,7 +273,7 @@ void UserInterface::FloatDraw(graphic_data_t* image, const char name[3], uint32_
   image->start_y = start_y;
   float float_data = graph_float;
   int32_t float2int_data;
-  memcpy(&float2int_data, (uint8_t*)&float_data, 4);
+  float2int_data = float_data * 1000;
   image->radius = float2int_data & 0x3FF;
   image->end_x = (float2int_data & 0x1FFC00) >> 10;
   image->end_y = (float2int_data & 0xFFE00000) >> 21;
