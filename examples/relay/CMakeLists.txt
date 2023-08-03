@@ -20,7 +20,11 @@
 
 project(example_relay ASM C CXX)
 
-irm_add_arm_executable(${PROJECT_NAME}
+irm_add_arm_executable(${PROJECT_NAME}_TypeA
     TARGET DJI_Board_TypeA
-    SOURCES main.cc)
+    SOURCES TypeA.cc)
+
+irm_add_arm_executable(${PROJECT_NAME}_TypeC
+    TARGET DJI_Board_TypeC
+    SOURCES TypeC.cc)
 

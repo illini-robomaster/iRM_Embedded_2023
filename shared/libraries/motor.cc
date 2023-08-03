@@ -106,6 +106,8 @@ int16_t MotorCANBase::GetCurr() const { return 0; }
 
 uint16_t MotorCANBase::GetTemp() const { return 0; }
 
+float MotorCANBase::GetTorque() const { return 0.0f; }
+
 //==================================================================================================
 // Motor3508
 //==================================================================================================
@@ -143,6 +145,9 @@ void Motor3508::SetOutput(int16_t val) {
 int16_t Motor3508::GetCurr() const { return raw_current_get_; }
 
 uint16_t Motor3508::GetTemp() const { return raw_temperature_; }
+
+
+
 
 //==================================================================================================
 // Motor 3510
@@ -419,6 +424,7 @@ void ServoMotor::CalcOutput() {
     // detect if motor is jammed
     // detect total is used as filter.
     if (detect_total_ >= jam_threshold_) {
+      omega_pid_.Reset();
       servo_jam_t data;
       data.speed = max_speed_;
       // this function is in shooter.cc called jam_callback.

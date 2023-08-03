@@ -136,6 +136,8 @@ class MotorCANBase : public MotorBase {
 
   virtual uint16_t GetTemp() const;
 
+  virtual float GetTorque() const;
+
   /**
    * @brief transmit CAN message for setting motor outputs
    *
@@ -213,6 +215,8 @@ class Motor3508 : public MotorCANBase {
   volatile int16_t raw_current_get_ = 0;
   volatile uint8_t raw_temperature_ = 0;
 };
+
+
 
 //==================================================================================================
 // Motor 3510
@@ -293,6 +297,10 @@ class Motor6623 : public MotorCANBase {
 
   static const int16_t CURRENT_CORRECTION = -1;  // current direction is reversed
 };
+
+
+
+
 
 //==================================================================================================
 // MotorPWMBase

@@ -28,15 +28,7 @@ static auto step_angles_ = std::unordered_map<ServoMotor*, float>();
 
 void jam_callback(control::ServoMotor* servo, const control::servo_jam_t data) {
   UNUSED(data);
-  float servo_target = servo->GetTarget();
-  if (servo_target >= servo->GetTheta()) {
-    float prev_target = servo->GetTheta() - (2 * PI/6);
-    servo->SetTarget(prev_target, true);
-    // print("Antijam engage\r\n");
-  } 
-  // else {
-  //   // print("Antijam in operation\r\n");
-  // }
+  servo->SetTarget(servo->GetTheta() - (2 * PI/6), true);
 }
 
 Shooter::Shooter(shooter_t shooter) {
@@ -57,7 +49,7 @@ Shooter::Shooter(shooter_t shooter) {
       servo_data.max_out = 10000;
 
       load_step_angle_ = 2 * PI / 8;
-      load_double_angle_ = 2 * PI / 4;
+      load_triple_angle_ = 2 * PI / 8 * 3;
       load_antijam_angle_ = 2 * PI / 8;
       dial_speed_ = 6 * PI;
       dial_continue_fast_acceleration = 100 * PI;
@@ -70,7 +62,7 @@ Shooter::Shooter(shooter_t shooter) {
       servo_data.max_speed = 100 * PI;
       servo_data.max_acceleration = 80 * PI;
       servo_data.transmission_ratio = M2006P36_RATIO;
-      servo_data.omega_pid_param = new float[3]{30, 1, 7};
+      servo_data.omega_pid_param = new float[3]{80, 1.5, 5};
       servo_data.max_iout = 9000;
       servo_data.max_out = 20000;
 
@@ -78,7 +70,7 @@ Shooter::Shooter(shooter_t shooter) {
       right_pid_ = new PIDController(80, 3, 0.1);
       flywheel_turning_detector_ = new BoolEdgeDetector(false);
       load_step_angle_ = 2 * PI / 8;
-      load_double_angle_ = 2 * PI / 4;
+      load_triple_angle_ = 2 * PI / 8 * 3;
       load_antijam_angle_ = 2 * PI / 8;
       speed_ = 0;
       dial_speed_ = 20 * PI;
@@ -94,7 +86,7 @@ Shooter::Shooter(shooter_t shooter) {
   // Initialize servomotor instance using data provided and register default jam callback
   load_servo_ = new control::ServoMotor(servo_data);
   // the callback function is at the start of the shooter.cc file.
-  load_servo_->RegisterJamCallback(jam_callback, 0.304);
+  load_servo_->RegisterJamCallback(jam_callback, 0.29);
 
   // Register in step_angles_ so callback function can find step angle corresponding to
   // specific servomotor instance.
@@ -164,8 +156,8 @@ void Shooter::SlowContinueShoot() {
   load_servo_->SetMaxAcceleration(dial_continue_slowly_acceleration);
 }
 
-void Shooter::DoubleShoot() {
-  load_servo_->SetTarget(load_servo_->GetTarget() + load_double_angle_, false);
+void Shooter::TripleShoot() {
+  load_servo_->SetTarget(load_servo_->GetTarget() + load_triple_angle_, false);
   load_servo_->SetMaxSpeed(dial_speed_);
   load_servo_->SetMaxAcceleration(dial_double_acceleration);
 }
