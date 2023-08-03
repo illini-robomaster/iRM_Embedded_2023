@@ -24,8 +24,8 @@ irm_add_arm_executable(Engineer_arm
     TARGET DJI_Board_TypeC
     SOURCES 
     src/arm.cc
-    src/chassis_task.cc
-    src/main.cc
+    # src/chassis_task.cc
+    # src/main.cc
     INCLUDES include)
 
 
