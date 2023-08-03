@@ -310,14 +310,14 @@ void gimbalTask(void* arg) {
     // pitch processing
     pitch_pos = clip<float>(pitch_pos + pitch_sum, -70 * PI, 70 * PI);
     // pitch update
-    pitch_motor->SetOutput(pitch_pos, pitch_sum);
+    pitch_motor->SetOutput(pitch_pos, 15);
     control::Motor4310::TransmitOutput(motors_can2_gimbal, 1);
     // if not elevation, update the yaw position in the chassis
     if (Elevation) {
       // yaw processing (gear ratio 1 : 4)
       yaw_pos = clip<float>(yaw_pos + yaw_sum, -PI / 3, PI / 3);
       // yaw update
-      yaw_motor->SetOutput(yaw_pos, 5, 20, 1, 0);
+      yaw_motor->SetOutput(yaw_pos, 10, 20, 1, 0);
       control::Motor4310::TransmitOutput(motors_can1_gimbal, 1);
     }
 
@@ -696,7 +696,7 @@ void RM_RTOS_Init() {
   servo_data.motor = reload_motor;
   servo_data.max_speed = 4 * PI; // params need test
   servo_data.max_acceleration = 10 * PI;
-  servo_data.omega_pid_param = new float [3] {150, 1.2, 5};
+  servo_data.omega_pid_param = new float [3] {130, 15, 5};
   reload_servo = new control::ServoMotor(servo_data);
 
   servo_data.motor = force_motor;

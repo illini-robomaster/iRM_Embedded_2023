@@ -86,8 +86,8 @@ void RM_RTOS_Init() {
 
   servo_data.motor = reload_motor;
   servo_data.max_speed = 4 * PI; // params need test
-  servo_data.max_acceleration = 8 * PI;
-  servo_data.omega_pid_param = new float [3] {130, 15, 5}; // pid need test
+  servo_data.max_acceleration = 10 * PI;
+  servo_data.omega_pid_param = new float [3] {150, 15, 5}; // pid need test
   reload_servo = new control::ServoMotor(servo_data);
 
   servo_data.motor = force_motor;
@@ -107,7 +107,7 @@ void RM_RTOS_Default_Task(const void* args) {
   // reload variables
   bool reload_pull = false;
   bool reload_push = false;
-  float reload_pos = 3.7 * PI * 99.506 / M3508P19_RATIO; // 99.506 is the ratio of the reload servo, devide the 3508 ratio
+  float reload_pos = 3.24 * PI * 99.506 / M3508P19_RATIO; // 99.506 is the ratio of the reload servo, devide the 3508 ratio
   // load variable
   bool loading = false;
   float load_angle = 2 * PI / 6 * 99.506 / M3508P19_RATIO; // 99.506 is the ratio of the load servo, devide the 3508 ratio
