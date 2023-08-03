@@ -81,11 +81,9 @@ constexpr float RUN_SPEED = (4 * PI);
 constexpr float ALIGN_SPEED = (PI);
 constexpr float ACCELERATION = (100 * PI);
 
-
 // speed for chassis rotation (no unit)
 constexpr float SPIN_SPEED = 40;
 constexpr float FOLLOW_SPEED = 40;
-
 
 //==================================================================================================
 // Referee
@@ -173,9 +171,6 @@ static const float CHASSIS_DEADZONE = 0.04;
 static const float CHASSIS_DEADZONE2 = 0.1;
 static float SPIN_DOWN_SPEED_FACTOR = 0.0;
 
-static bool CHARGE_CYCLE = false;
-static bool ACCELERATE = false;
-
 bool steering_align_detect1() { return pe1->Read() == 0; }
 
 bool steering_align_detect2() { return pe2->Read() == 0; }
@@ -212,6 +207,8 @@ void chassisTask(void* arg) {
   chassis->SetWheelSpeed(0,0,0,0);
 
   float WHEEL_SPEED_FACTOR = 0.0;
+  float power_limit = 0.0;
+  float power_limit_lowerbound = 45.0;
 
   while (true) {
     float relative_angle = receive->relative_angle;
@@ -243,75 +240,37 @@ void chassisTask(void* arg) {
       chassis->SteerSetMaxSpeed(RUN_SPEED);
       chassis->SteerThetaReset();
       chassis->SetWheelSpeed(0,0,0,0);
-
     }
-
-
-
 
     float supercap_voltage = (float)(supercap->info.voltage / 1000.0);
     float maximum_energy = 0.5 * pow(27.0,2) * 6.0;
 
-    float power = pow(supercap_voltage,2) * 6 / 2;
-
-    chassis->SteerCalcOutput();
-
+    float current_energy = pow(supercap_voltage,2) * 6 / 2;
 
     //consider using uart printing to check the power limit's value
     //log values out as files to obtain its trend
     //WHEEL_SPEED_FACTOR separated for two modes
-    if (CHARGE_CYCLE){
-      WHEEL_SPEED_FACTOR = 6.0;
-      if (power >= 0.85 * maximum_energy){
-        CHARGE_CYCLE = false;
-        ACCELERATE = true;
-      }
+    if (current_energy <= 0.1 * maximum_energy) {
+      // case when remaining energy of capacitor is below 10%, recharge the super capacitor
+      power_limit = power_limit_lowerbound;
+      WHEEL_SPEED_FACTOR = 4.0;
+    } else if (current_energy <= 0.2 * maximum_energy && current_energy > 0.1 * maximum_energy) {
+      // case when remaining energy of capacitor is between 10% and 20%
+      power_limit = power_limit_lowerbound + (power_limit_lowerbound / (0.1 * maximum_energy)) * (current_energy - 0.1 * maximum_energy);
+      WHEEL_SPEED_FACTOR = 6.0 + (4.0 / ((0.1 * maximum_energy))) * (current_energy - 0.1 * maximum_energy);
+    } else if (current_energy <= 0.3 * maximum_energy && current_energy > 0.2 * maximum_energy) {
+      // case when remaining energy of capacitor is between 20% and 30%
+      power_limit = 80.0 + (60.0 / (0.1 * maximum_energy)) * (current_energy - 0.2 * maximum_energy);
+      WHEEL_SPEED_FACTOR = 10.0 + (2.0 / ((0.1 * maximum_energy))) * (current_energy - 0.2 * maximum_energy);
+    } else if (current_energy > 0.3 * maximum_energy) {
+      // case when remaining energy of capacitor is above 30%
+      power_limit = 120;
+      WHEEL_SPEED_FACTOR = 12.0;
+      // WHEEL SPEED FACTOR will be 12
     }
-    else if (ACCELERATE){
-      WHEEL_SPEED_FACTOR += 0.001;
-      if (WHEEL_SPEED_FACTOR == 14.0){
-        ACCELERATE = false;
-      }
-    }
-    else {
-      if (power <= 0.1 * maximum_energy) {
-        // case when remaining power of capacitor is below 25%
-        chassis->Update((float)40.0,
-                        referee->power_heat_data.chassis_power,
-                        (float)referee->power_heat_data.chassis_power_buffer);
 
-        WHEEL_SPEED_FACTOR = (float)6.0;
-        CHARGE_CYCLE = true;
-      } else if (power <= 0.2 * maximum_energy && power > 0.1 * maximum_energy) {
-        // case when remaining power of capacitor is between 20% and 50%
-        chassis->Update((float)(40.0 + (40 / 0.1 * maximum_energy) * (power - 0.1 * maximum_energy)),
-                        referee->power_heat_data.chassis_power,
-                        (float)referee->power_heat_data.chassis_power_buffer);
-
-        WHEEL_SPEED_FACTOR = (float)(6.0 + (4.0 / ((0.1 * maximum_energy))) * (power - 0.1 * maximum_energy));
-      } else if (power <= 0.3 * maximum_energy && power > 0.2 * maximum_energy) {
-        // case when remaining power of capacitor is between 20% and 50%
-        chassis->Update((float)(80.0 + (60.0 / 0.1 * maximum_energy) * (power - 0.2 * maximum_energy)),
-                        referee->power_heat_data.chassis_power,
-                        (float)referee->power_heat_data.chassis_power_buffer);
-        WHEEL_SPEED_FACTOR = (float)(10.0 + (2.0 / ((0.1 * maximum_energy))) * (power - 0.2 * maximum_energy));
-      } else if (power > 0.3 * maximum_energy) {
-        // case when remaining power of capacitor is above 30%
-        chassis->Update((float)120.0,
-                        referee->power_heat_data.chassis_power,
-                        (float)referee->power_heat_data.chassis_power_buffer);
-        WHEEL_SPEED_FACTOR = (float)(12.0);
-        // WHEEL SPEED FACTOR will be 12
-      }
-    }
-    SPIN_DOWN_SPEED_FACTOR = (float)(4.0 / WHEEL_SPEED_FACTOR);
-    WHEEL_SPEED_FACTOR = receive->mode==1 ? (float)(6.0) : WHEEL_SPEED_FACTOR;
-    chassis->WheelUpdateSpeed(WHEEL_SPEED_FACTOR);
-
-//    print("chassis power: %f, voltage: %f, percentage: %f%%, "
-//        "WHEEL_SPEED_FACTOR: %f, CHA: %u, ACC: %u, vx: %f, vy: %f \r\n",referee->power_heat_data.chassis_power,
-//          supercap_voltage,power / maximum_energy * 100.0, WHEEL_SPEED_FACTOR, CHARGE_CYCLE, ACCELERATE,vx_set,vy_set);
-
+    SPIN_DOWN_SPEED_FACTOR = 4.0 / WHEEL_SPEED_FACTOR;
+    WHEEL_SPEED_FACTOR = receive->mode== 1 ? 4.0 : WHEEL_SPEED_FACTOR;
 
     if (receive->mode == 1) {  // spin mode
       // delay compensation
@@ -338,10 +297,15 @@ void chassisTask(void* arg) {
       if (-CHASSIS_DEADZONE < relative_angle && relative_angle < CHASSIS_DEADZONE) wz = 0;
       //If vx, vy are close to zero, dead zone is larger to avoid wheel to be 45 degree, leading to flipping.
       else if (vx <= 0.1 && vy <= 0.1 && (-CHASSIS_DEADZONE2 < relative_angle && relative_angle < CHASSIS_DEADZONE2)) wz = 0;
-    }  
-
+    }
+    // set the desired speed
     chassis->SetSpeed(vx / 10, vy / 10, wz);
     chassis->SteerUpdateTarget();
+    chassis->WheelUpdateSpeed(WHEEL_SPEED_FACTOR);
+    // update the steering and wheel output
+    chassis->SteerCalcOutput();
+    chassis->Update((float)power_limit, referee->power_heat_data.chassis_power,
+                    (float)referee->power_heat_data.chassis_power_buffer);
     
     if (Dead) {
       chassis->SetSpeed(0,0,0);
