@@ -110,7 +110,7 @@ void RM_RTOS_Default_Task(const void* argument) {
                                            UI_Color_Green, UI_Color_Pink, true);
   data[0] = pitchBar->Init();
   data[1] = pitchBar->InitFrame();
-  UI->FloatDraw(&data[2],"PI",UI_Graph_Add,1,UI_Color_Cyan,20,3,4,1600,800,114514);
+  UI->FloatDraw(&data[2],"PI",UI_Graph_Add,1,UI_Color_Cyan,20,3,4,1600,800,114.514);
   UI->GraphRefresh(5,data[0],data[1],data[2],data[0],data[1]);
   osDelay(110);
   crossairGUI = new communication::CrossairGUI(UI);
