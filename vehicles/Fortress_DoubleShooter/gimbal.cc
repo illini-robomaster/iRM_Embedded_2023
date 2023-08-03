@@ -53,7 +53,7 @@ static const int KILLALL_DELAY = 100;
 static const int DEFAULT_TASK_DELAY = 100;
 static const int SOFT_START_CONSTANT = 500;
 static const int SOFT_KILL_CONSTANT = 200;
-static const float START_PITCH_POS = 0.30f;
+static const float START_PITCH_POS = 0.48f;
 // TODO: the start position of the yaw motor
 static const float START_YAW_POS = 0;
 static const int INFANTRY_INITIAL_HP = 100;
@@ -323,14 +323,14 @@ void refereeTask(void* arg) {
 //==================================================================================================
 
 const osThreadAttr_t shooterTaskAttribute = {.name = "shooterTask",
-                                             .attr_bits = osThreadDetached,
-                                             .cb_mem = nullptr,
-                                             .cb_size = 0,
-                                             .stack_mem = nullptr,
-                                             .stack_size = 256 * 4,
-                                             .priority = (osPriority_t)osPriorityNormal,
-                                             .tz_module = 0,
-                                             .reserved = 0};
+                                            .attr_bits = osThreadDetached,
+                                            .cb_mem = nullptr,
+                                            .cb_size = 0,
+                                            .stack_mem = nullptr,
+                                            .stack_size = 256 * 4,
+                                            .priority = (osPriority_t)osPriorityNormal,
+                                            .tz_module = 0,
+                                            .reserved = 0};
 
 osThreadId_t shooterTaskHandle;
 
@@ -344,155 +344,149 @@ static control::MotorCANBase* right_bottom_flywheel = nullptr;
 static control::MotorCANBase* right_dial = nullptr;
 static control::Shooter* right_shooter = nullptr;
 
-static control::Stepper* stepper = nullptr;
-
 static volatile bool leftflywheelFlag = false;
 static volatile bool rightflywheelFlag = false;
 
-static const int SHOOTER_MODE_DELAY = 350;
-
 void shooterTask(void* arg) {
-  UNUSED(arg);
+ UNUSED(arg);
 
-  control::MotorCANBase* motors_can1_shooter_left[] = {left_top_flywheel, left_bottom_flywheel, left_dial};
+ control::MotorCANBase* motors_can1_shooter_left[] = {left_top_flywheel, left_bottom_flywheel, left_dial};
+ control::MotorCANBase* motors_can1_shooter_right[] = {right_top_flywheel, right_bottom_flywheel, right_dial};
 
-  control::MotorCANBase* motors_can1_shooter_right[] = {right_top_flywheel, right_bottom_flywheel, right_dial};
+ bool triple_shoot_detect_left = false;
+ bool triple_shoot_detect_right = false;
 
+ while (true) {
+   if (dbus->keyboard.bit.B || dbus->swr == remote::DOWN) break;
+   osDelay(100);
+ }
 
-  bool triple_shoot_detect_left = false;
-  bool triple_shoot_detect_right = false;
+ while (!imu->CaliDone()) osDelay(100);
 
-  while (true) {
-    if (dbus->keyboard.bit.B || dbus->swr == remote::DOWN) break;
-    osDelay(100);
-  }
+ while (true) {
+   while (Dead) osDelay(100);
+//       print("power1: %d, cooling heat: %.4f, cooling limit: %.4f\r\n", send->shooter_power, send->cooling_heat1, send->cooling_limit1);
+//       print("power2: %d, cooling heat: %.4f, cooling limit: %.4f\r\n", send->shooter_power, send->cooling_heat2, send->cooling_limit2);
 
-  while (!imu->CaliDone()) osDelay(100);
-
-  while (true) {
-    while (Dead) osDelay(100);
-//    print("power1: %d, cooling heat: %.4f, cooling limit: %.4f\r\n", send->shooter_power, send->cooling_heat1, send->cooling_limit1);
-//    print("power2: %d, cooling heat: %.4f, cooling limit: %.4f\r\n", send->shooter_power, send->cooling_heat2, send->cooling_limit2);
-
-    // left shooter(dial part)
-    if (send->shooter_power && send->cooling_heat1 >= send->cooling_limit1 - 15) {
-      left_top_flywheel->SetOutput(0);
-      left_bottom_flywheel->SetOutput(0);
-      left_dial->SetOutput(0);
-      osDelay(100);
-    } else if (GimbalDead) {
-      left_shooter->DialStop();
-    } else if (send->shooter_power) {
-      // for manual antijam
-      Antijam.input(dbus->keyboard.bit.G);
-      // slow shooting
-      if (dbus->mouse.l || dbus->swr == remote::UP) {
-        left_shooter->SlowContinueShoot();
-      // fast shooting
-      } else if ((dbus->mouse.r || dbus->wheel.wheel > remote::WheelDigitalValue)
+//    left shooter(dial part)
+   if (send->shooter_power && send->cooling_heat1 >= send->cooling_limit1 - 15) {
+     left_top_flywheel->SetOutput(0);
+     left_bottom_flywheel->SetOutput(0);
+     left_dial->SetOutput(0);
+     osDelay(100);
+   } else if (GimbalDead) {
+     left_shooter->DialStop();
+   } else if (send->shooter_power) {
+     // for manual antijam
+     Antijam.input(dbus->keyboard.bit.G);
+     // slow shooting
+     if (dbus->mouse.l || dbus->swr == remote::UP) {
+       left_shooter->SlowContinueShoot();
+       // fast shooting
+     } else if ((dbus->mouse.r || dbus->wheel.wheel > remote::WheelDigitalValue)
                 && send->cooling_heat1 < send->cooling_limit1 - 24) {
-        left_shooter->FastContinueShoot();
-      // triple shooting
-      } else if (dbus->wheel.wheel == remote::WheelDigitalValue
-                  && dbus->previous_wheel_value == remote::WheelDigitalValue) {
-        if (!triple_shoot_detect_left) {
-          triple_shoot_detect_left = true;
-          left_shooter->TripleShoot();
-        }
-      // manual antijam
-      } else if (Antijam.posEdge()) {
-        left_shooter->Antijam();
-      // stop
-      } else {
-        left_shooter->DialStop();
-        triple_shoot_detect_left = false;
-      }
-      dbus->previous_wheel_value = dbus->wheel.wheel;
-    }
+       left_shooter->FastContinueShoot();
+       // triple shooting
+     } else if (dbus->wheel.wheel == remote::WheelDigitalValue
+                && dbus->previous_wheel_value == remote::WheelDigitalValue) {
+       if (!triple_shoot_detect_left) {
+         triple_shoot_detect_left = true;
+         left_shooter->TripleShoot();
+       }
+       // manual antijam
+     } else if (Antijam.posEdge()) {
+       left_shooter->Antijam();
+       // stop
+     } else {
+       left_shooter->DialStop();
+       triple_shoot_detect_left = false;
+     }
+     dbus->previous_wheel_value = dbus->wheel.wheel;
+   }
 
-    // right shooter(dial part)
-    if (send->shooter_power && send->cooling_heat2 >= send->cooling_heat2 - 15) {
-      right_top_flywheel->SetOutput(0);
-      right_bottom_flywheel->SetOutput(0);
-      right_dial->SetOutput(0);
-      osDelay(100);
-    } else if (GimbalDead) {
-      right_shooter->DialStop();
-    } else if (send->shooter_power) {
-      // for manual antijam
-      Antijam.input(dbus->keyboard.bit.G);
-      // slow shooting
-      if (dbus->mouse.l || dbus->swr == remote::UP) {
-        right_shooter->SlowContinueShoot();
-      // fast shooting
-      } else if ((dbus->mouse.r || dbus->wheel.wheel > remote::WheelDigitalValue)
-                && send->cooling_heat1 < send->cooling_heat2 - 24) {
-        right_shooter->FastContinueShoot();
-      // triple shooting
-      } else if (dbus->wheel.wheel == remote::WheelDigitalValue
-                  && dbus->previous_wheel_value == remote::WheelDigitalValue) {
-        if (!triple_shoot_detect_right) {
-          triple_shoot_detect_right = true;
-          right_shooter->TripleShoot();
-        }
-      // manual antijam
-      } else if (Antijam.posEdge()) {
-        right_shooter->Antijam();
-      // stop
-      } else {
-        right_shooter->DialStop();
-        triple_shoot_detect_right = false;
-      }
-      dbus->previous_wheel_value = dbus->wheel.wheel;
-    }
+   // right shooter(dial part)
+   if (send->shooter_power && send->cooling_heat2 >= send->cooling_limit2 - 15) {
+     right_top_flywheel->SetOutput(0);
+     right_bottom_flywheel->SetOutput(0);
+     right_dial->SetOutput(0);
+     osDelay(100);
+   } else if (GimbalDead) {
+     right_shooter->DialStop();
+   } else if (send->shooter_power) {
+     // for manual antijam
+     Antijam.input(dbus->keyboard.bit.G);
+     // slow shooting
+     if (dbus->mouse.l || dbus->swr == remote::UP) {
+       right_shooter->SlowContinueShoot();
+       // fast shooting
+     } else if ((dbus->mouse.r || dbus->wheel.wheel > remote::WheelDigitalValue)
+                && send->cooling_heat2 < send->cooling_heat2 - 24) {
+       right_shooter->FastContinueShoot();
+       // triple shooting
+     } else if (dbus->wheel.wheel == remote::WheelDigitalValue
+                && dbus->previous_wheel_value == remote::WheelDigitalValue) {
+       if (!triple_shoot_detect_right) {
+         triple_shoot_detect_right = true;
+         right_shooter->TripleShoot();
+       }
+       // manual antijam
+     } else if (Antijam.posEdge()) {
+       right_shooter->Antijam();
+       // stop
+     } else {
+       right_shooter->DialStop();
+       triple_shoot_detect_right = false;
+     }
+     dbus->previous_wheel_value = dbus->wheel.wheel;
+   }
 
-    if (GimbalDead) {
-      leftflywheelFlag = false;
-      left_shooter->SetFlywheelSpeed(0);
-      rightflywheelFlag = false;
-      right_shooter->SetFlywheelSpeed(0);
-    } else {
-      // flywheel part for left shooter
-      if (!send->shooter_power || dbus->keyboard.bit.Q || dbus->swr == remote::DOWN) {
-        leftflywheelFlag = false;
-        left_shooter->SetFlywheelSpeed(0);
-      } else {
-        if (14 < send->speed_limit1 && send->speed_limit1 < 16) {
-          leftflywheelFlag = true;
-          left_shooter->SetFlywheelSpeed(437);  // 445 MAX
-        } else if (send->speed_limit1 >= 18) {
-          leftflywheelFlag = true;
-          left_shooter->SetFlywheelSpeed(482);  // 490 MAX
-        } else {
-          leftflywheelFlag = false;
-          left_shooter->SetFlywheelSpeed(0);
-        }
-      }
-      // flywheel part for right shooter
-      if (!send->shooter_power || dbus->keyboard.bit.Q || dbus->swr == remote::DOWN) {
-        rightflywheelFlag = false;
-        right_shooter->SetFlywheelSpeed(0);
-      } else {
-        if (14 < send->speed_limit2 && send->speed_limit2 < 16) {
-          rightflywheelFlag = true;
-          right_shooter->SetFlywheelSpeed(437);  // 445 MAX
-        } else if (send->speed_limit1 >= 18) {
-          rightflywheelFlag = true;
-          right_shooter->SetFlywheelSpeed(482);  // 490 MAX
-        } else {
-          rightflywheelFlag = false;
-          right_shooter->SetFlywheelSpeed(0);
-        }
-      }
-    }
+   if (GimbalDead) {
+     leftflywheelFlag = false;
+     left_shooter->SetFlywheelSpeed(0);
+     rightflywheelFlag = false;
+     right_shooter->SetFlywheelSpeed(0);
+   } else {
+     // flywheel part for left shooter
+     if (!send->shooter_power || dbus->keyboard.bit.Q || dbus->swr == remote::DOWN) {
+       leftflywheelFlag = false;
+       left_shooter->SetFlywheelSpeed(0);
+     } else {
+       if (14 < send->speed_limit1 && send->speed_limit1 < 16) {
+         leftflywheelFlag = true;
+         left_shooter->SetFlywheelSpeed(437);  // 445 MAX
+       } else if (send->speed_limit1 >= 18) {
+         leftflywheelFlag = true;
+         left_shooter->SetFlywheelSpeed(482);  // 490 MAX
+       } else {
+         leftflywheelFlag = false;
+         left_shooter->SetFlywheelSpeed(0);
+       }
+     }
+     // flywheel part for right shooter
+     if (!send->shooter_power || dbus->keyboard.bit.Q || dbus->swr == remote::DOWN) {
+       rightflywheelFlag = false;
+       right_shooter->SetFlywheelSpeed(0);
+     } else {
+       if (14 < send->speed_limit2 && send->speed_limit2 < 16) {
+         rightflywheelFlag = true;
+         right_shooter->SetFlywheelSpeed(437);  // 445 MAX
+       } else if (send->speed_limit2 >= 18) {
+         rightflywheelFlag = true;
+         right_shooter->SetFlywheelSpeed(482);  // 490 MAX
+       } else {
+         rightflywheelFlag = false;
+         right_shooter->SetFlywheelSpeed(0);
+       }
+     }
+   }
 
-    left_shooter->Update();
-    control::MotorCANBase::TransmitOutput(motors_can1_shooter_left, 3);
-    right_shooter->Update();
-    control::MotorCANBase::TransmitOutput(motors_can1_shooter_right, 3);
+   left_shooter->Update();
+   control::MotorCANBase::TransmitOutput(motors_can1_shooter_left, 3);
+   right_shooter->Update();
+   control::MotorCANBase::TransmitOutput(motors_can1_shooter_right, 3);
 
-    osDelay(SHOOTER_TASK_DELAY);
-  }
+   osDelay(SHOOTER_TASK_DELAY);
+ }
 }
 
 //==================================================================================================
@@ -551,10 +545,10 @@ void chassisTask(void* arg) {
       vy_keyboard += 60;
 
     vx_keyboard = clip<float>(vx_keyboard, -1200, 1200);
-    vy_keyboard = clip<float>(vy_keyboard, -1200, 1200);
+    vy_keyboard = clip<float>(-vy_keyboard, -1200, 1200);
 
-    vx_remote = dbus->ch0;
-    vy_remote = dbus->ch1;
+    vx_remote = -dbus->ch0;
+    vy_remote = -dbus->ch1;
 
     vx_set = vx_keyboard + vx_remote;
     vy_set = vy_keyboard + vy_remote;
@@ -847,8 +841,8 @@ void RM_RTOS_Init(void) {
   right_shooter_data.model = control::SHOOTER_STANDARD;
   right_shooter = new control::Shooter(right_shooter_data);
 
-  stepper = new control::Stepper(&htim1, 1, 1000000, DIR_GPIO_Port, DIR_Pin, ENABLE_GPIO_Port,
-                                 ENABLE_Pin);
+  // stepper = new control::Stepper(&htim1, 1, 1000000, DIR_GPIO_Port, DIR_Pin, ENABLE_GPIO_Port,
+  //                                ENABLE_Pin);
 
   buzzer = new bsp::Buzzer(&htim4, 3, 1000000);
   OLED = new display::OLED(&hi2c2, 0x3C);
