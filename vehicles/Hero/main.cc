@@ -23,6 +23,7 @@
 #include "bsp_gpio.h"
 #include "bsp_os.h"
 #include "bsp_print.h"
+#include "bsp_relay.h"
 #include "cmsis_os.h"
 #include "controller.h"
 #include "dbus.h"
@@ -39,13 +40,17 @@ static remote::DBUS* dbus = nullptr;
 static bsp::CAN* can1 = nullptr;
 static bsp::CAN* can2 = nullptr;
 static display::RGB* RGB = nullptr;
+static bsp::Relay* relay = nullptr;
 
 // Special Modes
 static BoolEdgeDetector FakeDeath(false);
 static BoolEdgeDetector LoadDetect(false);
+static BoolEdgeDetector ElevationDetect(false);
+static BoolEdgeDetector PreloadDetect(false);
 static volatile bool Dead = false;
 static volatile bool GimbalDead = false;
 static volatile bool Elevation = false;
+static volatile bool Preload = false;
 
 // Delays
 static const int KILLALL_DELAY = 100;
@@ -119,6 +124,7 @@ const osThreadAttr_t chassisTaskAttribute = {.name = "chassisTask",
 osThreadId_t chassisTaskHandle;
 // TODO:
 // 1. test keyboard and mouse data
+// 2. test relay
 
 // Params Initialization
 static control::MotorCANBase* fl_motor = nullptr;
@@ -142,6 +148,19 @@ void chassisTask(void* arg) {
   }
 
   while (true) {
+
+    // Elevation(shift)
+    ElevationDetect.input(dbus->keyboard.bit.SHIFT);
+    if (ElevationDetect.posEdge()) {
+      Elevation = !Elevation;
+      if (Elevation) {
+        relay->On();
+      } else {
+        relay->Off();
+      }
+      osDelay(100);
+    }
+
     // read the data from keyboard
     if (dbus->keyboard.bit.A) vx_keyboard -= 61.5;
     if (dbus->keyboard.bit.D) vx_keyboard += 61.5;
@@ -177,8 +196,7 @@ void chassisTask(void* arg) {
     } else {
       chassis->SetSpeed(0, 0, 0);
     }
-    print("vel: vx: %f, vy: %f, wz: %f\r\n", vx, vy, wz);
-    print("power limit: %d\r\n", referee->game_robot_status.chassis_power_limit);
+
     chassis->Update(true, (float)referee->game_robot_status.chassis_power_limit,
                     referee->power_heat_data.chassis_power,
                     (float)referee->power_heat_data.chassis_power_buffer);
@@ -360,6 +378,26 @@ void shooterTask(void* arg) {
     while (Dead || GimbalDead) osDelay(100);
 
     i = 0;
+    if (Preload) {
+      while (true) {
+        // break condition (loading)
+        if (++i > 10 && abs(load_servo->GetOmega()) <= 0.001) break;
+        // loading once
+        if (i == 1) {
+          Preload = false;
+          load_servo->SetTarget(load_servo->GetTarget() - load_angle);
+        }
+        load_servo->CalcOutput();
+        control::MotorCANBase::TransmitOutput(can2_loader, 1);
+        osDelay(2);
+      }
+      // after loading
+      i = 0;
+      load_motor->SetOutput(0);
+      control::MotorCANBase::TransmitOutput(can2_loader, 1);
+      osDelay(100); // need test the delay time
+    }
+
     // whether change the force motor position
     ForceWeakDetect.input(dbus->keyboard.bit.F || dbus->wheel.wheel > remote::WheelDigitalValue);
     ForceStrongDetect.input(dbus->keyboard.bit.C
@@ -651,6 +689,9 @@ void RM_RTOS_Init() {
   referee_uart->SetupRx(300);
   referee_uart->SetupTx(300);
   referee = new communication::Referee;
+
+  // Relay initialization
+  relay = new bsp::Relay(RELAY_1_GPIO_Port, RELAY_1_Pin); /* USE GPIO_1 (PB14)->PIN 7 in the board */
 }
 
 //==================================================================================================
@@ -661,7 +702,7 @@ void RM_RTOS_Threads_Init(void) {
   refereeTaskHandle = osThreadNew(refereeTask, nullptr, &refereeTaskAttribute);
   chassisTaskHandle = osThreadNew(chassisTask, nullptr, &chassisTaskAttribute);
   gimbalTaskHandle = osThreadNew(gimbalTask, nullptr, &gimbalTaskAttribute);
-//  shooterTaskHandle = osThreadNew(shooterTask, nullptr, &shooterTaskAttribute);
+  shooterTaskHandle = osThreadNew(shooterTask, nullptr, &shooterTaskAttribute);
 //  selfTestTaskHandle = osThreadNew(self_Check_Task, nullptr, &selfTestingTask);
 }
 
@@ -710,8 +751,6 @@ void KillAll() {
 //==================================================================================================
 // RTOS Default Task
 //==================================================================================================
-// Debug signal
-static bool debug = false;
 
 void RM_RTOS_Default_Task(const void* args) {
   UNUSED(args);
@@ -723,14 +762,11 @@ void RM_RTOS_Default_Task(const void* args) {
       Dead = true;
       KillAll();
     }
-
-    if (debug) {
-      set_cursor(0, 0);
-      clear_screen();
-      print("power limit: %.3f chassis power: %.3f power buffer: %.3f\r\n", (float)referee->game_robot_status.chassis_power_limit,
-            referee->power_heat_data.chassis_power,
-            (float)referee->power_heat_data.chassis_power_buffer);
+    PreloadDetect.input(dbus->swl == remote::UP);
+    if (PreloadDetect.posEdge() && !Preload) {
+      Preload = true;
     }
+
     osDelay(DEFAULT_TASK_DELAY);
   }
 }
