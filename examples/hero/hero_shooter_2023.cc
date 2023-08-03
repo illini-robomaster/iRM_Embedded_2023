@@ -67,9 +67,9 @@ void RM_RTOS_Init() {
   RGB = new display::RGB(&htim5, 3, 2, 1, 1000000);
 
   //Shooter initialization
-  load_motor = new control::Motor3508(can1, 0x201);
-  reload_motor = new control::Motor3508(can1, 0x202);
-  force_motor = new control::Motor3508(can1, 0x203);
+  load_motor = new control::Motor3508(can2, 0x201);
+  reload_motor = new control::Motor3508(can2, 0x202);
+  force_motor = new control::Motor3508(can2, 0x203);
   // magic number from the data test for this servo
   trigger = new control::PDIHV(&htim1, 1, 1980000, 500, 1500);
 
@@ -86,8 +86,8 @@ void RM_RTOS_Init() {
 
   servo_data.motor = reload_motor;
   servo_data.max_speed = 4 * PI; // params need test
-  servo_data.max_acceleration = 10 * PI;
-  servo_data.omega_pid_param = new float [3] {150, 1.2, 5}; // pid need test
+  servo_data.max_acceleration = 8 * PI;
+  servo_data.omega_pid_param = new float [3] {130, 15, 5}; // pid need test
   reload_servo = new control::ServoMotor(servo_data);
 
   servo_data.motor = force_motor;
@@ -107,7 +107,7 @@ void RM_RTOS_Default_Task(const void* args) {
   // reload variables
   bool reload_pull = false;
   bool reload_push = false;
-  float reload_pos = 10 * PI;
+  float reload_pos = 3.7 * PI * 99.506 / M3508P19_RATIO; // 99.506 is the ratio of the reload servo, devide the 3508 ratio
   // load variable
   bool loading = false;
   float load_angle = 2 * PI / 6 * 99.506 / M3508P19_RATIO; // 99.506 is the ratio of the load servo, devide the 3508 ratio
@@ -117,7 +117,7 @@ void RM_RTOS_Default_Task(const void* args) {
   bool force_strong = false;
   bool force_transforming = false;
   float force_pos = 0;
-  float force_angle = 10 * PI;
+  float force_angle = 55 * PI ;
 
 //   waiting for the start signal
   while (true) {
@@ -127,7 +127,7 @@ void RM_RTOS_Default_Task(const void* args) {
 
   while (true) {
     // whether change the force motor position
-    ForceWeakDetect.input(dbus->keyboard.bit.F || dbus->wheel.wheel > remote::WheelDigitalValue);
+    ForceWeakDetect.input(dbus->keyboard.bit.F || dbus->wheel.wheel < 1024);
     ForceStrongDetect.input(dbus->keyboard.bit.C
                             || (dbus->wheel.wheel == remote::WheelDigitalValue && dbus->previous_wheel_value == remote::WheelDigitalValue));
 
@@ -183,44 +183,44 @@ void RM_RTOS_Default_Task(const void* args) {
     LoadDetect.input(dbus->swr == remote::UP);
     if (LoadDetect.posEdge()) {
       // step 1
-      trigger->SetOutPutAngle(20);  // need test the trigger angle
-      osDelay(1000);                 // need test the delay time(wait for the)
+      trigger->SetOutPutAngle(0);  // need test the trigger angle
+      osDelay(100);                 // need test the delay time(wait for the)
                                     // step 2
       while (true) {
         // break condition (reach the desire position)
-        if (++i > 20 / 2 && abs(reload_servo->GetOmega()) <= 0.001) break;
+        if (++i > 50 / 2 && abs(reload_servo->GetOmega()) <= 0.001) break;
         // set the speed and acceleration for the reload motor
         // set target pull position once
         if (!reload_pull) {
           reload_pull = true;
           reload_servo->SetTarget(reload_pos);
+          print("target: %f", reload_servo->GetTarget());
         }
         print("reload theta: %f\n", reload_servo->GetTheta());
         reload_servo->CalcOutput();
         control::MotorCANBase::TransmitOutput(can2_reloader, 1);
         osDelay(2);
       }
+      // step 3
+      trigger->SetOutPutAngle(-80); // need test the trigger angle
+      osDelay(1700); // need test the delay time(wait for the)
       // after reload pulling
       i = 0;
       reload_motor->SetOutput(0);
       print("omega %f", reload_servo->GetOmega());
       control::MotorCANBase::TransmitOutput(can2_reloader, 1);
       reload_pull = false;
-      osDelay(100); // need test the delay time(wait for the)
-      // step 3
-      trigger->SetOutPutAngle(-80); // need test the trigger angle
-      osDelay(100); // need test the delay time(wait for the)
+      osDelay(50); // need test the delay time(wait for the)
+
       // step 4
       while (true) {
         // break condition (loading)
-        if (++i > 20 / 2 && abs(load_servo->GetOmega()) <= 0.001) break;
+        if (++i > 50 / 2 && abs(load_servo->GetOmega()) <= 0.001) break;
         // loading once
         if (!loading) {
           loading = true;
           load_servo->SetTarget(load_servo->GetTarget() - load_angle);
-          print("load target: %f\n", load_servo->GetTarget());
         }
-        print("load Theta: %f\n", load_servo->GetTheta());
         load_servo->CalcOutput();
         control::MotorCANBase::TransmitOutput(can2_loader, 1);
         osDelay(2);
@@ -234,13 +234,11 @@ void RM_RTOS_Default_Task(const void* args) {
       // step 5
       while (true) {
         // break condition (reach the desire position)
-        if (++i > 20 / 2 && abs(reload_servo->GetOmega()) <= 0.001) break;
+        if (++i > 50 / 2 && abs(reload_servo->GetOmega()) <= 0.001) break;
         // set target push position once
         if (!reload_push) {
           reload_push = true;
           reload_servo->SetTarget(0, true);
-          print("reload target: %f\n", reload_servo->GetTarget());
-          print("reload theta: %f\n", reload_servo->GetTheta());
         }
         reload_servo->CalcOutput();
         control::MotorCANBase::TransmitOutput(can2_reloader, 1);
@@ -252,7 +250,6 @@ void RM_RTOS_Default_Task(const void* args) {
       control::MotorCANBase::TransmitOutput(can2_reloader, 1);
       reload_push = false;
       osDelay(100); // need test the delay time(wait for the)
-
     }
     dbus->previous_wheel_value = dbus->wheel.wheel;
     osDelay(10);

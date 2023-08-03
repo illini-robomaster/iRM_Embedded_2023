@@ -57,6 +57,9 @@ static const int KILLALL_DELAY = 100;
 static const int DEFAULT_TASK_DELAY = 100;
 static const int CHASSIS_TASK_DELAY = 2;
 static const int GIMBAL_TASK_DELAY = 2;
+static const int SHOOTER_INNER_TASK_DELAY = 2;
+static const int SHOOTER_OUTER_TASK_DELAY = 100;
+static const int SHOOTER_TASK_DELAY = 10;
 static const int SELFTEST_TASK_DELAY = 100;
 
 // Params used in both chassis and gimbal task
@@ -137,6 +140,7 @@ void chassisTask(void* arg) {
   UNUSED(arg);
   // motors initialization
   control::MotorCANBase* motors_can1_chassis[] = {fl_motor, fr_motor, bl_motor, br_motor};
+  control::Motor4310* motor_can1_gimbal[] = {yaw_motor};
   float vx_keyboard = 0, vy_keyboard = 0;
   float vx_remote = 0, vy_remote = 0;
   float vx = 0, vy = 0, wz = 0;
@@ -188,11 +192,13 @@ void chassisTask(void* arg) {
     vx = vx_keyboard + vx_remote;
     vy = vy_keyboard + vy_remote;
     // rotation velocity calculation
-    wz = yaw_sum * 10000; // 10000 is magic number
+    wz = yaw_sum * 120000; // 120000 is magic number
 
-    // Update the speed by power limit from refree
+    // Update the speed by power limit from referee
     if (!Dead && !Elevation) {
       chassis->SetSpeed(vx, vy, wz);
+      yaw_motor->SetOutput(0, 0, 8, 1.5, 0);
+      control::Motor4310::TransmitOutput(motor_can1_gimbal, 1);
     } else {
       chassis->SetSpeed(0, 0, 0);
     }
@@ -222,7 +228,6 @@ const osThreadAttr_t gimbalTaskAttribute = {.name = "gimbalTask",
 osThreadId_t gimbalTaskHandle;
 // TODO:
 // 1. test keyboard and mouse data
-// 2. test pitch start cali
 
 // Params Initialization
 static control::Motor4310* pitch_motor = nullptr;
@@ -256,7 +261,7 @@ void gimbalTask(void* arg) {
   RGB->Display(display::color_yellow);
 //  laser->Off();
   // need test Pos_Vel mode params
-  pitch_motor->SetOutput(0, 3);
+  pitch_motor->SetOutput(0, 10);
   // need test MIT mode params
   yaw_motor->SetOutput(0, 0, 8, 1.5, 0);
   control::Motor4310::TransmitOutput(motors_can1_gimbal, 1);
@@ -278,20 +283,28 @@ void gimbalTask(void* arg) {
 
     // Data Collection
     // pitch data from keyboard
-    if (dbus->keyboard.bit.E) pitch_keyboard -= (10 * PI); // offset need test
-    if (dbus->keyboard.bit.Q) pitch_keyboard += (10 * PI); // offset need test
+    if (dbus->keyboard.bit.E) pitch_keyboard -= PI; // offset need test
+    if (dbus->keyboard.bit.Q) pitch_keyboard += PI; // offset need test
+    if (-0.55 * PI <= pitch_keyboard && pitch_keyboard <= 0.55 * PI) pitch_keyboard = 0;
+    if (pitch_keyboard > 0)
+      pitch_keyboard -= 0.85 * PI;
+    if (pitch_keyboard < 0)
+      pitch_keyboard += 0.85 * PI;
+    pitch_keyboard = clip<float>(pitch_keyboard, -30 * PI, 30 * PI);
+
     // pitch data from mouse (direction and offset need test)
-    pitch_mouse = dbus->mouse.y / 32767.0 * 0.05 * PI;
+    pitch_mouse = dbus->mouse.y / 32767.0 * 1000 * PI;
     // pitch data from remote controller (offset and data need test)
     pitch_remote = -dbus->ch3 / 660.0 * 30 * PI;
     // sum whole pitch data
     pitch_sum = pitch_keyboard + pitch_mouse + pitch_remote;
 
     // yaw data from mouse(direction and offset need test)
-    yaw_mouse = dbus->mouse.x / 32767.0 * 0.1 * PI;
+    yaw_mouse = dbus->mouse.x / 32767.0 / 20 * PI;
     yaw_remote = dbus->ch2 / 660.0 / 210.0 / 5 * PI;
     // sum whole yaw data
     yaw_sum = yaw_mouse + yaw_remote;
+    print("yaw_sum: %f\n", yaw_sum);
 
     // Data Processing and Update(yaw clip range need test)
     // pitch processing
@@ -353,35 +366,39 @@ void shooterTask(void* arg) {
   // reload variables
   bool reload_pull = false;
   bool reload_push = false;
-  float reload_pos = 10 * PI;
+  // the 99.506 is the ratio of the reload servo and devide the 3508 ratio to reload one bullet
+  float reload_pos_weak = 2.75 * PI * 99.506 / M3508P19_RATIO;
+  float reload_pos_strong = 2.75 * PI * 99.506 / M3508P19_RATIO;
+
   // load variable
   bool loading = false;
   // 99.506 is the ratio of the load servo and devide the 3508 ratio to load one bullet
   float load_angle = 2 * PI / 6 * 99.506 / M3508P19_RATIO;
+
   // force variable
-  bool force_week = false;
+  bool force_weak = true; // always start at the weak position
   bool force_strong = false;
   bool force_transforming = false;
   float force_pos = 0;
-  float  force_angle = 10 * PI;
+  float  force_angle = 55 * PI;
 
   int i= 0;
 
   // waiting for the start signal
   while (true) {
     if (dbus->keyboard.bit.B || dbus->swr == remote::DOWN) break;
-    osDelay(100);
+    osDelay(SHOOTER_OUTER_TASK_DELAY);
   }
 
   while (true) {
     // Dead
-    while (Dead || GimbalDead) osDelay(100);
+    while (Dead || GimbalDead) osDelay(SHOOTER_OUTER_TASK_DELAY);
 
     i = 0;
     if (Preload) {
       while (true) {
         // break condition (loading)
-        if (++i > 10 && abs(load_servo->GetOmega()) <= 0.001) break;
+        if (++i > 10 && abs(load_servo->GetOmega()) <= 0.001 && !GimbalDead) break;
         // loading once
         if (i == 1) {
           Preload = false;
@@ -389,7 +406,7 @@ void shooterTask(void* arg) {
         }
         load_servo->CalcOutput();
         control::MotorCANBase::TransmitOutput(can2_loader, 1);
-        osDelay(2);
+        osDelay(SHOOTER_INNER_TASK_DELAY);
       }
       // after loading
       i = 0;
@@ -399,45 +416,45 @@ void shooterTask(void* arg) {
     }
 
     // whether change the force motor position
-    ForceWeakDetect.input(dbus->keyboard.bit.F || dbus->wheel.wheel > remote::WheelDigitalValue);
+    ForceWeakDetect.input(dbus->keyboard.bit.F || dbus->wheel.wheel < 1024);
     ForceStrongDetect.input(dbus->keyboard.bit.C
                           || (dbus->wheel.wheel == remote::WheelDigitalValue && dbus->previous_wheel_value == remote::WheelDigitalValue));
     // just execute force transform once
-    if (ForceWeakDetect.posEdge() && !ForceStrongDetect.posEdge() && !force_week) {
+    if (ForceWeakDetect.posEdge() && !ForceStrongDetect.posEdge() && !force_weak) {
       force_transforming = true;
-      force_week = true;
+      force_weak = true;
       force_strong = false;
     } else if (ForceStrongDetect.posEdge() && !ForceWeakDetect.posEdge() && !force_strong) {
       force_transforming = true;
-      force_week = false;
+      force_weak = false;
       force_strong = true;
     }
     // force transforming
     if (force_transforming) {
       while (true) {
         // break condition (reach the desire position)
-        if (++i > 10 && abs(force_motor->GetOmega()) <= 0.001) break;
+        if (++i > 10 && abs(force_motor->GetOmega()) <= 0.001 && !GimbalDead) break;
         // set the speed and acceleration for the reload motor
         // set target pull position once
         if (i == 1) {
           // direction need test
-          if (force_week && !force_strong) {
+          if (force_weak && !force_strong) {
             force_pos += force_angle;
-          } else if (force_strong && !force_week) {
+          } else if (force_strong && !force_weak) {
             force_pos -= force_angle;
           }
           force_servo->SetTarget(force_pos);
         }
         force_servo->CalcOutput();
         control::MotorCANBase::TransmitOutput(can2_force, 1);
-        osDelay(2);
+        osDelay(SHOOTER_INNER_TASK_DELAY);
       }
       // after changing the force motor position
       i = 0;
       force_transforming = false;
       force_motor->SetOutput(0);
       control::MotorCANBase::TransmitOutput(can2_force, 1);
-      osDelay(100); // need test the delay time(wait for the)
+      osDelay(SHOOTER_OUTER_TASK_DELAY); // need test the delay time(wait for the)
     }
 
     // the shoot and load process is automatic
@@ -451,36 +468,40 @@ void shooterTask(void* arg) {
     LoadDetect.input(dbus->swr == remote::UP || dbus->mouse.l);
     if (LoadDetect.posEdge()) {
       // step 1
-      trigger->SetOutPutAngle(20);
-      osDelay(1000); // wait for the bullet out
+      trigger->SetOutPutAngle(0);
+      osDelay(SHOOTER_OUTER_TASK_DELAY); // wait for the bullet out
       // step 2
       while (true) {
         // break condition (reach the desire position)
-        if (++i > 10 && abs(reload_servo->GetOmega()) <= 0.001) break;
+        if (++i > 30 && abs(reload_servo->GetOmega()) <= 0.001 && !GimbalDead) break;
         // set the speed and acceleration for the reload motor
         // set target pull position once
         if (!reload_pull) {
           reload_pull = true;
-          reload_servo->SetTarget(reload_pos);
+          if (force_weak) {
+            reload_servo->SetTarget(reload_pos_weak);
+          } else if (force_strong) {
+            reload_servo->SetTarget(reload_pos_strong);
+          }
         }
-        print("reload theta: %f\n", reload_servo->GetTheta());
         reload_servo->CalcOutput();
         control::MotorCANBase::TransmitOutput(can2_reloader, 1);
-        osDelay(2);
+        osDelay(SHOOTER_INNER_TASK_DELAY);
       }
+      // step 3 (before release the reload board)
+      trigger->SetOutPutAngle(-80); // need test the trigger angle
+      osDelay(1700); // need test the delay time(wait for the)
       // after reload pulling
       i = 0;
       reload_motor->SetOutput(0);
       control::MotorCANBase::TransmitOutput(can2_reloader, 1);
       reload_pull = false;
-      osDelay(100); // need test the delay time(wait for the)
-      // step 3
-      trigger->SetOutPutAngle(-80);
-      osDelay(100); // need test the delay time(wait for the)
+      osDelay(SHOOTER_OUTER_TASK_DELAY); // need test the delay time(wait for the)
+
       // step 4
       while (true) {
         // break condition (loading)
-        if (++i > 10 && abs(load_servo->GetOmega()) <= 0.001) break;
+        if (++i > 30 && abs(load_servo->GetOmega()) <= 0.001 && !GimbalDead) break;
         // loading once
         if (!loading) {
           loading = true;
@@ -488,18 +509,18 @@ void shooterTask(void* arg) {
         }
         load_servo->CalcOutput();
         control::MotorCANBase::TransmitOutput(can2_loader, 1);
-        osDelay(2);
+        osDelay(SHOOTER_INNER_TASK_DELAY);
       }
       // after loading
       i = 0;
       load_motor->SetOutput(0);
       control::MotorCANBase::TransmitOutput(can2_loader, 1);
       loading = false;
-      osDelay(100); // need test the delay time
+      osDelay(SHOOTER_OUTER_TASK_DELAY); // need test the delay time
       // step 5
       while (true) {
         // break condition (reach the desire position)
-        if (++i > 10 && abs(reload_servo->GetOmega()) <= 0.001) break;
+        if (++i > 10 && abs(reload_servo->GetOmega()) <= 0.001 && !GimbalDead) break;
         // set target push position once
         if (!reload_push) {
           reload_push = true;
@@ -507,18 +528,18 @@ void shooterTask(void* arg) {
         }
         reload_servo->CalcOutput();
         control::MotorCANBase::TransmitOutput(can2_reloader, 1);
-        osDelay(2);
+        osDelay(SHOOTER_INNER_TASK_DELAY);
       }
       // after reload pushing
       i = 0;
       reload_motor->SetOutput(0);
       control::MotorCANBase::TransmitOutput(can2_reloader, 1);
       reload_push = false;
-      osDelay(100);
+      osDelay(SHOOTER_OUTER_TASK_DELAY);
     }
 
     dbus->previous_wheel_value = dbus->wheel.wheel;
-    osDelay(10);
+    osDelay(SHOOTER_TASK_DELAY);
   }
 }
 
@@ -754,6 +775,7 @@ void KillAll() {
 
 void RM_RTOS_Default_Task(const void* args) {
   UNUSED(args);
+  control::MotorCANBase* motors_can2_shooter_part[] = {reload_motor, force_motor};
 
   while (true) {
     // Emergency stop
@@ -762,9 +784,22 @@ void RM_RTOS_Default_Task(const void* args) {
       Dead = true;
       KillAll();
     }
+    // preloading
     PreloadDetect.input(dbus->swl == remote::UP);
     if (PreloadDetect.posEdge() && !Preload) {
       Preload = true;
+    }
+
+    if (referee->game_robot_status.mains_power_shooter_output == 0
+        || referee->game_robot_status.mains_power_gimbal_output == 0) {
+      GimbalDead = true;
+      pitch_motor->MotorDisable();
+      reload_motor->SetOutput(0);
+      force_motor->SetOutput(0);
+      control::MotorCANBase::TransmitOutput(motors_can2_shooter_part, 2);
+    } else {
+      GimbalDead = false;
+      pitch_motor->MotorEnable();
     }
 
     osDelay(DEFAULT_TASK_DELAY);
