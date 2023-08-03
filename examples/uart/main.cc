@@ -50,7 +50,7 @@ extern osThreadId_t defaultTaskHandle;
 
 class CustomUART : public bsp::UART {
  public:
-  using bsp::UART::UART;`
+  using bsp::UART::UART;
 
  protected:
   /* notify application when rx data is pending read */

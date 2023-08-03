@@ -33,14 +33,14 @@ typedef struct {
  * @note software range limitation defined in arm_config.h
  * @return 0 when the command is accepted, 1 otherwise
  */
-int ArmTurnRelative(joint_state_t* target_joint_state);
+int ArmTurnRelative(joint_state_t target_joint_state);
 
 /**
  * @brief turn to an absolute position
  * @note software range limitation defined in arm_config.h
  * @return 0 when the command is accepted, 1 otherwise
  */
-int ArmTurnAbsolute(joint_state_t* target_joint_state);
+int ArmTurnAbsolute(joint_state_t target_joint_state);
 
 /**
  * @brief Call all TransmitOutput() or equivalent function for each motor

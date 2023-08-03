@@ -23,6 +23,11 @@
 
 namespace control {
 
+UnitreeMotor::UnitreeMotor() {
+  memset(send, 0, sizeof(send[0]) * 3);
+  memset(recv, 0, sizeof(recv[0]) * 3);
+}
+
 void UnitreeMotor::ModifyData(const unsigned short motor_id) {
     send[motor_id].data.head.start[0] = 0xFE;
     send[motor_id].data.head.start[1] = 0xEE;
@@ -56,10 +61,10 @@ bool UnitreeMotor::ExtractData(const communication::package_t package) {
         tmp.Temp = tmp.data.Mdata.Temp;
         tmp.MError = tmp.data.Mdata.MError;
         tmp.T = ((float)tmp.data.Mdata.T) / 256;
-        tmp.W = ((float)tmp.data.Mdata.W) / 128;
+        tmp.W = ((float)tmp.data.Mdata.W) / 128 / gear_ratio;
         tmp.LW = tmp.data.Mdata.LW;
         tmp.Acc = (int)tmp.data.Mdata.Acc;
-        tmp.Pos = 6.2832 * ((float)tmp.data.Mdata.Pos) / 16384;
+        tmp.Pos = 6.2832 * ((float)tmp.data.Mdata.Pos) / 16384 / gear_ratio;
         tmp.gyro[0] = ((float)tmp.data.Mdata.gyro[0]) * 0.00107993176;
         tmp.gyro[1] = ((float)tmp.data.Mdata.gyro[1]) * 0.00107993176;
         tmp.gyro[2] = ((float)tmp.data.Mdata.gyro[2]) * 0.00107993176;
@@ -68,6 +73,7 @@ bool UnitreeMotor::ExtractData(const communication::package_t package) {
         tmp.acc[2] = ((float)tmp.data.Mdata.acc[2]) * 0.0023911132;
         tmp.correct = true;
         memcpy(&recv[tmp.id], &tmp, sizeof(motor_recv_t));
+        connection_flag_[tmp.id] = true;
         return tmp.correct;
     }
 }

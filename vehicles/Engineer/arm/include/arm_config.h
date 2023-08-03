@@ -50,17 +50,18 @@ const int A1_CONTROL_DELAY = 2;
 
 UART_HandleTypeDef* A1_UART = &huart6;
 
+
 // base vertical rotation motor params. (rotate the entire arm around an vertical axis)
-const float BASE_VERT_ROTATE_MAX = PI/8;
-const float BASE_VERT_ROTATE_MIN = -PI/8;
+const float BASE_VERT_ROTATE_MAX = 0.7692307692;
+const float BASE_VERT_ROTATE_MIN = -1.0989010989;
 
 // base horizontal rotation motor params (rotate the entire arm around a horizontal axis)
-const float BASE_HOR_ROTATE_MAX = PI/8;
-const float BASE_HOR_ROTATE_MIN = -PI/8;
+const float BASE_HOR_ROTATE_MAX = PI/2;
+const float BASE_HOR_ROTATE_MIN = -PI/2;
 
 // elbow rotation motor param (rotate the forearm on a horizontal axis)
-const float ELBOW_ROTATE_MAX = PI/8;
-const float ELBOW_ROTATE_MIN = -PI/8;
+const float ELBOW_ROTATE_MAX = 0.5494505495;
+const float ELBOW_ROTATE_MIN = -1.0989010989;
 
 /* A1 params end */
 

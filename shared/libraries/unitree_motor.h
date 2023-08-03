@@ -151,6 +151,7 @@ typedef struct {
  */
 class UnitreeMotor {
 public:
+  UnitreeMotor();
   /**
    * @brief zip the send data package
    */
@@ -190,6 +191,8 @@ public:
    * @param Kd Kd parameter for the PD controller
    */
   void Control(const unsigned short motor_id, const float torque, const float speed, const float position, const float Kp, const float Kd);
+
+  volatile bool connection_flag_[3] = {false};
 
   motor_send_t send[3]; // send storage structure instance
   motor_recv_t recv[3]; // recv storage structure instance

@@ -34,15 +34,16 @@
 #include "arm_config.h"
 
 static bsp::CAN* can = nullptr;
+static remote::DBUS* dbus = nullptr;
 
 // 3508
 //static control::MotorCANBase* motor1 = nullptr;
 //static control::SteeringMotor* base_translate_motor = nullptr;
 
-static bsp::GPIO* base_translate_pe_sensor = nullptr;
-bool base_translate_align_detect() {
-  return base_translate_pe_sensor->Read() == true;
-}
+//static bsp::GPIO* base_translate_pe_sensor = nullptr;
+//bool base_translate_align_detect() {
+//  return base_translate_pe_sensor->Read() == true;
+//}
 
 /**
  * forearm_rotate_motor     RX=0x02 TX=0x01
@@ -96,8 +97,6 @@ void A1Task(void* arg) {
     }
 }
 
-static CustomUART* joint_uart = nullptr;
-
 // 4310
 static control::Motor4310* forearm_rotate_motor = nullptr;
 static control::Motor4310* wrist_rotate_motor = nullptr;
@@ -109,7 +108,7 @@ static joint_state_t current_joint_state = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 // TODO fix transmit output for 4310 multi motors
 
 // PACIFICRIM!
-static remote::SBUS* sbus = nullptr;
+//static remote::SBUS* sbus = nullptr;
 
 void RM_RTOS_Init() {
   print_use_uart(&huart8);
@@ -118,6 +117,8 @@ void RM_RTOS_Init() {
 //   control::steering_t steering_data;
 
   can = new bsp::CAN(&hcan1);
+
+  dbus = new remote::DBUS(&huart1);
 
   // Init m3508 * 1
 //   motor1 = new control::Motor3508(can1, BASE_TRANSLATE_ID);
@@ -149,13 +150,13 @@ void RM_RTOS_Init() {
     can, HAND_ROTATE_RX_ID, HAND_ROTATE_TX_ID, control::MIT);
 
   // Init A1 * 3
-  joint_uart = new CustomUART(A1_UART);
-  joint_uart->SetupRx(300);
-  joint_uart->SetupTx(300);
+  A1_uart = new CustomUART(A1_UART);
+  A1_uart->SetupRx(300);
+  A1_uart->SetupTx(300);
 
   A1 = new control::UnitreeMotor();
 
-  sbus = new remote::SBUS(&huart1);
+//  sbus = new remote::SBUS(&huart1);
 }
 
 void RM_RTOS_Threads_Init(void) {
@@ -182,60 +183,69 @@ void RM_RTOS_Default_Task(const void* args) {
 //   4310 init state
   // TODO: config zero pos with 4310 config assist
 
-  forearm_rotate_motor->SetZeroPos();
-  wrist_rotate_motor->SetZeroPos();
-  hand_rotate_motor->SetZeroPos();
-  forearm_rotate_motor->MotorEnable();
-  wrist_rotate_motor->MotorEnable();
-  hand_rotate_motor->MotorEnable();
+//  forearm_rotate_motor->SetZeroPos();
+//  wrist_rotate_motor->SetZeroPos();
+//  hand_rotate_motor->SetZeroPos();
+//  forearm_rotate_motor->MotorEnable();
+//  wrist_rotate_motor->MotorEnable();
+//  hand_rotate_motor->MotorEnable();
 
   // A1 init state
   A1->Stop(0);
-  joint_uart->Write((uint8_t*)(&(A1->send[0].data)), A1->send_length);
+  A1_uart->Write((uint8_t*)(&A1->send[0].data), A1->send_length);
+  osDelay(A1_CONTROL_DELAY);
   A1->Stop(1);
-  joint_uart->Write((uint8_t*)(&(A1->send[1].data)), A1->send_length);
+  A1_uart->Write((uint8_t*)(&A1->send[1].data), A1->send_length);
+  osDelay(A1_CONTROL_DELAY);
   A1->Stop(2);
-  joint_uart->Write((uint8_t*)(&(A1->send[2].data)), A1->send_length);
-
-  print("arm starts in 2 secs\r\n");
-  // wait for 2 seconds
-  osDelay(2000);
+  A1_uart->Write((uint8_t*)(&A1->send[2].data), A1->send_length);
+  osDelay(A1_CONTROL_DELAY);
 
 //   joint_state_t target = {PI / 16, PI / 16, PI / 16, PI / 16, PI / 16, PI / 16, PI / 16};
+  joint_state_t target = {0, 0, -PI/8, 0, 0, 0, 0};
 
-//   int i = 0;
 //   turn each motor for PI/16 degree every 2 seconds.
 //   Should stop at defined limitation, see arm_config.h
   while (true) {
-   ArmPrintData();
-    osDelay(100);
-    // if (i <= 1000) {
-    //   i++;
-    // } else {
-    //   ArmTurnRelative(&target);
-    //   ArmPrintData();
-    // }
-    // ArmTransmitOutput();
-    // osDelay(2);
+        ArmPrintData();
+        A1->connection_flag_[0] = false;
+        A1->connection_flag_[1] = false;
+        A1->connection_flag_[2] = false;
+        target.base_hor_rotate = dbus->ch0 / 660.0 / 50.0;
+    //    print("dbus: %f\r\n", target.base_hor_rotate);
+        ArmTurnRelative(target);
+//        print("Target : %f %f %f %f %f %f %f\r\n", target.base_translate, target.base_vert_rotate, target.base_hor_rotate,
+//              target.elbow_rotate, target.forearm_rotate, target.wrist_rotate, target.hand_rotate);
+//        print("Current: %f %f %f %f %f %f %f\r\n",
+//              current_joint_state.base_translate, current_joint_state.base_vert_rotate, current_joint_state.base_hor_rotate,
+//              current_joint_state.elbow_rotate, current_joint_state.forearm_rotate, current_joint_state.wrist_rotate,
+//              current_joint_state.hand_rotate);
+
+//        set_cursor(0, 0);
+//        clear_screen();
+//        print("Target : %.3f\r\n", target.base_hor_rotate);
+//        print("Current: %.3f\r\n", current_joint_state.base_hor_rotate);
+//        print("\r\n");
+        ArmTransmitOutput();
+        osDelay(100);
   }
 } // end default task
 
-int ArmTurnRelative(joint_state_t* target) {
-  joint_state_t* abs_target = new joint_state_t();
-  abs_target->base_translate = current_joint_state.base_translate + target->base_translate;
-  abs_target->base_vert_rotate = current_joint_state.base_vert_rotate + target->base_vert_rotate;
-  abs_target->base_hor_rotate = current_joint_state.base_hor_rotate + target->base_hor_rotate;
-  abs_target->elbow_rotate = current_joint_state.elbow_rotate + target->elbow_rotate;
-  abs_target->forearm_rotate = current_joint_state.forearm_rotate + target->forearm_rotate;
-  abs_target->wrist_rotate = current_joint_state.wrist_rotate + target->wrist_rotate;
-  abs_target->hand_rotate = current_joint_state.hand_rotate + target->hand_rotate;
-
+int ArmTurnRelative(joint_state_t target) {
+  joint_state_t abs_target = joint_state_t();
+  abs_target.base_translate = current_joint_state.base_translate + target.base_translate;
+  abs_target.base_vert_rotate = current_joint_state.base_vert_rotate + target.base_vert_rotate;
+  abs_target.base_hor_rotate = current_joint_state.base_hor_rotate + target.base_hor_rotate;
+  abs_target.elbow_rotate = current_joint_state.elbow_rotate + target.elbow_rotate;
+  abs_target.forearm_rotate = current_joint_state.forearm_rotate + target.forearm_rotate;
+  abs_target.wrist_rotate = current_joint_state.wrist_rotate + target.wrist_rotate;
+  abs_target.hand_rotate = current_joint_state.hand_rotate + target.hand_rotate;
   return ArmTurnAbsolute(abs_target);
 }
 
-static const float A1_Kp = 0.001, A1_Kd = 0.001;
+static const float A1_Kp = 0.002, A1_Kd = 0.03;
 static const float m4310_Kp= 0.001, m4310_Kd = 0.001;
-int ArmTurnAbsolute(joint_state_t* target) {
+int ArmTurnAbsolute(joint_state_t target) {
   // M3508
 //   if (target->base_translate >= BASE_TRANSLATE_MAX) {
 //     base_translate_motor->TurnRelative(BASE_TRANSLATE_MAX-current_joint_state.base_translate);
@@ -247,74 +257,68 @@ int ArmTurnAbsolute(joint_state_t* target) {
 //   current_joint_state.base_translate = target->base_translate;
 
   // A1
-  if (target->base_vert_rotate >= BASE_VERT_ROTATE_MAX) {
-   A1->Control(BASE_VERT_ROTATE_ID, 0.0, 0.0, BASE_VERT_ROTATE_MAX, A1_Kp, A1_Kd);
-    target->base_vert_rotate = BASE_VERT_ROTATE_MAX;
-  } else if (target->base_vert_rotate <= BASE_VERT_ROTATE_MIN) {
-    A1->Control(BASE_VERT_ROTATE_ID, 0.0, 0.0, BASE_VERT_ROTATE_MIN,  A1_Kp, A1_Kd);
-    target->base_vert_rotate = BASE_VERT_ROTATE_MIN;
-  } else
-    A1->Control(BASE_VERT_ROTATE_ID, 0.0, 0.0, target->base_vert_rotate,  A1_Kp, A1_Kd);
-  current_joint_state.base_vert_rotate = target->base_vert_rotate;
+  if (target.base_vert_rotate > BASE_VERT_ROTATE_MAX)
+    target.base_vert_rotate = BASE_VERT_ROTATE_MAX;
+  else if (target.base_vert_rotate < BASE_VERT_ROTATE_MIN)
+    target.base_vert_rotate = BASE_VERT_ROTATE_MIN;
+  current_joint_state.base_vert_rotate = target.base_vert_rotate;
+  A1->Control(BASE_VERT_ROTATE_ID, 0.0, 0.0, current_joint_state.base_vert_rotate,  A1_Kp, A1_Kd);
 
-  if (target->base_hor_rotate >= BASE_HOR_ROTATE_MAX) {
-    A1->Control(BASE_HOR_ROTATE_ID, 0.0, 0.0, BASE_HOR_ROTATE_MAX,  A1_Kp, A1_Kd);
-    target->base_hor_rotate = BASE_HOR_ROTATE_MAX;
-  } else if (target->base_hor_rotate <= BASE_HOR_ROTATE_MIN) {
-    A1->Control(BASE_HOR_ROTATE_ID, 0.0, 0.0, BASE_HOR_ROTATE_MIN,  A1_Kp, A1_Kd);
-    target->base_hor_rotate = BASE_HOR_ROTATE_MIN;
-  } else
-    A1->Control(BASE_HOR_ROTATE_ID, 0.0, 0.0, target->base_hor_rotate,  A1_Kp, A1_Kd);
-  current_joint_state.base_hor_rotate = target->base_hor_rotate;
+  if (target.base_hor_rotate > BASE_HOR_ROTATE_MAX)
+    target.base_hor_rotate = BASE_HOR_ROTATE_MAX;
+  else if (target.base_hor_rotate < BASE_HOR_ROTATE_MIN)
+    target.base_hor_rotate = BASE_HOR_ROTATE_MIN;
+  current_joint_state.base_hor_rotate = target.base_hor_rotate;
+  A1->Control(BASE_HOR_ROTATE_ID, 0.0, 0.0, current_joint_state.base_hor_rotate,  A1_Kp, A1_Kd);
 
-  if (target->elbow_rotate >= ELBOW_ROTATE_MAX) {
-    A1->Control(ELBOW_ROTATE_ID, 0.0, 0.0, ELBOW_ROTATE_MAX,  A1_Kp, A1_Kd);
-    target->elbow_rotate = ELBOW_ROTATE_MAX;
-  } else if (target->elbow_rotate <= ELBOW_ROTATE_MIN) {
-    A1->Control(ELBOW_ROTATE_ID, 0.0, 0.0, ELBOW_ROTATE_MIN,  A1_Kp, A1_Kd);
-    target->elbow_rotate = ELBOW_ROTATE_MIN;
-  } else
-    A1->Control(ELBOW_ROTATE_ID, 0.0, 0.0, target->elbow_rotate,  A1_Kp, A1_Kd);
-  current_joint_state.elbow_rotate = target->elbow_rotate;
+  if (target.elbow_rotate > ELBOW_ROTATE_MAX)
+    target.elbow_rotate = ELBOW_ROTATE_MAX;
+  else if (target.elbow_rotate < ELBOW_ROTATE_MIN)
+    target.elbow_rotate = ELBOW_ROTATE_MIN;
+  current_joint_state.elbow_rotate = target.elbow_rotate;
+  A1->Control(ELBOW_ROTATE_ID, 0.0, 0.0, current_joint_state.elbow_rotate,  A1_Kp, A1_Kd);
 
-  // M4310
-  //TODO: Adjust VALUE For TESTING
-  if (target->forearm_rotate >= FOREARM_ROTATE_MAX) {
-    forearm_rotate_motor->SetOutput(FOREARM_ROTATE_MAX, M4310_VEL, m4310_Kp, m4310_Kd, 0);
-  } else if (target->forearm_rotate <= FOREARM_ROTATE_MIN) {
-    forearm_rotate_motor->SetOutput(FOREARM_ROTATE_MIN, M4310_VEL, m4310_Kp, m4310_Kd, 0);
-  } else
-    forearm_rotate_motor->SetOutput(target->forearm_rotate, M4310_VEL, m4310_Kp, m4310_Kd, 0);
-  current_joint_state.forearm_rotate = target->forearm_rotate;
-
-  if (target->wrist_rotate >= WRIST_ROTATE_MAX) {
-    wrist_rotate_motor->SetOutput(WRIST_ROTATE_MAX, M4310_VEL, m4310_Kp, m4310_Kd, 0);
-  } else if (target->wrist_rotate <= WRIST_ROTATE_MIN) {
-    wrist_rotate_motor->SetOutput(WRIST_ROTATE_MIN, M4310_VEL, m4310_Kp, m4310_Kd, 0);
-  } else
-    wrist_rotate_motor->SetOutput(target->wrist_rotate, M4310_VEL, m4310_Kp, m4310_Kd, 0);
-  current_joint_state.wrist_rotate = target->wrist_rotate;
-
-  if (target->hand_rotate >= HAND_ROTATE_MAX) {
-    hand_rotate_motor->SetOutput(HAND_ROTATE_MAX, M4310_VEL, m4310_Kp, m4310_Kd, 0);
-  } else if (target->hand_rotate <= HAND_ROTATE_MIN) {
-    hand_rotate_motor->SetOutput(HAND_ROTATE_MIN, M4310_VEL, m4310_Kp, m4310_Kd, 0);
-  } else
-    hand_rotate_motor->SetOutput(target->hand_rotate, M4310_VEL, m4310_Kp, m4310_Kd, 0);
-  current_joint_state.hand_rotate = target->hand_rotate;
+//  // M4310
+//  //TODO: Adjust VALUE For TESTING
+//  if (target.forearm_rotate > FOREARM_ROTATE_MAX) {
+//    forearm_rotate_motor->SetOutput(FOREARM_ROTATE_MAX, M4310_VEL, m4310_Kp, m4310_Kd, 0);
+//  } else if (target.forearm_rotate < FOREARM_ROTATE_MIN) {
+//    forearm_rotate_motor->SetOutput(FOREARM_ROTATE_MIN, M4310_VEL, m4310_Kp, m4310_Kd, 0);
+//  } else
+//    forearm_rotate_motor->SetOutput(target.forearm_rotate, M4310_VEL, m4310_Kp, m4310_Kd, 0);
+//  current_joint_state.forearm_rotate = target.forearm_rotate;
+//
+//  if (target.wrist_rotate > WRIST_ROTATE_MAX) {
+//    wrist_rotate_motor->SetOutput(WRIST_ROTATE_MAX, M4310_VEL, m4310_Kp, m4310_Kd, 0);
+//  } else if (target.wrist_rotate < WRIST_ROTATE_MIN) {
+//    wrist_rotate_motor->SetOutput(WRIST_ROTATE_MIN, M4310_VEL, m4310_Kp, m4310_Kd, 0);
+//  } else
+//    wrist_rotate_motor->SetOutput(target.wrist_rotate, M4310_VEL, m4310_Kp, m4310_Kd, 0);
+//  current_joint_state.wrist_rotate = target.wrist_rotate;
+//
+//  if (target.hand_rotate > HAND_ROTATE_MAX) {
+//    hand_rotate_motor->SetOutput(HAND_ROTATE_MAX, M4310_VEL, m4310_Kp, m4310_Kd, 0);
+//  } else if (target.hand_rotate < HAND_ROTATE_MIN) {
+//    hand_rotate_motor->SetOutput(HAND_ROTATE_MIN, M4310_VEL, m4310_Kp, m4310_Kd, 0);
+//  } else
+//    hand_rotate_motor->SetOutput(target.hand_rotate, M4310_VEL, m4310_Kp, m4310_Kd, 0);
+//  current_joint_state.hand_rotate = target.hand_rotate;
 
   return 0;
 }
 
 void ArmTransmitOutput() {
 //  control::MotorCANBase::TransmitOutput(m3508s, 1);
-  control::Motor4310* forearm_motors[] = {forearm_rotate_motor, wrist_rotate_motor, hand_rotate_motor};
+//  control::Motor4310* forearm_motors[] = {forearm_rotate_motor, wrist_rotate_motor, hand_rotate_motor};
 
-  joint_uart->Write((uint8_t*)(&(A1->send[0].data)), A1->send_length);
-  joint_uart->Write((uint8_t*)(&(A1->send[1].data)), A1->send_length);
-  joint_uart->Write((uint8_t*)(&(A1->send[2].data)), A1->send_length);
+  A1_uart->Write((uint8_t*)(&A1->send[0].data), A1->send_length);
+  osDelay(A1_CONTROL_DELAY);
+  A1_uart->Write((uint8_t*)(&A1->send[1].data), A1->send_length);
+  osDelay(A1_CONTROL_DELAY);
+  A1_uart->Write((uint8_t*)(&A1->send[2].data), A1->send_length);
+  osDelay(A1_CONTROL_DELAY);
 
-  control::Motor4310::TransmitOutput(forearm_motors, 3);
+//  control::Motor4310::TransmitOutput(forearm_motors, 3);
 }
 
 void ArmPrintData() {
@@ -327,9 +331,9 @@ void ArmPrintData() {
 //   print("Hand Rotate      : %10.4f\r\n", current_joint_state.hand_rotate);
   set_cursor(0, 0);
   clear_screen();
-  print("ID: %d, Pos %04f\r\n", A1->recv[0].id, A1->recv[0].Pos);
-  print("ID: %d, Pos %04f\r\n", A1->recv[1].id, A1->recv[1].Pos);
-  print("ID: %d, Pos %04f\r\n", A1->recv[2].id, A1->recv[2].Pos);
+  print("ID 0, flag: %s, Pos %04f\r\n", A1->connection_flag_[0] ? "true" : "false", A1->recv[0].Pos);
+  print("ID 1, flag: %s, Pos %04f\r\n", A1->connection_flag_[1] ? "true" : "false", A1->recv[1].Pos);
+  print("ID 2, flag: %s, Pos %04f\r\n", A1->connection_flag_[2] ? "true" : "false", A1->recv[2].Pos);
   print("Forearm POS: %04f\r\n",forearm_rotate_motor->GetTheta());
   print("Wrist POS: %04f\r\n",wrist_rotate_motor->GetTheta());
   print("Hand POS: %04f\r\n",hand_rotate_motor->GetTheta());
