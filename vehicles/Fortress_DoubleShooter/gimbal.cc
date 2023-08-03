@@ -241,7 +241,7 @@ void gimbalTask(void* arg) {
     // pitch calculation
     float pitch_vel;
     pitch_vel = clip<float>(dbus->ch3 / 660.0 * pitch_vel_range, -pitch_vel_range, pitch_vel_range);
-    pitch_pos += pitch_vel / 200 + dbus->mouse.y / 32767.0;
+    pitch_pos += pitch_vel / 200 - dbus->mouse.y / 20000.0;
     pitch_pos = clip<float>(pitch_pos, 0.05, 0.6);  // measured range
 
     if (pitch_reset) {
@@ -262,7 +262,8 @@ void gimbalTask(void* arg) {
 
     // yaw calculation
     float yaw_ratio, yaw_target;
-    yaw_ratio = -(dbus->ch2 / 18000.0);
+    yaw_ratio = -dbus->mouse.x / 10000.0;
+    yaw_ratio += -dbus->ch2 / 18000.0;
     yaw_target = clip<float>(yaw_ratio, -PI, PI);
     yaw_offset = wrap<float>(yaw_target + yaw_offset, -PI, PI);
     yaw_error = wrap<float>(yaw_offset - imu->INS_angle[0], -PI, PI);
@@ -365,15 +366,16 @@ void shooterTask(void* arg) {
 
  while (true) {
    while (Dead) osDelay(100);
-//       print("power1: %d, cooling heat: %.4f, cooling limit: %.4f\r\n", send->shooter_power, send->cooling_heat1, send->cooling_limit1);
-//       print("power2: %d, cooling heat: %.4f, cooling limit: %.4f\r\n", send->shooter_power, send->cooling_heat2, send->cooling_limit2);
+
+  // print("power1: %d, cooling heat: %.4f, cooling limit: %.4f\r\n", send->shooter_power, send->cooling_heat1, send->cooling_limit1);
+  // print("power2: %d, cooling heat: %.4f, cooling limit: %.4f\r\n", send->shooter_power, send->cooling_heat2, send->cooling_limit2);
+  // print("send->speed_limit1: %f, send->speed_limit2: %f\r\n", send->speed_limit1, send->speed_limit2);
 
 //    left shooter(dial part)
-   if (send->shooter_power && send->cooling_heat1 >= send->cooling_limit1 - 15) {
+   if (send->shooter_power && send->cooling_heat1 >= send->cooling_limit1 - 20) {
      left_top_flywheel->SetOutput(0);
      left_bottom_flywheel->SetOutput(0);
      left_dial->SetOutput(0);
-     osDelay(100);
    } else if (GimbalDead) {
      left_shooter->DialStop();
    } else if (send->shooter_power) {
@@ -405,11 +407,10 @@ void shooterTask(void* arg) {
    }
 
    // right shooter(dial part)
-   if (send->shooter_power && send->cooling_heat2 >= send->cooling_limit2 - 15) {
+   if (send->shooter_power && send->cooling_heat2 >= send->cooling_limit2 - 20) {
      right_top_flywheel->SetOutput(0);
      right_bottom_flywheel->SetOutput(0);
      right_dial->SetOutput(0);
-     osDelay(100);
    } else if (GimbalDead) {
      right_shooter->DialStop();
    } else if (send->shooter_power) {
@@ -420,7 +421,7 @@ void shooterTask(void* arg) {
        right_shooter->SlowContinueShoot();
        // fast shooting
      } else if ((dbus->mouse.r || dbus->wheel.wheel > remote::WheelDigitalValue)
-                && send->cooling_heat2 < send->cooling_heat2 - 24) {
+                && send->cooling_heat2 < send->cooling_limit2 - 24) {
        right_shooter->FastContinueShoot();
        // triple shooting
      } else if (dbus->wheel.wheel == remote::WheelDigitalValue
@@ -451,12 +452,15 @@ void shooterTask(void* arg) {
        leftflywheelFlag = false;
        left_shooter->SetFlywheelSpeed(0);
      } else {
-       if (14 < send->speed_limit1 && send->speed_limit1 < 16) {
+       if (send->speed_limit1 == 15.0) {
          leftflywheelFlag = true;
-         left_shooter->SetFlywheelSpeed(437);  // 445 MAX
-       } else if (send->speed_limit1 >= 18) {
+         left_shooter->SetFlywheelSpeed(485);  // 445 MAX
+       } else if (send->speed_limit1 == 18.0) {
          leftflywheelFlag = true;
-         left_shooter->SetFlywheelSpeed(482);  // 490 MAX
+         left_shooter->SetFlywheelSpeed(530);  // 490 MAX
+       } else if (send->speed_limit1 == 30.0) {
+         leftflywheelFlag = true;
+         left_shooter->SetFlywheelSpeed(770);
        } else {
          leftflywheelFlag = false;
          left_shooter->SetFlywheelSpeed(0);
@@ -467,12 +471,15 @@ void shooterTask(void* arg) {
        rightflywheelFlag = false;
        right_shooter->SetFlywheelSpeed(0);
      } else {
-       if (14 < send->speed_limit2 && send->speed_limit2 < 16) {
+       if (send->speed_limit2 == 15.0) {
          rightflywheelFlag = true;
-         right_shooter->SetFlywheelSpeed(437);  // 445 MAX
-       } else if (send->speed_limit2 >= 18) {
+         right_shooter->SetFlywheelSpeed(485);  // 445 MAX
+       } else if (send->speed_limit2 == 18.0) {
          rightflywheelFlag = true;
-         right_shooter->SetFlywheelSpeed(482);  // 490 MAX
+         right_shooter->SetFlywheelSpeed(530);  // 490 MAX
+       } else if (send->speed_limit2 == 30.0) {
+         rightflywheelFlag = true;
+         right_shooter->SetFlywheelSpeed(770);
        } else {
          rightflywheelFlag = false;
          right_shooter->SetFlywheelSpeed(0);
@@ -526,10 +533,10 @@ void chassisTask(void* arg) {
     send->cmd.data_int = SpinMode ? 1 : 0;
     send->TransmitOutput();
 
-    if (dbus->keyboard.bit.A) vx_keyboard -= 61.5;
-    if (dbus->keyboard.bit.D) vx_keyboard += 61.5;
-    if (dbus->keyboard.bit.W) vy_keyboard += 61.5;
-    if (dbus->keyboard.bit.S) vy_keyboard -= 61.5;
+    if (dbus->keyboard.bit.A) vx_keyboard += 61.5;
+    if (dbus->keyboard.bit.D) vx_keyboard -= 61.5;
+    if (dbus->keyboard.bit.W) vy_keyboard -= 61.5;
+    if (dbus->keyboard.bit.S) vy_keyboard += 61.5;
 
     if (-35 <= vx_keyboard && vx_keyboard <= 35) vx_keyboard = 0;
     if (-35 <= vy_keyboard && vy_keyboard <= 35) vy_keyboard = 0;
@@ -545,7 +552,7 @@ void chassisTask(void* arg) {
       vy_keyboard += 60;
 
     vx_keyboard = clip<float>(vx_keyboard, -1200, 1200);
-    vy_keyboard = clip<float>(-vy_keyboard, -1200, 1200);
+    vy_keyboard = clip<float>(vy_keyboard, -1200, 1200);
 
     vx_remote = -dbus->ch0;
     vy_remote = -dbus->ch1;
@@ -563,7 +570,7 @@ void chassisTask(void* arg) {
 
     // TODO
     // the angle difference between the gimbal and the chassis
-    relative_angle = wrap<float>(yaw_motor->GetTheta(),-PI,PI);
+    relative_angle = wrap<float>(yaw_motor->GetTheta(), -PI, PI);
 
     send->cmd.id = bsp::RELATIVE_ANGLE;
     send->cmd.data_float = -relative_angle;
