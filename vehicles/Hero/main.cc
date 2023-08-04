@@ -310,7 +310,7 @@ void gimbalTask(void* arg) {
     // pitch processing
     pitch_pos = clip<float>(pitch_pos + pitch_sum, -70 * PI, 70 * PI);
     // pitch update
-    pitch_motor->SetOutput(pitch_pos, 15);
+    pitch_motor->SetOutput(pitch_pos, pitch_sum);
     control::Motor4310::TransmitOutput(motors_can2_gimbal, 1);
     // if not elevation, update the yaw position in the chassis
     if (Elevation) {
@@ -367,7 +367,7 @@ void shooterTask(void* arg) {
   bool reload_pull = false;
   bool reload_push = false;
   // the 99.506 is the ratio of the reload servo and devide the 3508 ratio to reload one bullet
-  float reload_pos_weak = 2.75 * PI * 99.506 / M3508P19_RATIO;
+  float reload_pos_weak = 3.57 * PI * 99.506 / M3508P19_RATIO;
   float reload_pos_strong = 2.75 * PI * 99.506 / M3508P19_RATIO;
 
   // load variable
@@ -473,7 +473,7 @@ void shooterTask(void* arg) {
       // step 2
       while (true) {
         // break condition (reach the desire position)
-        if (++i > 30 && abs(reload_servo->GetOmega()) <= 0.001 && !GimbalDead) break;
+        if (++i > 30 && abs(reload_servo->GetOmega()) <= 0.00005 && !GimbalDead) break;
         // set the speed and acceleration for the reload motor
         // set target pull position once
         if (!reload_pull) {
@@ -496,12 +496,12 @@ void shooterTask(void* arg) {
       reload_motor->SetOutput(0);
       control::MotorCANBase::TransmitOutput(can2_reloader, 1);
       reload_pull = false;
-      osDelay(SHOOTER_OUTER_TASK_DELAY); // need test the delay time(wait for the)
+      osDelay(200); // need test the delay time(wait for the)
 
       // step 4
       while (true) {
         // break condition (loading)
-        if (++i > 30 && abs(load_servo->GetOmega()) <= 0.001 && !GimbalDead) break;
+        if (++i > 30 && abs(load_servo->GetOmega()) <= 0.0001 && !GimbalDead) break;
         // loading once
         if (!loading) {
           loading = true;
@@ -520,7 +520,7 @@ void shooterTask(void* arg) {
       // step 5
       while (true) {
         // break condition (reach the desire position)
-        if (++i > 10 && abs(reload_servo->GetOmega()) <= 0.001 && !GimbalDead) break;
+        if (++i > 10 && abs(reload_servo->GetOmega()) <= 0.0001 && !GimbalDead) break;
         // set target push position once
         if (!reload_push) {
           reload_push = true;
