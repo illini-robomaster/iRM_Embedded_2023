@@ -941,9 +941,11 @@ void KillAll() {
 }
 
 void KillGimbal() {
-  control::Motor4310* motor[] = {pitch_motor};
+  control::Motor4310* motor[] = {pitch_motor, yaw_motor};
 
   while (true) {
+    left_shooter->DialStop();
+    right_shooter->DialStop();
     GimbalDead = true;
     GimbalDeath.input(send->gimbal_power);
     if (GimbalDeath.posEdge() && robot_hp_begin) {
@@ -958,12 +960,15 @@ void KillGimbal() {
     for (int j = 0; j < SOFT_KILL_CONSTANT; j++) {
       tmp_pos -= START_PITCH_POS / SOFT_KILL_CONSTANT;  // decrease position gradually
       pitch_motor->SetOutput(tmp_pos, 1, 115, 0.5, 0);
-      control::Motor4310::TransmitOutput(motor, 1);
+      yaw_motor->SetOutput(0);
+      control::Motor4310::TransmitOutput(motor, 2);
       osDelay(GIMBAL_TASK_DELAY);
     }
 
     pitch_reset = true;
     pitch_motor->MotorDisable();
+    yaw_motor->SetOutput(0);
+    control::Motor4310::TransmitOutput(motor, 2);
 
     osDelay(KILLALL_DELAY);
   }
