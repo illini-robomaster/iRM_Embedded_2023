@@ -59,21 +59,20 @@ void loop() {
   int adc0 = 0, adc1 = 0, adc2 = 0, adc3 = 0, adc4 = 0, adc5 = 0;
   if (ads1.checkADS1115()) {
     adc0 = ads1.readVoltage(0);
-    adc1 = ads1.readVoltage(1);
-    adc2 = ads1.readVoltage(2);
-    adc3 = ads1.readVoltage(3);
     ledcWrite(0, calculatePWM(adc0 / 3300.0 * 360.0));
+    adc1 = ads1.readVoltage(1);
     ledcWrite(1, calculatePWM(adc1 / 3300.0 * 360.0));
+    adc2 = ads1.readVoltage(2);
     ledcWrite(2, calculatePWM(adc2 / 3300.0 * 360.0));
+    adc3 = ads1.readVoltage(3);
     ledcWrite(3, calculatePWM(adc3 / 3300.0 * 360.0));
   } else
     Serial.println("ADS1 Disconnected!");
   if (ads2.checkADS1115()) {
     adc4 = ads2.readVoltage(0);
-    adc5 = ads2.readVoltage(1);
     ledcWrite(4, calculatePWM(adc4 / 2050.0 * 180.0));
+    adc5 = ads2.readVoltage(1);
     ledcWrite(5, calculatePWM(adc5 / 2800.0 * 180.0));
   } else
     Serial.println("ADS2 Disconnected!");
-  Serial.println(adc0);
 }
