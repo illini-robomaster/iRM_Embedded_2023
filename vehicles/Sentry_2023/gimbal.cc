@@ -540,11 +540,11 @@ void chassisTask(void* arg) {
    vx_keyboard = clip<float>(vx_keyboard, -1200, 1200);
    vy_keyboard = clip<float>(vy_keyboard, -1200, 1200);
 
-   vx_remote = dbus->ch0;
-   vy_remote = dbus->ch1;
+   vx_remote = dbus->ch1;
+   vy_remote = dbus->ch0;
 
    vx_set = vx_keyboard + vx_remote;
-   vy_set = vy_keyboard + vy_remote;
+   vy_set = vy_keyboard - vy_remote;
 
    send->cmd.id = bsp::VX;
    send->cmd.data_float = Dead ? 0 : vx_set;
