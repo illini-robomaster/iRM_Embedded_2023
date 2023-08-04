@@ -471,12 +471,10 @@ void shooterTask(void* arg) {
   while (true) {
     while (Dead) osDelay(100);
 
-    if (send->shooter_power && send->cooling_heat1 >= send->cooling_limit1 - 15) {
+    if (send->shooter_power && send->cooling_heat1 >= send->cooling_limit1 - 20) {
       sl_motor->SetOutput(0);
       sr_motor->SetOutput(0);
       ld_motor->SetOutput(0);
-      control::MotorCANBase::TransmitOutput(motors_can1_shooter, 3);
-      osDelay(100);
     } else if (GimbalDead) {
       shooter->DialStop();
     } else if (send->shooter_power) {
@@ -515,12 +513,15 @@ void shooterTask(void* arg) {
         flywheelFlag = false;
         shooter->SetFlywheelSpeed(0);
       } else {
-        if (14 < send->speed_limit1 && send->speed_limit1 < 16) {
+        if (send->speed_limit1 == 15.0) {
           flywheelFlag = true;
-          shooter->SetFlywheelSpeed(437);  // 445 MAX
-        } else if (send->speed_limit1 >= 18) {
+          shooter->SetFlywheelSpeed(437);
+        } else if (send->speed_limit1 == 18.0) {
           flywheelFlag = true;
-          shooter->SetFlywheelSpeed(482);  // 490 MAX
+          shooter->SetFlywheelSpeed(478);
+        } else if (send->speed_limit1 == 30.0) {
+          flywheelFlag = true;
+          shooter->SetFlywheelSpeed(700);
         } else {
           flywheelFlag = false;
           shooter->SetFlywheelSpeed(0);
@@ -564,7 +565,7 @@ void chassisTask(void* arg) {
   float vx_set, vy_set;
 
   while (true) {
-    ChangeSpinMode.input(dbus->keyboard.bit.SHIFT /*|| dbus->swl == remote::UP*/);
+    ChangeSpinMode.input(dbus->keyboard.bit.SHIFT || dbus->swl == remote::UP);
     if (ChangeSpinMode.posEdge()) SpinMode = !SpinMode;
 
     send->cmd.id = bsp::MODE;
