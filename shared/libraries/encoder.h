@@ -40,11 +40,11 @@ class BRTEncoder {
   void UpdateData(const uint8_t data[]);
   /* implements data printout */
   void PrintData() const;
+  float angle_;
 
  private:
   bsp::CAN* can_;
   uint16_t rx_id_;
-  float angle_;
   bool connection_flag_ = false;
 };
 

@@ -50,9 +50,9 @@ const int A1_CONTROL_DELAY = 2;
 
 UART_HandleTypeDef* A1_UART = &huart6;
 
-
 // base vertical rotation motor params. (rotate the entire arm around an vertical axis)
-const float BASE_VERT_ROTATE_MAX = 0.7692307692;
+//const float BASE_VERT_ROTATE_MAX = 0.7692307692;
+const float BASE_VERT_ROTATE_MAX = 0.0;
 const float BASE_VERT_ROTATE_MIN = -1.0989010989;
 
 // base horizontal rotation motor params (rotate the entire arm around a horizontal axis)
@@ -60,8 +60,13 @@ const float BASE_HOR_ROTATE_MAX = PI/2;
 const float BASE_HOR_ROTATE_MIN = -PI/2;
 
 // elbow rotation motor param (rotate the forearm on a horizontal axis)
-const float ELBOW_ROTATE_MAX = 0.5494505495;
+//const float ELBOW_ROTATE_MAX = 0.5494505495;
+const float ELBOW_ROTATE_MAX = 0.0;
 const float ELBOW_ROTATE_MIN = -1.0989010989;
+
+//Encoder position offset.
+const float BASE_VERT_ENCODER_OFFSET = 2.135301;
+const float ELBOW_ENCODER_OFFSET = 3.515884;
 
 /* A1 params end */
 
@@ -78,9 +83,9 @@ const int HAND_ROTATE_TX_ID = 0x05;
 const int HAND_ROTATE_OFFSET = 100;
 const int WRIST_ROTATE_OFFSET = 100;
 const int FOREARM_ROTATE_OFFSET = 100;
-const int FPREARM_OFFSET = -967;
-const int GREATARM_OFFSET = 1023;
-const int BASE_OFFSET = 320;
+const int FPREARM_OFFSET = -651;
+const int GREATARM_OFFSET = 774;
+const int BASE_OFFSET = 780;
 const float M4310_VEL = 4.0; // magic number, see m4310_mit example
 
 // forearm rotation motor params. (rotate the forearm on its axis)

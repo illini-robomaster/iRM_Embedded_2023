@@ -226,7 +226,7 @@ void RM_RTOS_Default_Task(const void* args) {
 
   #ifdef ELBOW_ROTATE_MOTOR_ENABLE
   elbow_rotate_motor->Stop(ELBOW_MOTOR_ID);
-  elbow_rotate_motor_uart->Write((uint8_t*)(&(elbow_rotate_motor->send.data)),
+  elbow_rotate_motor_uart->Write((uint8_t*)(&(elbow_rotate_motor->send[0].data)),
                                 elbow_rotate_motor->send_length);
   #endif
 
@@ -263,7 +263,7 @@ void RM_RTOS_Default_Task(const void* args) {
 
         // elbow_rotate_motor->Control(ELBOW_MOTOR_ID, 0.0, 0.0, PI/4, 0.01, 0.01);
         elbow_rotate_motor->Test(ELBOW_MOTOR_ID);
-        elbow_rotate_motor_uart->Write((uint8_t*)(&(elbow_rotate_motor->send.data)),
+        elbow_rotate_motor_uart->Write((uint8_t*)(&(elbow_rotate_motor->send[0].data)),
                                       elbow_rotate_motor->send_length);
         #endif
 
@@ -279,7 +279,7 @@ void RM_RTOS_Default_Task(const void* args) {
         #ifdef ELBOW_ROTATE_MOTOR_ENABLE
         // elbow_rotate_motor->Control(ELBOW_MOTOR_ID, 0.0, 0.0, 0, 0.003, 0.003);
         elbow_rotate_motor->Test(ELBOW_MOTOR_ID);
-        elbow_rotate_motor_uart->Write((uint8_t*)(&(elbow_rotate_motor->send.data)),
+        elbow_rotate_motor_uart->Write((uint8_t*)(&(elbow_rotate_motor->send[0].data)),
                                       elbow_rotate_motor->send_length);
         #endif
      }

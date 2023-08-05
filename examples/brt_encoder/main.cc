@@ -30,7 +30,7 @@ static control::BRTEncoder* encoder = nullptr;
 void RM_RTOS_Init(void) {
   print_use_uart(&huart8);
   can = new bsp::CAN(&hcan1);
-  encoder = new control::BRTEncoder(can, 0x01);
+  encoder = new control::BRTEncoder(can, 0x0A);
 }
 
 void RM_RTOS_Default_Task(const void* args) {

@@ -42,7 +42,7 @@ void RM_RTOS_Init(void) {
 
     can = new bsp::CAN(&hcan1);
 
-    A1 = new CustomUART(BASE_HOR_ROTATE_UART);
+    A1 = new CustomUART(A1_UART);
     A1->SetupRx(300);
     A1->SetupTx(300);
     base_vert_rotate_motor = new control::UnitreeMotor();
@@ -51,7 +51,7 @@ void RM_RTOS_Init(void) {
 }
 
 static joint_state_t current_joint_state = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-static joint_state_t target_state = {0.0,0.0,0.0,0.0,0.0,0.0,0.0};
+//static joint_state_t target_state = {0.0,0.0,0.0,0.0,0.0,0.0,0.0};
 
 #define DEBUG_MODE
 
@@ -134,11 +134,11 @@ int ArmTurnAbsolute(joint_state_t* target) {
 }
 
 void ArmTransmitOutput() {
-  A1->Write((uint8_t*)(&(base_hor_rotate_motor->send.data)), base_hor_rotate_motor->send_length);
+  A1->Write((uint8_t*)(&(base_hor_rotate_motor->send[0].data)), base_hor_rotate_motor->send_length);
   osDelay(A1_CONTROL_DELAY);
-  A1->Write((uint8_t*)(&(base_vert_rotate_motor->send.data)), base_vert_rotate_motor->send_length);
+  A1->Write((uint8_t*)(&(base_vert_rotate_motor->send[0].data)), base_vert_rotate_motor->send_length);
   osDelay(A1_CONTROL_DELAY);
-  A1->Write((uint8_t*)(&(elbow_rotate_motor->send.data)), elbow_rotate_motor->send_length);
+  A1->Write((uint8_t*)(&(elbow_rotate_motor->send[0].data)), elbow_rotate_motor->send_length);
   osDelay(A1_CONTROL_DELAY);                          
 }
 
