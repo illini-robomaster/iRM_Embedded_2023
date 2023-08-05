@@ -276,16 +276,16 @@ void chassisTask(void* arg) {
       // delay compensation
       // based on rule-of-thumb formula SPIN_SPEED = 80 = ~30 degree of error
       relative_angle = relative_angle - PI * 30.0 / 180.0 / 80.0 * SPIN_SPEED;
-      relative_angle = relative_angle - PI / 6.0;
+      relative_angle = relative_angle - PI / 9.0;
       chassis->SteerSetMaxSpeed(RUN_SPEED * 3 / 2);
 
       sin_yaw = sin(relative_angle);
       cos_yaw = cos(relative_angle);
       vx = cos_yaw * vx_set + sin_yaw * vy_set;
       vy = -sin_yaw * vx_set + cos_yaw * vy_set;
-      vx = vx * 2 / 3;
-      vy = vy * 2 / 3;
-      wz = SPIN_SPEED * 3 / 2;
+      vx = vx * 2.0;
+      vy = vy * 2.0;
+      wz = SPIN_SPEED * 2.0;
     } else {
       chassis->SteerSetMaxSpeed(RUN_SPEED / SPIN_DOWN_SPEED_FACTOR);
       sin_yaw = sin(relative_angle);
