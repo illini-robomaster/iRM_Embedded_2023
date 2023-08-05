@@ -72,7 +72,15 @@ const int WRIST_ROTATE_RX_ID = 0x04;
 const int WRIST_ROTATE_TX_ID = 0x03;
 const int HAND_ROTATE_RX_ID = 0x06;
 const int HAND_ROTATE_TX_ID = 0x05;
-
+//const int HAND_ROTATE_OFFSET = 402;
+//const int WRIST_ROTATE_OFFSET = 756;
+//const int FOREARM_ROTATE_OFFSET = 1023;
+const int HAND_ROTATE_OFFSET = 100;
+const int WRIST_ROTATE_OFFSET = 100;
+const int FOREARM_ROTATE_OFFSET = 100;
+const int FPREARM_OFFSET = -967;
+const int GREATARM_OFFSET = 1023;
+const int BASE_OFFSET = 320;
 const float M4310_VEL = 4.0; // magic number, see m4310_mit example
 
 // forearm rotation motor params. (rotate the forearm on its axis)
@@ -80,8 +88,8 @@ const float FOREARM_ROTATE_MIN = -PI;
 const float FOREARM_ROTATE_MAX = PI;
 
 // wrist rotation motor params. (rotate the hand around an vertical axis)
-const float WRIST_ROTATE_MAX = PI;
-const float WRIST_ROTATE_MIN = -PI;
+const float WRIST_ROTATE_MAX = PI/4;
+const float WRIST_ROTATE_MIN = -PI/4;
 
 // hand rotation motor params (rotate the hand on its axis)
 const float HAND_ROTATE_MAX = PI;

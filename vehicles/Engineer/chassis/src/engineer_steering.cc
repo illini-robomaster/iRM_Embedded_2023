@@ -72,7 +72,7 @@ namespace control{
 //   SteerThetaReset();
   // just for wheel speed pid (not for steer motor)
   float* pid_params = new float[3]{12, 3, 1};
-  float motor_max_iout = 2000;
+  float motor_max_iout = 20000;
   float motor_max_out = 20000;
   for (int i = 0; i < MOTOR_NUM; i++) {
     pids[i].Reinit(pid_params, motor_max_iout, motor_max_out);

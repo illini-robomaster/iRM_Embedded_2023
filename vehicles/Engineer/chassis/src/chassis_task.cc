@@ -1,6 +1,6 @@
 
 #include "chassis_task.h"
-
+//#define SINGLEBOARD
 
 //Constants 
 static const int KILLALL_DELAY = 100;
@@ -50,13 +50,15 @@ void chassisTask(void* arg){
     while (true) {
         float relative_angle = 0;
         float sin_yaw, cos_yaw, vx_set, vy_set;
-        float vx, vy, wz; 
+        float vx, vy, wz;
 
-        // vx_set = -receive->vx;
-        // vy_set = receive->vy;
-
-        vx_set = -dbus->ch3;
-        vy_set = dbus->ch2;
+#ifndef SINGLEBOARD
+         vx_set = -receive->vx;
+         vy_set = receive->vy;
+#else
+        vx_set = 0;
+        vy_set = 0;
+#endif
 
        
 
@@ -66,7 +68,12 @@ void chassisTask(void* arg){
         vx = cos_yaw * vx_set + sin_yaw * vy_set;
         vy = -sin_yaw * vx_set + cos_yaw * vy_set;
         wz = std::min(FOLLOW_SPEED, FOLLOW_SPEED * relative_angle);       /* TODO : ASK IF GIMBAL EXIST, HOW CHASSIS MOVE */
-        wz = dbus->ch0;
+//        wz = dbus->ch2;
+#ifndef  SINGLEBOARD
+        wz = receive->relative_angle;
+#else
+        wz = 0;
+#endif
         // if (-CHASSIS_DEADZONE < relative_angle && relative_angle < CHASSIS_DEADZONE) wz = 0;
 
         chassis->SetSpeed(vx / 10, vy / 10, wz/10);
@@ -74,16 +81,15 @@ void chassisTask(void* arg){
         constexpr float WHEEL_SPEED_FACTOR = 4;
         chassis->WheelUpdateSpeed(WHEEL_SPEED_FACTOR);
         chassis->SteerCalcOutput();
-        chassis->PrintData();
+//        chassis->PrintData();
 
-
-        // chassis->Update((float)referee->game_robot_status.chassis_power_limit,
-        //                   referee->power_heat_data.chassis_power,
-        //                   (float)referee->power_heat_data.chassis_power_buffer);
-        chassis->Update(0,
-                        0,
-                        0);
-
+        chassis->Update((float)referee->game_robot_status.chassis_power_limit,
+                           referee->power_heat_data.chassis_power,
+                           (float)referee->power_heat_data.chassis_power_buffer);
+//        chassis->Update(0,
+//                        0,
+//                        0);
+////
 
         if (Dead) {
         chassis->SetSpeed(0,0,0);
@@ -95,36 +101,6 @@ void chassisTask(void* arg){
         // chassis->PrintData();
         control::MotorCANBase::TransmitOutput(wheel_motors, 4);
         control::MotorCANBase::TransmitOutput(steer_motors, 4);
-
-        // TODO: Enable code below when referee ready.
-        // receive->cmd.id = bsp::SHOOTER_POWER;
-        // receive->cmd.data_bool = referee->game_robot_status.mains_power_shooter_output;
-        // receive->TransmitOutput();
-
-        // receive->cmd.id = bsp::COOLING_HEAT1;
-        // receive->cmd.data_float = (float)referee->power_heat_data.shooter_id1_17mm_cooling_heat;
-        // receive->TransmitOutput();
-
-        // receive->cmd.id = bsp::COOLING_HEAT2;
-        // receive->cmd.data_float = (float)referee->power_heat_data.shooter_id2_17mm_cooling_heat;
-        // receive->TransmitOutput();
-
-        // receive->cmd.id = bsp::COOLING_LIMIT1;
-        // receive->cmd.data_float = (float)referee->game_robot_status.shooter_id1_17mm_cooling_limit;
-        // receive->TransmitOutput();
-
-        // receive->cmd.id = bsp::COOLING_LIMIT2;
-        // receive->cmd.data_float = (float)referee->game_robot_status.shooter_id2_17mm_cooling_limit;
-        // receive->TransmitOutput();
-
-        // receive->cmd.id = bsp::SPEED_LIMIT1;
-        // receive->cmd.data_float = (float)referee->game_robot_status.shooter_id1_17mm_speed_limit;
-        // receive->TransmitOutput();
-
-        // receive->cmd.id = bsp::SPEED_LIMIT2;
-        // receive->cmd.data_float = (float)referee->game_robot_status.shooter_id2_17mm_speed_limit;
-        // receive->TransmitOutput();
-
 
 
         osDelay(CHASSIS_TASK_DELAY);

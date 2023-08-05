@@ -25,9 +25,11 @@
 #include "dbus.h"
 #include "rgb.h"
 #include "chassis_task.h"
-// #include "ui_task.h"
-// #include "referee_task.h"
-
+//  #include "ui_task.h"
+#include "referee_task.h"
+#include "bsp_print.h"
+//#define SINGLEBOARD
+//
 osThreadId_t chassisTaskHandle;
 osThreadId_t UITaskHandle;
 osThreadId_t refereeTaskHandle;
@@ -39,8 +41,11 @@ bsp::CAN* can2 = nullptr;
 remote::DBUS* dbus = nullptr;
 // display::RGB* RGB = nullptr;
 
-// RefereeUART* referee_uart = nullptr;
-// communication::Referee* referee = nullptr;
+ RefereeUART* referee_uart = nullptr;
+ communication::Referee* referee = nullptr;
+#ifndef SINGLEBOARD
+ bsp::CanBridge* receive = nullptr;
+#endif
 
 
 
@@ -55,9 +60,11 @@ void RM_RTOS_Init() {
     can2 = new bsp::CAN(&hcan2, false);
     // RGB = new display::RGB(&htim5, 3, 2, 1, 1000000);
 
-    // referee_uart = new RefereeUART(&huart6);
-    // referee = new communication::Referee();
-
+   referee_uart = new RefereeUART(&huart1);
+   referee = new communication::Referee();
+#ifndef SINGLEBOARD
+   receive = new bsp::CanBridge(can2,0x20B,0x20A);
+#endif
 
 
     init_chassis();
@@ -66,8 +73,8 @@ void RM_RTOS_Init() {
 
 void RM_RTOS_Threads_Init(void) {
     chassisTaskHandle = osThreadNew(chassisTask,nullptr,&chassisTaskAttribute);
-    // refereeTaskHandle = osThreadNew(refereeTask,nullptr,&refereeTaskAttribute);
-    // UITaskHandle = osThreadNew(UITask,nullptr,&UITaskAttribute);
+    refereeTaskHandle = osThreadNew(refereeTask,nullptr,&refereeTaskAttribute);
+//     UITaskHandle = osThreadNew(UITask,nullptr,&UITaskAttribute);
 }
 
 
@@ -79,4 +86,9 @@ void KillAll() {
 
 void RM_RTOS_Default_Task(const void* args) {
     UNUSED(args);
+    while(true){
+      set_cursor(0,0);
+      clear_screen();
+      print("ROBOTID: %d",referee->game_robot_status.robot_id);
+    }
 }

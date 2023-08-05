@@ -1,3 +1,4 @@
+#pragma once
 #include "cmsis_os.h"
 #include "bsp_uart.h"
 #include "protocol.h"
