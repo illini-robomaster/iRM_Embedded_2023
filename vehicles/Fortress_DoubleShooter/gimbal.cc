@@ -189,7 +189,7 @@ void gimbalTask(void* arg) {
   // the start code for motor 4310
   pitch_motor->SetZeroPos();
   pitch_motor->MotorEnable();
-  // yaw_motor->SetZeroPos();
+//  yaw_motor->SetZeroPos();
   yaw_motor->MotorEnable();
 //  osDelay(GIMBAL_TASK_DELAY);
 
@@ -242,7 +242,7 @@ void gimbalTask(void* arg) {
     float pitch_vel;
     pitch_vel = clip<float>(dbus->ch3 / 660.0 * pitch_vel_range, -pitch_vel_range, pitch_vel_range);
     pitch_pos += pitch_vel / 200 - dbus->mouse.y / 20000.0;
-    pitch_pos = clip<float>(pitch_pos, 0.05, 0.6);  // measured range
+    pitch_pos = clip<float>(pitch_pos, 0.05, 0.73);  // measured range
 
     if (pitch_reset) {
       // 4310 soft start

@@ -44,6 +44,7 @@ typedef enum {
   FORTRESS_CALIBRATED,
   RECALIBRATE,
   IS_MY_COLOR_BLUE,
+  SUPERCAP_VOLTAGE
 } can_bridge_cmd;
 
 typedef struct {
@@ -83,6 +84,7 @@ class CanBridge {
   bool fortress_calibrated = false;
   bool recalibrate = false;
   bool is_my_color_blue = false;
+  float supercap_voltage = 0;
   // each bit represents a flag correspond to specific motor e.g.(at index 0, it represents the motor 1's connection flag)
  private:
   bsp::CAN* can_;

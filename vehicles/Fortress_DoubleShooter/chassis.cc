@@ -133,7 +133,8 @@ static control::Chassis* chassis = nullptr;
 // static control::steering_chassis_t* chassis_data;
 // static control::SteeringChassis* chassis;
 
-// static control::SuperCap* supercap = nullptr;
+ static control::SuperCap* supercap = nullptr;
+ static float SPIN_DOWN_SPEED_FACTOR = 0.0;
 
 static const float CHASSIS_DEADZONE = 0.04;
 
@@ -162,6 +163,10 @@ void chassisTask(void* arg) {
   //  while (receive->start < 0.5) osDelay(100);
   //  print("Here2\r\n");
 
+  float WHEEL_SPEED_FACTOR = 0.0;
+  float power_limit = 0.0;
+  float power_limit_lowerbound = 45.0;
+
   while (true) {
     float relative_angle = receive->relative_angle;
     float sin_yaw, cos_yaw, vx_set, vy_set;
@@ -169,6 +174,37 @@ void chassisTask(void* arg) {
 
     vx_set = -receive->vx;
     vy_set = -receive->vy;
+
+    float supercap_voltage = (float)(supercap->info.voltage / 1000.0);
+    float maximum_energy = 0.5 * pow(27.0,2) * 6.0;
+
+    float current_energy = pow(supercap_voltage,2) * 6 / 2;
+
+    //consider using uart printing to check the power limit's value
+    //log values out as files to obtain its trend
+    //WHEEL_SPEED_FACTOR separated for two modes
+    if (current_energy <= 0.1 * maximum_energy) {
+      // case when remaining energy of capacitor is below 10%, recharge the super capacitor
+      power_limit = power_limit_lowerbound;
+      WHEEL_SPEED_FACTOR = 4.0;
+    } else if (current_energy <= 0.2 * maximum_energy && current_energy > 0.1 * maximum_energy) {
+      // case when remaining energy of capacitor is between 10% and 20%
+      power_limit = power_limit_lowerbound + (power_limit_lowerbound / (0.1 * maximum_energy)) * (current_energy - 0.1 * maximum_energy);
+      WHEEL_SPEED_FACTOR = 6.0 + (4.0 / ((0.1 * maximum_energy))) * (current_energy - 0.1 * maximum_energy);
+    } else if (current_energy <= 0.3 * maximum_energy && current_energy > 0.2 * maximum_energy) {
+      // case when remaining energy of capacitor is between 20% and 30%
+      power_limit = 80.0 + (60.0 / (0.1 * maximum_energy)) * (current_energy - 0.2 * maximum_energy);
+      WHEEL_SPEED_FACTOR = 10.0 + (2.0 / ((0.1 * maximum_energy))) * (current_energy - 0.2 * maximum_energy);
+    } else if (current_energy > 0.3 * maximum_energy) {
+      // case when remaining energy of capacitor is above 30%
+      power_limit = 120;
+      WHEEL_SPEED_FACTOR = 12.0;
+      // WHEEL SPEED FACTOR will be 12
+    }
+
+    SPIN_DOWN_SPEED_FACTOR = 4.0 / WHEEL_SPEED_FACTOR;
+    WHEEL_SPEED_FACTOR = receive->mode== 1 ? 4.0 : WHEEL_SPEED_FACTOR;
+
 
     if (receive->mode == 1) {  // spin mode
                                // need add the relative angle compensation for the board communication
@@ -187,7 +223,7 @@ void chassisTask(void* arg) {
     }
 
     chassis->SetSpeed(vx, vy, wz);
-    chassis->Update(true, (float)referee->game_robot_status.chassis_power_limit,
+    chassis->Update(true, power_limit,
                     referee->power_heat_data.chassis_power,
                     (float)referee->power_heat_data.chassis_power_buffer);
 
@@ -418,6 +454,9 @@ void self_Check_Task(void* arg) {
       receive->cmd.id = bsp::CHASSIS_FLAG;
       receive->cmd.data_uint = (unsigned int)flag_summary;
       receive->TransmitOutput();
+      receive->cmd.id = bsp :: SUPERCAP_VOLTAGE;
+      receive->cmd.data_float = supercap->info.voltage / 1000;
+      receive->TransmitOutput();
     }
     transmission_flag = !transmission_flag;
   }
@@ -476,6 +515,8 @@ void RM_RTOS_Init() {
   referee = new communication::Referee;
 
   receive = new bsp::CanBridge(can2, 0x20B, 0x20A);
+
+  supercap = new control::SuperCap(can1, 0x301);
 }
 
 //==================================================================================================
