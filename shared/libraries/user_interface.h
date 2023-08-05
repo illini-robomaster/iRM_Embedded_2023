@@ -135,7 +135,7 @@ class UserInterface {
   void CapGUIInit(graphic_data_t* barFrame, graphic_data_t* bar);
   void CapGUIUpdate(float cap);  // cap 0 - 1
   void CapGUICharInit(graphic_data_t* percent);
-  void CapGUICharUpdate();
+  void CapGUICharUpdate(int cap_volts);
   void DiagGUIInit(graphic_data_t* message, int len);
   void DiagGUIUpdate(int len);
   void DiagGUIClear(UserInterface* UI, Referee* referee, graphic_data_t* graph, int currCount);

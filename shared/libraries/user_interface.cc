@@ -457,14 +457,14 @@ void UserInterface::CapGUIInit(graphic_data_t* barFrame, graphic_data_t* bar) {
 
 void UserInterface::CapGUIUpdate(float cap) {
   cap_ = cap;
-  float offset = cap * 300;
+  float offset = cap / 26.7 * 300.0;
   int x = barStartX_;
   int y = barStartY_;
   int color;
   uint32_t x_end = x + (uint32_t)offset;
-  if (cap >= 0 && cap <= 0.3)
+  if (cap >= 0 && cap <= 5.0)
     color = UI_Color_Purplish_red;
-  else if (cap > 0.2 && cap < 0.95)
+  else if (cap > 5.0 && cap < 15.0)
     color = UI_Color_Orange;
   else
     color = UI_Color_Green;
@@ -473,14 +473,14 @@ void UserInterface::CapGUIUpdate(float cap) {
 
 void UserInterface::CapGUICharInit(graphic_data_t* percent) {
   percent_ = percent;
-  percentLen_ = snprintf(percentStr_, 30, "%d%%", 100);
-  CharDraw(percent, "PG", UI_Graph_Add, 2, UI_Color_Yellow, 15, percentLen_, 2, barStartX_ - 56,
+  percentLen_ = snprintf(percentStr_, 30, "%d mV", 100);
+  CharDraw(percent, "PG", UI_Graph_Add, 2, UI_Color_Yellow, 15, percentLen_, 2, barStartX_ - 67,
            barStartY_ + 18);
 }
 
-void UserInterface::CapGUICharUpdate() {
-  percentLen_ = snprintf(percentStr_, 30, "%d%%", (int)(cap_ * 100));
-  CharDraw(percent_, "PG", UI_Graph_Change, 2, UI_Color_Yellow, 15, percentLen_, 2, barStartX_ - 56,
+void UserInterface::CapGUICharUpdate(int cap_volts) {
+  percentLen_ = snprintf(percentStr_, 30, "%d mV", cap_volts);
+  CharDraw(percent_, "PG", UI_Graph_Change, 2, UI_Color_Yellow, 15, percentLen_, 2, barStartX_ - 67,
            barStartY_ + 18);
 }
 
