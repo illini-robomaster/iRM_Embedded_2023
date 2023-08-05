@@ -308,7 +308,7 @@ void gimbalTask(void* arg) {
 
     // Data Processing and Update(yaw clip range need test)
     // pitch processing
-    pitch_pos = clip<float>(pitch_pos + pitch_sum, -70 * PI, 70 * PI);
+    pitch_pos = clip<float>(pitch_pos + pitch_sum, -60 * PI, 0);
     // pitch update
     pitch_motor->SetOutput(pitch_pos, pitch_sum);
     control::Motor4310::TransmitOutput(motors_can2_gimbal, 1);
@@ -317,7 +317,7 @@ void gimbalTask(void* arg) {
       // yaw processing (gear ratio 1 : 4)
       yaw_pos = clip<float>(yaw_pos + yaw_sum, -PI / 3, PI / 3);
       // yaw update
-      yaw_motor->SetOutput(yaw_pos, 10, 20, 1, 0);
+      yaw_motor->SetOutput(yaw_pos, 8, 20, 1, 0);
       control::Motor4310::TransmitOutput(motors_can1_gimbal, 1);
     }
 
@@ -367,7 +367,7 @@ void shooterTask(void* arg) {
   bool reload_pull = false;
   bool reload_push = false;
   // the 99.506 is the ratio of the reload servo and devide the 3508 ratio to reload one bullet
-  float reload_pos_weak = 3.57 * PI * 99.506 / M3508P19_RATIO;
+  float reload_pos_weak = 3.53 * PI * 99.506 / M3508P19_RATIO;
   float reload_pos_strong = 2.75 * PI * 99.506 / M3508P19_RATIO;
 
   // load variable
@@ -395,7 +395,7 @@ void shooterTask(void* arg) {
     while (Dead || GimbalDead) osDelay(SHOOTER_OUTER_TASK_DELAY);
 
     i = 0;
-    if (Preload) {
+    if (Preload && !GimbalDead) {
       while (true) {
         // break condition (loading)
         if (++i > 10 && abs(load_servo->GetOmega()) <= 0.001 && !GimbalDead) break;
@@ -430,7 +430,7 @@ void shooterTask(void* arg) {
       force_strong = true;
     }
     // force transforming
-    if (force_transforming) {
+    if (force_transforming && !GimbalDead) {
       while (true) {
         // break condition (reach the desire position)
         if (++i > 10 && abs(force_motor->GetOmega()) <= 0.001 && !GimbalDead) break;
@@ -466,7 +466,7 @@ void shooterTask(void* arg) {
 
     // Load Detector
     LoadDetect.input(dbus->swr == remote::UP || dbus->mouse.l);
-    if (LoadDetect.posEdge()) {
+    if (LoadDetect.posEdge() && !GimbalDead) {
       // step 1
       trigger->SetOutPutAngle(0);
       osDelay(SHOOTER_OUTER_TASK_DELAY); // wait for the bullet out
@@ -790,12 +790,12 @@ void RM_RTOS_Default_Task(const void* args) {
       Preload = true;
     }
 
-    if (referee->game_robot_status.mains_power_shooter_output == 0
-        || referee->game_robot_status.mains_power_gimbal_output == 0) {
+    if (referee->game_robot_status.mains_power_shooter_output == 0) {
       GimbalDead = true;
       pitch_motor->MotorDisable();
       reload_motor->SetOutput(0);
       force_motor->SetOutput(0);
+      load_motor->SetOutput(0);
       control::MotorCANBase::TransmitOutput(motors_can2_shooter_part, 2);
     } else {
       GimbalDead = false;
