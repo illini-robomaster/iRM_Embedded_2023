@@ -66,6 +66,8 @@ static const int SELFTEST_TASK_DELAY = 100;
 static volatile float yaw_sum = 0;
 static control::Motor4310* yaw_motor = nullptr;
 
+static volatile bool safe_mode = true;
+
 //==================================================================================================
 // Referee
 //==================================================================================================
@@ -304,11 +306,14 @@ void gimbalTask(void* arg) {
     yaw_remote = dbus->ch2 / 660.0 / 210.0 / 5 * PI;
     // sum whole yaw data
     yaw_sum = yaw_mouse + yaw_remote;
-    print("yaw_sum: %f\n", yaw_sum);
 
     // Data Processing and Update(yaw clip range need test)
     // pitch processing
-    pitch_pos = clip<float>(pitch_pos + pitch_sum, -60 * PI, 0);
+    if (dbus->swl == remote::DOWN) {
+      pitch_pos = clip<float>(pitch_pos + pitch_sum, -60 * PI, 60 * PI);
+    } else {
+      pitch_pos = clip<float>(pitch_pos + pitch_sum, -25 * PI, 0);
+    }
     // pitch update
     pitch_motor->SetOutput(pitch_pos, pitch_sum);
     control::Motor4310::TransmitOutput(motors_can2_gimbal, 1);
@@ -355,6 +360,8 @@ static control::ServoMotor* force_servo = nullptr;
 static BoolEdgeDetector ForceWeakDetect(false);
 static BoolEdgeDetector ForceStrongDetect(false);
 
+static float force_angle = 65 * PI;
+
 void shooterTask(void* arg) {
   UNUSED(arg);
   // motors initialization
@@ -367,8 +374,8 @@ void shooterTask(void* arg) {
   bool reload_pull = false;
   bool reload_push = false;
   // the 99.506 is the ratio of the reload servo and devide the 3508 ratio to reload one bullet
-  float reload_pos_weak = 3.53 * PI * 99.506 / M3508P19_RATIO;
-  float reload_pos_strong = 2.75 * PI * 99.506 / M3508P19_RATIO;
+  float reload_pos_weak = 3.78 * PI * 99.506 / M3508P19_RATIO;
+  float reload_pos_strong = 4.7 * PI * 99.506 / M3508P19_RATIO;
 
   // load variable
   bool loading = false;
@@ -380,7 +387,6 @@ void shooterTask(void* arg) {
   bool force_strong = false;
   bool force_transforming = false;
   float force_pos = 0;
-  float  force_angle = 55 * PI;
 
   int i= 0;
 
@@ -389,6 +395,8 @@ void shooterTask(void* arg) {
     if (dbus->keyboard.bit.B || dbus->swr == remote::DOWN) break;
     osDelay(SHOOTER_OUTER_TASK_DELAY);
   }
+
+  safe_mode = false;
 
   while (true) {
     // Dead
@@ -415,6 +423,10 @@ void shooterTask(void* arg) {
       osDelay(100); // need test the delay time
     }
 
+    if (dbus->swl == remote::DOWN) {
+      force_weak = false;
+    }
+
     // whether change the force motor position
     ForceWeakDetect.input(dbus->keyboard.bit.F || dbus->wheel.wheel < 1024);
     ForceStrongDetect.input(dbus->keyboard.bit.C
@@ -433,7 +445,7 @@ void shooterTask(void* arg) {
     if (force_transforming && !GimbalDead) {
       while (true) {
         // break condition (reach the desire position)
-        if (++i > 10 && abs(force_motor->GetOmega()) <= 0.001 && !GimbalDead) break;
+        if (++i > 30 && abs(force_motor->GetOmega()) <= 0.001 && !GimbalDead) break;
         // set the speed and acceleration for the reload motor
         // set target pull position once
         if (i == 1) {
@@ -467,6 +479,7 @@ void shooterTask(void* arg) {
     // Load Detector
     LoadDetect.input(dbus->swr == remote::UP || dbus->mouse.l);
     if (LoadDetect.posEdge() && !GimbalDead) {
+      osDelay(100);
       // step 1
       trigger->SetOutPutAngle(0);
       osDelay(SHOOTER_OUTER_TASK_DELAY); // wait for the bullet out
@@ -478,6 +491,8 @@ void shooterTask(void* arg) {
         // set target pull position once
         if (!reload_pull) {
           reload_pull = true;
+          reload_servo->SetMaxSpeed(10 * PI);
+          reload_servo->SetMaxAcceleration(25 * PI);
           if (force_weak) {
             reload_servo->SetTarget(reload_pos_weak);
           } else if (force_strong) {
@@ -490,13 +505,13 @@ void shooterTask(void* arg) {
       }
       // step 3 (before release the reload board)
       trigger->SetOutPutAngle(-80); // need test the trigger angle
-      osDelay(1700); // need test the delay time(wait for the)
+      osDelay(1500); // need test the delay time(wait for the)
       // after reload pulling
       i = 0;
       reload_motor->SetOutput(0);
       control::MotorCANBase::TransmitOutput(can2_reloader, 1);
       reload_pull = false;
-      osDelay(200); // need test the delay time(wait for the)
+      osDelay(100); // need test the delay time(wait for the)
 
       // step 4
       while (true) {
@@ -520,11 +535,13 @@ void shooterTask(void* arg) {
       // step 5
       while (true) {
         // break condition (reach the desire position)
-        if (++i > 10 && abs(reload_servo->GetOmega()) <= 0.0001 && !GimbalDead) break;
+        if (++i > 20 && abs(reload_servo->GetOmega()) <= 0.0001 && !GimbalDead) break;
         // set target push position once
         if (!reload_push) {
           reload_push = true;
           reload_servo->SetTarget(0, true);
+          reload_servo->SetMaxSpeed(50 * PI);
+          reload_servo->SetMaxAcceleration(100 * PI);
         }
         reload_servo->CalcOutput();
         control::MotorCANBase::TransmitOutput(can2_reloader, 1);
@@ -685,8 +702,8 @@ void RM_RTOS_Init() {
   // Servo control for each shooter motor
   control::servo_t servo_data;
   servo_data.motor = load_motor;
-  servo_data.max_speed = 4 * PI; // params need test
-  servo_data.max_acceleration = 10 * PI;
+  servo_data.max_speed = 3 * PI; // params need test
+  servo_data.max_acceleration = 8 * PI;
   servo_data.transmission_ratio = M3508P19_RATIO;
   servo_data.omega_pid_param = new float [3] {150, 1.2, 5};
   servo_data.max_iout = 1000;
@@ -694,14 +711,14 @@ void RM_RTOS_Init() {
   load_servo = new control::ServoMotor(servo_data);
 
   servo_data.motor = reload_motor;
-  servo_data.max_speed = 4 * PI; // params need test
-  servo_data.max_acceleration = 10 * PI;
+  servo_data.max_speed = 15 * PI; // params need test
+  servo_data.max_acceleration = 25 * PI;
   servo_data.omega_pid_param = new float [3] {130, 15, 5};
   reload_servo = new control::ServoMotor(servo_data);
 
   servo_data.motor = force_motor;
-  servo_data.max_speed = 4 * PI; // params need test
-  servo_data.max_acceleration = 10 * PI;
+  servo_data.max_speed = 100 * PI;
+  servo_data.max_acceleration = 100 * PI;
   servo_data.omega_pid_param = new float [3] {150, 1.2, 5};
   force_servo = new control::ServoMotor(servo_data);
 
@@ -740,7 +757,7 @@ void KillAll() {
 
   while (true) {
     // Restart after emergency stop
-    FakeDeath.input(dbus->swl == remote::DOWN);
+    FakeDeath.input(dbus->swr == remote::DOWN && safe_mode == false);
     if (FakeDeath.posEdge()) {
       Dead = false;
       RGB->Display(display::color_green);
@@ -776,10 +793,11 @@ void KillAll() {
 void RM_RTOS_Default_Task(const void* args) {
   UNUSED(args);
   control::MotorCANBase* motors_can2_shooter_part[] = {reload_motor, force_motor};
+  safe_mode = true;
 
   while (true) {
     // Emergency stop
-    FakeDeath.input(dbus->swl == remote::DOWN);
+    FakeDeath.input(dbus->swr == remote::DOWN && safe_mode == false);
     if (FakeDeath.posEdge()) {
       Dead = true;
       KillAll();
