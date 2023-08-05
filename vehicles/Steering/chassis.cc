@@ -391,17 +391,6 @@ void UITask(void* arg) {
 
   while (!receive->start) osDelay(100);
 
-  //   int tryLIDAR = 0;
-  //   while (!LIDAR->begin()) {
-  //     if (++tryLIDAR >= 5) break;
-  //     osDelay(10);
-  //   }
-  //   tryLIDAR = 0;
-  //   while (!LIDAR->startFilter()) {
-  //     if (++tryLIDAR >= 5) break;
-  //     osDelay(10);
-  //   }
-
   UI->SetID(referee->game_robot_status.robot_id);
 
   communication::package_t frame;
@@ -463,7 +452,7 @@ void UITask(void* arg) {
 
   while (true) {
     // Update chassis GUI
-    UI->ChassisGUIUpdate(receive->relative_angle, calibration_flag);
+    UI->ChassisGUIUpdate(receive->relative_angle, receive->start);
     UI->GraphRefresh((uint8_t*)(&referee->graphic_five), 5, graphChassis, graphArrow, graphGimbal,
                      graphCali, graphEmpty2);
     referee->PrepareUIContent(communication::FIVE_GRAPH);
