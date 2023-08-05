@@ -358,15 +358,16 @@ void shooterTask(void* arg) {
 
  while (true) {
    while (Dead) osDelay(100);
-//       print("power1: %d, cooling heat: %.4f, cooling limit: %.4f\r\n", send->shooter_power, send->cooling_heat1, send->cooling_limit1);
-//       print("power2: %d, cooling heat: %.4f, cooling limit: %.4f\r\n", send->shooter_power, send->cooling_heat2, send->cooling_limit2);
+
+  // print("power1: %d, cooling heat: %.4f, cooling limit: %.4f\r\n", send->shooter_power, send->cooling_heat1, send->cooling_limit1);
+  // print("power2: %d, cooling heat: %.4f, cooling limit: %.4f\r\n", send->shooter_power, send->cooling_heat2, send->cooling_limit2);
+  // print("send->speed_limit1: %f, send->speed_limit2: %f\r\n", send->speed_limit1, send->speed_limit2);
 
 //    left shooter(dial part)
-   if (send->shooter_power && send->cooling_heat1 >= send->cooling_limit1 - 15) {
+   if (send->shooter_power && send->cooling_heat1 >= send->cooling_limit1 - 20) {
      left_top_flywheel->SetOutput(0);
      left_bottom_flywheel->SetOutput(0);
      left_dial->SetOutput(0);
-     osDelay(100);
    } else if (GimbalDead) {
      left_shooter->DialStop();
    } else if (send->shooter_power) {
@@ -398,11 +399,10 @@ void shooterTask(void* arg) {
    }
 
    // right shooter(dial part)
-   if (send->shooter_power && send->cooling_heat2 >= send->cooling_limit2 - 15) {
+   if (send->shooter_power && send->cooling_heat2 >= send->cooling_limit2 - 20) {
      right_top_flywheel->SetOutput(0);
      right_bottom_flywheel->SetOutput(0);
      right_dial->SetOutput(0);
-     osDelay(100);
    } else if (GimbalDead) {
      right_shooter->DialStop();
    } else if (send->shooter_power) {
@@ -413,7 +413,7 @@ void shooterTask(void* arg) {
        right_shooter->SlowContinueShoot();
        // fast shooting
      } else if ((dbus->mouse.r || dbus->wheel.wheel > remote::WheelDigitalValue)
-                && send->cooling_heat2 < send->cooling_heat2 - 24) {
+                && send->cooling_heat2 < send->cooling_limit2 - 24) {
        right_shooter->FastContinueShoot();
        // triple shooting
      } else if (dbus->wheel.wheel == remote::WheelDigitalValue
@@ -444,12 +444,15 @@ void shooterTask(void* arg) {
        leftflywheelFlag = false;
        left_shooter->SetFlywheelSpeed(0);
      } else {
-       if (14 < send->speed_limit1 && send->speed_limit1 < 16) {
+       if (send->speed_limit1 == 15.0) {
          leftflywheelFlag = true;
-         left_shooter->SetFlywheelSpeed(437);  // 445 MAX
-       } else if (send->speed_limit1 >= 18) {
+         left_shooter->SetFlywheelSpeed(485);  // 445 MAX
+       } else if (send->speed_limit1 == 18.0) {
          leftflywheelFlag = true;
-         left_shooter->SetFlywheelSpeed(482);  // 490 MAX
+         left_shooter->SetFlywheelSpeed(530);  // 490 MAX
+       } else if (send->speed_limit1 == 30.0) {
+         leftflywheelFlag = true;
+         left_shooter->SetFlywheelSpeed(770);
        } else {
          leftflywheelFlag = false;
          left_shooter->SetFlywheelSpeed(0);
@@ -460,12 +463,15 @@ void shooterTask(void* arg) {
        rightflywheelFlag = false;
        right_shooter->SetFlywheelSpeed(0);
      } else {
-       if (14 < send->speed_limit2 && send->speed_limit2 < 16) {
+       if (send->speed_limit2 == 15.0) {
          rightflywheelFlag = true;
-         right_shooter->SetFlywheelSpeed(437);  // 445 MAX
-       } else if (send->speed_limit2 >= 18) {
+         right_shooter->SetFlywheelSpeed(485);  // 445 MAX
+       } else if (send->speed_limit2 == 18.0) {
          rightflywheelFlag = true;
-         right_shooter->SetFlywheelSpeed(482);  // 490 MAX
+         right_shooter->SetFlywheelSpeed(530);  // 490 MAX
+       } else if (send->speed_limit2 == 30.0) {
+         rightflywheelFlag = true;
+         right_shooter->SetFlywheelSpeed(770);
        } else {
          rightflywheelFlag = false;
          right_shooter->SetFlywheelSpeed(0);
@@ -867,32 +873,37 @@ void KillAll() {
 }
 
 void KillGimbal() {
- control::Motor4310* motor[] = {pitch_motor};
+  control::Motor4310* motor[] = {pitch_motor, yaw_motor};
 
- while (true) {
-   GimbalDead = true;
-   GimbalDeath.input(send->gimbal_power);
-   if (GimbalDeath.posEdge() && robot_hp_begin) {
-     GimbalDead = false;
-     pitch_motor->MotorEnable();
-     break;
-   }
-   print("gimbal killed\r\n");
+  while (true) {
+    left_shooter->DialStop();
+    right_shooter->DialStop();
+    GimbalDead = true;
+    GimbalDeath.input(send->gimbal_power);
+    if (GimbalDeath.posEdge() && robot_hp_begin) {
+      GimbalDead = false;
+      pitch_motor->MotorEnable();
+      break;
+    }
+    print("gimbal killed\r\n");
 
-   // 4310 soft kill
-   float tmp_pos = pitch_pos;
-   for (int j = 0; j < SOFT_KILL_CONSTANT; j++) {
-     tmp_pos -= START_PITCH_POS / SOFT_KILL_CONSTANT;  // decrease position gradually
-     pitch_motor->SetOutput(tmp_pos, 1, 115, 0.5, 0);
-     control::Motor4310::TransmitOutput(motor, 1);
-     osDelay(GIMBAL_TASK_DELAY);
-   }
+    // 4310 soft kill
+    float tmp_pos = pitch_pos;
+    for (int j = 0; j < SOFT_KILL_CONSTANT; j++) {
+      tmp_pos -= START_PITCH_POS / SOFT_KILL_CONSTANT;  // decrease position gradually
+      pitch_motor->SetOutput(tmp_pos, 1, 115, 0.5, 0);
+      yaw_motor->SetOutput(0);
+      control::Motor4310::TransmitOutput(motor, 2);
+      osDelay(GIMBAL_TASK_DELAY);
+    }
 
-   pitch_reset = true;
-   pitch_motor->MotorDisable();
+    pitch_reset = true;
+    pitch_motor->MotorDisable();
+    yaw_motor->SetOutput(0);
+    control::Motor4310::TransmitOutput(motor, 2);
 
-   osDelay(KILLALL_DELAY);
- }
+    osDelay(KILLALL_DELAY);
+  }
 }
 
 static bool debug = false;

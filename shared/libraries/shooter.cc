@@ -50,9 +50,9 @@ Shooter::Shooter(shooter_t shooter) {
      servo_data.max_out = 10000;
      servo_data.direction = shooter.dial_direction;
 
-     load_step_angle_ = 2 * PI / 8;
-     load_triple_angle_ = 2 * PI / 8 * 3;
-     load_antijam_angle_ = 2 * PI / 8;
+     load_step_angle_ = (2 * PI / 8)  * dial_direction_;
+     load_triple_angle_ = (2 * PI / 8 * 3) * dial_direction_;
+     load_antijam_angle_ = (2 * PI / 8) * dial_direction_;
      dial_speed_ = 6 * PI;
      dial_continue_fast_acceleration = 100 * PI;
      dial_continue_slowly_acceleration = 20 * PI;
@@ -72,9 +72,9 @@ Shooter::Shooter(shooter_t shooter) {
      left_pid_ = new PIDController(80, 3, 0.1);
      right_pid_ = new PIDController(80, 3, 0.1);
      flywheel_turning_detector_ = new BoolEdgeDetector(false);
-     load_step_angle_ = 2 * PI / 8;
-     load_triple_angle_ = 2 * PI / 8 * 3;
-     load_antijam_angle_ = 2 * PI / 8;
+     load_step_angle_ = (2 * PI / 8) * dial_direction_;
+     load_triple_angle_ = (2 * PI / 8 * 3) * dial_direction_;
+     load_antijam_angle_ = (2 * PI / 8) * dial_direction_;
      speed_ = 0;
      dial_speed_ = 20 * PI;
      dial_continue_fast_acceleration = 100 * PI;

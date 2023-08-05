@@ -45,7 +45,7 @@ static const int CHASSIS_TASK_DELAY = 2;
 
 // speed for chassis rotation (no unit)
 // TODO: the speed for the Sentry chassis(by server)
-constexpr float SPIN_SPEED = 160;
+constexpr float SPIN_SPEED = 500;
 constexpr float FOLLOW_SPEED = 200;
 static const float CHASSIS_DEADZONE = 0.04;
 
