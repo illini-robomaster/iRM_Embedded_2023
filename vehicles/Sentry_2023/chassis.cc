@@ -152,11 +152,15 @@ void chassisTask(void* arg) {
      vy = -sin_yaw * vx_set + cos_yaw * vy_set;
      wz = SPIN_SPEED;
    } else {
-     sin_yaw = arm_sin_f32(relative_angle);
-     cos_yaw = arm_cos_f32(relative_angle);
-     vx = cos_yaw * vx_set + sin_yaw * vy_set;
-     vy = -sin_yaw * vx_set + cos_yaw * vy_set;
-     wz = std::min(FOLLOW_SPEED, FOLLOW_SPEED * relative_angle);
+//     sin_yaw = arm_sin_f32(relative_angle);
+//     cos_yaw = arm_cos_f32(relative_angle);
+//     vx = cos_yaw * vx_set + sin_yaw * vy_set;
+//     vy = -sin_yaw * vx_set + cos_yaw * vy_set;
+//     wz = std::min(FOLLOW_SPEED, FOLLOW_SPEED * relative_angle);
+      vx = vx_set;
+      vy = vy_set;
+      wz = 0.0;
+
      if (-CHASSIS_DEADZONE < relative_angle && relative_angle < CHASSIS_DEADZONE) wz = 0;
    }
 

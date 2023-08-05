@@ -184,7 +184,7 @@ void gimbalTask(void* arg) {
  // the start code for motor 4310
  pitch_motor->SetZeroPos();
  pitch_motor->MotorEnable();
- yaw_motor->MotorEnable();
+// yaw_motor->MotorEnable();
 
  float yaw_offset = 0;
  float yaw_error;
