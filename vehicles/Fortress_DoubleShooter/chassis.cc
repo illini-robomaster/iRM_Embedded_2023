@@ -35,6 +35,7 @@
 #include "protocol.h"
 #include "rgb.h"
 #include "supercap.h"
+#include "user_interface.h"
 
 static bsp::CAN* can1 = nullptr;
 static bsp::CAN* can2 = nullptr;
@@ -51,6 +52,7 @@ static const int KILLALL_DELAY = 100;
 static const int DEFAULT_TASK_DELAY = 100;
 static const int CHASSIS_TASK_DELAY = 2;
 static const int FORTRESS_TASK_DELAY = 2;
+static const int UI_TASK_DELAY = 100;
 
 // TODO: Mecanum wheel need different speed???
 // speed for steering motors (rad/s)
@@ -393,6 +395,100 @@ void fortressTask(void* arg) {
 }
 
 //==================================================================================================
+// UI
+//==================================================================================================
+
+const osThreadAttr_t UITaskAttribute = {.name = "UITask",
+                                        .attr_bits = osThreadDetached,
+                                        .cb_mem = nullptr,
+                                        .cb_size = 0,
+                                        .stack_mem = nullptr,
+                                        .stack_size = 1024 * 4,
+                                        .priority = (osPriority_t)osPriorityBelowNormal,
+                                        .tz_module = 0,
+                                        .reserved = 0};
+
+osThreadId_t UITaskHandle;
+
+static communication::UserInterface* UI = nullptr;
+
+void UITask(void* arg) {
+  UNUSED(arg);
+
+  while (!receive->start) osDelay(100);
+
+  UI->SetID(referee->game_robot_status.robot_id);
+
+  communication::package_t frame;
+  communication::graphic_data_t graphGimbal;
+  communication::graphic_data_t graphChassis;
+  communication::graphic_data_t graphArrow;
+  communication::graphic_data_t graphCali;
+  communication::graphic_data_t graphEmpty2;
+  communication::graphic_data_t graphCrosshair1;
+  communication::graphic_data_t graphCrosshair2;
+  communication::graphic_data_t graphCrosshair3;
+  communication::graphic_data_t graphCrosshair4;
+  communication::graphic_data_t graphCrosshair5;
+  communication::graphic_data_t graphCrosshair6;
+  communication::graphic_data_t graphCrosshair7;
+  communication::graphic_data_t graphMode;
+
+  // Initialize chassis GUI
+  UI->ChassisGUIInit(&graphChassis, &graphArrow, &graphGimbal, &graphCali, &graphEmpty2);
+  UI->GraphRefresh((uint8_t*)(&referee->graphic_five), 5, graphChassis, graphArrow, graphGimbal,
+                   graphCali, graphEmpty2);
+  referee->PrepareUIContent(communication::FIVE_GRAPH);
+  frame = referee->Transmit(communication::STUDENT_INTERACTIVE);
+  referee_uart->Write(frame.data, frame.length);
+  osDelay(UI_TASK_DELAY);
+
+  // Initialize crosshair GUI
+  UI->CrosshairGUI(&graphCrosshair1, &graphCrosshair2, &graphCrosshair3, &graphCrosshair4,
+                   &graphCrosshair5, &graphCrosshair6, &graphCrosshair7);
+  UI->GraphRefresh((uint8_t*)(&referee->graphic_seven), 7, graphCrosshair1, graphCrosshair2,
+                   graphCrosshair3, graphCrosshair4, graphCrosshair5, graphCrosshair6,
+                   graphCrosshair7);
+  referee->PrepareUIContent(communication::SEVEN_GRAPH);
+  frame = referee->Transmit(communication::STUDENT_INTERACTIVE);
+  referee_uart->Write(frame.data, frame.length);
+  osDelay(UI_TASK_DELAY);
+
+  // Initialize current mode GUI
+  char followModeStr[15] = "FOLLOW MODE";
+  char spinModeStr[15] = "SPIN  MODE";
+  uint32_t modeColor = UI_Color_Orange;
+  UI->ModeGUIInit(&graphMode);
+  UI->CharRefresh((uint8_t*)(&referee->graphic_character), graphMode, followModeStr,
+                  sizeof followModeStr);
+  referee->PrepareUIContent(communication::CHAR_GRAPH);
+  frame = referee->Transmit(communication::STUDENT_INTERACTIVE);
+  referee_uart->Write(frame.data, frame.length);
+  osDelay(UI_TASK_DELAY);
+
+  while (true) {
+    // Update chassis GUI
+    UI->ChassisGUIUpdate(receive->relative_angle, receive->start);
+    UI->GraphRefresh((uint8_t*)(&referee->graphic_five), 5, graphChassis, graphArrow, graphGimbal,
+                     graphCali, graphEmpty2);
+    referee->PrepareUIContent(communication::FIVE_GRAPH);
+    frame = referee->Transmit(communication::STUDENT_INTERACTIVE);
+    referee_uart->Write(frame.data, frame.length);
+    osDelay(UI_TASK_DELAY);
+
+    // Update current mode GUI
+    char* modeStr = receive->mode ? spinModeStr : followModeStr;
+    modeColor = receive->mode ? UI_Color_Green : UI_Color_Orange;
+    UI->ModeGuiUpdate(&graphMode, modeColor);
+    UI->CharRefresh((uint8_t*)(&referee->graphic_character), graphMode, modeStr, 15);
+    referee->PrepareUIContent(communication::CHAR_GRAPH);
+    frame = referee->Transmit(communication::STUDENT_INTERACTIVE);
+    referee_uart->Write(frame.data, frame.length);
+    osDelay(UI_TASK_DELAY);
+  }
+}
+
+//==================================================================================================
 // SelfTest
 //==================================================================================================
 
@@ -517,6 +613,8 @@ void RM_RTOS_Init() {
   receive = new bsp::CanBridge(can2, 0x20B, 0x20A);
 
   supercap = new control::SuperCap(can1, 0x301);
+
+  UI = new communication::UserInterface();
 }
 
 //==================================================================================================
@@ -528,6 +626,7 @@ void RM_RTOS_Threads_Init(void) {
   refereeTaskHandle = osThreadNew(refereeTask, nullptr, &refereeTaskAttribute);
   chassisTaskHandle = osThreadNew(chassisTask, nullptr, &chassisTaskAttribute);
   selfTestTaskHandle = osThreadNew(self_Check_Task, nullptr, &selfTestingTask);
+  UITaskHandle = osThreadNew(UITask, nullptr, &UITaskAttribute);
 //  fortressTaskHandle = osThreadNew(fortressTask, nullptr, &fortressTaskAttribute);
 }
 
