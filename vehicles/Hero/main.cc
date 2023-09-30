@@ -281,7 +281,7 @@ void gimbalTask(void* arg) {
   float pitch_pos = 0, yaw_pos = 0;
   while (true) {
     // Dead
-    while (Dead || GimbalDead) osDelay(100);
+    while (Dead) osDelay(100);
 
     // Data Collection
     // pitch data from keyboard
@@ -300,6 +300,9 @@ void gimbalTask(void* arg) {
     pitch_remote = -dbus->ch3 / 660.0 * 30 * PI;
     // sum whole pitch data
     pitch_sum = pitch_keyboard + pitch_mouse + pitch_remote;
+    if (GimbalDead) {
+      pitch_sum = 0;
+    }
 
     // yaw data from mouse(direction and offset need test)
     yaw_mouse = dbus->mouse.x / 32767.0 / 20 * PI;
@@ -792,7 +795,7 @@ void KillAll() {
 
 void RM_RTOS_Default_Task(const void* args) {
   UNUSED(args);
-  control::MotorCANBase* motors_can2_shooter_part[] = {reload_motor, force_motor};
+  control::MotorCANBase* motors_can2_shooter_part[] = {reload_motor, force_motor, load_motor};
   safe_mode = true;
 
   while (true) {
@@ -814,7 +817,7 @@ void RM_RTOS_Default_Task(const void* args) {
       reload_motor->SetOutput(0);
       force_motor->SetOutput(0);
       load_motor->SetOutput(0);
-      control::MotorCANBase::TransmitOutput(motors_can2_shooter_part, 2);
+      control::MotorCANBase::TransmitOutput(motors_can2_shooter_part, 3);
     } else {
       GimbalDead = false;
       pitch_motor->MotorEnable();
