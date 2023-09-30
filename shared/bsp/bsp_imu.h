@@ -508,6 +508,8 @@ class IMU_typeC {
   bool CaliDone();
   void Update();
   bool DataReady();
+  float* GetGyro();
+  float* GetAccel();
 
   float INS_quat[4] = {0.0f, 0.0f, 0.0f, 0.0f};
   float INS_angle[3] = {0.0f, 0.0f, 0.0f};

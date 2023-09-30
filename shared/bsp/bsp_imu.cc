@@ -855,6 +855,14 @@ void DMACallbackWrapper(SPI_HandleTypeDef* hspi) {
 
 void IMU_typeC::RxCompleteCallback() {}
 
+float* IMU_typeC::GetGyro() {
+  return BMI088_real_data_.gyro;
+}
+
+float* IMU_typeC::GetAccel() {
+  return BMI088_real_data_.accel;
+}
+
 } /* namespace bsp */
 
 void RM_DMA_IRQHandler(SPI_HandleTypeDef* hspi) { bsp::DMACallbackWrapper(hspi); }
