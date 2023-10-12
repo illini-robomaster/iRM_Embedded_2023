@@ -98,14 +98,14 @@ void RM_RTOS_Init(void) {
   imu_init.Gyro_INT_pin_ = INT1_GYRO_Pin;
   imu = new IMU(imu_init, false);
 
-  left_motor = new control::Motor2006(can1, 0x201);
-  right_motor = new control::Motor2006(can1, 0x202);
+  left_motor = new control::Motor3508(can1, 0x201);
+  right_motor = new control::Motor3508(can1, 0x202);
 }
 
 void RM_RTOS_Threads_Init(void) {
   imuTaskHandle = osThreadNew(imuTask, nullptr, &imuTaskAttribute);
 }
-static float balance_pid[3]{120,0,18};
+static float balance_pid[3]{130,0,20};
 
 void RM_RTOS_Default_Task(const void* arg) {
   UNUSED(arg);
@@ -120,10 +120,10 @@ void RM_RTOS_Default_Task(const void* arg) {
   while (imu->CaliDone() && imu->DataReady());
   osDelay(10);
 
-  float balance_angle = -1.8;
+  float balance_angle = -1.0;
   float output = 0.0;
   float balance_difference = 0.0;
-  int16_t max_output = 10000;
+  int16_t max_output = 5000;
   control::MotorCANBase* motors[] = {left_motor, right_motor};
 
   while (true) {
@@ -134,13 +134,14 @@ void RM_RTOS_Default_Task(const void* arg) {
       balance_difference = imu->INS_angle[1] / PI * 180 - balance_angle;
       output = balance_pid[0] * balance_difference + balance_pid[2] * imu->GetGyro()[1];
       print("angle: %.2f, gyro: %.2f, output: %.2f\r\n", balance_difference, imu->GetGyro()[1], output);
+      print("111111\n");
       if (output > max_output) {
         output = max_output;
       } else if (output < -max_output) {
         output = -max_output;
       }
-      left_motor->SetOutput((int16_t)output);
-      right_motor->SetOutput(-(int16_t)output);
+      left_motor->SetOutput(-(int16_t)output);
+      right_motor->SetOutput((int16_t)output);
     }
 
     control::MotorCANBase::TransmitOutput(motors, 2);
