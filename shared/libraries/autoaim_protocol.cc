@@ -25,29 +25,62 @@
 
 namespace communication {
 
-AutoaimProtocol::AutoaimProtocol() {
+MinipcPort::MinipcPort() {
   index = 0; // current pointer to write
   flag = 0;
 }
 
-void AutoaimProtocol::Send(STMToJetsonData* packet, uint8_t color, float cur_yaw, float cur_pitch, uint32_t additional_info) {
-  packet->header[0] = 'H';
-  packet->header[1] = 'D';
-  packet->my_color = color;
-  packet->cur_yaw = (int32_t)(cur_yaw * INT_FP_SCALE);
-  packet->cur_pitch = (int32_t)(cur_pitch * INT_FP_SCALE);
-  packet->additional_info = additional_info;
-
-  const int tail_offset = 3; // size of data minus uint8_t checksum and 2 uint8_t tail
-  packet->crc8_checksum = get_crc8_check_sum((uint8_t*)packet,
-                                              sizeof(STMToJetsonData) - tail_offset,
-                                              0);
-
-  packet->tail[0] = 'E';
-  packet->tail[1] = 'D';
+void MinipcPort::Pack(uint8_t* packet, void* data, uint8_t cmd_id) {
+  switch (cmd_id) {
+    case GIMBAL_CMD_ID:
+      PackGimbalData(packet, static_cast<gimbal_data_t*>(data));
+      break;
+    case COLOR_CMD_ID:
+      PackColorData(packet, static_cast<color_data_t*>(data));
+      break;
+    case CHASSIS_CMD_ID:
+      PackChassisData(packet, static_cast<chassis_data_t*>(data));
+      break;
+  }
 }
 
-void AutoaimProtocol::Receive(const uint8_t* data, uint8_t length) {
+void MinipcPort::PackGimbalData(uint8_t* packet, gimbal_data_t* data) {
+  AddHeaderTail(packet, GIMBAL_CMD_ID);
+  int i = 0;
+  for (i = 0; i < 4; i++) {
+    packet[0 + DATA_OFFSET + i] = data->cur_yaw >> 8 * i;
+  }
+  for (i = 0; i < 4; i++) {
+    packet[4 + DATA_OFFSET + i] = data->cur_pitch >> 8 * i;
+  }
+  for (i = 0; i < 4; i++) {
+    packet[8 + DATA_OFFSET + i] = data->additional_info >> 8 * i;
+  }
+  AddCRC8(packet, GIMBAL_CMD_ID);
+}
+
+void MinipcPort::PackColorData(uint8_t* packet, color_data_t* data) {
+  AddHeaderTail(packet, COLOR_CMD_ID);
+  packet[DATA_OFFSET] = data->my_color;
+  AddCRC8(packet, COLOR_CMD_ID);
+}
+
+void MinipcPort::PackChassisData(uint8_t* packet, chassis_data_t* data) {
+  AddHeaderTail(packet, CHASSIS_CMD_ID);
+  int i = 0;
+  for (i = 0; i < 4; i++) {
+    packet[0 + DATA_OFFSET + i] = data->vx >> 8 * i;
+  }
+  for (i = 0; i < 4; i++) {
+    packet[4 + DATA_OFFSET + i] = data->vy >> 8 * i;
+  }
+  for (i = 0; i < 4; i++) {
+    packet[8 + DATA_OFFSET + i] = data->vw >> 8 * i;
+  }
+  AddCRC8(packet, CHASSIS_CMD_ID);
+}
+
+void MinipcPort::Receive(const uint8_t* data, uint8_t length) {
   // Four cases
   // Case 1: everything is fresh with complete package(s)
   // Case 2: everything is fresh; package is incomplete
@@ -65,7 +98,7 @@ void AutoaimProtocol::Receive(const uint8_t* data, uint8_t length) {
       // Case 3
       // done package reading
       index = 0;
-      handle();
+      Handle();
     } else {
       if (remain == length) {
         // exhausted current package already; and not reaching PKG_LEN
@@ -97,13 +130,33 @@ void AutoaimProtocol::Receive(const uint8_t* data, uint8_t length) {
       host_command[index++] = data[i++];
       if (index == PKG_LEN) {
         index = 0;
-        handle();
+        Handle();
       }
     }
   }
 }
 
-void AutoaimProtocol::handle(void) {
+void MinipcPort::AddHeaderTail (uint8_t* packet, uint8_t cmd_id) {
+  // Add header
+  packet[0] = 'S';
+  packet[1] = 'T';
+  // dummy seq num
+  packet[SEQNUM_OFFSET] = 0;
+  packet[DATA_LENGTH_OFFSET] = cmd_to_len[cmd_id];
+  packet[CMD_ID_OFFSET] = cmd_id;
+
+  // Add tail WITHOUT crc8
+  const int EOF_OFFSET = DATA_OFFSET + cmd_to_len[cmd_id] + 1;
+  packet[EOF_OFFSET] = 'E';
+  packet[EOF_OFFSET + 1] = 'D';
+}
+
+void MinipcPort::AddCRC8 (uint8_t* packet, int8_t cmd_id) {
+  const int CRC8_OFFSET = DATA_OFFSET + cmd_to_len[cmd_id];
+  packet[CRC8_OFFSET] = get_crc8_check_sum(packet, CRC8_OFFSET, 0);
+}
+
+void MinipcPort::Handle(void) {
   // TODO: implement thread-safe logic here (use a lock to handle changes from interrupt)
   // here we can assume that the package is complete
   // in the host_command buffer
@@ -114,7 +167,7 @@ void AutoaimProtocol::handle(void) {
   //  Two packets arrive in two UART calls.
   //  The first packet misses 1 byte, but the second one is complete.
   //  In this case, when the host_command buffer is filled
-  //  (the last byte is 'S' or 'M' for the second packet), handle() will be called. The whole buffer
+  //  (the last byte is 'S' or 'M' for the second packet), Handle() will be called. The whole buffer
   //  would be tossed, resulting in two unusable packets. However, if we implement this logic, we would be
   //  able to recover the second packet.
 
@@ -130,7 +183,7 @@ void AutoaimProtocol::handle(void) {
   }
 
   if (verify_crc8_check_sum(host_command, PKG_LEN - 2)) {
-    process_data();
+    ProcessData();
     valid_packet_cnt++;
     flag = 1;
   } else {
@@ -138,38 +191,39 @@ void AutoaimProtocol::handle(void) {
   }
 }
 
-float AutoaimProtocol::get_relative_yaw(void) {
+float MinipcPort::GetRelativeYaw(void) {
   return relative_yaw;
 }
 
-float AutoaimProtocol::get_relative_pitch(void) {
+float MinipcPort::GetRelativePitch(void) {
   return relative_pitch;
 }
 
-uint32_t AutoaimProtocol::get_seqnum(void) {
+uint16_t MinipcPort::GetSeqnum(void) {
   return seqnum;
 }
 
-uint32_t AutoaimProtocol::get_valid_packet_cnt(void) {
+uint32_t MinipcPort::GetValidPacketCnt(void) {
   return valid_packet_cnt;
 }
 
-void AutoaimProtocol::process_data() {
+void MinipcPort::ProcessData() {
   // Assume that the host_command is a complete and verified message
 
   // char pointer because host_command is a byte array
-  uint8_t* seq_num_start = host_command + this->SEQNUM_OFFSET;
-  uint8_t* rel_yaw_start = host_command + this->REL_YAW_OFFSET;
-  uint8_t* rel_pitch_start = host_command + this->REL_PITCH_OFFSET;
+  uint8_t* seq_num_start = host_command + SEQNUM_OFFSET;
+  uint8_t* rel_yaw_start = host_command + SEQNUM_OFFSET + sizeof(int32_t);
+  uint8_t* rel_pitch_start = host_command + SEQNUM_OFFSET + sizeof(int32_t) * 2;
 
-  seqnum = (*(uint32_t *)seq_num_start);
+  seqnum = (*(uint16_t *)seq_num_start);
   relative_yaw = (*(int32_t *)rel_yaw_start) * 1.0f / this->INT_FP_SCALE;
   relative_pitch = *(int32_t *)rel_pitch_start *1.0f / this->INT_FP_SCALE;
 }
 
-uint8_t AutoaimProtocol::get_valid_flag(void) {
+uint8_t MinipcPort::GetValidFlag(void) {
   uint8_t temp = flag;
   flag = 0;
   return temp;
 }
 }  // namespace communication
+
