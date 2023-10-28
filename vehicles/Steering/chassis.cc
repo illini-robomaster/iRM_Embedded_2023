@@ -206,14 +206,25 @@ void chassisTask(void* arg) {
   chassis->SteerThetaReset();
   chassis->SetWheelSpeed(0,0,0,0);
 
+  float v_max = 660;
+  float v_max2 = std::pow(v_max, 2);
+  float normalization_factor = 1;
   while (true) {
     float relative_angle = receive->relative_angle;
-    float sin_yaw, cos_yaw, vx_set, vy_set;
+    float sin_yaw, cos_yaw, vx_set, vy_set, v_mag2;
     float vx, vy, wz;
-
     // TODO need to change the channels in gimbal.cc
     vx_set = -receive->vy;
     vy_set = receive->vx;
+    // Check with the square of the magnitude
+    v_mag2 = std::pow(vx_set, 2) + std::pow(vy_set, 2);
+    // Normalize vx and vy
+    if (v_mag2 > v_max2) {
+        normalization_factor *= std::abs(v_max / std::pow(v_mag2, 0.5));
+    }
+    vx_set *= normalization_factor;
+    vy_set *= normalization_factor;
+    
 
     ReCali.input(receive->recalibrate);   // detect force recalibration
     Revival.input(receive->dead);         // detect robot revival
