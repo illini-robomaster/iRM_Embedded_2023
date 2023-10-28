@@ -92,6 +92,7 @@ constexpr float FOLLOW_SPEED = 40;
 //==================================================================================================
 
 #define REFEREE_RX_SIGNAL (1 << 1)
+#define LIMITED_SAMPLE_MATCH
 
 
 const osThreadAttr_t refereeTaskAttribute = {.name = "refereeTask",
@@ -209,6 +210,9 @@ void chassisTask(void* arg) {
   float v_max = 660;
   float v_max2 = std::pow(v_max, 2);
   float normalization_factor = 1;
+#ifdef LIMITED_SAMPLE_MATCH
+  normalization_factor *= 0.5;
+#endif
   while (true) {
     float relative_angle = receive->relative_angle;
     float sin_yaw, cos_yaw, vx_set, vy_set, v_mag2;
