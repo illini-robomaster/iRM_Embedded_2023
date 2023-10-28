@@ -1,6 +1,6 @@
 # ---------------------------------------------------------------------- #
 #                                                                        #
-#  Copyright (C) 2022                                                    #
+#  Copyright (C) 2023                                                    #
 #  Illini RoboMaster @ University of Illinois at Urbana-Champaign.       #
 #                                                                        #
 #  This program is free software: you can redistribute it and/or modify  #
@@ -44,3 +44,9 @@ irm_add_board_specific_library(DJI_Board_TypeC_irm
     SOURCES ${IRM_SOURCES}
     INCLUDES ${IRM_INCLUDES}
     DEPENDS eigen3)
+
+irm_add_board_specific_library(Nucleo-f103rb_irm
+        TARGET Nucleo-f103rb
+        SOURCES ${IRM_SOURCES}
+        INCLUDES ${IRM_INCLUDES}
+        DEPENDS eigen3)

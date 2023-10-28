@@ -1,6 +1,6 @@
 # ---------------------------------------------------------------------- #
 #                                                                        #
-#  Copyright (C) 2022                                                    #
+#  Copyright (C) 2023                                                    #
 #  Illini RoboMaster @ University of Illinois at Urbana-Champaign.       #
 #                                                                        #
 #  This program is free software: you can redistribute it and/or modify  #
@@ -27,3 +27,7 @@ irm_add_arm_executable(${PROJECT_NAME}_typeA
 irm_add_arm_executable(${PROJECT_NAME}_typeC
     TARGET DJI_Board_TypeC
     SOURCES typeC.cc)
+
+irm_add_arm_executable(${PROJECT_NAME}_nucleo
+    TARGET Nucleo-f103rb
+    SOURCES nucleo.cc)
