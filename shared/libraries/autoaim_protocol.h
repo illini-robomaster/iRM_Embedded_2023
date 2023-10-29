@@ -57,18 +57,16 @@ typedef struct {
   int32_t vw;
 } __packed chassis_data_t;
 
-typedef struct {
-  char header[2];
-  uint8_t my_color;
-  int32_t cur_yaw;
-  int32_t cur_pitch;
-  uint32_t additional_info;
-  uint8_t crc8_checksum;
-  char tail[2];
-} __packed STMToJetsonData;
+// GIMBAL_CMD_ID  : 0x00 Autoaim gimbal RelYaw RelPitch
+// COLOR_CMD_ID   : 0x01
+// CHASSIS_CMD_ID : 0x02
+// TOTAL_NUM_OF_ID: length of the enum
+enum CMD_ID {GIMBAL_CMD_ID,
+             COLOR_CMD_ID,
+             CHASSIS_CMD_ID,
+             TOTAL_NUM_OF_ID};
 
 // WARNING: THIS CLASS IS NOT THREAD SAFE!!!
-
 class MinipcPort {
  public:
   MinipcPort();
@@ -79,11 +77,33 @@ class MinipcPort {
   uint16_t GetSeqnum(void);
   uint32_t GetValidPacketCnt(void);
 
-  // TODO function header
+  /**
+   * @brief Pack data into a packet array
+   * @note For the smallest length of the packet, see CMD_TO_LEN[] or GetPacketLength()
+   */
   void Pack(uint8_t* packet, void* data, uint8_t cmd_id);
   void PackGimbalData(uint8_t* packet, gimbal_data_t* data);
   void PackColorData(uint8_t* packet, color_data_t* data);
   void PackChassisData(uint8_t* packet, chassis_data_t* data);
+
+  /**
+   * Length of the data section ONLY in bytes. Header/tail/crc8 (total len = 9) NOT included.
+   * Gimbal  CMD: id = 0x00, length = 21 - 9 = 12
+   * Color   CMD: id = 0x01, length = 10 - 9 = 1
+   * Chassis CMD: id = 0x02, length = 21 - 9 = 12
+   */
+  static constexpr uint8_t CMD_TO_LEN[TOTAL_NUM_OF_ID] = {
+                                                sizeof(gimbal_data_t),
+                                                sizeof(color_data_t),
+                                                sizeof(chassis_data_t),
+                                                };
+  static constexpr uint8_t MAX_PACKET_LENGTH = 21;
+  static constexpr uint8_t MIN_PACKET_LENGTH = 10;
+  /**
+   * @brief Total length of packet in bytes
+   *  Header/tail/crc8 included.
+   */
+  uint8_t GetPacketLen(uint8_t cmd_id);
 
  private:
   // For definitions of constants, check out the documentation at either
@@ -96,24 +116,21 @@ class MinipcPort {
   static constexpr uint8_t CMD_ID_OFFSET = DATA_LENGTH_OFFSET + 1;
   static constexpr uint8_t DATA_OFFSET = CMD_ID_OFFSET + 1;
 
+
+  /**
+   * @brief Add header and tail to the packet array based on cmd_id
+   * @note For the smallest length of the packet, see CMD_TO_LEN[]
+   *       The sum of length for header and tail is 8 bytes
+   */
   void AddHeaderTail (uint8_t* packet, uint8_t cmd_id);
-  // Only call AddCRC8() after packet has data and header written
+
+  /**
+   * @brief Add CRC8 checksum for the packet array based on cmd_id
+   *       CRC8 calulated based on the entire array except the tail ('ED')
+   * @note Only call this function after packet has data and header/tails written
+   *       The length of CRC8 checksum is 1 byte
+   */
   void AddCRC8 (uint8_t* packet, int8_t cmd_id);
-
-  // GIMBAL_CMD_ID: 0x00 Autoaim gimbal RelYaw RelPitch
-  // COLOR_CMD_ID: 0x01
-  // CHASSIS_CMD_ID: 0x02
-  // TOTAL_NUM_OF_ID: length of the enum
-  enum CMD_ID {GIMBAL_CMD_ID,
-               COLOR_CMD_ID,
-               CHASSIS_CMD_ID,
-               TOTAL_NUM_OF_ID};
-
-  uint8_t cmd_to_len[TOTAL_NUM_OF_ID] = { sizeof(gimbal_data_t),
-                                          sizeof(color_data_t),
-                                          sizeof(chassis_data_t),
-                                          };
-
 
   int index;
   uint8_t flag;

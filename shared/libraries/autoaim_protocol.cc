@@ -80,6 +80,14 @@ void MinipcPort::PackChassisData(uint8_t* packet, chassis_data_t* data) {
   AddCRC8(packet, CHASSIS_CMD_ID);
 }
 
+uint8_t MinipcPort::GetPacketLen(uint8_t cmd_id) {
+  if (cmd_id >= TOTAL_NUM_OF_ID) {
+    return 0;
+  }
+  // Total length = Data length + header & tail (8 bytes) + crc checksum (1 byte)
+  return CMD_TO_LEN[cmd_id] + 9;
+}
+
 void MinipcPort::Receive(const uint8_t* data, uint8_t length) {
   // Four cases
   // Case 1: everything is fresh with complete package(s)
@@ -136,23 +144,26 @@ void MinipcPort::Receive(const uint8_t* data, uint8_t length) {
   }
 }
 
+// 8 bytes
 void MinipcPort::AddHeaderTail (uint8_t* packet, uint8_t cmd_id) {
   // Add header
   packet[0] = 'S';
   packet[1] = 'T';
   // dummy seq num
   packet[SEQNUM_OFFSET] = 0;
-  packet[DATA_LENGTH_OFFSET] = cmd_to_len[cmd_id];
+  packet[SEQNUM_OFFSET + 1] = 0 >> 8;
+  packet[DATA_LENGTH_OFFSET] = CMD_TO_LEN[cmd_id];
   packet[CMD_ID_OFFSET] = cmd_id;
 
   // Add tail WITHOUT crc8
-  const int EOF_OFFSET = DATA_OFFSET + cmd_to_len[cmd_id] + 1;
+  const int EOF_OFFSET = DATA_OFFSET + CMD_TO_LEN[cmd_id] + 1;
   packet[EOF_OFFSET] = 'E';
   packet[EOF_OFFSET + 1] = 'D';
 }
 
+// 1 bytes
 void MinipcPort::AddCRC8 (uint8_t* packet, int8_t cmd_id) {
-  const int CRC8_OFFSET = DATA_OFFSET + cmd_to_len[cmd_id];
+  const int CRC8_OFFSET = DATA_OFFSET + CMD_TO_LEN[cmd_id];
   packet[CRC8_OFFSET] = get_crc8_check_sum(packet, CRC8_OFFSET, 0);
 }
 
