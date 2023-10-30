@@ -46,16 +46,10 @@ void MinipcPort::Pack(uint8_t* packet, void* data, uint8_t cmd_id) {
 
 void MinipcPort::PackGimbalData(uint8_t* packet, gimbal_data_t* data) {
   AddHeaderTail(packet, GIMBAL_CMD_ID);
-  int i = 0;
-  for (i = 0; i < 4; i++) {
-    packet[0 + DATA_OFFSET + i] = data->cur_yaw >> 8 * i;
-  }
-  for (i = 0; i < 4; i++) {
-    packet[4 + DATA_OFFSET + i] = data->cur_pitch >> 8 * i;
-  }
-  for (i = 0; i < 4; i++) {
-    packet[8 + DATA_OFFSET + i] = data->additional_info >> 8 * i;
-  }
+  memcpy(&packet[0 + DATA_OFFSET], &data->rel_yaw, sizeof(float));
+  memcpy(&packet[4 + DATA_OFFSET], &data->rel_pitch, sizeof(float));
+  packet[8 + DATA_OFFSET] = data->mode;
+  packet[9 + DATA_OFFSET] = data->debug_info;
   AddCRC8(packet, GIMBAL_CMD_ID);
 }
 
@@ -67,16 +61,9 @@ void MinipcPort::PackColorData(uint8_t* packet, color_data_t* data) {
 
 void MinipcPort::PackChassisData(uint8_t* packet, chassis_data_t* data) {
   AddHeaderTail(packet, CHASSIS_CMD_ID);
-  int i = 0;
-  for (i = 0; i < 4; i++) {
-    packet[0 + DATA_OFFSET + i] = data->vx >> 8 * i;
-  }
-  for (i = 0; i < 4; i++) {
-    packet[4 + DATA_OFFSET + i] = data->vy >> 8 * i;
-  }
-  for (i = 0; i < 4; i++) {
-    packet[8 + DATA_OFFSET + i] = data->vw >> 8 * i;
-  }
+  memcpy(&packet[0 + DATA_OFFSET], &data->vx, sizeof(float));
+  memcpy(&packet[4 + DATA_OFFSET], &data->vy, sizeof(float));
+  memcpy(&packet[8 + DATA_OFFSET], &data->vw, sizeof(float));
   AddCRC8(packet, CHASSIS_CMD_ID);
 }
 
@@ -94,7 +81,9 @@ void MinipcPort::Receive(const uint8_t* data, uint8_t length) {
   // Case 2: everything is fresh; package is incomplete
   // Case 3: package contains half previous package and half new package
   // Case 4: package contains half previous package and new package(s)
-
+UNUSED(data);
+UNUSED(length);
+/*
   if (index > 0) {
     // Case 3 and 4
     // copy the remaining bytes from previous package
@@ -142,6 +131,7 @@ void MinipcPort::Receive(const uint8_t* data, uint8_t length) {
       }
     }
   }
+*/
 }
 
 // 8 bytes
@@ -188,6 +178,7 @@ void MinipcPort::Handle(void) {
   //       trigger this issue. (first slice: S/T is sent to host_command; second slide: the rest)
 
   // check end of packet is 'ED'
+/*
   if (host_command[PKG_LEN - 2] != 'E' || host_command[PKG_LEN - 1] != 'D') {
     flag = 0;
     return;
@@ -200,6 +191,7 @@ void MinipcPort::Handle(void) {
   } else {
     flag = 0;
   }
+*/
 }
 
 float MinipcPort::GetRelativeYaw(void) {
@@ -219,6 +211,7 @@ uint32_t MinipcPort::GetValidPacketCnt(void) {
 }
 
 void MinipcPort::ProcessData() {
+/*
   // Assume that the host_command is a complete and verified message
 
   // char pointer because host_command is a byte array
@@ -229,6 +222,7 @@ void MinipcPort::ProcessData() {
   seqnum = (*(uint16_t *)seq_num_start);
   relative_yaw = (*(int32_t *)rel_yaw_start) * 1.0f / this->INT_FP_SCALE;
   relative_pitch = *(int32_t *)rel_pitch_start *1.0f / this->INT_FP_SCALE;
+*/
 }
 
 uint8_t MinipcPort::GetValidFlag(void) {

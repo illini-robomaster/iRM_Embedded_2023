@@ -46,15 +46,17 @@ typedef struct {
 } __packed color_data_t;
 
 typedef struct {
-  int32_t cur_yaw;
-  int32_t cur_pitch;
-  uint32_t additional_info;
+  float rel_yaw;
+  float rel_pitch;
+  // Search Target is 0. Move Yoke is 1.
+  uint8_t mode;
+  uint8_t debug_info;
 } __packed gimbal_data_t;
 
 typedef struct {
-  int32_t vx;
-  int32_t vy;
-  int32_t vw;
+  float vx;
+  float vy;
+  float vw;
 } __packed chassis_data_t;
 
 // GIMBAL_CMD_ID  : 0x00 Autoaim gimbal RelYaw RelPitch
@@ -88,7 +90,7 @@ class MinipcPort {
 
   /**
    * Length of the data section ONLY in bytes. Header/tail/crc8 (total len = 9) NOT included.
-   * Gimbal  CMD: id = 0x00, length = 21 - 9 = 12
+   * Gimbal  CMD: id = 0x00, length = 19 - 9 = 10
    * Color   CMD: id = 0x01, length = 10 - 9 = 1
    * Chassis CMD: id = 0x02, length = 21 - 9 = 12
    */
@@ -109,8 +111,6 @@ class MinipcPort {
   // For definitions of constants, check out the documentation at either
   // https://github.com/illini-robomaster/iRM_Vision_2023/blob/roger/crc_comm/docs/comm_protocol.md
   // or https://github.com/illini-robomaster/iRM_Vision_2023/tree/docs/comm_protocol.md
-  static constexpr uint8_t PKG_LEN = 17;  // jetson to STM32 length
-  static constexpr int32_t INT_FP_SCALE = 1000000;
   static constexpr uint8_t SEQNUM_OFFSET = 2;
   static constexpr uint8_t DATA_LENGTH_OFFSET = SEQNUM_OFFSET + 2;
   static constexpr uint8_t CMD_ID_OFFSET = DATA_LENGTH_OFFSET + 1;
@@ -134,7 +134,7 @@ class MinipcPort {
 
   int index;
   uint8_t flag;
-  uint8_t host_command[PKG_LEN];
+  //uint8_t host_command[PKG_LEN];
   void Handle();
   void ProcessData();
 
