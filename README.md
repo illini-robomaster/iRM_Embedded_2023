@@ -41,7 +41,9 @@ building the source code and flashing the embedded chips.
    Note that `Debug` build could be much slower than the other two due to lack
    of compiler optimizations.
 
-### Flash Binary to Chip
+### Flash Binary to Chip (Wired Flasher)
+
+
 
 1. Install [stlink](https://github.com/stlink-org/stlink).
 
@@ -51,10 +53,19 @@ building the source code and flashing the embedded chips.
    4. For Linux users, either use prebuilt binaries, or build from source
       following their compile manual.
 
-2. Flash one of the example programs by running `make flash-<xxx>` in the
+2. Find a usb-flasher and connect it to your laptop
+   1. Connect the usb-flasher to swd port on the chip (search documentation of the boards to see how to connect)
+   
+3. Flash one of the example programs by running `make flash-<xxx>` in the
    `build/` directory created at compilation.
 
    e.g. `make flash-example_buzzer` -> and you shall hear some music (or noise)
+
+### Flash Binary to Chip (Wireless Flasher)
+
+1. Connect 
+2. Do the same steps as wired flash but in step 2, instead of `make flash-<xxx>`, run `make rflash-<xxx>`
+
 
 ### Document Usage
 
