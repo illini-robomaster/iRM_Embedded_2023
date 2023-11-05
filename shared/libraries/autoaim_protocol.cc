@@ -25,9 +25,17 @@
 
 namespace communication {
 
+// For definitions of constants, check out the documentation at
+// illini-robomaster/iRM_Vision_2023/docs/comm_protocol.md
+static constexpr uint8_t SEQNUM_OFFSET = 2;
+static constexpr uint8_t DATA_LENGTH_OFFSET = SEQNUM_OFFSET + 2;
+static constexpr uint8_t CMD_ID_OFFSET = DATA_LENGTH_OFFSET + 1;
+static constexpr uint8_t DATA_OFFSET = CMD_ID_OFFSET + 1;
+
 MinipcPort::MinipcPort() {
-  index = 0; // current pointer to write
-  flag = 0;
+  buffer_index_ = 0; // current pointer to write
+  valid_flag_ = 0;
+  seqnum_ = 0;
 }
 
 void MinipcPort::Pack(uint8_t* packet, void* data, uint8_t cmd_id) {
@@ -49,7 +57,7 @@ void MinipcPort::PackGimbalData(uint8_t* packet, gimbal_data_t* data) {
   memcpy(&packet[0 + DATA_OFFSET], &data->rel_yaw, sizeof(float));
   memcpy(&packet[4 + DATA_OFFSET], &data->rel_pitch, sizeof(float));
   packet[8 + DATA_OFFSET] = data->mode;
-  packet[9 + DATA_OFFSET] = data->debug_info;
+  packet[9 + DATA_OFFSET] = data->debug_int;
   AddCRC8(packet, GIMBAL_CMD_ID);
 }
 
@@ -68,71 +76,101 @@ void MinipcPort::PackChassisData(uint8_t* packet, chassis_data_t* data) {
 }
 
 uint8_t MinipcPort::GetPacketLen(uint8_t cmd_id) {
-  if (cmd_id >= TOTAL_NUM_OF_ID) {
-    return 0;
-  }
   // Total length = Data length + header & tail (8 bytes) + crc checksum (1 byte)
   return CMD_TO_LEN[cmd_id] + 9;
 }
 
-void MinipcPort::Receive(const uint8_t* data, uint8_t length) {
+void MinipcPort::ParseUartBuffer(const uint8_t* data, int32_t length) {
   // Four cases
   // Case 1: everything is fresh with complete package(s)
   // Case 2: everything is fresh; package is incomplete
   // Case 3: package contains half previous package and half new package
   // Case 4: package contains half previous package and new package(s)
-UNUSED(data);
-UNUSED(length);
-/*
-  if (index > 0) {
+  int i = 0;
+  if (buffer_index_ > 0) {
     // Case 3 and 4
     // copy the remaining bytes from previous package
-    int remain = std::min((int)PKG_LEN - index, (int)length);
-    memcpy(host_command + index, data, remain);
-    index += remain;
-
-    if (index == PKG_LEN) {
-      // Case 3
-      // done package reading
-      index = 0;
-      Handle();
-    } else {
-      if (remain == length) {
-        // exhausted current package already; and not reaching PKG_LEN
-        return;
+    while (i < (int)length) {
+      possible_packet[buffer_index_] = data[i];
+      // Parse possible packet if detect tail
+      if (possible_packet[buffer_index_ - 1] == 'E' &&
+          possible_packet[buffer_index_]     == 'D') {
+        buffer_index_ = 0;
+        VerifyAndParseData();
+        break;
+      }
+      buffer_index_++;
+      i++;
+      // drop packet if buffer overflow
+      if (buffer_index_ >= MAX_PACKET_LENGTH) {
+        buffer_index_ = 0;
+        break;
       }
     }
   }
 
-  int i = 0;
-
   while (i < (int)length) {
-    if (index == 0) {
+    if (buffer_index_ == 0) {
       if (i == (int)length - 1) {
-        // A special case to handle the last byte; index must be zero
-        if (data[i] == 'S' || data[i] == 'M') {
-          host_command[index++] = data[i];
+        // A special case to handle the last byte; buffer_index_ must be zero
+        if (data[i] == 'S') {
+          possible_packet[buffer_index_++] = data[i];
         }
         return;
       }
-      if ((data[i] == 'S' && data[i + 1] == 'T') ||
-          (data[i] == 'M' && data[i + 1] == 'Y')) {
+      if (data[i] == 'S' && data[i + 1] == 'T'){
         // Detect packet head; start copying
-        host_command[index++] = data[i++];
-        host_command[index++] = data[i++];
+        possible_packet[buffer_index_++] = data[i++];
+        possible_packet[buffer_index_++] = data[i++];
       } else {
         i++;
       }
     } else {
-      host_command[index++] = data[i++];
-      if (index == PKG_LEN) {
-        index = 0;
-        Handle();
+      possible_packet[buffer_index_] = data[i];
+      // Parse possible packet if detect tail
+      if (possible_packet[buffer_index_ - 1] == 'E' &&
+          possible_packet[buffer_index_]     == 'D') {
+        buffer_index_ = 0;
+        VerifyAndParseData();
+      } else {
+      // If not packet end, continue
+        buffer_index_++;
+        i++;
+        // drop packet if buffer overflow
+        if (buffer_index_ >= MAX_PACKET_LENGTH) {
+          buffer_index_ = 0;
+        }
       }
     }
   }
-*/
 }
+
+uint8_t MinipcPort::GetCmdId(void) {
+    return cmd_id_;
+}
+
+const status_data_t* MinipcPort::GetStatus(void) {
+  return &status_;
+}
+
+uint8_t MinipcPort::GetValidFlag(void) {
+  uint8_t temp = valid_flag_;
+  valid_flag_ = 0;
+  return temp;
+}
+
+uint16_t MinipcPort::GetSeqnum(void) {
+  return seqnum_;
+}
+
+uint32_t MinipcPort::GetValidPacketCnt(void) {
+  return valid_packet_cnt;
+}
+
+/**
+ * Every function below is a private function
+ */
+
 
 // 8 bytes
 void MinipcPort::AddHeaderTail (uint8_t* packet, uint8_t cmd_id) {
@@ -157,78 +195,70 @@ void MinipcPort::AddCRC8 (uint8_t* packet, int8_t cmd_id) {
   packet[CRC8_OFFSET] = get_crc8_check_sum(packet, CRC8_OFFSET, 0);
 }
 
-void MinipcPort::Handle(void) {
+void MinipcPort::VerifyAndParseData(void) {
   // TODO: implement thread-safe logic here (use a lock to handle changes from interrupt)
   // here we can assume that the package is complete
-  // in the host_command buffer
+  // in the possible_packet buffer
 
-  // TODO: add a logic here such that when the checking fails; it moves the write pointer 'index'
-  // to the next 'S' or 'M' for more robustness.
   // A minor issue with current implementation: imagine the following case:
   //  Two packets arrive in two UART calls.
   //  The first packet misses 1 byte, but the second one is complete.
-  //  In this case, when the host_command buffer is filled
-  //  (the last byte is 'S' or 'M' for the second packet), Handle() will be called. The whole buffer
+  //  In this case, when the possible_packet buffer is filled
+  //  (the last byte is 'S' or 'M' for the second packet), VerifyAndParseData() will be called. The whole buffer
   //  would be tossed, resulting in two unusable packets. However, if we implement this logic, we would be
   //  able to recover the second packet.
 
   // This is a minor issue because
   //    1) we don't observe this even when packets are sent at 200Hz
   //    2) probability of this happening is very low. The second packet has to be sent in two slices to
-  //       trigger this issue. (first slice: S/T is sent to host_command; second slide: the rest)
+  //       trigger this issue. (first slice: S/T is sent to possible_packet; second slide: the rest)
 
-  // check end of packet is 'ED'
-/*
-  if (host_command[PKG_LEN - 2] != 'E' || host_command[PKG_LEN - 1] != 'D') {
-    flag = 0;
+  // verify the start and the end of the packet
+  uint8_t cmd_id = possible_packet[CMD_ID_OFFSET];
+  if (possible_packet[0] != 'S' || possible_packet[1] != 'T' ||
+      possible_packet[CMD_TO_LEN[cmd_id] + HT_LEN - 2] != 'E' ||
+      possible_packet[CMD_TO_LEN[cmd_id] + HT_LEN - 1] != 'D') {
+    valid_flag_ = 0;
     return;
   }
 
-  if (verify_crc8_check_sum(host_command, PKG_LEN - 2)) {
-    ProcessData();
+  if (verify_crc8_check_sum(possible_packet, CMD_TO_LEN[cmd_id] + HT_LEN - 2)) {
+    ParseData(cmd_id);
     valid_packet_cnt++;
-    flag = 1;
+    valid_flag_ = 1;
   } else {
-    flag = 0;
+    valid_flag_ = 0;
   }
-*/
 }
 
-float MinipcPort::GetRelativeYaw(void) {
-  return relative_yaw;
+
+
+void MinipcPort::ParseData(uint8_t cmd_id) {
+  // Update member variable
+  cmd_id_ = cmd_id;
+
+  // Update seqnum
+  memcpy(&seqnum_, &possible_packet[SEQNUM_OFFSET], sizeof(uint16_t));
+
+  // Update data section
+  switch (cmd_id) {
+    case GIMBAL_CMD_ID:
+      memcpy(&(status_.rel_yaw),   &possible_packet[0 + DATA_OFFSET], sizeof(float));
+      memcpy(&(status_.rel_pitch), &possible_packet[4 + DATA_OFFSET], sizeof(float));
+      status_.mode = possible_packet[8 + DATA_OFFSET];
+      status_.debug_int = possible_packet[9 + DATA_OFFSET];
+      break;
+    case COLOR_CMD_ID:
+      status_.my_color = possible_packet[DATA_OFFSET];
+      break;
+    case CHASSIS_CMD_ID:
+      memcpy(&(status_.vx), &possible_packet[0 + DATA_OFFSET], sizeof(float));
+      memcpy(&(status_.vy), &possible_packet[4 + DATA_OFFSET], sizeof(float));
+      memcpy(&(status_.vw), &possible_packet[8 + DATA_OFFSET], sizeof(float));
+      break;
+  }
 }
 
-float MinipcPort::GetRelativePitch(void) {
-  return relative_pitch;
-}
 
-uint16_t MinipcPort::GetSeqnum(void) {
-  return seqnum;
-}
-
-uint32_t MinipcPort::GetValidPacketCnt(void) {
-  return valid_packet_cnt;
-}
-
-void MinipcPort::ProcessData() {
-/*
-  // Assume that the host_command is a complete and verified message
-
-  // char pointer because host_command is a byte array
-  uint8_t* seq_num_start = host_command + SEQNUM_OFFSET;
-  uint8_t* rel_yaw_start = host_command + SEQNUM_OFFSET + sizeof(int32_t);
-  uint8_t* rel_pitch_start = host_command + SEQNUM_OFFSET + sizeof(int32_t) * 2;
-
-  seqnum = (*(uint16_t *)seq_num_start);
-  relative_yaw = (*(int32_t *)rel_yaw_start) * 1.0f / this->INT_FP_SCALE;
-  relative_pitch = *(int32_t *)rel_pitch_start *1.0f / this->INT_FP_SCALE;
-*/
-}
-
-uint8_t MinipcPort::GetValidFlag(void) {
-  uint8_t temp = flag;
-  flag = 0;
-  return temp;
-}
 }  // namespace communication
 

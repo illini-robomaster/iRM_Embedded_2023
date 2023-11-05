@@ -50,7 +50,7 @@ typedef struct {
   float rel_pitch;
   // Search Target is 0. Move Yoke is 1.
   uint8_t mode;
-  uint8_t debug_info;
+  uint8_t debug_int;
 } __packed gimbal_data_t;
 
 typedef struct {
@@ -58,6 +58,20 @@ typedef struct {
   float vy;
   float vw;
 } __packed chassis_data_t;
+
+// summary of all information transmitted between minipc and stm32
+typedef struct {
+  // RED is 0; BLUE is one
+  uint8_t my_color;
+  float rel_yaw;
+  float rel_pitch;
+  // Search Target is 0. Move Yoke is 1.
+  uint8_t mode;
+  uint8_t debug_int;
+  float vx;
+  float vy;
+  float vw;
+} __packed status_data_t;
 
 // GIMBAL_CMD_ID  : 0x00 Autoaim gimbal RelYaw RelPitch
 // COLOR_CMD_ID   : 0x01
@@ -72,12 +86,6 @@ enum CMD_ID {GIMBAL_CMD_ID,
 class MinipcPort {
  public:
   MinipcPort();
-  void Receive(const uint8_t* data, uint8_t len);
-  uint8_t GetValidFlag(void);
-  float GetRelativeYaw(void);
-  float GetRelativePitch(void);
-  uint16_t GetSeqnum(void);
-  uint32_t GetValidPacketCnt(void);
 
   /**
    * @brief Pack data into a packet array
@@ -89,10 +97,41 @@ class MinipcPort {
   void PackChassisData(uint8_t* packet, chassis_data_t* data);
 
   /**
+   * @brief Total length of packet in bytes
+   *  Header/tail/crc8 included.
+   */
+  uint8_t GetPacketLen(uint8_t cmd_id);
+
+  /**
+   * @brief parse and handle the uart buffer
+   * @param data: pointer to the uart buffer
+   *        len:  length of the data received in bytes
+   */
+  void ParseUartBuffer(const uint8_t* data, int32_t len);
+
+  /**
+   * @brief Return the cmd_id of the most recently parsed packet
+   */
+  uint8_t GetCmdId(void);
+
+  /**
+   * @brief Get command status of the robot
+   */
+  const status_data_t* GetStatus(void);
+
+  /**
+   * @brief Get the valid flag, 1 when the packet is valid, 0 otherwise
+   * @note  Flag can only be acquired once. Once asked, flag will be reset to 0 (invalid)
+   */
+  uint8_t GetValidFlag(void);
+  uint16_t GetSeqnum(void);
+  uint32_t GetValidPacketCnt(void);
+
+  /**
    * Length of the data section ONLY in bytes. Header/tail/crc8 (total len = 9) NOT included.
-   * Gimbal  CMD: id = 0x00, length = 19 - 9 = 10
-   * Color   CMD: id = 0x01, length = 10 - 9 = 1
-   * Chassis CMD: id = 0x02, length = 21 - 9 = 12
+   * Gimbal  CMD: id = 0x00, total packet length = 19 - 9 = 10
+   * Color   CMD: id = 0x01, total packet length = 10 - 9 = 1
+   * Chassis CMD: id = 0x02, total packet length = 21 - 9 = 12
    */
   static constexpr uint8_t CMD_TO_LEN[TOTAL_NUM_OF_ID] = {
                                                 sizeof(gimbal_data_t),
@@ -101,22 +140,10 @@ class MinipcPort {
                                                 };
   static constexpr uint8_t MAX_PACKET_LENGTH = 21;
   static constexpr uint8_t MIN_PACKET_LENGTH = 10;
-  /**
-   * @brief Total length of packet in bytes
-   *  Header/tail/crc8 included.
-   */
-  uint8_t GetPacketLen(uint8_t cmd_id);
+  // sum of header and tail = 9. Total packet length = data length (CMD_TO_LEN) + 9
+  static constexpr uint8_t HT_LEN = 9;
 
  private:
-  // For definitions of constants, check out the documentation at either
-  // https://github.com/illini-robomaster/iRM_Vision_2023/blob/roger/crc_comm/docs/comm_protocol.md
-  // or https://github.com/illini-robomaster/iRM_Vision_2023/tree/docs/comm_protocol.md
-  static constexpr uint8_t SEQNUM_OFFSET = 2;
-  static constexpr uint8_t DATA_LENGTH_OFFSET = SEQNUM_OFFSET + 2;
-  static constexpr uint8_t CMD_ID_OFFSET = DATA_LENGTH_OFFSET + 1;
-  static constexpr uint8_t DATA_OFFSET = CMD_ID_OFFSET + 1;
-
-
   /**
    * @brief Add header and tail to the packet array based on cmd_id
    * @note For the smallest length of the packet, see CMD_TO_LEN[]
@@ -132,17 +159,24 @@ class MinipcPort {
    */
   void AddCRC8 (uint8_t* packet, int8_t cmd_id);
 
-  int index;
-  uint8_t flag;
-  //uint8_t host_command[PKG_LEN];
-  void Handle();
-  void ProcessData();
+  // Wrapper of ParseData(uint8_t), do some verification.
+  void VerifyAndParseData();
 
-  float relative_yaw;
-  float relative_pitch;
-  uint16_t seqnum;
+  // Assume that the possible_packet is a complete and verified message
+  void ParseData(uint8_t cmd_id);
+
+  uint8_t cmd_id_;
+  status_data_t status_;
+  uint8_t possible_packet[MAX_PACKET_LENGTH];
+  // keep track of the index of the current packet
+  // in case of 1 packet being sent in multiple uart transmissions
+  int buffer_index_;
+
+  // Least current available sequence number
+  uint16_t seqnum_;
+  uint8_t valid_flag_;
   uint32_t valid_packet_cnt = 0;
-}; /* class AutoaimProtocol */
+}; /* class MinipcPort */
 
 } /* namespace communication */
 
