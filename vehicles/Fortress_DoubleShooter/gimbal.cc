@@ -168,7 +168,9 @@ static control::Motor4310* yaw_motor = nullptr;
 static bsp::Laser* laser = nullptr;
 
 // 4310 PID
-static control::ConstrainedPID* yaw_pid_position = nullptr;
+//static control::ConstrainedPID* yaw_pid_position = nullptr;
+static control::ConstrainedPID* yaw_theta_pid = nullptr;
+static control::ConstrainedPID* yaw_omega_pid = nullptr;
 
 void gimbalTask(void* arg) {
   UNUSED(arg);
@@ -195,15 +197,21 @@ void gimbalTask(void* arg) {
 
   float yaw_offset = 0;
   float yaw_error;
-  float yaw_output_position;
+  float yaw_output_theta;
+
   float tmp_pitch_pos = 0;
   for (int j = 0; j < SOFT_START_CONSTANT; j++) {
     tmp_pitch_pos += START_PITCH_POS / SOFT_START_CONSTANT;  // increase position gradually
     pitch_motor->SetOutput(tmp_pitch_pos, 1, 115, 0.5, 0);
     // Caluclate the PID output of the yaw motor
     yaw_error = wrap<float>(-(yaw_motor->GetTheta() - yaw_offset), -PI, PI);
-    yaw_output_position = yaw_pid_position->ComputeOutput(yaw_error);
-    yaw_motor->SetOutput(yaw_output_position);
+    yaw_output_theta = yaw_theta_pid->ComputeOutput(yaw_error);
+    yaw_motor->SetOutput(yaw_output_theta);
+//    float yaw_offset = 0.1f;  // TODO: CHANGE THE OFFSET
+//    yaw_angle_ = wrap<float>(yaw_offset, 0, 2 * PI);
+//    yaw_error = wrap<float>(-(yaw_motor->GetTheta() - yaw_offset), -PI, PI);
+//    yaw_output_position = yaw_pid_position->ComputeOutput(yaw_error);
+//    yaw_motor->SetOutput(0, 0, 0, 0, yaw_output_position);
     control::Motor4310::TransmitOutput(motors_can1_gimbal, 2);
     osDelay(GIMBAL_TASK_DELAY);
   }
@@ -212,7 +220,7 @@ void gimbalTask(void* arg) {
   RGB->Display(display::color_yellow);
   laser->Off();
   pitch_motor->SetOutput(tmp_pitch_pos, 1, 115, 0.5, 0);
-  yaw_motor->SetOutput(0);
+  yaw_motor->SetOutput(0, 0, 0, 0, 0);
   control::Motor4310::TransmitOutput(motors_can1_gimbal, 2);
 
   osDelay(GIMBAL_START_DELAY);
@@ -220,7 +228,7 @@ void gimbalTask(void* arg) {
 
   while (!imu->DataReady() || !imu->CaliDone()) {
     pitch_motor->SetOutput(tmp_pitch_pos, 1, 115, 0.5, 0);
-    yaw_motor->SetOutput(0);
+    yaw_motor->SetOutput(0, 0, 0, 0, 0);
     control::Motor4310::TransmitOutput(motors_can1_gimbal, 2);
     osDelay(GIMBAL_TASK_DELAY);
   }
@@ -250,7 +258,7 @@ void gimbalTask(void* arg) {
       for (int j = 0; j < SOFT_START_CONSTANT; j++){
         tmp_pitch_pos += START_PITCH_POS / SOFT_START_CONSTANT;  // increase position gradually
         pitch_motor->SetOutput(tmp_pitch_pos, 1, 115, 0.5, 0);
-        yaw_motor->SetOutput(0);
+        yaw_motor->SetOutput(0, 0, 0, 0, 0);
         control::Motor4310::TransmitOutput(motors_can1_gimbal, 2);
         osDelay(GIMBAL_TASK_DELAY);
       }
@@ -260,17 +268,33 @@ void gimbalTask(void* arg) {
 
     pitch_motor->SetOutput(pitch_pos, pitch_vel, 115, 0.5, 0);
 
-    // yaw calculation
     float yaw_ratio, yaw_target;
     yaw_ratio = -dbus->mouse.x / 10000.0;
-    yaw_ratio += -dbus->ch2 / 18000.0;
+    yaw_ratio += -dbus->ch2 / 20000.0;
     yaw_target = clip<float>(yaw_ratio, -PI, PI);
     yaw_offset = wrap<float>(yaw_target + yaw_offset, -PI, PI);
     yaw_error = wrap<float>(yaw_offset - imu->INS_angle[0], -PI, PI);
-    if (abs(yaw_error) <= 0.001) yaw_error = 0;
-    yaw_output_position = yaw_pid_position->ComputeOutput(yaw_error);
+//    if (abs(yaw_error) <= 0.001) yaw_error = 0;
+    float yt_out = yaw_theta_pid->ComputeOutput(yaw_error);
+    float yt_in = yt_out - yaw_motor->GetOmega();
+    float yo_out = yaw_omega_pid->ComputeOutput(yt_in);
+    yt_out = clip<float>(yt_out, -15, 15);
 
-    yaw_motor->SetOutput(yaw_output_position);
+//    set_cursor(0, 0);
+//    clear_screen();
+    print("yt_out: %f, yt_in: %f, yo_out: %f\r\n", yt_out, yt_in, yo_out);
+    // yaw calculation
+//    float yaw_ratio, yaw_target;
+//    yaw_ratio = -dbus->mouse.x / 10000.0;
+//    yaw_ratio += -dbus->ch2 / 18000.0;
+//    yaw_target = clip<float>(yaw_ratio, -PI, PI);
+//    yaw_offset = wrap<float>(yaw_target + yaw_offset, -PI, PI);
+//    yaw_error = wrap<float>(yaw_offset - imu->INS_angle[0], -PI, PI);
+//    if (abs(yaw_error) <= 0.001) yaw_error = 0;
+//    yaw_output_position = yaw_pid_position->ComputeOutput(yaw_error);
+
+//    yaw_motor->SetOutput(yaw_output_position);
+    yaw_motor->SetOutput(0, yt_out, 0, 1.5, 0);
 
     control::Motor4310::TransmitOutput(motors_can1_gimbal, 2);
     osDelay(GIMBAL_TASK_DELAY);
@@ -810,7 +834,7 @@ void RM_RTOS_Init(void) {
   laser = new bsp::Laser(LASER_GPIO_Port, LASER_Pin);
   pitch_motor = new control::Motor4310(can2, 0x32, 0x33, control::MIT);
   // TODO: initialize the yaw motor
-  yaw_motor = new control::Motor4310(can2, 0x34, 0x35, control::VEL);
+  yaw_motor = new control::Motor4310(can2, 0x34, 0x35, control::MIT);
 
   //  control::gimbal_t gimbal_data;
   //  gimbal_data.pitch_motor_4310_ = pitch_motor;
@@ -857,10 +881,20 @@ void RM_RTOS_Init(void) {
   send = new bsp::CanBridge(can2, 0x20A, 0x20B);
 
   // 4310 PID Init
-  float yaw_pid_param_position[] = {2.5, 10.0, 3.0};
-  float yaw_max_iout_position = 0;
-  float yaw_max_out_position = 30;
-  yaw_pid_position = new control::ConstrainedPID(yaw_pid_param_position, yaw_max_iout_position, yaw_max_out_position);
+//  float yaw_pid_param_position[] = {2.5, 10.0, 3.0};
+//  float yaw_max_iout_position = 0;
+//  float yaw_max_out_position = 30;
+//  yaw_pid_position = new control::ConstrainedPID(yaw_pid_param_position, yaw_max_iout_position, yaw_max_out_position);
+
+  float yaw_pid_param_theta[] = {6.0, 1.0, 0.05};
+  float yaw_max_iout_theta = 0;
+  float yaw_max_out_theta = 15;
+  yaw_theta_pid = new control::ConstrainedPID(yaw_pid_param_theta, yaw_max_iout_theta, yaw_max_out_theta);
+
+  float yaw_pid_param_omega[] = {1.0, 0.0, 0.0};
+  float yaw_max_iout_omega = 0;
+  float yaw_max_out_omega = 18;
+  yaw_omega_pid = new control::ConstrainedPID(yaw_pid_param_omega, yaw_max_iout_omega, yaw_max_out_omega);
 }
 
 //==================================================================================================
@@ -905,7 +939,7 @@ void KillAll() {
       laser->On();
       pitch_motor->MotorEnable();
       // TODO: whether the 4310 yaw motor need to enable ???
-      // yaw_motor->MotorEnable(yaw_motor);
+       yaw_motor->MotorEnable();
       break;
     }
 
@@ -921,9 +955,9 @@ void KillAll() {
     pitch_reset = true;
     pitch_motor->MotorDisable();
     // TODO:
-    // yaw_motor->MotorDisable(yaw_motor);
+//     yaw_motor->MotorDisable();
 
-    // yaw_motor->SetOutput(0);
+//     yaw_motor->SetOutput(0);
     // control::MotorCANBase::TransmitOutput(motors_can2_gimbal, 1);
 
     left_top_flywheel->SetOutput(0);
@@ -960,14 +994,14 @@ void KillGimbal() {
     for (int j = 0; j < SOFT_KILL_CONSTANT; j++) {
       tmp_pos -= START_PITCH_POS / SOFT_KILL_CONSTANT;  // decrease position gradually
       pitch_motor->SetOutput(tmp_pos, 1, 115, 0.5, 0);
-      yaw_motor->SetOutput(0);
+//      yaw_motor->SetOutput(0);
       control::Motor4310::TransmitOutput(motor, 2);
       osDelay(GIMBAL_TASK_DELAY);
     }
 
     pitch_reset = true;
     pitch_motor->MotorDisable();
-    yaw_motor->SetOutput(0);
+//    yaw_motor->SetOutput(0);
     control::Motor4310::TransmitOutput(motor, 2);
 
     osDelay(KILLALL_DELAY);

@@ -225,7 +225,7 @@ void chassisTask(void* arg) {
     }
 
     chassis->SetSpeed(vx, vy, wz);
-    chassis->Update(true, power_limit,
+    chassis->Update(false, power_limit,
                     referee->power_heat_data.chassis_power,
                     (float)referee->power_heat_data.chassis_power_buffer);
 
