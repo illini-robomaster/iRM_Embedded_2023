@@ -19,7 +19,7 @@
 # ---------------------------------------------------------------------- #
 
 # generic board interface
-add_library(board_interface INTERFACE)
+add_library(board_interface INTERFACE ../examples/balancing/wheeled_legged.h)
 target_compile_definitions(board_interface INTERFACE USE_HAL_DRIVER)
 target_compile_options(board_interface INTERFACE
     $<$<COMPILE_LANGUAGE:ASM>:-x assembler-with-cpp>

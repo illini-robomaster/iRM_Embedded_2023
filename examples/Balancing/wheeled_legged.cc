@@ -28,11 +28,17 @@
 #include "motor.h"
 #include "dbus.h"
 #include "utils.h"
+#include "wheeled_legged.h"
 
 #define RX_SIGNAL (1 << 0)
 static bsp::CAN* can1 = nullptr;
-static control::MotorCANBase* left_motor = nullptr;
-static control::MotorCANBase* right_motor = nullptr;
+static bsp::CAN* can2 = nullptr;
+static control::MotorCANBase* left_wheel_motor = nullptr;
+static control::MotorCANBase* right_wheel_motor = nullptr;
+static control::Motor4310* left_frout_leg_motor = nullptr;
+static control::Motor4310* left_back_leg_motor = nullptr;
+static control::Motor4310* right_frout_leg_motor = nullptr;
+static control::Motor4310* right_back_leg_motor = nullptr;
 static remote::DBUS* dbus = nullptr;
 
 const osThreadAttr_t imuTaskAttribute = {.name = "imuTask",
@@ -68,10 +74,25 @@ void imuTask(void* arg) {
 }
 
 void RM_RTOS_Init(void) {
+  //dbus and print initialization
   print_use_uart(&huart1);
   dbus = new remote::DBUS(&huart3);
-  can1 = new bsp::CAN(&hcan1, true);
 
+  // can initialization
+  can1 = new bsp::CAN(&hcan1, true);
+  can2 = new bsp::CAN(&hcan2, false);
+
+  // wheel motor initialization
+  left_wheel_motor = new control::Motor3508(can1, 0x201);
+  right_wheel_motor = new control::Motor3508(can1, 0x202);
+
+  // leg motor initialization
+  left_frout_leg_motor = new control::Motor4310(can2, 0x02, 0x01, control::MIT);
+  left_back_leg_motor = new control::Motor4310(can2, 0x04, 0x03, control::MIT);
+  right_frout_leg_motor = new control::Motor4310(can2, 0x06, 0x05, control::MIT);
+  right_back_leg_motor = new control::Motor4310(can2, 0x08, 0x07, control::MIT);
+
+  // imu initialization
   bsp::IST8310_init_t IST8310_init;
   IST8310_init.hi2c = &hi2c3;
   IST8310_init.int_pin = DRDY_IST8310_Pin;
@@ -98,21 +119,15 @@ void RM_RTOS_Init(void) {
   imu_init.Accel_INT_pin_ = INT1_ACCEL_Pin;
   imu_init.Gyro_INT_pin_ = INT1_GYRO_Pin;
   imu = new IMU(imu_init, false);
-
-  left_motor = new control::Motor3508(can1, 0x201);
-  right_motor = new control::Motor3508(can1, 0x202);
 }
 
 void RM_RTOS_Threads_Init(void) {
   imuTaskHandle = osThreadNew(imuTask, nullptr, &imuTaskAttribute);
 }
-static float balance_pid[3]{280,0,130};
-static float speed_pid[3]{200,1,0};
-
-static float velocity_lowpass;
 
 void RM_RTOS_Default_Task(const void* arg) {
   UNUSED(arg);
+  // start switch
   while(true){
     if (dbus->swr == remote::UP) {
       break;
@@ -125,51 +140,40 @@ void RM_RTOS_Default_Task(const void* arg) {
   osDelay(10);
   print("Calibration done\r\n");
 
-  float balance_angle = 0.7; // measured by IMU
-  float output = 0.0;
-  float balance_difference = 0.0;
-  float velocity_difference = 0.0;
-  float velocity_integral = 0.0;
-  int16_t max_output = 3000;
-  control::MotorCANBase* motors[] = {left_motor, right_motor};
+  // leg motor activation
+  left_frout_leg_motor->SetZeroPos();
+  left_frout_leg_motor->MotorEnable();
+  left_back_leg_motor->SetZeroPos();
+  left_back_leg_motor->MotorEnable();
+  right_frout_leg_motor->SetZeroPos();
+  right_frout_leg_motor->MotorEnable();
+  right_back_leg_motor->SetZeroPos();
+  right_back_leg_motor->MotorEnable();
+
+  control::MotorCANBase* wheel_motors[] = {left_wheel_motor, right_wheel_motor};
+  control::Motor4310* leg_motors[] = {left_frout_leg_motor, left_back_leg_motor, right_frout_leg_motor, right_back_leg_motor};
 
   while (true) {
-    // position control
-    balance_difference = imu->INS_angle[1] / PI * 180 - balance_angle;
-    // velocity control
-    velocity_difference = left_motor->GetOmega() + right_motor->GetOmega() - 0; // want stop
-    velocity_lowpass = 0.32 * velocity_difference + 0.68 * velocity_lowpass;
-    velocity_integral += velocity_lowpass;
-    velocity_integral = clip<float>(velocity_integral, -10000, 10000);
+    // Update wheel omega and robot velocity
+    left_wheel_omega = left_wheel_motor->GetOmega() * rpm_rads;
+    right_wheel_omega = right_wheel_motor->GetOmega() * rpm_rads;
+    left_wheel_speed = left_wheel_omega * wheel_radius;
+    right_wheel_speed = right_wheel_motor->GetOmega() * rpm_rads * wheel_radius;
+    // need to check the sign for each speed
+    robot_speed = (left_wheel_speed + right_wheel_speed) / 2;
 
+    // update IMU data(roll, pitch, yaw)
+    //TODO: test the axis of IMU
+    yaw = imu->INS_angle[1];
+    pitch = imu->INS_angle[0];
+    roll = imu->INS_angle[2];
+    yaw_omega = imu->GetGyro()[1];
+    pitch_omega = imu->GetGyro()[0];
+    roll_omega = imu->GetGyro()[2];
 
-    if (dbus->swr == remote::DOWN || imu->INS_angle[1] / PI * 180 < balance_angle - 75 || imu->INS_angle[1] / PI * 180 > balance_angle + 75
-        || left_motor->GetCurr() > 10000 || right_motor->GetCurr() > 10000) {
-      output = 0;
-      velocity_integral = 0;
-      print("angle: %.2f, gyro: %.2f\r\n", balance_difference, imu->GetGyro()[1]);
-    } else {
-      output = balance_pid[0] * balance_difference + balance_pid[2] * imu->GetGyro()[1]
-               + speed_pid[0] * velocity_lowpass + speed_pid[1] * velocity_integral;
-      print("angle: %.2f, gyro: %.2f, velocity: %.2f, output: %.2f\r\n", balance_difference, imu->GetGyro()[1], velocity_lowpass, output);
-      if (output > max_output) {
-        output = max_output;
-      }
-    }
+    // LQR control
+//    torque_left_wheel = -(K2*(robot_speed - vx_set) + K3 )
 
-    left_motor->SetOutput(-(int16_t)output);
-    right_motor->SetOutput((int16_t)output);
-    control::MotorCANBase::TransmitOutput(motors, 2);
     osDelay(10);
-
-
-//    set_cursor(0, 0);
-//    clear_screen();
-//    print("# %.2f s, IMU %s\r\n", HAL_GetTick() / 1000.0,
-//          imu->DataReady() ? "\033[1;42mReady\033[0m" : "\033[1;41mNot Ready\033[0m");
-//    print("Temp: %.2f\r\n", imu->Temp);
-//    print("Euler Angles: %.2f, %.2f, %.2f\r\n", imu->INS_angle[0] / PI * 180,
-//          imu->INS_angle[1] / PI * 180, imu->INS_angle[2] / PI * 180);
-//    osDelay(50);
   }
 }
