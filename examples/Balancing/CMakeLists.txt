@@ -20,6 +20,10 @@
 
 project(example_balancing ASM C CXX)
 
-irm_add_arm_executable(${PROJECT_NAME}
+irm_add_arm_executable(${PROJECT_NAME}_balance
         TARGET DJI_Board_TypeC
-        SOURCES main.cc)
+        SOURCES balance.cc)
+
+irm_add_arm_executable(${PROJECT_NAME}_wheeled_legged
+        TARGET DJI_Board_TypeC
+        SOURCES wheeled_legged.cc)
