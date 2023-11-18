@@ -193,9 +193,8 @@ void gimbalTask(void* arg) {
   pitch_motor->MotorEnable();
 //  yaw_motor->SetZeroPos();
   yaw_motor->MotorEnable();
-//  osDelay(GIMBAL_TASK_DELAY);
 
-  float yaw_offset = 0;
+  float yaw_target = 0;
   float yaw_error;
   float yaw_output_theta;
 
@@ -204,14 +203,9 @@ void gimbalTask(void* arg) {
     tmp_pitch_pos += START_PITCH_POS / SOFT_START_CONSTANT;  // increase position gradually
     pitch_motor->SetOutput(tmp_pitch_pos, 1, 115, 0.5, 0);
     // Caluclate the PID output of the yaw motor
-    yaw_error = wrap<float>(-(yaw_motor->GetTheta() - yaw_offset), -PI, PI);
+    yaw_error = wrap<float>(-(yaw_motor->GetTheta() - yaw_target), -PI, PI);
     yaw_output_theta = yaw_theta_pid->ComputeOutput(yaw_error);
     yaw_motor->SetOutput(yaw_output_theta);
-//    float yaw_offset = 0.1f;  // TODO: CHANGE THE OFFSET
-//    yaw_angle_ = wrap<float>(yaw_offset, 0, 2 * PI);
-//    yaw_error = wrap<float>(-(yaw_motor->GetTheta() - yaw_offset), -PI, PI);
-//    yaw_output_position = yaw_pid_position->ComputeOutput(yaw_error);
-//    yaw_motor->SetOutput(0, 0, 0, 0, yaw_output_position);
     control::Motor4310::TransmitOutput(motors_can1_gimbal, 2);
     osDelay(GIMBAL_TASK_DELAY);
   }
@@ -268,33 +262,16 @@ void gimbalTask(void* arg) {
 
     pitch_motor->SetOutput(pitch_pos, pitch_vel, 115, 0.5, 0);
 
-    float yaw_ratio, yaw_target;
+    float yaw_ratio;
     yaw_ratio = -dbus->mouse.x / 10000.0;
     yaw_ratio += -dbus->ch2 / 20000.0;
-    yaw_target = clip<float>(yaw_ratio, -PI, PI);
-    yaw_offset = wrap<float>(yaw_target + yaw_offset, -PI, PI);
-    yaw_error = wrap<float>(yaw_offset - imu->INS_angle[0], -PI, PI);
-//    if (abs(yaw_error) <= 0.001) yaw_error = 0;
-    float yt_out = yaw_theta_pid->ComputeOutput(yaw_error);
-    float yt_in = yt_out - yaw_motor->GetOmega();
-    float yo_out = yaw_omega_pid->ComputeOutput(yt_in);
-    yt_out = clip<float>(yt_out, -15, 15);
+    yaw_ratio = clip<float>(yaw_ratio, -PI, PI);
+    yaw_target = wrap<float>(yaw_ratio + yaw_target, -PI, PI);
+    yaw_error = wrap<float>(yaw_target - imu->INS_angle[0], -PI, PI);
+    float yaw_theta_out = yaw_theta_pid->ComputeOutput(yaw_error);
+    yaw_theta_out = clip<float>(yaw_theta_out, -15, 15);
 
-//    set_cursor(0, 0);
-//    clear_screen();
-    print("yt_out: %f, yt_in: %f, yo_out: %f\r\n", yt_out, yt_in, yo_out);
-    // yaw calculation
-//    float yaw_ratio, yaw_target;
-//    yaw_ratio = -dbus->mouse.x / 10000.0;
-//    yaw_ratio += -dbus->ch2 / 18000.0;
-//    yaw_target = clip<float>(yaw_ratio, -PI, PI);
-//    yaw_offset = wrap<float>(yaw_target + yaw_offset, -PI, PI);
-//    yaw_error = wrap<float>(yaw_offset - imu->INS_angle[0], -PI, PI);
-//    if (abs(yaw_error) <= 0.001) yaw_error = 0;
-//    yaw_output_position = yaw_pid_position->ComputeOutput(yaw_error);
-
-//    yaw_motor->SetOutput(yaw_output_position);
-    yaw_motor->SetOutput(0, yt_out, 0, 1.5, 0);
+    yaw_motor->SetOutput(0, yaw_theta_out, 0, 1.5, 0);
 
     control::Motor4310::TransmitOutput(motors_can1_gimbal, 2);
     osDelay(GIMBAL_TASK_DELAY);
