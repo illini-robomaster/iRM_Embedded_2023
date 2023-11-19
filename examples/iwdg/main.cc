@@ -38,7 +38,7 @@ void RM_RTOS_Default_Task(const void* arguments){
 
         print("Hello World!\r\n");
         osDelay(1000);
-//        HAL_IWDG_Refresh(&hiwdg);
+        HAL_IWDG_Refresh(&hiwdg);
         HAL_Delay(18);
     }
 }
