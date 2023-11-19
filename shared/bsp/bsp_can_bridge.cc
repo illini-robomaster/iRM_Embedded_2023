@@ -90,6 +90,15 @@ void CanBridge::UpdateData(const uint8_t* data) {
     case IS_MY_COLOR_BLUE:
       is_my_color_blue = cmd.data_bool;
       break;
+    case RELATIVE_ANGLE_RECEIVED:
+      relative_angle_received = cmd.data_float;
+      break;
+    case STEERING_TIMESTAMP_DOWN:
+      steering_timestamp_down = cmd.data_float;
+      break;
+    case STEERING_TIMESTAMP_UP:
+      steering_timestamp_up = cmd.data_float;
+      break;
     default:;
   }
 }

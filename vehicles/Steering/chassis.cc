@@ -208,6 +208,11 @@ void chassisTask(void* arg) {
 
   while (true) {
     float relative_angle = receive->relative_angle;
+    
+    receive->cmd.id = bsp::RELATIVE_ANGLE_RECEIVED;
+    receive->cmd.data_float = relative_angle;
+    receive->TransmitOutput();
+
     float sin_yaw, cos_yaw, vx_set, vy_set;
     float vx, vy, wz;
 
@@ -241,7 +246,7 @@ void chassisTask(void* arg) {
     if (receive->mode == 1) {  // spin mode
       // delay compensation
       // based on rule-of-thumb formula SPIN_SPEED = 80 = ~30 degree of error
-      relative_angle = relative_angle - PI * 30.0 / 180.0 / 80.0 * SPIN_SPEED;
+      relative_angle = relative_angle /* - PI * 30.0 / 180.0 / 80.0 * SPIN_SPEED */;
 
       chassis->SteerSetMaxSpeed(RUN_SPEED * 2);
       sin_yaw = sin(relative_angle);

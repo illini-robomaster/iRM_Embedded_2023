@@ -558,7 +558,7 @@ void chassisTask(void* arg) {
   float vx_set, vy_set;
 
   while (true) {
-    ChangeSpinMode.input(dbus->keyboard.bit.SHIFT /*|| dbus->swl == remote::UP*/);
+    ChangeSpinMode.input(dbus->keyboard.bit.SHIFT || dbus->swl == remote::UP);
     if (ChangeSpinMode.posEdge()) SpinMode = !SpinMode;
 
     send->cmd.id = bsp::MODE;
@@ -896,7 +896,7 @@ void KillGimbal() {
   }
 }
 
-static bool debug = false;
+static bool debug = true;
 
 void RM_RTOS_Default_Task(const void* arg) {
   UNUSED(arg);
@@ -917,17 +917,22 @@ void RM_RTOS_Default_Task(const void* arg) {
     }
 
     send->cmd.id = bsp::DEAD;
-    send->cmd.data_bool = false;
+    send->cmd.data_bool = false; 
     send->TransmitOutput();
 
     relative_angle = yaw_motor->GetThetaDelta(gimbal_param->yaw_offset_);
     send->cmd.id = bsp::RELATIVE_ANGLE;
     send->cmd.data_float = relative_angle;
     send->TransmitOutput();
+    
+
 
     if (debug) {
       set_cursor(0, 0);
       clear_screen();
+
+      print("relative_angle: %.2f \r\n", relative_angle);
+      print("relative_angle_received: %.2f \r\n", send->relative_angle_received - relative_angle);
 
       print("# %.2f s, IMU %s\r\n", HAL_GetTick() / 1000.0,
             imu->CaliDone() ? "\033[1;42mReady\033[0m" : "\033[1;41mNot Ready\033[0m");

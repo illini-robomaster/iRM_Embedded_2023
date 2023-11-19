@@ -42,6 +42,9 @@ typedef enum {
   GIMBAL_POWER,
   RECALIBRATE,
   IS_MY_COLOR_BLUE,
+  RELATIVE_ANGLE_RECEIVED,
+  STEERING_TIMESTAMP_DOWN,
+  STEERING_TIMESTAMP_UP
 } can_bridge_cmd;
 
 typedef struct {
@@ -79,6 +82,9 @@ class CanBridge {
   unsigned int gimbal_power = 0;
   bool recalibrate = false;
   bool is_my_color_blue = false;
+  float relative_angle_received = 0;
+  float steering_timestamp_down = 0;
+  float steering_timestamp_up = 0;
   // each bit represents a flag correspond to specific motor e.g.(at index 0, it represents the motor 1's connection flag)
  private:
   bsp::CAN* can_;
