@@ -175,7 +175,7 @@ class MinipcPort {
   // Least current available sequence number
   uint16_t seqnum_;
   uint8_t valid_flag_;
-  uint32_t valid_packet_cnt = 0;
+  uint32_t valid_packet_cnt_ = 0;
 }; /* class MinipcPort */
 
 } /* namespace communication */

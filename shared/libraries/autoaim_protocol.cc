@@ -164,7 +164,7 @@ uint16_t MinipcPort::GetSeqnum(void) {
 }
 
 uint32_t MinipcPort::GetValidPacketCnt(void) {
-  return valid_packet_cnt;
+  return valid_packet_cnt_;
 }
 
 /**
@@ -213,7 +213,7 @@ void MinipcPort::VerifyAndParseData(void) {
   //    2) probability of this happening is very low. The second packet has to be sent in two slices to
   //       trigger this issue. (first slice: S/T is sent to possible_packet; second slide: the rest)
 
-  // verify the start and the end of the packet
+  // if packet Head or Tail is corrupted
   uint8_t cmd_id = possible_packet[CMD_ID_OFFSET];
   if (possible_packet[0] != 'S' || possible_packet[1] != 'T' ||
       possible_packet[CMD_TO_LEN[cmd_id] + HT_LEN - 2] != 'E' ||
@@ -222,9 +222,10 @@ void MinipcPort::VerifyAndParseData(void) {
     return;
   }
 
+  // if packet crc8 checksum is valid
   if (verify_crc8_check_sum(possible_packet, CMD_TO_LEN[cmd_id] + HT_LEN - 2)) {
     ParseData(cmd_id);
-    valid_packet_cnt++;
+    valid_packet_cnt_++;
     valid_flag_ = 1;
   } else {
     valid_flag_ = 0;
