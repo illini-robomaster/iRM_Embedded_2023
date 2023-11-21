@@ -27,7 +27,7 @@
 #include "bsp_print.h"
 #include "bsp_uart.h"
 #include "cmsis_os.h"
-#include "autoaim_protocol.h"
+#include "minipc_protocol.h"
 #include "rgb.h"
 
 #define RX_SIGNAL (1 << 0)
@@ -52,63 +52,65 @@ void RM_RTOS_Init(void) {
 void RM_RTOS_Default_Task(const void* argument) {
   UNUSED(argument);
 
+  uint32_t length;
+  uint8_t* data;
+
   auto uart = std::make_unique<CustomUART>(&huart1);  // see cmake for which uart
   uart->SetupRx(50);
   uart->SetupTx(50);
 
   auto minipc_session = communication::MinipcPort();
+  int total_processed_bytes = 0;
 
-  communication::gimbal_data_t gimbal_data;
-  communication::color_data_t color_data;
-  communication::chassis_data_t chassis_data;
-
-  const communication::status_data_t* status_data;
-
-  gimbal_data.rel_yaw = 100;
-  gimbal_data.rel_pitch = 200;
-  gimbal_data.debug_int = 50;
-  gimbal_data.mode = 1;
-
-  color_data.my_color = 1;
-
-  chassis_data.vx = 20;
-  chassis_data.vy = 30;
-  chassis_data.vw = 40;
-
-  uint8_t packet_to_send[minipc_session.MAX_PACKET_LENGTH];
-  uint8_t *data;
-  int32_t length;
-
-  UNUSED(color_data);
-  UNUSED(chassis_data);
+  /* To run this test, use Communication/communicator.py in the iRM_Vision_2023 repo
+   * Need to set TESTING_TX_RX = False and TESTING_CRC = True
+  **/
 
   while (true) {
     /* wait until rx data is available */
-    //led->Display(0xFF0000FF);
+    led->Display(0xFF0000FF);
 
-    // TX RX test, see vision repo communication/communicator.py
-    uint32_t flags = osThreadFlagsWait(RX_SIGNAL, osFlagsWaitAll, osWaitForever);
+    // An alternative is to use osThreadFlagsWait.
+    // However, we want to experiment with periodic sending
+    uint32_t flags = osThreadFlagsGet();
     if (flags & RX_SIGNAL) {
+      /* time the non-blocking rx / tx calls (should be <= 1 osTick) */
+
+      // max length of the UART buffer at 150Hz is ~50 bytes
       length = uart->Read(&data);
+      total_processed_bytes += length;
+
       minipc_session.ParseUartBuffer(data, length);
-      status_data = minipc_session.GetStatus();
-      gimbal_data.rel_pitch = status_data->rel_pitch + 1;
-      minipc_session.Pack(packet_to_send, (void*)&gimbal_data, communication::GIMBAL_CMD_ID);
-      uart->Write(packet_to_send, minipc_session.GetPacketLen(communication::GIMBAL_CMD_ID));
+      uint32_t valid_packet_cnt = minipc_session.GetValidPacketCnt();
+
+      uint8_t packet_to_send[minipc_session.MAX_PACKET_LENGTH];
+
+      // Jetson / PC sends 200Hz valid packets for stress testing
+      // For testing script, please see iRM_Vision_2023/Communication/communicator.py
+      // For comm protocol details, please see iRM_Vision_2023/docs/comm_protocol.md
+      if (valid_packet_cnt == 1000) {
+        // Jetson test cases write 1000 packets. Pass
+        led->Display(0xFF00FF00);
+        osDelay(10000);
+        // after 10 seconds, write 1000 alternating packets to Jetson
+        communication::color_data_t color_data;
+        uint8_t my_color = 1; // blue
+        for (int i = 0; i < 1000; ++i) {
+          if (i % 2 == 0) {
+            my_color = 1; // blue
+          } else {
+            my_color = 0; // red
+          }
+          color_data.my_color = my_color;
+          minipc_session.Pack(packet_to_send, (void*)&color_data, communication::COLOR_CMD_ID);
+          uart->Write(packet_to_send, minipc_session.GetPacketLen(communication::COLOR_CMD_ID));
+          // NOTE: THIS BREAKS WHEN WORKING AT 1000HZ!
+          osDelay(2);
+        }
+      }
+      // blue when nothing is received
+      led->Display(0xFF0000FF);
     }
-    osDelay(10);
-
-
-    // example code for prepare packet and send
-    //uart->Write(packet_to_send, minipc_session.GetPacketLen(communication::GIMBAL_CMD_ID));
-    //osDelay(1);
-
-    //minipc_session.Pack(packet_to_send, (void*)&color_data, communication::COLOR_CMD_ID);
-    //uart->Write(packet_to_send, minipc_session.GetPacketLen(communication::COLOR_CMD_ID));
-    //osDelay(1);
-
-    //minipc_session.Pack(packet_to_send, (void*)&chassis_data, communication::CHASSIS_CMD_ID);
-    //uart->Write(packet_to_send, minipc_session.GetPacketLen(communication::CHASSIS_CMD_ID));
-    //osDelay(1);
+    osDelay(2);
   }
 }

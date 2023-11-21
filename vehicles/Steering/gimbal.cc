@@ -40,7 +40,7 @@
 #include "rgb.h"
 #include "shooter.h"
 #include "stepper.h"
-#include "autoaim_protocol.h"
+#include "minipc_protocol.h"
 
 static bsp::CAN* can1 = nullptr;
 static bsp::CAN* can2 = nullptr;

@@ -83,6 +83,7 @@ enum CMD_ID {GIMBAL_CMD_ID,
              TOTAL_NUM_OF_ID};
 
 // WARNING: THIS CLASS IS NOT THREAD SAFE!!!
+// See docs/comm_protocol.md in vision repo for docs
 class MinipcPort {
  public:
   MinipcPort();

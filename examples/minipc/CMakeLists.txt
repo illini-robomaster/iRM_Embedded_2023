@@ -24,11 +24,11 @@ project(example_minipc ASM C CXX)
 #    TARGET DJI_Board_TypeA
 #    SOURCES typeA.cc)
 #
-irm_add_arm_executable(${PROJECT_NAME}_typeC
+irm_add_arm_executable(${PROJECT_NAME}_stresstesttypec
     TARGET DJI_Board_TypeC
-    SOURCES typeC.cc)
+    SOURCES StressTestTypeC.cc)
 
-irm_add_arm_executable(${PROJECT_NAME}_test
+irm_add_arm_executable(${PROJECT_NAME}_pingpongtest
     TARGET DJI_Board_TypeC
-    SOURCES test.cc)
+    SOURCES PingpongTest.cc)
 

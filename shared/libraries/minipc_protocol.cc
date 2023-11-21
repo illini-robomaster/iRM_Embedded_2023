@@ -18,7 +18,7 @@
  *                                                                          *
  ****************************************************************************/
 
-#include "autoaim_protocol.h"
+#include "minipc_protocol.h"
 
 #include <cstring>
 #include <memory>

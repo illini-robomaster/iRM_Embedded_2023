@@ -27,7 +27,7 @@
 #include "bsp_print.h"
 #include "bsp_uart.h"
 #include "cmsis_os.h"
-#include "autoaim_protocol.h"
+#include "minipc_protocol.h"
 
 #define RX_SIGNAL (1 << 0)
 
