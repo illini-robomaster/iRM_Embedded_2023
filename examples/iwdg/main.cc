@@ -25,15 +25,17 @@
 
 void RM_RTOS_Init(void){
     print_use_uart(&huart1);
-    HAL_Init();
-
-    MX_IWDG_Init();
-
-    // default &hiwdg got prescaler of 4 and reload of 249
-    //
+    // default &hiwdg got prescaler of 4 and reload of 999, timeout set to 500ms
+    // hiwdg is a IWDG_HandleTypeDef
+    // Calculate the reload value according to the formula:
+    // Reload_Value = ((Desired_Time_Out * 32kHz) / (Prescaler_Value * 4 * 1000)) - 1
+    hiwdg.Init.Prescaler = IWDG_PRESCALER_4;
+    hiwdg.Init.Reload = 999;
 }
 void RM_RTOS_Default_Task(const void* arguments){
     UNUSED(arguments);
+    HAL_Init();
+    MX_IWDG_Init();
     while(true){
 
         print("Hello World!\r\n");
