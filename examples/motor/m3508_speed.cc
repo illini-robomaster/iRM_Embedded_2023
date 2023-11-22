@@ -24,7 +24,7 @@
 #include "main.h"
 #include "motor.h"
 
-#define TARGET_SPEED 30
+#define TARGET_SPEED -30
 
 bsp::CAN* can = nullptr;
 control::MotorCANBase* motor = nullptr;
@@ -32,7 +32,7 @@ control::MotorCANBase* motor = nullptr;
 void RM_RTOS_Init() {
   print_use_uart(&huart1);
   can = new bsp::CAN(&hcan1, true);
-  motor = new control::Motor3508(can, 0x201);
+  motor = new control::Motor3508(can, 0x202);
 }
 
 void RM_RTOS_Default_Task(const void* args) {

@@ -106,7 +106,7 @@ void RM_RTOS_Init(void) {
 void RM_RTOS_Threads_Init(void) {
   imuTaskHandle = osThreadNew(imuTask, nullptr, &imuTaskAttribute);
 }
-static float balance_pid[3]{280,0,130};
+static float balance_pid[3]{500,0,100};
 static float speed_pid[3]{200,1,0};
 
 static float velocity_lowpass;
@@ -125,7 +125,7 @@ void RM_RTOS_Default_Task(const void* arg) {
   osDelay(10);
   print("Calibration done\r\n");
 
-  float balance_angle = 0.7; // measured by IMU
+  float balance_angle = 0.0; // measured by IMU
   float output = 0.0;
   float balance_difference = 0.0;
   float velocity_difference = 0.0;
@@ -135,7 +135,7 @@ void RM_RTOS_Default_Task(const void* arg) {
 
   while (true) {
     // position control
-    balance_difference = imu->INS_angle[1] / PI * 180 - balance_angle;
+    balance_difference = imu->INS_angle[2] / PI * 180 - balance_angle;
     // velocity control
     velocity_difference = left_motor->GetOmega() + right_motor->GetOmega() - 0; // want stop
     velocity_lowpass = 0.32 * velocity_difference + 0.68 * velocity_lowpass;
@@ -143,22 +143,22 @@ void RM_RTOS_Default_Task(const void* arg) {
     velocity_integral = clip<float>(velocity_integral, -10000, 10000);
 
 
-    if (dbus->swr == remote::DOWN || imu->INS_angle[1] / PI * 180 < balance_angle - 75 || imu->INS_angle[1] / PI * 180 > balance_angle + 75
+    if (dbus->swr == remote::DOWN || imu->INS_angle[2] / PI * 180 < balance_angle - 75 || imu->INS_angle[2] / PI * 180 > balance_angle + 75
         || left_motor->GetCurr() > 10000 || right_motor->GetCurr() > 10000) {
       output = 0;
       velocity_integral = 0;
-      print("angle: %.2f, gyro: %.2f\r\n", balance_difference, imu->GetGyro()[1]);
+      print("angle: %.2f, gyro: %.2f\r\n", balance_difference, imu->GetGyro()[2]);
     } else {
-      output = balance_pid[0] * balance_difference + balance_pid[2] * imu->GetGyro()[1]
+      output = balance_pid[0] * balance_difference + balance_pid[2] * imu->GetGyro()[2]
                + speed_pid[0] * velocity_lowpass + speed_pid[1] * velocity_integral;
-      print("angle: %.2f, gyro: %.2f, velocity: %.2f, output: %.2f\r\n", balance_difference, imu->GetGyro()[1], velocity_lowpass, output);
+      print("angle: %.2f, gyro: %.2f, velocity: %.2f, output: %.2f\r\n", balance_difference, imu->GetGyro()[2], velocity_lowpass, output);
       if (output > max_output) {
         output = max_output;
       }
     }
 
-    left_motor->SetOutput(-(int16_t)output);
-    right_motor->SetOutput((int16_t)output);
+    left_motor->SetOutput((int16_t)output);
+    right_motor->SetOutput(-(int16_t)output);
     control::MotorCANBase::TransmitOutput(motors, 2);
     osDelay(10);
 

@@ -32,12 +32,11 @@
 
 #define RX_SIGNAL (1 << 0)
 static bsp::CAN* can1 = nullptr;
-static bsp::CAN* can2 = nullptr;
 static control::MotorCANBase* left_wheel_motor = nullptr;
 static control::MotorCANBase* right_wheel_motor = nullptr;
-static control::Motor4310* left_frout_leg_motor = nullptr;
+static control::Motor4310* left_front_leg_motor = nullptr;
 static control::Motor4310* left_back_leg_motor = nullptr;
-static control::Motor4310* right_frout_leg_motor = nullptr;
+static control::Motor4310* right_front_leg_motor = nullptr;
 static control::Motor4310* right_back_leg_motor = nullptr;
 static remote::DBUS* dbus = nullptr;
 
@@ -80,17 +79,16 @@ void RM_RTOS_Init(void) {
 
   // can initialization
   can1 = new bsp::CAN(&hcan1, true);
-  can2 = new bsp::CAN(&hcan2, false);
 
   // wheel motor initialization
   left_wheel_motor = new control::Motor3508(can1, 0x201);
   right_wheel_motor = new control::Motor3508(can1, 0x202);
 
   // leg motor initialization
-  left_frout_leg_motor = new control::Motor4310(can2, 0x02, 0x01, control::MIT);
-  left_back_leg_motor = new control::Motor4310(can2, 0x04, 0x03, control::MIT);
-  right_frout_leg_motor = new control::Motor4310(can2, 0x06, 0x05, control::MIT);
-  right_back_leg_motor = new control::Motor4310(can2, 0x08, 0x07, control::MIT);
+  left_front_leg_motor = new control::Motor4310(can1, 0x02, 0x01, control::MIT);
+  left_back_leg_motor = new control::Motor4310(can1, 0x04, 0x03, control::MIT);
+  right_front_leg_motor = new control::Motor4310(can1, 0x06, 0x05, control::MIT);
+  right_back_leg_motor = new control::Motor4310(can1, 0x08, 0x07, control::MIT);
 
   // imu initialization
   bsp::IST8310_init_t IST8310_init;
@@ -125,11 +123,16 @@ void RM_RTOS_Threads_Init(void) {
   imuTaskHandle = osThreadNew(imuTask, nullptr, &imuTaskAttribute);
 }
 
+static float balance_pid[3]{730,0,150};
+static float speed_pid[3]{400,2,0};
+
+static float velocity_lowpass;
+
 void RM_RTOS_Default_Task(const void* arg) {
   UNUSED(arg);
   // start switch
   while(true){
-    if (dbus->swr == remote::UP) {
+    if (dbus->swr == remote::DOWN) {
       break;
     }
   }
@@ -139,40 +142,163 @@ void RM_RTOS_Default_Task(const void* arg) {
   while (imu->CaliDone() && imu->DataReady());
   osDelay(10);
   print("Calibration done\r\n");
-
+  osDelay(1000);
   // leg motor activation
-  left_frout_leg_motor->SetZeroPos();
-  left_frout_leg_motor->MotorEnable();
+  left_front_leg_motor->SetZeroPos();
+  left_front_leg_motor->MotorEnable();
+  osDelay(100);
   left_back_leg_motor->SetZeroPos();
   left_back_leg_motor->MotorEnable();
-  right_frout_leg_motor->SetZeroPos();
-  right_frout_leg_motor->MotorEnable();
+  osDelay(100);
+  right_front_leg_motor->SetZeroPos();
+  right_front_leg_motor->MotorEnable();
+  osDelay(100);
   right_back_leg_motor->SetZeroPos();
   right_back_leg_motor->MotorEnable();
 
+  float pos = 0;
+  float min_pos = -PI/4;
+  float max_pos = PI/4;
+
+  float balance_angle = -2.65; // measured by IMU
+  float output = 0.0;
+  float balance_difference = 0.0;
+  float velocity_difference = 0.0;
+  float velocity_integral = 0.0;
+  int16_t max_output = 3000;
+
   control::MotorCANBase* wheel_motors[] = {left_wheel_motor, right_wheel_motor};
-  control::Motor4310* leg_motors[] = {left_frout_leg_motor, left_back_leg_motor, right_frout_leg_motor, right_back_leg_motor};
+  control::Motor4310* leg_motors[] = {left_front_leg_motor, left_back_leg_motor, right_front_leg_motor, right_back_leg_motor};
 
   while (true) {
     // Update wheel omega and robot velocity
     left_wheel_omega = left_wheel_motor->GetOmega() * rpm_rads;
     right_wheel_omega = right_wheel_motor->GetOmega() * rpm_rads;
     left_wheel_speed = left_wheel_omega * wheel_radius;
-    right_wheel_speed = right_wheel_motor->GetOmega() * rpm_rads * wheel_radius;
+    right_wheel_speed = right_wheel_omega * wheel_radius;
     // need to check the sign for each speed
-    robot_speed = (left_wheel_speed + right_wheel_speed) / 2;
+    robot_speed = (left_wheel_speed - right_wheel_speed) / 2;
 
     // update IMU data(roll, pitch, yaw)
-    //TODO: test the axis of IMU
-    yaw = imu->INS_angle[1];
-    pitch = imu->INS_angle[0];
-    roll = imu->INS_angle[2];
-    yaw_omega = imu->GetGyro()[1];
-    pitch_omega = imu->GetGyro()[0];
-    roll_omega = imu->GetGyro()[2];
+    yaw = imu->INS_angle[0]; // CCW is angle increase
+    pitch = imu->INS_angle[2]; // CCW is angle increase(falling down backward is positive)
+    roll = imu->INS_angle[1]; // CW is angle increase
+    yaw_omega = imu->GetGyro()[0];
+    pitch_omega = imu->GetGyro()[2];
+    roll_omega = imu->GetGyro()[1];
 
+    // get the input from remote controller
+    move_set = dbus->ch1/660.0; // map to speed
+    rotate_set = dbus->ch2/660.0; // map to rotation angle
+    elevation_speed = dbus->ch3/660.0; // map to elevation angle
+
+    clip<float>(move_set, -1, 1);
     // LQR control
-//    torque_left_wheel = -(K2*(robot_speed - vx_set) + K3 )
+    torque_left_wheel = -(K1* robot_speed*0.015 + K2*(robot_speed - move_set) + K3*pitch + K4*pitch_omega + K15*(yaw-rotate_set) + K16*yaw_omega);
+    torque_right_wheel = -(K1* robot_speed*0.015 + K2*(robot_speed - move_set) + K3*pitch + K4*pitch_omega + K25*(yaw-rotate_set) + K26*yaw_omega);
+    // clip the torque
+//    torque_left_wheel = clip<float>(torque_left_wheel, -max_torque_wheel, max_torque_wheel);
+//    torque_right_wheel = clip<float>(torque_right_wheel, -max_torque_wheel, max_torque_wheel);
+
+    // convert to the corresponding current
+    current_left_wheel = torque_left_wheel / torque_constant * current_mapping_constant_3508;
+    current_right_wheel = torque_right_wheel / torque_constant * current_mapping_constant_3508;
+    // set the current
+    left_wheel_motor->SetOutput(int16_t(clip<float>(current_left_wheel, -3000, 3000)));
+    right_wheel_motor->SetOutput(-int16_t(clip<float>(current_right_wheel, -3000, 3000)));
+
+    // leg motor control
+    // Update leg data
+    // angle
+    left_front_leg_angle = left_front_leg_motor->GetTheta() + leg_angle_offset;
+    left_back_leg_angle = left_back_leg_motor->GetTheta() - leg_angle_offset;
+    right_front_leg_angle = right_front_leg_motor->GetTheta() - leg_angle_offset;
+    right_back_leg_angle = right_back_leg_motor->GetTheta() + leg_angle_offset;
+
+    // height
+    left_height = sqrt(pow(l_3,2)-pow(l_1 - l_2* cos(left_front_leg_angle),2)) - l_2*sin(left_front_leg_angle);
+    right_height = sqrt(pow(l_3,2)-pow(l_1 - l_2* cos(right_front_leg_angle),2)) - l_2*sin(right_front_leg_angle);
+    robot_height = (left_height + right_height) / 2;
+    // velocity and acceleration
+//    robot_acceleration_z = imu->GetAccel()[2] - gravity_constant;
+//    robot_velocity_z = robot_velocity_z + robot_acceleration_z * 0.005;
+    // end-effector constant calculation
+    left_leg_force_to_torque = -((((l_1 - l_2* cos(left_front_leg_angle))*l_2*sin(left_front_leg_angle))
+                                  / sqrt(pow(l_3,2)-pow(l_1 - l_2* cos(left_front_leg_angle),2)))
+                                  + l_2*cos(left_front_leg_angle));
+    right_leg_force_to_torque = -((((l_1 - l_2* cos(right_front_leg_angle))*l_2*sin(right_front_leg_angle))
+                                   / sqrt(pow(l_3,2)-pow(l_1 - l_2* cos(right_front_leg_angle),2)))
+                                  + l_2*cos(right_front_leg_angle));
+
+    // VMC control
+    left_leg_force = (k_1*(elevation_speed*0.01) - c_1*elevation_speed + mass * 9.81) / 2
+                     - (k_2*(0-roll) - c_2*roll_omega) / distance;
+    right_leg_force = (k_1*(elevation_speed*0.01) - c_1*elevation_speed + mass * 9.81) / 2
+                      + (k_2*(0-roll) - c_2*roll_omega) / distance;
+    print("left_leg_force: %f\n",(k_2*(0-roll) - c_2*roll_omega) / distance);
+    print("right_leg_force: %f\n",right_leg_force);
+
+    // get the torque
+    left_front_leg_torque = 0.5 * left_leg_force * left_leg_force_to_torque;
+    left_back_leg_torque = -0.5 * left_leg_force * left_leg_force_to_torque;
+    right_front_leg_torque = -0.5 * right_leg_force * right_leg_force_to_torque;
+    right_back_leg_torque = 0.5 * right_leg_force * right_leg_force_to_torque;
+
+    //============================================================================================
+    // position control
+    balance_difference = imu->INS_angle[2] / PI * 180 - balance_angle;
+    // velocity control
+    velocity_difference = left_wheel_motor->GetOmega() + right_wheel_motor->GetOmega() - 0; // want stop
+    velocity_lowpass = 0.32 * velocity_difference + 0.68 * velocity_lowpass;
+    velocity_integral += velocity_lowpass;
+    velocity_integral = clip<float>(velocity_integral, -10000, 10000);
+
+
+    if (dbus->swr == remote::DOWN || imu->INS_angle[2] / PI * 180 < balance_angle - 75 || imu->INS_angle[2] / PI * 180 > balance_angle + 75
+        || left_wheel_motor->GetCurr() > 10000 || right_wheel_motor->GetCurr() > 10000) {
+      output = 0;
+      velocity_integral = 0;
+      print("angle: %.2f, gyro: %.2f\r\n", balance_difference, imu->GetGyro()[2]);
+    } else {
+      output = balance_pid[0] * balance_difference + balance_pid[2] * imu->GetGyro()[2]
+               + speed_pid[0] * velocity_lowpass + speed_pid[1] * velocity_integral;
+      print("angle: %.2f, gyro: %.2f, velocity: %.2f, output: %.2f\r\n", balance_difference, imu->GetGyro()[2], velocity_lowpass, output);
+      if (output > 16384) {
+        output = max_output;
+      }
+    }
+    print("output: %f\n", output);
+    left_wheel_motor->SetOutput((int16_t)output);
+    right_wheel_motor->SetOutput(-(int16_t)output);
+
+    float vel;
+    vel = clip<float>(dbus->ch3 / 660.0 * 15.0, -15, 15);
+    pos += vel / 200;
+    pos = clip<float>(pos, min_pos, max_pos);   // clipping position within a range
+
+    left_front_leg_motor->SetOutput(pos, vel, 30, 0.5, 0);
+    left_back_leg_motor->SetOutput(-pos, vel, 30, 0.5, 0);
+    right_front_leg_motor->SetOutput(-pos, vel, 30, 0.5, 0);
+    right_back_leg_motor->SetOutput(pos, vel, 30, 0.5, 0);
+
+//    left_front_leg_motor->SetOutput(0.0, 0.0, 0.0, 0.0, left_front_leg_torque);
+//    left_back_leg_motor->SetOutput(0.0, 0.0, 0.0, 0.0, left_back_leg_torque);
+//    right_front_leg_motor->SetOutput(0.0, 0.0, 0.0, 0.0, right_front_leg_torque);
+//    right_back_leg_motor->SetOutput(0.0, 0.0, 0.0, 0.0, right_back_leg_torque);
+
+    if (dbus->swr == remote::UP) {
+      left_wheel_motor->SetOutput(0);
+      right_wheel_motor->SetOutput(0);
+      left_front_leg_motor->SetOutput(0.0, 0.0, 0.0, 0.0, 0);
+      left_back_leg_motor->SetOutput(0.0, 0.0, 0.0, 0.0, 0);
+      right_front_leg_motor->SetOutput(0.0, 0.0, 0.0, 0.0, 0);
+      right_back_leg_motor->SetOutput(0.0, 0.0, 0.0, 0.0, 0);
+    }
+
+    if (dbus->swl != remote::UP) {
+      control::MotorCANBase::TransmitOutput(wheel_motors, 2);
+    }
+    control::Motor4310::TransmitOutput(leg_motors, 4);
 
     osDelay(10);
   }
