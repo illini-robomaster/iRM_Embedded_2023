@@ -123,8 +123,8 @@ void RM_RTOS_Threads_Init(void) {
   imuTaskHandle = osThreadNew(imuTask, nullptr, &imuTaskAttribute);
 }
 
-static float balance_pid[3]{600,0,70};
-static float speed_pid[3]{20,0.1,0};
+static float balance_pid[3]{600,0,50};
+static float speed_pid[3]{3,0.015,0};
 //static float rotation_pid[3]{200,0,0};
 
 static float velocity_lowpass;
@@ -145,23 +145,23 @@ void RM_RTOS_Default_Task(const void* arg) {
   print("Calibration done\r\n");
   osDelay(1000);
   // leg motor activation
-  left_front_leg_motor->SetZeroPos();
+//  left_front_leg_motor->SetZeroPos();
   left_front_leg_motor->MotorEnable();
   osDelay(100);
-  left_back_leg_motor->SetZeroPos();
+//  left_back_leg_motor->SetZeroPos();
   left_back_leg_motor->MotorEnable();
   osDelay(100);
-  right_front_leg_motor->SetZeroPos();
+//  right_front_leg_motor->SetZeroPos();
   right_front_leg_motor->MotorEnable();
   osDelay(100);
-  right_back_leg_motor->SetZeroPos();
+//  right_back_leg_motor->SetZeroPos();
   right_back_leg_motor->MotorEnable();
 
   float pos = 0;
   float min_pos = -PI/4;
   float max_pos = PI/4;
 
-  float balance_angle = -3.5; // measured by IMU
+  float balance_angle = -3.25; // measured by IMU
   float output = 0.0;
   float balance_difference = 0.0;
   float velocity_difference = 0.0;
@@ -253,12 +253,12 @@ void RM_RTOS_Default_Task(const void* arg) {
     velocity_difference = -left_wheel_motor->GetOmega() + right_wheel_motor->GetOmega() - (dbus->ch1/660.0/0.03); // want stop
     velocity_lowpass = 0.3 * velocity_difference + 0.7 * velocity_lowpass;
     velocity_integral += velocity_lowpass;
-    velocity_integral = clip<float>(velocity_integral, -1000, 1000);
+    velocity_integral = clip<float>(velocity_integral, -5000, 5000);
     // rotation control
 //    rotation_difference = imu->GetGyro()[0] - 0;
 
     if (dbus->swr == remote::DOWN || imu->INS_angle[2] / PI * 180 < balance_angle - 75 || imu->INS_angle[2] / PI * 180 > balance_angle + 75
-        || left_wheel_motor->GetCurr() > 10000 || right_wheel_motor->GetCurr() > 10000) {
+        || left_wheel_motor->GetCurr() > 16384 || right_wheel_motor->GetCurr() > 16384) {
       output = 0;
       velocity_integral = 0;
       print("angle: %.2f, gyro: %.2f\r\n", balance_difference, imu->GetGyro()[2]);
@@ -270,6 +270,8 @@ void RM_RTOS_Default_Task(const void* arg) {
       print("balance: %.2f\r\n, velocity: %.2f\r\n", balance_pid[0] * balance_difference + balance_pid[2] * imu->GetGyro()[2], - speed_pid[0] * velocity_lowpass - speed_pid[1] * velocity_integral);
       if (output > 16384) {
         output = max_output;
+      } else if (output < -16384) {
+        output = -max_output;
       }
     }
     print("angular velocity: %.2f\r\n", left_wheel_motor->GetOmega());
