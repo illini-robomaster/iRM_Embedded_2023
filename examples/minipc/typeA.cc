@@ -23,7 +23,6 @@
 #include <cstring>
 #include <memory>
 
-#include "bsp_gpio.h"
 #include "bsp_print.h"
 #include "bsp_uart.h"
 #include "cmsis_os.h"
@@ -33,49 +32,54 @@
 
 extern osThreadId_t defaultTaskHandle;
 
-static bsp::GPIO *gpio_red, *gpio_green;
-
 class CustomUART : public bsp::UART {
- public:
+public:
   using bsp::UART::UART;
 
- protected:
+protected:
   /* notify application when rx data is pending read */
   void RxCompleteCallback() override final { osThreadFlagsSet(defaultTaskHandle, RX_SIGNAL); }
 };
 
+void RM_RTOS_Init(void) {
+}
+
 void RM_RTOS_Default_Task(const void* argument) {
   UNUSED(argument);
-
-  uint32_t length;
-  uint8_t* data;
 
   auto uart = std::make_unique<CustomUART>(&huart8);  // see cmake for which uart
   uart->SetupRx(50);
   uart->SetupTx(50);
 
-  gpio_red = new bsp::GPIO(LED_RED_GPIO_Port, LED_RED_Pin);
-  gpio_green = new bsp::GPIO(LED_GREEN_GPIO_Port, LED_GREEN_Pin);
+  auto minipc_session = communication::MinipcPort();
 
-  auto miniPCreceiver = communication::AutoaimProtocol();
+  communication::gimbal_data_t gimbal_data;
+  communication::color_data_t color_data;
+  communication::chassis_data_t chassis_data;
+
+  uint8_t packet_to_send[minipc_session.MAX_PACKET_LENGTH];
+  uint8_t *data;
+  int32_t length;
 
   while (true) {
-    /* wait until rx data is available */
-    uint32_t flags = osThreadFlagsWait(RX_SIGNAL, osFlagsWaitAll, osWaitForever);
-    if (flags & RX_SIGNAL) {  // unnecessary check
-      /* time the non-blocking rx / tx calls (should be <= 1 osTick) */
-      length = uart->Read(&data);
+    // Send packet example. Send packet at 1 Hz
+    gimbal_data.rel_yaw = 100;
+    gimbal_data.rel_pitch = 200;
+    gimbal_data.debug_int = 50;
+    gimbal_data.mode = 1;
+    uart->Write(packet_to_send, minipc_session.GetPacketLen(communication::GIMBAL_CMD_ID));
+    osDelay(1000);
 
-      // if read anything, flash red
-      gpio_red->High();
+    color_data.my_color = 1;
+    minipc_session.Pack(packet_to_send, (void*)&color_data, communication::COLOR_CMD_ID);
+    uart->Write(packet_to_send, minipc_session.GetPacketLen(communication::COLOR_CMD_ID));
+    osDelay(1000);
 
-      miniPCreceiver.Receive(data, length);
-      if (miniPCreceiver.get_valid_flag() == 1) {
-        gpio_green->High();
-      }
-      osDelay(200);
-      gpio_green->Low();
-      gpio_red->Low();
-    }
+    chassis_data.vx = 20;
+    chassis_data.vy = 30;
+    chassis_data.vw = 40;
+    minipc_session.Pack(packet_to_send, (void*)&chassis_data, communication::CHASSIS_CMD_ID);
+    uart->Write(packet_to_send, minipc_session.GetPacketLen(communication::CHASSIS_CMD_ID));
+    osDelay(1000);
   }
 }

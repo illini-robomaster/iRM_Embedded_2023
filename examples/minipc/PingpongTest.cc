@@ -69,18 +69,9 @@ void RM_RTOS_Default_Task(const void* argument) {
   gimbal_data.debug_int = 50;
   gimbal_data.mode = 1;
 
-  color_data.my_color = 1;
-
-  chassis_data.vx = 20;
-  chassis_data.vy = 30;
-  chassis_data.vw = 40;
-
   uint8_t packet_to_send[minipc_session.MAX_PACKET_LENGTH];
   uint8_t *data;
   int32_t length;
-
-  UNUSED(color_data);
-  UNUSED(chassis_data);
 
   while (true) {
     /* wait until rx data is available */
@@ -102,20 +93,5 @@ void RM_RTOS_Default_Task(const void* argument) {
       uart->Write(packet_to_send, minipc_session.GetPacketLen(communication::GIMBAL_CMD_ID));
     }
     osDelay(10);
-
-
-    // example code for prepare other packets and send
-    /*
-    uart->Write(packet_to_send, minipc_session.GetPacketLen(communication::GIMBAL_CMD_ID));
-    osDelay(1);
-
-    minipc_session.Pack(packet_to_send, (void*)&color_data, communication::COLOR_CMD_ID);
-    uart->Write(packet_to_send, minipc_session.GetPacketLen(communication::COLOR_CMD_ID));
-    osDelay(1);
-
-    minipc_session.Pack(packet_to_send, (void*)&chassis_data, communication::CHASSIS_CMD_ID);
-    uart->Write(packet_to_send, minipc_session.GetPacketLen(communication::CHASSIS_CMD_ID));
-    osDelay(1);
-    */
   }
 }
