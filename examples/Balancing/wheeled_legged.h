@@ -27,6 +27,8 @@ float move_set= 0.0;
 float rotate_set = 0.0;
 float elevation_speed = 0.0;
 
+float demo_height = 0.360795;
+
 // unit convert parameters
 float rpm_rads = 2.0 * PI / 60.0;
 float degree_rad = PI / 180.0;
