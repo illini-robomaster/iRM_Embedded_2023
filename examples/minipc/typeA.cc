@@ -58,8 +58,6 @@ void RM_RTOS_Default_Task(const void* argument) {
   communication::chassis_data_t chassis_data;
 
   uint8_t packet_to_send[minipc_session.MAX_PACKET_LENGTH];
-  uint8_t *data;
-  int32_t length;
 
   while (true) {
     // Send packet example. Send packet at 1 Hz
@@ -67,6 +65,7 @@ void RM_RTOS_Default_Task(const void* argument) {
     gimbal_data.rel_pitch = 200;
     gimbal_data.debug_int = 50;
     gimbal_data.mode = 1;
+    minipc_session.Pack(packet_to_send, (void*)&gimbal_data, communication::GIMBAL_CMD_ID);
     uart->Write(packet_to_send, minipc_session.GetPacketLen(communication::GIMBAL_CMD_ID));
     osDelay(1000);
 

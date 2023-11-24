@@ -59,8 +59,6 @@ void RM_RTOS_Default_Task(const void* argument) {
   auto minipc_session = communication::MinipcPort();
 
   communication::gimbal_data_t gimbal_data;
-  communication::color_data_t color_data;
-  communication::chassis_data_t chassis_data;
 
   const communication::status_data_t* status_data;
 

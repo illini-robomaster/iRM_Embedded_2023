@@ -65,7 +65,7 @@ void MotorTask(void* argument) {
   UNUSED(argument);
   uint32_t flags;
   control::PIDController pid1(20, 0, 0);
-  control::MotorCANBase motors[] = {motor1};
+  control::MotorCANBase* motors[] = {motor1};
 
   while (true) {
     // Wait time = 50 ticks, 50ms?
