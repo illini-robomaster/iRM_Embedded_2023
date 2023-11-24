@@ -128,8 +128,8 @@ void RM_RTOS_Threads_Init(void) {
 //static float speed_pid[3]{3,0,0};
 //static float rotation_pid[3]{200,0,0};
 control::ConstrainedPID* balance_controller = new control::ConstrainedPID(1200.0, 0.0, 800.0, 14000.0, 14000.0);
-control::ConstrainedPID* velocity_controller = new control::ConstrainedPID(6000.0, 0.0, 1500.0, 14000.0, 14000.0);
-control::ConstrainedPID* rotation_controller = new control::ConstrainedPID(1.0, 0.0, 1.0, 14000.0, 14000.0);
+control::ConstrainedPID* velocity_controller = new control::ConstrainedPID(7000.0, 0.0, 4000.0, 14000.0, 14000.0);
+control::ConstrainedPID* rotation_controller = new control::ConstrainedPID(4000.0, 0.0, 1500.0, 14000.0, 14000.0);
 static float balance_output = 0.0;
 static float velocity_output = 0.0;
 static float rotation_output = 0.0;
@@ -195,7 +195,7 @@ void RM_RTOS_Default_Task(const void* arg) {
   float right_output = 0.0;
   float balance_difference = 0.0;
   float velocity_difference = 0.0;
-//  float rotation_difference = 0.0;
+  float rotation_difference = 0.0;
 
 
 //  float velocity_integral = 0.0;
@@ -285,12 +285,11 @@ void RM_RTOS_Default_Task(const void* arg) {
 //    velocity_integral += velocity_lowpass;
 //    velocity_integral = clip<float>(velocity_integral, -5000, 5000);
     // rotation control
-//    rotation_difference = 0 - imu->GetGyro()[0];
+    rotation_difference = 0 - imu->INS_angle[0];
 
     balance_output = -balance_controller->ComputeOutput(balance_difference);
     velocity_output = velocity_controller->ComputeOutput(velocity_difference);
-//    rotation_output = rotation_controller->ComputeOutput(rotation_difference);
-    rotation_output = 0;
+    rotation_output = rotation_controller->ComputeOutput(rotation_difference);
     print("balance_output: %f, velocity_output: %f, rotation_output: %f\n", balance_output, velocity_output, rotation_output);
     if (dbus->swr == remote::DOWN || imu->INS_angle[2] / PI * 180 < balance_angle - 75 || imu->INS_angle[2] / PI * 180 > balance_angle + 75
         || left_wheel_motor->GetCurr() > 16384 || right_wheel_motor->GetCurr() > 16384) {
@@ -300,6 +299,7 @@ void RM_RTOS_Default_Task(const void* arg) {
     } else {
       left_output = balance_output + velocity_output + rotation_output;
       right_output = balance_output + velocity_output - rotation_output;
+      print("left_output: %f, right_output: %f\n", left_output, right_output);
       left_output = clip<float>(left_output, -14000, 14000);
       right_output = clip<float>(right_output, -14000, 14000);
     }
