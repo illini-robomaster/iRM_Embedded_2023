@@ -127,9 +127,11 @@ void RM_RTOS_Threads_Init(void) {
 //static float balance_pid[3]{600,0,50};
 //static float speed_pid[3]{3,0,0};
 //static float rotation_pid[3]{200,0,0};
-control::ConstrainedPID* balance_controller = new control::ConstrainedPID(1200.0, 0.0, 800.0, 14000.0, 14000.0);
-control::ConstrainedPID* velocity_controller = new control::ConstrainedPID(7000.0, 0.0, 4000.0, 14000.0, 14000.0);
-control::ConstrainedPID* rotation_controller = new control::ConstrainedPID(4000.0, 0.0, 1500.0, 14000.0, 14000.0);
+control::ConstrainedPID* balance_controller = new control::ConstrainedPID(1000.0, 0.0, 400.0, 14000.0, 14000.0);
+control::ConstrainedPID* velocity_controller = new control::ConstrainedPID(30000.0, 0.0, 8000.0, 14000.0, 14000.0);
+control::ConstrainedPID* rotation_controller = new control::ConstrainedPID(3000.0, 0.0, 500.0, 14000.0, 14000.0);
+control::ConstrainedPID* left_wheel_vel_pid = new control::ConstrainedPID(2000, 10, 500, 14000.0, 14000.0);
+control::ConstrainedPID* right_wheel_vel_pid = new control::ConstrainedPID(2000, 10, 500, 14000.0, 14000.0);
 static float balance_output = 0.0;
 static float velocity_output = 0.0;
 static float rotation_output = 0.0;
@@ -196,7 +198,9 @@ void RM_RTOS_Default_Task(const void* arg) {
   float balance_difference = 0.0;
   float velocity_difference = 0.0;
   float rotation_difference = 0.0;
-
+  current_raw_yaw = imu->INS_angle[0];
+  last_raw_yaw = imu->INS_angle[0];
+  rotation_angle = current_raw_yaw;
 
 //  float velocity_integral = 0.0;
 //  int16_t max_output = 3000;
@@ -278,19 +282,32 @@ void RM_RTOS_Default_Task(const void* arg) {
     // position control
     balance_difference =  balance_angle - imu->INS_angle[2] / PI * 180;
     // velocity control
-//    velocity_difference = (dbus->ch1/660.0)
-//                          - (-left_wheel_motor->GetOmega() + right_wheel_motor->GetOmega()) * rpm_rads * wheel_radius * 0.5; // want stop
-    velocity_difference = 0 - ((-left_wheel_motor->GetOmega() + right_wheel_motor->GetOmega()) * rpm_rads * wheel_radius * 0.5);
+    velocity_difference = (dbus->ch1/660.0) / 2.0
+                          - (-left_wheel_motor->GetOmega() + right_wheel_motor->GetOmega()) * rpm_rads * wheel_radius * 0.5; // want stop
+//    velocity_difference = 0 - ((-left_wheel_motor->GetOmega() + right_wheel_motor->GetOmega()) * rpm_rads * wheel_radius * 0.5);
 //    velocity_lowpass = 0.3 * velocity_difference + 0.7 * velocity_lowpass;
 //    velocity_integral += velocity_lowpass;
 //    velocity_integral = clip<float>(velocity_integral, -5000, 5000);
     // rotation control
-    rotation_difference = 0 - imu->INS_angle[0];
+    rotation_angle += -(dbus->ch2/660.0) * 0.3;
+//    print("rotation_angle: %f\n", rotation_angle);
+    last_raw_yaw = current_raw_yaw;
+    current_raw_yaw = imu->INS_angle[0];
+    current_yaw = turn_count * 2 * PI + current_raw_yaw;
+    if (fabs(current_raw_yaw - last_raw_yaw) > 1.9f * PI)
+    {
+      if ((current_raw_yaw - last_raw_yaw) < 0)
+        turn_count++;
+      else
+        turn_count--;
+    }
+
+    rotation_difference = rotation_angle - current_yaw;
 
     balance_output = -balance_controller->ComputeOutput(balance_difference);
     velocity_output = velocity_controller->ComputeOutput(velocity_difference);
     rotation_output = rotation_controller->ComputeOutput(rotation_difference);
-    print("balance_output: %f, velocity_output: %f, rotation_output: %f\n", balance_output, velocity_output, rotation_output);
+//    print("balance_output: %f, velocity_output: %f, rotation_output: %f\n", balance_output, velocity_output, rotation_output);
     if (dbus->swr == remote::DOWN || imu->INS_angle[2] / PI * 180 < balance_angle - 75 || imu->INS_angle[2] / PI * 180 > balance_angle + 75
         || left_wheel_motor->GetCurr() > 16384 || right_wheel_motor->GetCurr() > 16384) {
       left_output = 0;
@@ -299,23 +316,27 @@ void RM_RTOS_Default_Task(const void* arg) {
     } else {
       left_output = balance_output + velocity_output + rotation_output;
       right_output = balance_output + velocity_output - rotation_output;
-      print("left_output: %f, right_output: %f\n", left_output, right_output);
+//      print("left_wheel_motor->GetOmega(): %f, right_wheel_motor->GetOmega(): %f\n", left_wheel_motor->GetOmega(), right_wheel_motor->GetOmega());
+      left_output = left_wheel_vel_pid->ComputeOutput(left_output * magic_rpm - left_wheel_motor->GetOmega());
+      right_output = right_wheel_vel_pid->ComputeOutput(right_output * magic_rpm + right_wheel_motor->GetOmega());
+
       left_output = clip<float>(left_output, -14000, 14000);
       right_output = clip<float>(right_output, -14000, 14000);
     }
     left_wheel_motor->SetOutput((int16_t)left_output);
     right_wheel_motor->SetOutput(-(int16_t)right_output);
 
-    float vel;
-    vel = clip<float>(dbus->ch3 / 660.0 * 15.0, -15, 15);
-    pos += vel / 200;
-    pos = clip<float>(pos, min_pos, max_pos);   // clipping position within a range
+    if (dbus->swl == remote::UP) {
+      float vel;
+      vel = clip<float>(dbus->ch3 / 660.0 * 15.0, -15, 15);
+      pos += vel / 200;
+      pos = clip<float>(pos, min_pos, max_pos);   // clipping position within a range
 
-    left_front_leg_motor->SetOutput(pos, vel, 30, 0.5, 0);
-    left_back_leg_motor->SetOutput(-pos, vel, 30, 0.5, 0);
-    right_front_leg_motor->SetOutput(-pos, vel, 30, 0.5, 0);
-    right_back_leg_motor->SetOutput(pos, vel, 30, 0.5, 0);
-
+      left_front_leg_motor->SetOutput(pos, vel, 30, 0.5, 0);
+      left_back_leg_motor->SetOutput(-pos, vel, 30, 0.5, 0);
+      right_front_leg_motor->SetOutput(-pos, vel, 30, 0.5, 0);
+      right_back_leg_motor->SetOutput(pos, vel, 30, 0.5, 0);
+    }
 //    left_front_leg_motor->SetOutput(0.0, 0.0, 0.0, 0.0, left_front_leg_torque);
 //    left_back_leg_motor->SetOutput(0.0, 0.0, 0.0, 0.0, left_back_leg_torque);
 //    right_front_leg_motor->SetOutput(0.0, 0.0, 0.0, 0.0, right_front_leg_torque);

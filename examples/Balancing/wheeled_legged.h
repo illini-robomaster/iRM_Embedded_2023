@@ -28,6 +28,11 @@ float rotate_set = 0.0;
 float elevation_speed = 0.0;
 
 float demo_height = 0.360795;
+float rotation_angle = 0.0;
+int8_t turn_count = 0;
+float last_raw_yaw = 0.0;
+float current_raw_yaw = 0.0;
+float current_yaw = 0.0;
 
 // unit convert parameters
 float rpm_rads = 2.0 * PI / 60.0;
@@ -36,6 +41,7 @@ float torque_constant = 0.34; // Nm/A
 float current_mapping_constant_3508 = 16384.0 / 20.0;
 float left_leg_force_to_torque = 0.0;
 float right_leg_force_to_torque = 0.0;
+float magic_rpm = 469.0 * rpm_rads / 14000.0;
 
 // robot parameters
 float wheel_radius = 0.03;
