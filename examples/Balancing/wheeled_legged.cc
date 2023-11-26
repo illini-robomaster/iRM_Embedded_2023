@@ -326,7 +326,7 @@ void RM_RTOS_Default_Task(const void* arg) {
     left_wheel_motor->SetOutput((int16_t)left_output);
     right_wheel_motor->SetOutput(-(int16_t)right_output);
 
-    if (dbus->swl == remote::UP) {
+    if (dbus->swl == remote::MID) {
       float vel;
       vel = clip<float>(dbus->ch3 / 660.0 * 15.0, -15, 15);
       pos += vel / 200;
@@ -336,6 +336,20 @@ void RM_RTOS_Default_Task(const void* arg) {
       left_back_leg_motor->SetOutput(-pos, vel, 30, 0.5, 0);
       right_front_leg_motor->SetOutput(-pos, vel, 30, 0.5, 0);
       right_back_leg_motor->SetOutput(pos, vel, 30, 0.5, 0);
+    } else if (dbus->swl == remote::UP && jump_flag == true) {
+      jump_flag = false;
+      left_front_leg_motor->SetOutput(jump_height, 10, 30, 0.5, 0);
+      left_back_leg_motor->SetOutput(-jump_height, 10, 30, 0.5, 0);
+      right_front_leg_motor->SetOutput(-jump_height, 10, 30, 0.5, 0);
+      right_back_leg_motor->SetOutput(jump_height, 10, 30, 0.5, 0);
+      control::Motor4310::TransmitOutput(leg_motors, 4);
+      osDelay(200);
+      left_front_leg_motor->SetOutput(pos, 10, 30, 0.5, 0);
+      left_back_leg_motor->SetOutput(-pos, 10, 30, 0.5, 0);
+      right_front_leg_motor->SetOutput(-pos, 10, 30, 0.5, 0);
+      right_back_leg_motor->SetOutput(pos, 10, 30, 0.5, 0);
+      control::Motor4310::TransmitOutput(leg_motors, 4);
+      osDelay(10);
     }
 //    left_front_leg_motor->SetOutput(0.0, 0.0, 0.0, 0.0, left_front_leg_torque);
 //    left_back_leg_motor->SetOutput(0.0, 0.0, 0.0, 0.0, left_back_leg_torque);
@@ -351,11 +365,11 @@ void RM_RTOS_Default_Task(const void* arg) {
       right_back_leg_motor->SetOutput(0.0, 0.0, 0.0, 0.0, 0);
     }
 
+    control::MotorCANBase::TransmitOutput(wheel_motors, 2);
     if (dbus->swl != remote::UP) {
-      control::MotorCANBase::TransmitOutput(wheel_motors, 2);
+      jump_flag = true;
+      control::Motor4310::TransmitOutput(leg_motors, 4);
     }
-    control::Motor4310::TransmitOutput(leg_motors, 4);
-
     osDelay(10);
   }
 }

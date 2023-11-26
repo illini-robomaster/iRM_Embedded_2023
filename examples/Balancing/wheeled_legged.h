@@ -33,6 +33,8 @@ int8_t turn_count = 0;
 float last_raw_yaw = 0.0;
 float current_raw_yaw = 0.0;
 float current_yaw = 0.0;
+float jump_height = demo_height + 0.3;
+bool jump_flag = false;
 
 // unit convert parameters
 float rpm_rads = 2.0 * PI / 60.0;
