@@ -22,20 +22,33 @@
 #include "iwdg.h"
 #include "cmsis_os.h"
 #include "bsp_print.h"
+#include "stm32f4xx_hal_iwdg.h"
+long reloop = 0;
 
 void RM_RTOS_Init(void){
     print_use_uart(&huart1);
-    // default &hiwdg got prescaler of 4 and reload of 999, timeout set to 500ms
+    // default &hiwdg got prescaler of 32 and reload of 1000
     // hiwdg is a IWDG_HandleTypeDef
     // Calculate the reload value according to the formula:
     // Reload_Value = ((Desired_Time_Out * 32kHz) / (Prescaler_Value * 4 * 1000)) - 1
 }
+bool is_LSI_Enabled() {
+    // Check if LSI is enabled and ready
+    if ((RCC->CSR & RCC_CSR_LSION) && (RCC->CSR & RCC_CSR_LSIRDY)) {
+        return true;  // LSI is enabled and ready
+    } else {
+        return false; // LSI is not enabled
+    }
+}
 void RM_RTOS_Default_Task(const void* arguments){
     UNUSED(arguments);
     HAL_Init();
+//    reloop = 0;
     MX_IWDG_Init();
+    // expected behavior: triggers a hard reset if not refreshed within the expected timeout
     while(true){
-        print("Hello World!\r\n");
+        print("reloop: %d\n", reloop++);
+        osDelay(10);
         HAL_IWDG_Refresh(&hiwdg);
     }
 }
