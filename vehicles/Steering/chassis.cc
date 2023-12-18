@@ -32,6 +32,7 @@
 #include "steering.h"
 #include "supercap.h"
 #include <cmath>
+#include "iwdg.h"
 
 static bsp::CAN* can1 = nullptr;
 static bsp::CAN* can2 = nullptr;
@@ -185,7 +186,6 @@ void chassisTask(void* arg) {
 
   control::MotorCANBase* steer_motors[] = {motor1, motor2, motor3, motor4};
   control::MotorCANBase* wheel_motors[] = {motor5, motor6, motor7, motor8};
-
   while (!receive->start) osDelay(100);
 
   while (receive->start < 0.5) osDelay(100);
@@ -224,7 +224,10 @@ void chassisTask(void* arg) {
   float prev_vx = 0;
   float prev_vy = 0;
   float prev_mag = 0;
+  HAL_Init();
+  MX_IWDG_Init();
   while (true) {
+    HAL_IWDG_Refresh(&hiwdg);
     float relative_angle = receive->relative_angle;
     float sin_yaw, cos_yaw, vx_set, vy_set, v_mag, v_perp;
     float vx, vy, wz;

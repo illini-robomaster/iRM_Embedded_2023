@@ -41,6 +41,7 @@
 #include "shooter.h"
 #include "stepper.h"
 #include "autoaim_protocol.h"
+#include "iwdg.h"
 
 static bsp::CAN* can1 = nullptr;
 static bsp::CAN* can2 = nullptr;
@@ -175,10 +176,10 @@ void gimbalTask(void* arg) {
   laser->On();
 
   while (true) {
-    if (dbus->keyboard.bit.B || dbus->swr == remote::DOWN) break;
-    osDelay(100);
+      if (dbus->keyboard.bit.B || dbus->swr == remote::DOWN) break;
+      osDelay(100);
   }
-  
+
   // to avoid the zero drifting problem
   int i = 0;
   while (i < 1000 || !imu->DataReady()) {
@@ -234,10 +235,11 @@ void gimbalTask(void* arg) {
   float pitch_target = 0, yaw_target = 0;
   float pitch_vel = 0;
   float pitch_diff, yaw_diff;
-
+  HAL_Init();
+  MX_IWDG_Init();
   while (true) {
     while (Dead || GimbalDead) osDelay(100);
-
+    HAL_IWDG_Refresh(&hiwdg);
     // autoaim comflict with spinmode control
     if (dbus->keyboard.bit.F /*|| dbus->swl == remote::UP*/ || dbus->keyboard.bit.CTRL) {
       float abs_pitch_buffer = abs_pitch_jetson;
