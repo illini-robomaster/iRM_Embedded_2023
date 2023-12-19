@@ -59,7 +59,8 @@ void LED_GREEN_Task(void* argument) {
   while (true) {
 
     flags = osEventFlagsWait(key_event_flag, VX_READY_SIGNAL, osFlagsWaitAny, osWaitForever);
-
+    // Note that if osEventFlagsWait returns a error code (most commonly, timeout), flags is negative
+    // and only checking flags & SIGNAL is not enough
     if (flags & VX_READY_SIGNAL) {
       print("\r\nOK!\r\n");
       gpio_green->Toggle();
