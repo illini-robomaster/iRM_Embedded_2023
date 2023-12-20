@@ -165,6 +165,9 @@ static control::Gimbal* gimbal = nullptr;
 static control::gimbal_data_t* gimbal_param = nullptr;
 static bsp::Laser* laser = nullptr;
 
+osEventFlagsId_t gimbal_motor_Event = osEventFlagsNew(nullptr);
+#define GIMBAL_ERROR_DETECT (1 << 1)
+
 void gimbalTask(void* arg) {
   UNUSED(arg);
 
@@ -174,12 +177,12 @@ void gimbalTask(void* arg) {
   print("Wait for beginning signal...\r\n");
   RGB->Display(display::color_red);
   laser->On();
-
+  uint32_t gimbal_error_flag;
   while (true) {
+
       if (dbus->keyboard.bit.B || dbus->swr == remote::DOWN) break;
       osDelay(100);
   }
-
   // to avoid the zero drifting problem
   int i = 0;
   while (i < 1000 || !imu->DataReady()) {
@@ -235,11 +238,12 @@ void gimbalTask(void* arg) {
   float pitch_target = 0, yaw_target = 0;
   float pitch_vel = 0;
   float pitch_diff, yaw_diff;
-  HAL_Init();
-  MX_IWDG_Init();
   while (true) {
+    gimbal_error_flag = osEventFlagsWait(gimbal_motor_Event, GIMBAL_ERROR_DETECT, osFlagsWaitAll, 0);
+    if(gimbal_error_flag & GIMBAL_ERROR_DETECT) {
+      Error_Handler();
+    }
     while (Dead || GimbalDead) osDelay(100);
-    HAL_IWDG_Refresh(&hiwdg);
     // autoaim comflict with spinmode control
     if (dbus->keyboard.bit.F /*|| dbus->swl == remote::UP*/ || dbus->keyboard.bit.CTRL) {
       float abs_pitch_buffer = abs_pitch_jetson;
@@ -466,7 +470,6 @@ void shooterTask(void* arg) {
 
   while (true) {
     while (Dead) osDelay(100);
-
     if (send->shooter_power && send->cooling_heat1 >= send->cooling_limit1 - 15) {
       sl_motor->SetOutput(0);
       sr_motor->SetOutput(0);
@@ -476,7 +479,7 @@ void shooterTask(void* arg) {
     } else if (GimbalDead) {
       shooter->DialStop();
     } else if (send->shooter_power) {
-        // for manual antijam 
+        // for manual antijam
         Antijam.input(dbus->keyboard.bit.G);
         // slow shooting
         if (dbus->mouse.l || dbus->swr == remote::UP) {
@@ -484,12 +487,12 @@ void shooterTask(void* arg) {
         // fast shooting
         } else if ((dbus->mouse.r || dbus->wheel.wheel > remote::WheelDigitalValue)
                   && send->cooling_heat1 < send->cooling_limit1 - 24) {
-          shooter->FastContinueShoot(); 
+          shooter->FastContinueShoot();
         // triple shooting
         } else if (dbus->wheel.wheel == remote::WheelDigitalValue
                    && dbus->previous_wheel_value == remote::WheelDigitalValue) {
           if (!triple_shoot_detect) {
-            triple_shoot_detect = true;          
+            triple_shoot_detect = true;
             shooter->TripleShoot();
           }
         // manual antijam
@@ -506,7 +509,7 @@ void shooterTask(void* arg) {
     if (GimbalDead) {
         flywheelFlag = false;
         shooter->SetFlywheelSpeed(0);
-    } else { 
+    } else {
       if (!send->shooter_power || dbus->keyboard.bit.Q || dbus->swr == remote::DOWN) {
         flywheelFlag = false;
         shooter->SetFlywheelSpeed(0);
@@ -545,6 +548,9 @@ const osThreadAttr_t chassisTaskAttribute = {.name = "chassisTask",
                                              .reserved = 0};
 osThreadId_t chassisTaskHandle;
 
+#define ERROR_DETECT_SIGNAL (1 << 1)
+osEventFlagsId_t keymap_Error_Event = osEventFlagsNew(nullptr);
+
 void chassisTask(void* arg) {
   UNUSED(arg);
 
@@ -553,12 +559,15 @@ void chassisTask(void* arg) {
     osDelay(100);
   }
 
-  while (!imu->CaliDone()) osDelay(100);
+  while (!imu->CaliDone()) {
+      osDelay(100);
+
+  }
 
   float vx_keyboard = 0, vy_keyboard = 0;
   float vx_remote, vy_remote;
   float vx_set, vy_set;
-
+  uint32_t keymap_error_flag;
   while (true) {
     ChangeSpinMode.input(dbus->keyboard.bit.SHIFT /*|| dbus->swl == remote::UP*/);
     if (ChangeSpinMode.posEdge()) SpinMode = !SpinMode;
@@ -598,6 +607,11 @@ void chassisTask(void* arg) {
     vx_set = vx_keyboard + vx_remote;
     vy_set = vy_keyboard + vy_remote;
 
+      // if the chassis flag is not 0xFF or the gimbal's can bus is not connected, then stop.
+    keymap_error_flag = osEventFlagsWait(keymap_Error_Event, ERROR_DETECT_SIGNAL, osFlagsWaitAll, 0);
+    if (keymap_error_flag & ERROR_DETECT_SIGNAL) {
+        Error_Handler();
+      }
     send->cmd.id = bsp::VX;
     send->cmd.data_float = Dead ? 0 : vx_set;
     send->TransmitOutput();
@@ -620,7 +634,7 @@ const osThreadAttr_t selfTestTaskAttribute = {.name = "selfTestTask",
                                               .cb_size = 0,
                                               .stack_mem = nullptr,
                                               .stack_size = 256 * 4,
-                                              .priority = (osPriority_t)osPriorityBelowNormal,
+                                              .priority = (osPriority_t)osPriorityNormal,
                                               .tz_module = 0,
                                               .reserved = 0};
 
@@ -634,9 +648,13 @@ static bsp::BuzzerNoteDelayed Mario[] = {
 static bsp::Buzzer* buzzer = nullptr;
 static display::OLED* OLED = nullptr;
 //simple bitmask function for chassis flag
+
+#define BITMAP_SUMMARY 0b11111111 // expected bit map for chassis motors
+
 void selfTestTask(void* arg) {
   UNUSED(arg);
   osDelay(100);
+
   //Try to make the chassis Flags initialized at first.
 
   //Could need more time to test it out.
@@ -644,13 +662,11 @@ void selfTestTask(void* arg) {
   OLED->ShowIlliniRMLOGO();
   buzzer->SingSong(Mario, [](uint32_t milli) { osDelay(milli); });
   OLED->OperateGram(display::PEN_CLEAR);
-
   OLED->ShowString(0, 0, (uint8_t*)"GP");
   OLED->ShowString(0, 5, (uint8_t*)"GY");
   OLED->ShowString(1, 0, (uint8_t*)"SL");
   OLED->ShowString(1, 5, (uint8_t*)"SR");
   OLED->ShowString(2, 0, (uint8_t*)"LD");
-  OLED->ShowString(2, 5, (uint8_t*)"Ldr");
   OLED->ShowString(3, 0, (uint8_t*)"Cal");
   OLED->ShowString(3, 6, (uint8_t*)"Dbs");
   OLED->ShowString(4, 0, (uint8_t*)"Temp:");
@@ -664,10 +680,17 @@ void selfTestTask(void* arg) {
 //
   OLED->ShowString(3, 12, (uint8_t*)"BL");
   OLED->ShowString(4, 12, (uint8_t*)"BR");
-
+  MX_IWDG_Init();
+  selftestStart = send->self_check_flag;
+  while(!selftestStart){
+      // wait for the self check signal
+    HAL_IWDG_Refresh(&hiwdg);
+    selftestStart = send->self_check_flag;
+    osDelay(100);
+  }
   char temp[6] = "";
   while (true) {
-
+    HAL_IWDG_Refresh(&hiwdg);
     osDelay(100);
     pitch_motor->connection_flag_ = false;
     yaw_motor->connection_flag_ = false;
@@ -685,7 +708,12 @@ void selfTestTask(void* arg) {
     ld_motor_flag = ld_motor->connection_flag_;
 
     chassis_flag_bitmap = send->chassis_flag;
-
+    if (chassis_flag_bitmap != BITMAP_SUMMARY){
+      osEventFlagsSet(keymap_Error_Event, ERROR_DETECT_SIGNAL);
+    }
+    if (!(yaw_motor_flag && sl_motor_flag && sr_motor_flag && ld_motor_flag)){
+      osEventFlagsSet(gimbal_motor_Event, GIMBAL_ERROR_DETECT);
+    }
     fl_wheel_flag = (0x80 & chassis_flag_bitmap);
     //motor 8
     fr_wheel_flag = (0x40 & chassis_flag_bitmap);
@@ -707,13 +735,11 @@ void selfTestTask(void* arg) {
     calibration_flag = imu->CaliDone();
     //    referee_flag = referee->connection_flag_;
     dbus_flag = dbus->connection_flag_;
-
     OLED->ShowBlock(0, 2, pitch_motor_flag);
     OLED->ShowBlock(0, 7, yaw_motor_flag);
     OLED->ShowBlock(1, 2, sl_motor_flag);
     OLED->ShowBlock(1, 7, sr_motor_flag);
     OLED->ShowBlock(2, 2, ld_motor_flag);
-    OLED->ShowBlock(2, 8, lidar_flag);
     OLED->ShowBlock(3, 3, imu->CaliDone());
     OLED->ShowBlock(3, 9, dbus_flag);
     snprintf(temp, 6, "%.2f", imu->Temp);
@@ -738,7 +764,7 @@ void selfTestTask(void* arg) {
 
     OLED->RefreshGram();
 
-    selftestStart = send->self_check_flag;
+
   }
 }
 
@@ -804,10 +830,10 @@ void RM_RTOS_Init(void) {
   shooter = new control::Shooter(shooter_data);
   // stepper = new control::Stepper(&htim1, 1, 1000000, DIR_GPIO_Port, DIR_Pin, ENABLE_GPIO_Port,
   //                                ENABLE_Pin);
+  keymap_Error_Event = osEventFlagsNew(nullptr);
 
   buzzer = new bsp::Buzzer(&htim4, 3, 1000000);
   OLED = new display::OLED(&hi2c2, 0x3C);
-
   send = new bsp::CanBridge(can2, 0x20A, 0x20B);
 }
 
@@ -832,6 +858,7 @@ void KillAll() {
   laser->Off();
 
   while (true) {
+
     send->cmd.id = bsp::DEAD;
     send->cmd.data_bool = true;
     send->TransmitOutput();
@@ -904,6 +931,7 @@ void RM_RTOS_Default_Task(const void* arg) {
   UNUSED(arg);
 
   while (true) {
+
     if (send->gimbal_power == 1) robot_hp_begin = true;
     gimbal_alive = robot_hp_begin ? send->gimbal_power : 1;
 

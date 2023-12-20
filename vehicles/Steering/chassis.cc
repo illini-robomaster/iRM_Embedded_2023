@@ -60,7 +60,7 @@ const osThreadAttr_t selfTestingTask = {.name = "selfTestTask",
                                              .cb_size = 0,
                                              .stack_mem = nullptr,
                                              .stack_size = 256 * 4,
-                                             .priority = (osPriority_t)osPriorityBelowNormal,
+                                             .priority = (osPriority_t)osPriorityNormal,
                                              .tz_module = 0,
                                              .reserved = 0};
 osThreadId_t selfTestTaskHandle;
@@ -181,6 +181,11 @@ bool steering_align_detect3() { return pe3->Read() == 0; }
 
 bool steering_align_detect4() { return pe4->Read() == 0; }
 
+// Event flags for chassis CAN error if any
+osEventFlagsId_t chassis_event_flags;
+#define CHASSIS_EVENT_FLAGS (1 << 1)
+uint32_t chassis_error_flag;
+
 void chassisTask(void* arg) {
   UNUSED(arg);
 
@@ -224,10 +229,7 @@ void chassisTask(void* arg) {
   float prev_vx = 0;
   float prev_vy = 0;
   float prev_mag = 0;
-  HAL_Init();
-  MX_IWDG_Init();
   while (true) {
-    HAL_IWDG_Refresh(&hiwdg);
     float relative_angle = receive->relative_angle;
     float sin_yaw, cos_yaw, vx_set, vy_set, v_mag, v_perp;
     float vx, vy, wz;
@@ -309,7 +311,21 @@ void chassisTask(void* arg) {
       wz = std::min(FOLLOW_SPEED, FOLLOW_SPEED * relative_angle);
       if (-CHASSIS_DEADZONE < relative_angle && relative_angle < CHASSIS_DEADZONE) wz = 0;
     }
-
+    // shut down the chassis if any can error occurs
+    chassis_error_flag = osEventFlagsWait(chassis_event_flags,CHASSIS_EVENT_FLAGS, osFlagsWaitAll, 0);
+    if(chassis_error_flag & CHASSIS_EVENT_FLAGS){
+      motor1->SetOutput(0);
+      motor2->SetOutput(0);
+      motor3->SetOutput(0);
+      motor4->SetOutput(0);
+      motor5->SetOutput(0);
+      motor6->SetOutput(0);
+      motor7->SetOutput(0);
+      motor8->SetOutput(0);
+      control::MotorCANBase* motor_shut[]={motor1,motor2,motor3,motor4,motor5,motor6,motor7,motor8};
+      control::MotorCANBase::TransmitOutput(motor_shut,8);
+      Error_Handler();
+    }
     chassis->SetSpeed(vx / 10, vy / 10, wz);
     chassis->SteerUpdateTarget();
     constexpr float WHEEL_SPEED_FACTOR = 4;
@@ -363,8 +379,13 @@ void chassisTask(void* arg) {
 
   }
 }
+
+#define EXPECTED_FLAG_SUMMARY 0b11111111
+
 void self_Check_Task(void* arg){
   UNUSED(arg);
+
+  MX_IWDG_Init();
 
   while(true){
     osDelay(100);
@@ -394,12 +415,16 @@ void self_Check_Task(void* arg){
                    fr_wheel_motor_flag<<6|
                    fl_wheel_motor_flag<<7;
     osDelay(100);
+    if (flag_summary != EXPECTED_FLAG_SUMMARY){
+      osEventFlagsSet(chassis_event_flags, CHASSIS_EVENT_FLAGS);
+    }
     if(transmission_flag){
       receive->cmd.id = bsp::CHASSIS_FLAG;
       receive->cmd.data_uint = (unsigned int)flag_summary;
       receive->TransmitOutput();
     }
     transmission_flag = !transmission_flag;
+    HAL_IWDG_Refresh(&hiwdg);
   }
 }
 void RM_RTOS_Init() {
@@ -471,6 +496,29 @@ void RM_RTOS_Init() {
   referee_uart->SetupTx(300);
   referee = new communication::Referee;
   receive = new bsp::CanBridge(can2, 0x20B, 0x20A);
+  fl_wheel_motor_flag = motor8->connection_flag_;
+  fr_wheel_motor_flag = motor7->connection_flag_;
+  bl_wheel_motor_flag = motor6->connection_flag_;
+  br_wheel_motor_flag = motor5->connection_flag_;
+  fl_steer_motor_flag = motor4->connection_flag_;
+  fr_steer_motor_flag = motor3->connection_flag_;
+  br_steer_motor_flag = motor2->connection_flag_;
+  bl_steer_motor_flag = motor1->connection_flag_;
+  flag_summary = bl_steer_motor_flag|
+                 br_steer_motor_flag<<1|
+                 fr_steer_motor_flag<<2|
+                 fl_steer_motor_flag<<3|
+                 br_wheel_motor_flag<<4|
+                 bl_wheel_motor_flag<<5|
+                 fr_wheel_motor_flag<<6|
+                 fl_wheel_motor_flag<<7;
+  receive->cmd.id = bsp::CHASSIS_FLAG;
+  receive->cmd.data_uint = (unsigned int)flag_summary;
+  receive->TransmitOutput();
+  bool self_check_flag = true;
+  receive->cmd.id = bsp::SELF_CHECK_FLAG;
+  receive->cmd.data_bool = self_check_flag;
+  receive->TransmitOutput();
 }
 
 void RM_RTOS_Threads_Init(void) {
@@ -526,7 +574,7 @@ void RM_RTOS_Default_Task(const void* args) {
     receive->cmd.data_bool = (referee->game_robot_status.robot_id >= 100) ? true : false;
     receive->TransmitOutput();
 
-    print("type: %d\r\n", referee->robot_hurt.hurt_type);
+//    print("type: %d\r\n", referee->robot_hurt.hurt_type);
 
     if (debug) {
       set_cursor(0, 0);
