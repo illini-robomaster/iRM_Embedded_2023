@@ -564,7 +564,7 @@ void fortressTask(void* arg) {
 // SelfTest
 //==================================================================================================
 
-const osThreadAttr_t selfTestTaskAttribute = {.name = "selfTestTask",
+const osThreadAttr_t rmselfTestTaskAttribute = {.name = "selfTestTask",
                                               .attr_bits = osThreadDetached,
                                               .cb_mem = nullptr,
                                               .cb_size = 0,
@@ -1111,7 +1111,7 @@ void RM_RTOS_Threads_Init(void) {
   chassisTaskHandle = osThreadNew(chassisTask, nullptr, &chassisTaskAttribute);
   shooterTaskHandle = osThreadNew(shooterTask, nullptr, &shooterTaskAttribute);
   fortressTaskHandle = osThreadNew(fortressTask, nullptr, &fortressTaskAttribute);
-  selfTestTaskHandle = osThreadNew(selfTestTask, nullptr, &selfTestTaskAttribute);
+  selfTestTaskHandle = osThreadNew(selfTestTask, nullptr, &rmselfTestTaskAttribute);
   UITaskHandle = osThreadNew(UITask, nullptr, &UITaskAttribute);
 }
 

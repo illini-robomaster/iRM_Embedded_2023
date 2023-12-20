@@ -140,6 +140,7 @@ void imuTask(void* arg) {
   while (true) {
     uint32_t flags = osThreadFlagsWait(IMU_RX_SIGNAL, osFlagsWaitAll, osWaitForever);
     if (flags & IMU_RX_SIGNAL) imu->Update();
+
   }
 }
 
@@ -147,7 +148,7 @@ void imuTask(void* arg) {
 // Gimbal
 //==================================================================================================
 
-const osThreadAttr_t gimbalTaskAttribute = {.name = "gimbalTask",
+const osThreadAttr_t rmgimbalTaskAttribute = {.name = "gimbalTask",
                                             .attr_bits = osThreadDetached,
                                             .cb_mem = nullptr,
                                             .cb_size = 0,
@@ -191,6 +192,7 @@ void gimbalTask(void* arg) {
     control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
     osDelay(GIMBAL_TASK_DELAY);
     ++i;
+
   }
 
   pitch_motor->MotorEnable();
@@ -206,6 +208,7 @@ void gimbalTask(void* arg) {
     pitch_motor->SetOutput(pitch_motor->GetRelativeTarget(), 1, 115, 0.5, 0);
     control::Motor4310::TransmitOutput(motors_can1_pitch, 1);
     osDelay(GIMBAL_TASK_DELAY);
+
   }
 
   print("Start Calibration.\r\n");
@@ -222,9 +225,11 @@ void gimbalTask(void* arg) {
     control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
     pitch_motor->SetOutput(pitch_motor->GetRelativeTarget(), 1, 115, 0.5, 0);
     control::Motor4310::TransmitOutput(motors_can1_pitch, 1);
+
     osDelay(GIMBAL_TASK_DELAY);
   }
-
+  HAL_IWDG_Refresh(&hiwdg);
+  // prevent unexpected timeout
   print("Gimbal Begin!\r\n");
   RGB->Display(display::color_green);
   laser->On();
@@ -350,6 +355,7 @@ void refereeTask(void* arg) {
       length = referee_uart->Read(&data);
       referee->Receive(communication::package_t{data, (int)length});
     }
+
   }
 }
 
@@ -628,7 +634,7 @@ void chassisTask(void* arg) {
 // SelfTest
 //==================================================================================================
 
-const osThreadAttr_t selfTestTaskAttribute = {.name = "selfTestTask",
+const osThreadAttr_t rmselfTestTaskAttribute = {.name = "selfTestTask",
                                               .attr_bits = osThreadDetached,
                                               .cb_mem = nullptr,
                                               .cb_size = 0,
@@ -654,12 +660,13 @@ static display::OLED* OLED = nullptr;
 void selfTestTask(void* arg) {
   UNUSED(arg);
   osDelay(100);
-
+  MX_IWDG_Init();
   //Try to make the chassis Flags initialized at first.
 
   //Could need more time to test it out.
   //The self test task for chassis will not update after the first check.
   OLED->ShowIlliniRMLOGO();
+  HAL_IWDG_Refresh(&hiwdg);
   buzzer->SingSong(Mario, [](uint32_t milli) { osDelay(milli); });
   OLED->OperateGram(display::PEN_CLEAR);
   OLED->ShowString(0, 0, (uint8_t*)"GP");
@@ -680,7 +687,7 @@ void selfTestTask(void* arg) {
 //
   OLED->ShowString(3, 12, (uint8_t*)"BL");
   OLED->ShowString(4, 12, (uint8_t*)"BR");
-  MX_IWDG_Init();
+
   selftestStart = send->self_check_flag;
   while(!selftestStart){
       // wait for the self check signal
@@ -839,11 +846,11 @@ void RM_RTOS_Init(void) {
 
 void RM_RTOS_Threads_Init(void) {
   imuTaskHandle = osThreadNew(imuTask, nullptr, &imuTaskAttribute);
-  gimbalTaskHandle = osThreadNew(gimbalTask, nullptr, &gimbalTaskAttribute);
+  gimbalTaskHandle = osThreadNew(gimbalTask, nullptr, &rmgimbalTaskAttribute);
   refereeTaskHandle = osThreadNew(refereeTask, nullptr, &refereeTaskAttribute);
   shooterTaskHandle = osThreadNew(shooterTask, nullptr, &shooterTaskAttribute);
   chassisTaskHandle = osThreadNew(chassisTask, nullptr, &chassisTaskAttribute);
-  selfTestTaskHandle = osThreadNew(selfTestTask, nullptr, &selfTestTaskAttribute);
+  selfTestTaskHandle = osThreadNew(selfTestTask, nullptr, &rmselfTestTaskAttribute);
   // jetsonCommTaskHandle = osThreadNew(jetsonCommTask, nullptr, &jetsonCommTaskAttribute);
 }
 
