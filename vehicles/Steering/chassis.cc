@@ -312,7 +312,7 @@ void chassisTask(void* arg) {
       if (-CHASSIS_DEADZONE < relative_angle && relative_angle < CHASSIS_DEADZONE) wz = 0;
     }
     // shut down the chassis if any can error occurs
-    chassis_error_flag = osEventFlagsWait(chassis_event_flags,CHASSIS_EVENT_FLAGS, osFlagsWaitAll, 0);
+    chassis_error_flag = osEventFlagsGet(chassis_event_flags);
     if(chassis_error_flag & CHASSIS_EVENT_FLAGS){
       motor1->SetOutput(0);
       motor2->SetOutput(0);
