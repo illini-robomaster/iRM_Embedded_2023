@@ -380,7 +380,7 @@ void chassisTask(void* arg) {
   }
 }
 
-#define EXPECTED_FLAG_SUMMARY 0b11111111
+#define EXPECTED_FLAG_SUMMARY 0xFF
 
 void self_Check_Task(void* arg){
   UNUSED(arg);
