@@ -20,7 +20,7 @@
 
 project(example_iwdg ASM C CXX)
 
-irm_add_arm_executable(${PROJECT_NAME}_A
+irm_add_arm_executable(${PROJECT_NAME}_typeA
     TARGET DJI_Board_TypeA
         SOURCES main.cc
 )
