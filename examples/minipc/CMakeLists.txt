@@ -32,7 +32,22 @@ irm_add_arm_executable(${PROJECT_NAME}_pingpongtest
     TARGET DJI_Board_TypeC
     SOURCES PingpongTest.cc)
 
+irm_add_arm_executable(${PROJECT_NAME}_modifiedpingpongtest
+    TARGET DJI_Board_TypeC
+    SOURCES PingpongTestPlus.cc)
+
 irm_add_arm_executable(${PROJECT_NAME}_motor
     TARGET DJI_Board_TypeA
     SOURCES MotorTest.cc)
 
+irm_add_arm_executable(${PROJECT_NAME}_latency
+    TARGET DJI_Board_TypeC
+    SOURCES LatencyTest.cc)
+
+irm_add_arm_executable(${PROJECT_NAME}_color
+    TARGET DJI_Board_TypeC
+    SOURCES ColorTest.cc)
+
+irm_add_arm_executable(${PROJECT_NAME}_chassis
+    TARGET DJI_Board_TypeC
+    SOURCES ChassisTest.cc)

@@ -59,6 +59,10 @@ void RM_RTOS_Default_Task(const void* argument) {
 
   uint8_t packet_to_send[minipc_session.MAX_PACKET_LENGTH];
 
+  /* To run this test, use Communication/communicator.py in the iRM_Vision_2023 repo
+   * Need to set testing=Test.TYPE_A
+  **/
+
   while (true) {
     // Send packet example. Send packet at 1 Hz
     gimbal_data.rel_yaw = 100;

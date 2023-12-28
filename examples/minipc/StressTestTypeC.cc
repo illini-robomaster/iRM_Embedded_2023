@@ -63,7 +63,7 @@ void RM_RTOS_Default_Task(const void* argument) {
   int total_processed_bytes = 0;
 
   /* To run this test, use Communication/communicator.py in the iRM_Vision_2023 repo
-   * Need to set TESTING_TX_RX = False and TESTING_CRC = True
+   * Need to set testing=Test.CRC
   **/
 
   while (true) {

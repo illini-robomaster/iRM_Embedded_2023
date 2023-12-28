@@ -58,14 +58,11 @@ void RM_RTOS_Default_Task(const void* argument) {
 
   auto minipc_session = communication::MinipcPort();
 
-  communication::gimbal_data_t gimbal_data;
+  communication::color_data_t color_data;
 
   const communication::status_data_t* status_data;
 
-  gimbal_data.rel_yaw = 100;
-  gimbal_data.rel_pitch = 200;
-  gimbal_data.debug_int = 50;
-  gimbal_data.mode = 1;
+  color_data.my_color = 0;
 
   uint8_t packet_to_send[minipc_session.MAX_PACKET_LENGTH];
   uint8_t *data;
@@ -75,19 +72,20 @@ void RM_RTOS_Default_Task(const void* argument) {
     /* wait until rx data is available */
     //led->Display(0xFF0000FF);
 
-    // TX RX test. Use with communication/communicator.py in iRM_Vision_2023 repo
-    // In the communicator.py, need to set testing=Test.PINGPONG for this test
+    // Latency test. Use with communication/communicator.py in iRM_Vision_2023 repo
+    // In the communicator.py, need to set testing = Test.LATENCY for this test
 
     // Wait until first packet from minipc.
     uint32_t flags = osThreadFlagsWait(RX_SIGNAL, osFlagsWaitAll, osWaitForever);
     if (flags & RX_SIGNAL) {
-      // When packet received from miniPC, increase rel_pitch by 1 and send back
       length = uart->Read(&data);
       minipc_session.ParseUartBuffer(data, length);
       status_data = minipc_session.GetStatus();
-      gimbal_data.rel_pitch = status_data->rel_pitch + 1;
-      minipc_session.Pack(packet_to_send, (void*)&gimbal_data, communication::GIMBAL_CMD_ID);
-      uart->Write(packet_to_send, minipc_session.GetPacketLen(communication::GIMBAL_CMD_ID));
+      if (status_data->my_color == 0){
+        color_data.my_color = 0;
+      }
+      minipc_session.Pack(packet_to_send, (void*)&color_data, communication::COLOR_CMD_ID);
+      uart->Write(packet_to_send, minipc_session.GetPacketLen(communication::COLOR_CMD_ID));
     }
     osDelay(10);
   }
