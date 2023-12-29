@@ -70,19 +70,15 @@ void RM_RTOS_Default_Task(const void* argument) {
     /* wait until rx data is available */
     led->Display(0xFF0000FF);
 
-    // An alternative is to use osThreadFlagsWait.
-    // However, we want to experiment with periodic sending
-    uint32_t flags = osThreadFlagsGet();
+    int32_t flags = osThreadFlagsWait(RX_SIGNAL, osFlagsWaitAll, osWaitForever);
     if (flags & RX_SIGNAL) {
       /* time the non-blocking rx / tx calls (should be <= 1 osTick) */
 
       // max length of the UART buffer at 150Hz is ~50 bytes
       length = uart->Read(&data);
       total_processed_bytes += length;
-
       minipc_session.ParseUartBuffer(data, length);
       uint32_t valid_packet_cnt = minipc_session.GetValidPacketCnt();
-
       uint8_t packet_to_send[minipc_session.MAX_PACKET_LENGTH];
 
       // Jetson / PC sends 200Hz valid packets for stress testing
@@ -91,7 +87,8 @@ void RM_RTOS_Default_Task(const void* argument) {
       if (valid_packet_cnt == 1000) {
         // Jetson test cases write 1000 packets. Pass
         led->Display(0xFF00FF00);
-        osDelay(10000);
+        osDelay(4000);
+        led->Display(0xFFFF0000);
         // after 10 seconds, write 1000 alternating packets to Jetson
         communication::color_data_t color_data;
         uint8_t my_color = 1; // blue

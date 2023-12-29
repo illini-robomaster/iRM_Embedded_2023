@@ -58,14 +58,13 @@ void RM_RTOS_Default_Task(const void* argument) {
 
   auto minipc_session = communication::MinipcPort();
 
-  communication::gimbal_data_t gimbal_data;
+  communication::chassis_data_t chassis_data; // this has to be the data type that has the maximum size
 
   const communication::status_data_t* status_data;
 
-  gimbal_data.rel_yaw = 100;
-  gimbal_data.rel_pitch = 200;
-  gimbal_data.debug_int = 50;
-  gimbal_data.mode = 1;
+  chassis_data.vx = 0.0;
+  chassis_data.vy = 0.0;
+  chassis_data.vw = 0.0;
 
   uint8_t packet_to_send[minipc_session.MAX_PACKET_LENGTH];
   uint8_t *data;
@@ -84,9 +83,9 @@ void RM_RTOS_Default_Task(const void* argument) {
       length = uart->Read(&data);
       minipc_session.ParseUartBuffer(data, length);
       status_data = minipc_session.GetStatus();
-      gimbal_data.rel_yaw = status_data->rel_yaw;
-      minipc_session.Pack(packet_to_send, (void*)&gimbal_data, communication::GIMBAL_CMD_ID);
-      uart->Write(packet_to_send, minipc_session.GetPacketLen(communication::GIMBAL_CMD_ID));
+      chassis_data.vx = status_data->vx;
+      minipc_session.Pack(packet_to_send, (void*)&chassis_data, communication::CHASSIS_CMD_ID); 
+      uart->Write(packet_to_send, minipc_session.GetPacketLen(communication::CHASSIS_CMD_ID)); 
     }
     osDelay(10);
   }
