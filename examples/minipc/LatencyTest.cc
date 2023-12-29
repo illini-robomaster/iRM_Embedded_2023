@@ -45,6 +45,11 @@ class CustomUART : public bsp::UART {
   void RxCompleteCallback() override final { osThreadFlagsSet(defaultTaskHandle, RX_SIGNAL); }
 };
 
+// Latency test. Use with communication/communicator.py in iRM_Vision_2023 repo
+// In the communicator.py, both tests need to set testing = Test.LATENCY for this test
+#define LATENCY_TEST
+//#define COLOR_TEST
+
 void RM_RTOS_Init(void) {
   led = new display::RGB(&htim5, 3, 2, 1, 1000000);
 }
@@ -58,13 +63,24 @@ void RM_RTOS_Default_Task(const void* argument) {
 
   auto minipc_session = communication::MinipcPort();
 
+#ifdef LATENCY_TEST
   communication::chassis_data_t chassis_data; // this has to be the data type that has the maximum size
+#endif
+#ifdef COLOR_TEST
+  communication::color_data_t color_data;
+#endif
 
   const communication::status_data_t* status_data;
 
+#ifdef LATENCY_TEST
   chassis_data.vx = 0.0;
   chassis_data.vy = 0.0;
   chassis_data.vw = 0.0;
+#endif
+
+#ifdef COLOR_TEST
+  color_data.my_color = 0;
+#endif
 
   uint8_t packet_to_send[minipc_session.MAX_PACKET_LENGTH];
   uint8_t *data;
@@ -74,8 +90,6 @@ void RM_RTOS_Default_Task(const void* argument) {
     /* wait until rx data is available */
     //led->Display(0xFF0000FF);
 
-    // Latency test. Use with communication/communicator.py in iRM_Vision_2023 repo
-    // In the communicator.py, need to set testing = Test.LATENCY for this test
 
     // Wait until first packet from minipc.
     uint32_t flags = osThreadFlagsWait(RX_SIGNAL, osFlagsWaitAll, osWaitForever);
@@ -83,9 +97,21 @@ void RM_RTOS_Default_Task(const void* argument) {
       length = uart->Read(&data);
       minipc_session.ParseUartBuffer(data, length);
       status_data = minipc_session.GetStatus();
+
+#ifdef LATENCY_TEST
       chassis_data.vx = status_data->vx;
-      minipc_session.Pack(packet_to_send, (void*)&chassis_data, communication::CHASSIS_CMD_ID); 
-      uart->Write(packet_to_send, minipc_session.GetPacketLen(communication::CHASSIS_CMD_ID)); 
+      minipc_session.Pack(packet_to_send, (void*)&chassis_data, communication::CHASSIS_CMD_ID);
+      uart->Write(packet_to_send, minipc_session.GetPacketLen(communication::CHASSIS_CMD_ID));
+#endif
+      
+#ifdef COLOR_TEST
+      if (status_data->my_color == 0){
+        color_data.my_color = 0;
+      }
+      minipc_session.Pack(packet_to_send, (void*)&color_data, communication::COLOR_CMD_ID);
+      uart->Write(packet_to_send, minipc_session.GetPacketLen(communication::COLOR_CMD_ID));
+#endif
+
     }
     osDelay(10);
   }
