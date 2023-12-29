@@ -55,7 +55,7 @@ void RM_RTOS_Default_Task(const void* argument) {
   uint32_t length;
   uint8_t* data;
 
-  auto uart = std::make_unique<CustomUART>(&huart1);  // see cmake for which uart
+  auto uart = std::make_unique<CustomUART>(&huart1);  
   uart->SetupRx(50);
   uart->SetupTx(50);
 

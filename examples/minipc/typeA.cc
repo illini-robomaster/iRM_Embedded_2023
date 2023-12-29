@@ -47,7 +47,7 @@ void RM_RTOS_Init(void) {
 void RM_RTOS_Default_Task(const void* argument) {
   UNUSED(argument);
 
-  auto uart = std::make_unique<CustomUART>(&huart8);  // see cmake for which uart
+  auto uart = std::make_unique<CustomUART>(&huart8); 
   uart->SetupRx(50);
   uart->SetupTx(50);
 
