@@ -30,7 +30,7 @@ static control::MotorCANBase* motor = nullptr;
 void RM_RTOS_Init() {
   print_use_uart(&huart1);
   can = new bsp::CAN(&hcan1, true);
-  motor = new control::Motor3510(can, 0x205);
+  motor = new control::Motor3510(can, 0x207);
 }
 
 void RM_RTOS_Default_Task(const void* args) {
