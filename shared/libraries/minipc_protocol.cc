@@ -204,7 +204,7 @@ void MinipcPort::VerifyAndParseData(void) {
   //  Two packets arrive in two UART calls.
   //  The first packet misses 1 byte, but the second one is complete.
   //  In this case, when the possible_packet buffer is filled
-  //  (the last byte is 'S' or 'M' for the second packet), VerifyAndParseData() will be called. The whole buffer
+  //  (the last bytes are from the second packet), VerifyAndParseData() will be called. The whole buffer
   //  would be tossed, resulting in two unusable packets. However, if we implement this logic, we would be
   //  able to recover the second packet.
 
@@ -212,6 +212,7 @@ void MinipcPort::VerifyAndParseData(void) {
   //    1) we don't observe this even when packets are sent at 200Hz
   //    2) probability of this happening is very low. The second packet has to be sent in two slices to
   //       trigger this issue. (first slice: S/T is sent to possible_packet; second slide: the rest)
+  // Note: The issue discussed above might be deprecated.
 
   // if packet Head or Tail is corrupted
   uint8_t cmd_id = possible_packet[CMD_ID_OFFSET];
