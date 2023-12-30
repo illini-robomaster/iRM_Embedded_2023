@@ -1111,7 +1111,7 @@ void RM_RTOS_Threads_Init(void) {
   chassisTaskHandle = osThreadNew(chassisTask, nullptr, &chassisTaskAttribute);
   shooterTaskHandle = osThreadNew(shooterTask, nullptr, &shooterTaskAttribute);
   fortressTaskHandle = osThreadNew(fortressTask, nullptr, &fortressTaskAttribute);
-  selfTestTaskHandle = osThreadNew(selfTestTask, nullptr, &rmselfTestTaskAttribute);
+  selfTestTaskHandle = osThreadNew(selfTestTask, nullptr, &rmSelfTestTaskAttribute);
   UITaskHandle = osThreadNew(UITask, nullptr, &UITaskAttribute);
 }
 

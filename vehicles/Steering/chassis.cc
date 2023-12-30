@@ -54,7 +54,7 @@ static bool bl_wheel_motor_flag = false;
 static bool br_wheel_motor_flag = false;
 
 static bool transmission_flag = true;
-const osThreadAttr_t selfTestingTask = {.name = "selfTestTask",
+const osThreadAttr_t rmSelfTestingTask = {.name = "selfTestTask",
                                              .attr_bits = osThreadDetached,
                                              .cb_mem = nullptr,
                                              .cb_size = 0,
@@ -524,7 +524,7 @@ void RM_RTOS_Init() {
 void RM_RTOS_Threads_Init(void) {
   refereeTaskHandle = osThreadNew(refereeTask, nullptr, &refereeTaskAttribute);
   chassisTaskHandle = osThreadNew(chassisTask, nullptr, &chassisTaskAttribute);
-  selfTestTaskHandle = osThreadNew(self_Check_Task, nullptr, &selfTestingTask);
+  selfTestTaskHandle = osThreadNew(self_Check_Task, nullptr, &rmSelfTestingTask);
 }
 
 void KillAll() {

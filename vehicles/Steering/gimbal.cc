@@ -40,7 +40,6 @@
 #include "rgb.h"
 #include "shooter.h"
 #include "stepper.h"
-#include "autoaim_protocol.h"
 #include "iwdg.h"
 #include "minipc_protocol.h"
 
@@ -245,7 +244,7 @@ void gimbalTask(void* arg) {
   float pitch_vel = 0;
   float pitch_diff, yaw_diff;
   while (true) {
-    gimbal_error_flag = osEventFlagsWait(gimbal_motor_Event, GIMBAL_ERROR_DETECT, osFlagsWaitAll, 0);
+    gimbal_error_flag = osEventFlagsWait(gimbal_motor_event, GIMBAL_ERROR_DETECT, osFlagsWaitAll, 0);
     if(gimbal_error_flag & GIMBAL_ERROR_DETECT) {
       Error_Handler();
     }
@@ -617,7 +616,7 @@ void chassisTask(void* arg) {
     vy_set = vy_keyboard + vy_remote;
 
       // if the chassis flag is not 0xFF or the gimbal's can bus is not connected, then stop.
-    keymap_error_flag = osEventFlagsWait(keymap_Error_Event, ERROR_DETECT_SIGNAL, osFlagsWaitAll, 0);
+    keymap_error_flag = osEventFlagsWait(keymap_error_event, ERROR_DETECT_SIGNAL, osFlagsWaitAll, 0);
     if (keymap_error_flag & ERROR_DETECT_SIGNAL) {
         Error_Handler();
       }
@@ -637,7 +636,7 @@ void chassisTask(void* arg) {
 // SelfTest
 //==================================================================================================
 
-const osThreadAttr_t rmselfTestTaskAttribute = {.name = "selfTestTask",
+const osThreadAttr_t rmSelfTestTaskAttribute = {.name = "selfTestTask",
                                               .attr_bits = osThreadDetached,
                                               .cb_mem = nullptr,
                                               .cb_size = 0,
@@ -719,10 +718,10 @@ void selfTestTask(void* arg) {
 
     chassis_flag_bitmap = send->chassis_flag;
     if (chassis_flag_bitmap != BITMAP_SUMMARY){
-      osEventFlagsSet(keymap_Error_Event, ERROR_DETECT_SIGNAL);
+      osEventFlagsSet(keymap_error_event, ERROR_DETECT_SIGNAL);
     }
     if (!(yaw_motor_flag && sl_motor_flag && sr_motor_flag && ld_motor_flag)){
-      osEventFlagsSet(gimbal_motor_Event, GIMBAL_ERROR_DETECT);
+      osEventFlagsSet(gimbal_motor_event, GIMBAL_ERROR_DETECT);
     }
     fl_wheel_flag = (0x80 & chassis_flag_bitmap);
     //motor 8
@@ -840,7 +839,7 @@ void RM_RTOS_Init(void) {
   shooter = new control::Shooter(shooter_data);
   // stepper = new control::Stepper(&htim1, 1, 1000000, DIR_GPIO_Port, DIR_Pin, ENABLE_GPIO_Port,
   //                                ENABLE_Pin);
-  keymap_Error_Event = osEventFlagsNew(nullptr);
+  keymap_error_event = osEventFlagsNew(nullptr);
 
   buzzer = new bsp::Buzzer(&htim4, 3, 1000000);
   OLED = new display::OLED(&hi2c2, 0x3C);
@@ -853,7 +852,7 @@ void RM_RTOS_Threads_Init(void) {
   refereeTaskHandle = osThreadNew(refereeTask, nullptr, &refereeTaskAttribute);
   shooterTaskHandle = osThreadNew(shooterTask, nullptr, &shooterTaskAttribute);
   chassisTaskHandle = osThreadNew(chassisTask, nullptr, &chassisTaskAttribute);
-  selfTestTaskHandle = osThreadNew(selfTestTask, nullptr, &rmselfTestTaskAttribute);
+  selfTestTaskHandle = osThreadNew(selfTestTask, nullptr, &rmSelfTestTaskAttribute);
   // jetsonCommTaskHandle = osThreadNew(jetsonCommTask, nullptr, &jetsonCommTaskAttribute);
 }
 
