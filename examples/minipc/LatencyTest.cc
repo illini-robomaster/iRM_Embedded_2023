@@ -23,66 +23,74 @@
 #include <cstring>
 #include <memory>
 
+#include "bsp_gpio.h"
 #include "bsp_print.h"
 #include "bsp_uart.h"
 #include "cmsis_os.h"
 #include "minipc_protocol.h"
+#include "rgb.h"
 
 #define RX_SIGNAL (1 << 0)
 
 extern osThreadId_t defaultTaskHandle;
 
+static display::RGB* led = nullptr;
+
 class CustomUART : public bsp::UART {
-public:
+ public:
   using bsp::UART::UART;
 
-protected:
+ protected:
   /* notify application when rx data is pending read */
   void RxCompleteCallback() override final { osThreadFlagsSet(defaultTaskHandle, RX_SIGNAL); }
 };
 
+
 void RM_RTOS_Init(void) {
+  led = new display::RGB(&htim5, 3, 2, 1, 1000000);
 }
 
+// Latency test. Use with communication/communicator.py in iRM_Vision_2023 repo
+// In the communicator.py, need to set testing = Test.LATENCY for this test
 void RM_RTOS_Default_Task(const void* argument) {
   UNUSED(argument);
 
-  auto uart = std::make_unique<CustomUART>(&huart8); 
+  auto uart = std::make_unique<CustomUART>(&huart1); 
   uart->SetupRx(50);
   uart->SetupTx(50);
 
   auto minipc_session = communication::MinipcPort();
 
-  communication::gimbal_data_t gimbal_data;
-  communication::color_data_t color_data;
-  communication::chassis_data_t chassis_data;
+  communication::chassis_data_t chassis_data; // this has to be the data type that has the maximum size
+  //if changed, please make sure the data type in `case Test.LATENCY` communicator.py in the vision repo is also changed
+
+  const communication::status_data_t* status_data;
+
+  chassis_data.vx = 0.0;
+  chassis_data.vy = 0.0;
+  chassis_data.vw = 0.0;
 
   uint8_t packet_to_send[minipc_session.MAX_PACKET_LENGTH];
-
-  /* To run this test, use Communication/communicator.py in the iRM_Vision_2023 repo
-   * Need to set testing=Test.TYPE_A
-  **/
+  uint8_t *data;
+  int32_t length;
 
   while (true) {
-    // Send packet example. Send packet at 1 Hz
-    gimbal_data.rel_yaw = 100;
-    gimbal_data.rel_pitch = 200;
-    gimbal_data.debug_int = 50;
-    gimbal_data.mode = 1;
-    minipc_session.Pack(packet_to_send, (void*)&gimbal_data, communication::GIMBAL_CMD_ID);
-    uart->Write(packet_to_send, minipc_session.GetPacketLen(communication::GIMBAL_CMD_ID));
-    osDelay(1000);
+    /* wait until rx data is available */
+    //led->Display(0xFF0000FF);
+    
+    // Wait until first packet from minipc.
+    uint32_t flags = osThreadFlagsWait(RX_SIGNAL, osFlagsWaitAll, osWaitForever);
+    if (flags & RX_SIGNAL) {
+      length = uart->Read(&data);
+      minipc_session.ParseUartBuffer(data, length);
+      status_data = minipc_session.GetStatus();
 
-    color_data.my_color = 1;
-    minipc_session.Pack(packet_to_send, (void*)&color_data, communication::COLOR_CMD_ID);
-    uart->Write(packet_to_send, minipc_session.GetPacketLen(communication::COLOR_CMD_ID));
-    osDelay(1000);
 
-    chassis_data.vx = 20;
-    chassis_data.vy = 30;
-    chassis_data.vw = 40;
-    minipc_session.Pack(packet_to_send, (void*)&chassis_data, communication::CHASSIS_CMD_ID);
-    uart->Write(packet_to_send, minipc_session.GetPacketLen(communication::CHASSIS_CMD_ID));
-    osDelay(1000);
+      chassis_data.vx = status_data->vx;
+      minipc_session.Pack(packet_to_send, (void*)&chassis_data, communication::CHASSIS_CMD_ID);
+      uart->Write(packet_to_send, minipc_session.GetPacketLen(communication::CHASSIS_CMD_ID));
+
+    }
+    osDelay(10);
   }
 }

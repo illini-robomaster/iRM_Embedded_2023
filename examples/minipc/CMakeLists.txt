@@ -24,7 +24,19 @@ irm_add_arm_executable(${PROJECT_NAME}
     TARGET DJI_Board_TypeA
     SOURCES typeA.cc)
 
-irm_add_arm_executable(${PROJECT_NAME}_typeC
+irm_add_arm_executable(${PROJECT_NAME}_stresstesttypec
     TARGET DJI_Board_TypeC
-    SOURCES typeC.cc)
+    SOURCES StressTestTypeC.cc)
+
+irm_add_arm_executable(${PROJECT_NAME}_pingpongtest
+    TARGET DJI_Board_TypeC
+    SOURCES PingpongTest.cc)
+
+irm_add_arm_executable(${PROJECT_NAME}_motor
+    TARGET DJI_Board_TypeA
+    SOURCES MotorTest.cc)
+
+irm_add_arm_executable(${PROJECT_NAME}_latency
+    TARGET DJI_Board_TypeC
+    SOURCES LatencyTest.cc)
 
