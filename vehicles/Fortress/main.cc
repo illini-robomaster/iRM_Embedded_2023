@@ -564,7 +564,7 @@ void fortressTask(void* arg) {
 // SelfTest
 //==================================================================================================
 
-const osThreadAttr_t rmselfTestTaskAttribute = {.name = "selfTestTask",
+const osThreadAttr_t rmSelfTestTaskAttribute = {.name = "selfTestTask",
                                               .attr_bits = osThreadDetached,
                                               .cb_mem = nullptr,
                                               .cb_size = 0,
