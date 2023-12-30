@@ -166,7 +166,7 @@ static control::Gimbal* gimbal = nullptr;
 static control::gimbal_data_t* gimbal_param = nullptr;
 static bsp::Laser* laser = nullptr;
 
-osEventFlagsId_t gimbal_motor_Event = osEventFlagsNew(nullptr);
+osEventFlagsId_t gimbal_motor_event = osEventFlagsNew(nullptr);
 #define GIMBAL_ERROR_DETECT (1 << 1)
 
 void gimbalTask(void* arg) {
