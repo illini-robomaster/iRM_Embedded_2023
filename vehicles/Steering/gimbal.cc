@@ -555,7 +555,7 @@ const osThreadAttr_t chassisTaskAttribute = {.name = "chassisTask",
 osThreadId_t chassisTaskHandle;
 
 #define ERROR_DETECT_SIGNAL (1 << 1)
-osEventFlagsId_t keymap_Error_Event = osEventFlagsNew(nullptr);
+osEventFlagsId_t keymap_error_event = osEventFlagsNew(nullptr);
 
 void chassisTask(void* arg) {
   UNUSED(arg);
