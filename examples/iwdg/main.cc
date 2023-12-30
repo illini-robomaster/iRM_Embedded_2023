@@ -18,73 +18,37 @@
  *                                                                          *
  ****************************************************************************/
 
-#pragma once
+#include "main.h"
+#include "iwdg.h"
+#include "cmsis_os.h"
+#include "bsp_print.h"
+#include "stm32f4xx_hal_iwdg.h"
+long reloop = 0;
 
-#include "bsp_can.h"
-
-namespace bsp {
-
-typedef enum {
-  VX,
-  VY,
-  RELATIVE_ANGLE,
-  START,
-  MODE,
-  DEAD,
-  SHOOTER_POWER,
-  COOLING_HEAT1,
-  COOLING_HEAT2,
-  COOLING_LIMIT1,
-  COOLING_LIMIT2,
-  SPEED_LIMIT1,
-  SPEED_LIMIT2,
-  CHASSIS_FLAG,
-  GIMBAL_POWER,
-  RECALIBRATE,
-  IS_MY_COLOR_BLUE,
-  SELF_CHECK_FLAG
-} can_bridge_cmd;
-
-typedef struct {
-  uint8_t id;
-  union {
-    float data_float;
-    int data_int;
-    bool data_bool;
-    unsigned int data_uint;
-  };
-} bridge_data_t;
-
-class CanBridge {
- public:
-  CanBridge(bsp::CAN* can, uint16_t rx_id, uint16_t tx_id);
-  void UpdateData(const uint8_t data[]);
-  void TransmitOutput();
-
-  bridge_data_t cmd;
-  float vx = 0;
-  float vy = 0;
-  float relative_angle = 0;
-  bool start = false;
-  int mode = 0;
-  bool dead = false;
-  bool shooter_power = false;
-  float cooling_heat1 = 0;
-  float cooling_heat2 = 0;
-  float cooling_limit1 = 0;
-  float cooling_limit2 = 0;
-  float speed_limit1 = 0;
-  float speed_limit2 = 0;
-  unsigned int chassis_flag = 0;
-  unsigned int gimbal_power = 0;
-  bool recalibrate = false;
-  bool is_my_color_blue = false;
-  bool self_check_flag = false;
-  // each bit represents a flag correspond to specific motor e.g.(at index 0, it represents the motor 1's connection flag)
- private:
-  bsp::CAN* can_;
-  uint16_t rx_id_;
-  uint16_t tx_id_;
-};
-
-}  // namespace bsp
+void RM_RTOS_Init(void){
+    print_use_uart(&huart1);
+    // default &hiwdg got prescaler of 32 and reload of 1000
+    // hiwdg is a IWDG_HandleTypeDef
+    // Calculate the reload value according to the formula:
+    // Reload_Value = ((Desired_Time_Out * 32kHz) / (Prescaler_Value * 4 * 1000)) - 1
+}
+bool is_LSI_Enabled() {
+    // Check if LSI is enabled and ready
+    if ((RCC->CSR & RCC_CSR_LSION) && (RCC->CSR & RCC_CSR_LSIRDY)) {
+        return true;  // LSI is enabled and ready
+    } else {
+        return false; // LSI is not enabled
+    }
+}
+void RM_RTOS_Default_Task(const void* arguments){
+    UNUSED(arguments);
+    HAL_Init();
+//    reloop = 0;
+    MX_IWDG_Init();
+    // expected behavior: triggers a hard reset if not refreshed within the expected timeout
+    while(true){
+        print("%d\n", HAL_GetTick());
+        osDelay(10);
+        HAL_IWDG_Refresh(&hiwdg);
+    }
+}
