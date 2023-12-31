@@ -527,11 +527,6 @@ class IMU_typeC {
   float zeroDrift[3] = {0, 0, 0};
   float zeroDriftTemp[3] = {0, 0, 0};
 
-  float accel_fliter_1[3] = {0.0f, 0.0f, 0.0f};
-  float accel_fliter_2[3] = {0.0f, 0.0f, 0.0f};
-  float accel_fliter_3[3] = {0.0f, 0.0f, 0.0f};
-  const float fliter_num[3] = {1.929454039488895f, -0.93178349823448126f, 0.002329458745586203f};
-
   friend class IST8310;
 
   IST8310 IST8310_;
