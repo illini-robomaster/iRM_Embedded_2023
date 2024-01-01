@@ -623,11 +623,13 @@ void IMU_typeC::Update() {
       if (++count_ < zeroDriftTry) {
         for (int i = 0; i < 3; ++i) {
           zeroDriftTemp[i] += BMI088_real_data_.gyro[i];
+          gravityTemp[i] += BMI088_real_data_.accel[i];
         }
         return;
       } else if (count_ == zeroDriftTry) {
         for (int i = 0; i < 3; ++i) {
           zeroDrift[i] = zeroDriftTemp[i] / (float)zeroDriftTry;
+          ODOM_gravity[i] = gravityTemp[i] / (float)zeroDriftTry;
         }
         calidone_ = true;
         return;
@@ -640,6 +642,9 @@ void IMU_typeC::Update() {
                 IST8310_real_data_.mag);
     GetAngle(INS_quat, INS_angle + INS_YAW_ADDRESS_OFFSET, INS_angle + INS_PITCH_ADDRESS_OFFSET,
              INS_angle + INS_ROLL_ADDRESS_OFFSET);
+    for (int i = 0; i < 3; i++) {
+        ODOM_accel[i] = BMI088_real_data_.accel[i];
+    }
   }
 }
 

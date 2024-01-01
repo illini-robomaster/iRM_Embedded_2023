@@ -511,6 +511,10 @@ class IMU_typeC {
 
   float INS_quat[4] = {0.0f, 0.0f, 0.0f, 0.0f};
   float INS_angle[3] = {0.0f, 0.0f, 0.0f};
+
+  float ODOM_accel[3] = {0.0f, 0.0f, 0.0f};
+  float ODOM_gravity[3] = {0.0f, 0.0f, 0.0f};
+
   float Temp = 0;
   float TempPWM = 0;
 
@@ -526,6 +530,7 @@ class IMU_typeC {
   unsigned zeroDriftTry = 1000;
   float zeroDrift[3] = {0, 0, 0};
   float zeroDriftTemp[3] = {0, 0, 0};
+  float gravityTemp[3] = {0, 0, 0};
 
   friend class IST8310;
 

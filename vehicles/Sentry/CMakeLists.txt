@@ -27,3 +27,8 @@ irm_add_arm_executable(Sentry
 irm_add_arm_executable(Sentry_base
     TARGET DJI_Board_TypeC
     SOURCES base_task.cc)
+
+irm_add_arm_executable(Odom
+    TARGET DJI_Board_TypeC
+    SOURCES odom.cc
+    DEPENDS eigen3)
