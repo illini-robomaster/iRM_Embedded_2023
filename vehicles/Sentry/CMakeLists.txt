@@ -32,3 +32,12 @@ irm_add_arm_executable(Odom
     TARGET DJI_Board_TypeC
     SOURCES odom.cc
     DEPENDS eigen3)
+
+irm_add_arm_executable(Odom_publisher
+    TARGET DJI_Board_TypeA
+    SOURCES typeA.cc)
+
+irm_add_arm_executable(Chassis
+    TARGET DJI_Board_TypeC
+    SOURCES chassis.cc)
+

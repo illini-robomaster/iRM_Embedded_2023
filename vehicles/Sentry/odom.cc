@@ -1,6 +1,6 @@
 /****************************************************************************
  *                                                                          *
- *  Copyright (C) 2023 RoboMaster.                                          *
+ *  Copyright (C) 2024 RoboMaster.                                          *
  *  Illini RoboMaster @ University of Illinois at Urbana-Champaign          *
  *                                                                          *
  *  This program is free software: you can redistribute it and/or modify    *
@@ -20,10 +20,13 @@
 
 #include "bsp_imu.h"
 #include "bsp_print.h"
+#include "bsp_uart.h"
 #include "cmsis_os.h"
 #include "i2c.h"
 #include "main.h"
 #include "spi.h"
+#include "minipc_protocol.h"
+#include <memory>
 
 #include <Eigen/Dense>
 #include "filter.h"
@@ -40,6 +43,16 @@ const osThreadAttr_t imuTaskAttribute = {.name = "imuTask",
                                          .tz_module = 0,
                                          .reserved = 0};
 osThreadId_t imuTaskHandle;
+
+extern osThreadId_t defaultTaskHandle;
+class CustomUART : public bsp::UART {
+ public:
+  using bsp::UART::UART;
+
+ protected:
+  /* notify application when rx data is pending read */
+  void RxCompleteCallback() override final { osThreadFlagsSet(defaultTaskHandle, RX_SIGNAL); }
+};
 
 class IMU : public bsp::IMU_typeC {
  public:
@@ -66,8 +79,6 @@ void imuTask(void* arg) {
 }
 
 void RM_RTOS_Init(void) {/*{{{*/
-  print_use_uart(&huart1);
-
   bsp::IST8310_init_t IST8310_init;
   IST8310_init.hi2c = &hi2c3;
   IST8310_init.int_pin = DRDY_IST8310_Pin;
@@ -139,6 +150,17 @@ void RM_RTOS_Default_Task(const void* arg) {
   }
   grav = grav / N;
 
+  auto uart = std::make_unique<CustomUART>(&huart1);
+  uart->SetupRx(50);
+  uart->SetupTx(50);
+
+  auto minipc_session = communication::MinipcPort();
+
+  communication::chassis_data_t chassis_data;
+
+  uint8_t packet_to_send[minipc_session.MAX_PACKET_LENGTH];
+
+  /* To run this test, use odom_publisher */
   while (true) {
     set_cursor(0, 0);
     clear_screen();
@@ -165,8 +187,13 @@ void RM_RTOS_Default_Task(const void* arg) {
     float deltaT = 50.0 / 1000.0;
     vel = vel + deltaT * acc_l;
     pos = pos + deltaT * vel;
-    print("Vel: %.2f, %.2f, %.2f\r\n", vel[0], vel[1], vel[2]);
-    print("Odom: %.2f, %.2f, %.2f\r\n", pos[0], pos[1], pos[2]);
+    // print("Vel: %.2f, %.2f, %.2f\r\n", vel[0], vel[1], vel[2]);
+    // print("Odom: %.2f, %.2f, %.2f\r\n", pos[0], pos[1], pos[2]);
+    chassis_data.vx = 0;
+    chassis_data.vy = 0;
+    chassis_data.vw = imu->INS_angle[0];
+    minipc_session.Pack(packet_to_send, (void*)&chassis_data, communication::CHASSIS_CMD_ID);
+    uart->Write(packet_to_send, minipc_session.GetPacketLen(communication::CHASSIS_CMD_ID));
     osDelay(50);
   }
 }

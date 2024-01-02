@@ -131,7 +131,7 @@ void RM_RTOS_Default_Task(const void* arg) {
     acce0_filtered = Chebyshev50HzLPF(&acce0_filter);
     acce1_filtered = Chebyshev50HzLPF(&acce1_filter);
     acce2_filtered = Chebyshev50HzLPF(&acce2_filter);
-    print("%.2f, %.2f, %.2f\r\n", acce0_filtered, acce1_filtered, acce2_filtered);
+    // print("%.2f, %.2f, %.2f\r\n", acce0_filtered, acce1_filtered, acce2_filtered);
     //print("%.2f, %.2f, %.2f\r\n", imu->ODOM_accel[0], imu->ODOM_accel[1], imu->ODOM_accel[2]);
     osDelay(50);
   }
