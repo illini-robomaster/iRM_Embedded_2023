@@ -63,7 +63,7 @@ void RM_RTOS_Default_Task(const void* args) {
   control::MotorCANBase* motors[] = {fl_motor, fr_motor, bl_motor, br_motor};
 
   while (true) {
-    chassis->SetSpeed(dbus->ch0, dbus->ch1, dbus->ch2);
+    chassis->SetSpeed(dbus->ch1, -dbus->ch0, dbus->ch2);
 
     // Kill switch
     if (dbus->swr == remote::UP || dbus->swr == remote::DOWN) {
