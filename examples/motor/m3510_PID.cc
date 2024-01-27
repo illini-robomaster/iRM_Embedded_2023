@@ -34,7 +34,7 @@
 #define KEY_GPIO_GROUP GPIOB
 #define KEY_GPIO_PIN GPIO_PIN_2
 
-// #define CONTROLLER
+#define CONTROLLER
 
 bsp::CAN* can1 = nullptr;                   /*CAN*/
 control::MotorCANBase* motor = nullptr;     /* 3510Motor*/
@@ -42,7 +42,9 @@ control::MotorCANBase* motor = nullptr;     /* 3510Motor*/
 // BoolEdgeDetector key_detector(false);    /* Edge Detector*/
 
 
-float pid_params[3]{10000,1500,40000};           /* PID Params */
+// float pid_params[3]{10000,1500,40000};           /* PID Params */
+
+float pid_params[3]{10000,0,10000};           /* PID Params */
 
 #ifdef CONTROLLER
   remote::DBUS* dbus = nullptr;             /* Controller */
@@ -50,7 +52,7 @@ float pid_params[3]{10000,1500,40000};           /* PID Params */
 
 void RM_RTOS_Init() {
     print_use_uart(&huart1);                /* Print through *huart*/
-
+    last_time_ms = xTaskGetTickCount() * (1.0/configTICK_RATE_HZ) * 1000;
 
     /* Init */
     can1 = new bsp::CAN(&hcan1, true);
@@ -82,13 +84,17 @@ void RM_RTOS_Default_Task(const void* args){
     float diff = 0; /* Position Difference */
     float out = 0;  /* PID Controller Output */
     float target = 3.14; /* Target Position */
- 
+    int32_t curr_time_ms = 0;
+    int32_t last_time_ms = xTaskGetTickCount() * (1.0/configTICK_RATE_HZ) * 1000;
+
     int count = 0;
 
     while (true) {
 #ifdef CONTROLLER
+        curr_time_ms = xTaskGetTickCount() * (1.0/configTICK_RATE_HZ) * 1000;
+        int32_t delta_time_ms = curr_time_ms - last_time_ms;
         target = clip<float>(float(dbus->ch1) / remote::DBUS::ROCKER_MAX * PI,-PI,PI);
-#endif
+#endif  
         
         //Calculate error
         diff = motor->GetThetaDelta(target);
@@ -96,6 +102,8 @@ void RM_RTOS_Default_Task(const void* args){
 
         //Control Motor 
         motor->SetOutput(out);
+        // motor->SetOutput(0);
+
         control::MotorCANBase::TransmitOutput(motors, 1);
 
 
@@ -104,15 +112,20 @@ void RM_RTOS_Default_Task(const void* args){
         count ++;
 
         if(count == 10){
-            print("target: %.4f, diff: %.4f \r\n",target,diff);
+
+            set_cursor(0, 0);
+            clear_screen();
+            print("target: %.4f, diff in degree: %.4f \r\n",target,diff/PI*180.0);
             print("PID output: %.f \r\n", out);
             motor->PrintData();
             count = 0;
-        }
 #ifdef CONTROLLER
-        print("CH0: %-4d CH1: %-4d CH2: %-4d CH3: %-4d ", dbus->ch0, dbus->ch1, dbus->ch2, dbus->ch3);
+            print("CH0: %-4d CH1: %-4d CH2: %-4d CH3: %-4d ", dbus->ch0, dbus->ch1, dbus->ch2, dbus->ch3);
+            print("SWL: %d SWR: %d @ %d ms\r\n", dbus->swl, dbus->swr, dbus->timestamp);
+            print("time: %d ms", );
 #endif
-        // print("SWL: %d SWR: %d @ %d ms\r\n", dbus->swl, dbus->swr, dbus->timestamp);
+        }
+
         osDelay(10);
 
     }
