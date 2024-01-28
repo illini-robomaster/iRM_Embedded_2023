@@ -52,7 +52,7 @@ void RM_RTOS_Init() {
 
     /* Init */
     can1 = new bsp::CAN(&hcan1, true);
-    motor =  new control::Motor3510(can1,0x207);
+    motor =  new control::Motor3510(can1,0x205);
 
     dbus = new remote::DBUS(&huart3);
 
