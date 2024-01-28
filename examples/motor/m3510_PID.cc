@@ -44,7 +44,7 @@ control::MotorCANBase* motor = nullptr;     /* 3510Motor*/
 
 // float pid_params[3]{10000,1500,40000};           /* PID Params */
 
-float pid_params[3]{10000,0,10000};           /* PID Params */
+float pid_params[3]{10000,200,40000};           /* PID Params */
 
 #ifdef CONTROLLER
   remote::DBUS* dbus = nullptr;             /* Controller */
@@ -52,7 +52,6 @@ float pid_params[3]{10000,0,10000};           /* PID Params */
 
 void RM_RTOS_Init() {
     print_use_uart(&huart1);                /* Print through *huart*/
-    last_time_ms = xTaskGetTickCount() * (1.0/configTICK_RATE_HZ) * 1000;
 
     /* Init */
     can1 = new bsp::CAN(&hcan1, true);
@@ -84,16 +83,21 @@ void RM_RTOS_Default_Task(const void* args){
     float diff = 0; /* Position Difference */
     float out = 0;  /* PID Controller Output */
     float target = 3.14; /* Target Position */
-    int32_t curr_time_ms = 0;
-    int32_t last_time_ms = xTaskGetTickCount() * (1.0/configTICK_RATE_HZ) * 1000;
+    float curr_time_s = 0; //current timestamp
+    float last_time_s = xTaskGetTickCount() * (1.0/configTICK_RATE_HZ); //last loop's timestamp
+    float delta_time_s = 0; //loop delta time
+    float target_angular_vel = 0; //target m3510 angular_vel
 
     int count = 0;
 
     while (true) {
 #ifdef CONTROLLER
-        curr_time_ms = xTaskGetTickCount() * (1.0/configTICK_RATE_HZ) * 1000;
-        int32_t delta_time_ms = curr_time_ms - last_time_ms;
-        target = clip<float>(float(dbus->ch1) / remote::DBUS::ROCKER_MAX * PI,-PI,PI);
+        curr_time_s = xTaskGetTickCount() * (1.0/configTICK_RATE_HZ);
+        delta_time_s = curr_time_s - last_time_s;
+        last_time_s = curr_time_s;
+        target_angular_vel = float(dbus->ch1) / remote::DBUS::ROCKER_MAX * PI; //maximum 1 PI/s rate change
+        target += target_angular_vel * delta_time_s;
+        target = clip<float>(target,0,2*PI); //angle limit for the gimbal
 #endif  
         
         //Calculate error
@@ -106,7 +110,6 @@ void RM_RTOS_Default_Task(const void* args){
 
         control::MotorCANBase::TransmitOutput(motors, 1);
 
-
         //Check output
     
         count ++;
@@ -115,14 +118,14 @@ void RM_RTOS_Default_Task(const void* args){
 
             set_cursor(0, 0);
             clear_screen();
-            print("target: %.4f, diff in degree: %.4f \r\n",target,diff/PI*180.0);
+            print("target: %.4f, diff in degree: %.4f, target_angular_vel: %.4f \r\n",target,diff/PI*180.0, target_angular_vel);
             print("PID output: %.f \r\n", out);
             motor->PrintData();
             count = 0;
 #ifdef CONTROLLER
             print("CH0: %-4d CH1: %-4d CH2: %-4d CH3: %-4d ", dbus->ch0, dbus->ch1, dbus->ch2, dbus->ch3);
             print("SWL: %d SWR: %d @ %d ms\r\n", dbus->swl, dbus->swr, dbus->timestamp);
-            print("time: %d ms", );
+            print("time: %d s", curr_time_s);
 #endif
         }
 
