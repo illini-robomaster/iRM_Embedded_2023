@@ -31,3 +31,7 @@ irm_add_arm_executable(${PROJECT_NAME}_imu
 irm_add_arm_executable(${PROJECT_NAME}_typeC
     TARGET DJI_Board_TypeC
     SOURCES typeC.cc)
+
+irm_add_arm_executable(${PROJECT_NAME}_m3510
+    TARGET DJI_Board_TypeC
+    SOURCES m3510.cc)
