@@ -57,8 +57,8 @@ namespace control{
 
     servo_status_t Steering6020::SetTarget(float target, bool override){
         if(motor_->GetThetaDelta(wrap<float>(target_angle_ + install_offset_,-PI,PI)) < 0.1 || override) {
-            corrected_current_angle_ = 2*PI-target;
-            target_angle_ = wrap<float>(2*PI - target + install_offset_,0,2*PI);
+            corrected_target_angle_ = 2*PI-target;
+            target_angle_ = wrap<float>(corrected_target_angle_+ install_offset_,0,2*PI);
             return TURNING_CLOCKWISE;
         }
         return INPUT_REJECT;
@@ -68,15 +68,18 @@ namespace control{
 
     void Steering6020::SetMaxAcceleration(float max_acceleration){max_acceleration_ = max_acceleration;};
 
-    float Steering6020::GetTarget(){return corrected_target_angle_;}
+    float Steering6020::GetTarget(){return wrap<float>(wrap<float>(2*PI-corrected_target_angle_,-PI,PI), -PI, PI);}
 
-    float Steering6020::GetTheta(){return corrected_current_angle_;}
+    float Steering6020::GetTheta(){return wrap<float>(wrap<float>(2*PI-corrected_current_angle_,-PI,PI), -PI, PI);}
 
+    // float Steering6020::GetTarget(){return corrected_target_angle_;}
+
+    // float Steering6020::GetTheta(){return corrected_current_angle_;}
 
     bool Steering6020::inPosition(){return abs(target_angle_- motor_->GetTheta())<0.1;}
 
     void Steering6020::PrintData(){
-        print("Current: %04f, Target: %04f", GetTheta(),target_angle_);
+        print("Current: %04f, Target: %04f \r\n", GetTheta(),GetTarget());
     }
 
 

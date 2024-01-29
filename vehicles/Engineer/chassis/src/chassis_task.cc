@@ -27,6 +27,7 @@ static control::EngineerSteeringChassis* chassis;
 
 static volatile bool Dead = false;
 
+int16_t loop_count = 0;
 
 void chassisTask(void* arg){
     UNUSED(arg);
@@ -60,33 +61,38 @@ void chassisTask(void* arg){
         vy_set = 0;
 #endif
 
-       
-
+        vx_set = dbus->ch0;
+        vy_set = dbus->ch1;
         chassis->SteerSetMaxSpeed(RUN_SPEED);
         sin_yaw = sin(relative_angle);
         cos_yaw = cos(relative_angle);
         vx = cos_yaw * vx_set + sin_yaw * vy_set;
         vy = -sin_yaw * vx_set + cos_yaw * vy_set;
-        wz = std::min(FOLLOW_SPEED, FOLLOW_SPEED * relative_angle);       /* TODO : ASK IF GIMBAL EXIST, HOW CHASSIS MOVE */
-//        wz = dbus->ch2;
+        wz = std::min(FOLLOW_SPEED, FOLLOW_SPEED * dbus->ch2);       /* TODO : ASK IF GIMBAL EXIST, HOW CHASSIS MOVE */
+        // wz = dbus->ch2;
 #ifndef  SINGLEBOARD
-        wz = receive->relative_angle;
+        // wz = receive->relative_angle;
 #else
         wz = 0;
 #endif
         // if (-CHASSIS_DEADZONE < relative_angle && relative_angle < CHASSIS_DEADZONE) wz = 0;
-
         chassis->SetSpeed(vx / 10, vy / 10, wz/10);
         chassis->SteerUpdateTarget();
         constexpr float WHEEL_SPEED_FACTOR = 4;
         chassis->WheelUpdateSpeed(WHEEL_SPEED_FACTOR);
         chassis->SteerCalcOutput();
-//        chassis->PrintData();
 
+        if(loop_count == 100){
+            chassis->PrintData();
+            loop_count = 0;
+        }
+        loop_count ++;
+#ifdef REFEREE
         chassis->Update((float)referee->game_robot_status.chassis_power_limit,
                            referee->power_heat_data.chassis_power,
                            (float)referee->power_heat_data.chassis_power_buffer);
-//        chassis->Update(0,
+#endif
+//        chass is->Update(0,
 //                        0,
 //                        0);
 ////

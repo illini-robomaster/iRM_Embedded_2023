@@ -173,6 +173,12 @@ EngineerSteeringChassis::~EngineerSteeringChassis() {
     double _theta_bl = atan2(vy - vw * cos(PI / 4), vx - vw * sin(PI / 4));
     double _theta_br = atan2(vy - vw * cos(PI / 4), vx + vw * sin(PI / 4));
 
+    theta_fl_ = _theta_fl;
+    theta_fr_ = _theta_fr;
+    theta_bl_ = _theta_bl;;
+    theta_br_ = _theta_br;
+
+
     double _theta_fl_alt = wrap<double>(_theta_fl + PI, -PI, PI);
     double _theta_fr_alt = wrap<double>(_theta_fr + PI, -PI, PI);
     double _theta_bl_alt = wrap<double>(_theta_bl + PI, -PI, PI);
@@ -189,42 +195,58 @@ EngineerSteeringChassis::~EngineerSteeringChassis() {
     wheel_dir_br_ = 1.0;
 
     // Compute 2 position proposals, theta and theta + PI.
-    if (abs(wrap<double>(_theta_bl, -PI, PI)) <
-        abs(wrap<double>(_theta_bl_alt, -PI, PI))) {
-      wheel_dir_bl_ = 1.0;
-      ret_bl = bl_steer_motor->SetTarget(wrap<double>(_theta_bl, -PI, PI)) == 0 ? false : true;
+    // Turn to which one is closer
 
+    float _current_theta_bl = bl_steer_motor->GetTheta();
+    float _current_theta_br = br_steer_motor->GetTheta();
+    float _current_theta_fl = fl_steer_motor->GetTheta();
+    float _current_theta_fr = fr_steer_motor->GetTheta();
+
+
+    // Back Left Motor
+    if (abs(wrap<double>(_theta_bl - _current_theta_bl, -PI, PI)) <
+        abs(wrap<double>(_theta_bl_alt - _current_theta_bl, -PI, PI))) {
+      wheel_dir_bl_ = 1.0;
+      steer_target_bl_  = wrap<double>(_theta_bl, -PI, PI);
     } else {
       wheel_dir_bl_ = -1.0;
-      ret_bl = bl_steer_motor->SetTarget(wrap<double>(_theta_bl_alt , -PI, PI)) == 0 ? false : true;
+      steer_target_bl_  = wrap<double>(_theta_bl_alt, -PI, PI);
     }
-    if (abs(wrap<double>(_theta_br , -PI, PI)) <
-        abs(wrap<double>(_theta_br_alt, -PI, PI))) {
-      wheel_dir_br_ = 1.0;
-      ret_br = br_steer_motor->SetTarget(wrap<double>(_theta_br , -PI, PI)) == 0 ? false : true;
+    ret_bl = bl_steer_motor->SetTarget(steer_target_bl_) == 0 ? false : true;
 
+    //Back Right Motor
+    if (abs(wrap<double>(_theta_br - _current_theta_br, -PI, PI)) <
+        abs(wrap<double>(_theta_br_alt - _current_theta_br, -PI, PI))) {
+      wheel_dir_br_ = 1.0;
+      steer_target_br_  = wrap<double>(_theta_bl, -PI, PI);
     } else {
       wheel_dir_br_ = -1.0;
-      ret_br = br_steer_motor->SetTarget(wrap<double>(_theta_br_alt , -PI, PI)) == 0 ? false : true;
+      steer_target_br_  = wrap<double>(_theta_bl_alt, -PI, PI);
     }
-    if (abs(wrap<double>(_theta_fr , -PI, PI)) <
-        abs(wrap<double>(_theta_fr_alt , -PI, PI))) {
-      wheel_dir_fr_ = 1.0;
-      ret_fr = fr_steer_motor->SetTarget(wrap<double>(_theta_fr, -PI, PI)) == 0 ? false : true;
+    ret_br = br_steer_motor->SetTarget(steer_target_br_) == 0 ? false : true;
 
+    // Front Right Motor
+    if (abs(wrap<double>(_theta_fr - _current_theta_fr , -PI, PI)) <
+        abs(wrap<double>(_theta_fr_alt - _current_theta_fr , -PI, PI))) {
+      wheel_dir_fr_ = 1.0;
+      steer_target_fr_  = wrap<double>(_theta_fr, -PI, PI);
     } else {
       wheel_dir_fr_ = -1.0;
-      ret_fr = fr_steer_motor->SetTarget(wrap<double>(_theta_fr_alt , -PI, PI)) == 0 ? false : true;
+      steer_target_fr_  = wrap<double>(_theta_fr_alt, -PI, PI);
     }
-    if (abs(wrap<double>(_theta_fl, -PI, PI)) <
-        abs(wrap<double>(_theta_fl_alt, -PI, PI))) {
-      wheel_dir_fl_ = 1.0;
-      ret_fl = fl_steer_motor->SetTarget(wrap<double>(_theta_fl, -PI, PI)) == 0 ? false : true;
+    ret_fr = fr_steer_motor->SetTarget(steer_target_fr_) == 0 ? false : true;
 
+
+    if (abs(wrap<double>(_theta_fl - _current_theta_fl, -PI, PI)) <
+        abs(wrap<double>(_theta_fl_alt - _current_theta_fl, -PI, PI))) {
+      wheel_dir_fl_ = 1.0;
+      steer_target_fl_ = wrap<double>(_theta_fl, -PI, PI);
     } else {
       wheel_dir_fl_ = -1.0;
-      ret_fl = fl_steer_motor->SetTarget(wrap<double>(_theta_fl_alt, -PI, PI)) == 0 ? false : true;
+      steer_target_fl_ = wrap<double>(_theta_fl_alt, -PI, PI);
     }
+    ret_fl = fl_steer_motor->SetTarget(steer_target_fl_) == 0 ? false : true;
+
 
     // if(fl_steer_motor->inPosition()){
     //   theta_fl_ = fl_steer_motor->GetTheta();
@@ -238,8 +260,6 @@ EngineerSteeringChassis::~EngineerSteeringChassis() {
     // if(br_steer_motor->inPosition()){
     //   theta_br_ = br_steer_motor->GetTheta();
     // }
-    
-
 
     //in_position logic might not working here.
     in_position = ret_fl && ret_fr && ret_bl && ret_br;
@@ -280,17 +300,36 @@ EngineerSteeringChassis::~EngineerSteeringChassis() {
     clear_screen();
     set_cursor(0, 0);
 
-    print("fl_steer_motor: \r\n");
-    fl_steer_motor->PrintData();
-    osDelay(10);
-    print("fr_steer_motor: \r\n");
-    fr_steer_motor->PrintData();
-    osDelay(10);
-    print("bl_steer_motor: \r\n");
-    bl_steer_motor->PrintData();
-    osDelay(10);
-    print("br_steer_motor: \r\n");
-    br_steer_motor->PrintData();
+    //print steer angle from chassis's reference
+    if(true){
+      print("fl_steer_motor: \r\n");
+      print("target: %f, current: %f \r\n", steer_target_fl_, fl_steer_motor->GetTheta());
+      osDelay(10);
+      print("fr_steer_motor: \r\n");
+      print("target: %f, current: %f \r\n", steer_target_fr_, fr_steer_motor->GetTheta());
+      osDelay(10);
+      print("bl_steer_motor: \r\n");
+      print("target: %f, current: %f \r\n", steer_target_bl_, bl_steer_motor->GetTheta());
+      osDelay(10);
+      print("br_steer_motor: \r\n");
+      print("target: %f, current: %f \r\n", steer_target_br_, br_steer_motor->GetTheta());
+ 
+    }
+    
+    //print motor data
+    if(false){
+      print("fl_steer_motor: \r\n");
+      fl_steer_motor->PrintData();
+      osDelay(10);
+      print("fr_steer_motor: \r\n");
+      fr_steer_motor->PrintData();
+      osDelay(10);
+      print("bl_steer_motor: \r\n");
+      bl_steer_motor->PrintData();
+      osDelay(10);
+      print("br_steer_motor: \r\n");
+      br_steer_motor->PrintData();
+    }
   }
 
   bool EngineerSteeringChassis::SteerInPosition(){

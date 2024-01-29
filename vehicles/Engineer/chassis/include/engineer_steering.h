@@ -152,6 +152,11 @@ public:
   double theta_bl_;
   double theta_br_;
 
+  double steer_target_fl_;
+  double steer_target_fr_;
+  double steer_target_bl_;
+  double steer_target_br_;
+
   float wheel_dir_fl_;
   float wheel_dir_fr_;
   float wheel_dir_bl_;
