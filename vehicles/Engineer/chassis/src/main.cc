@@ -100,7 +100,6 @@ void RM_RTOS_Default_Task(const void* args) {
       set_cursor(0,0);
       clear_screen();
       print("HAL Tick: %d \r\n", HAL_GetTick());
-      print("test number: %d \r\n", testNumber); 
       print("vx: %d, vy: %d, wz; %d \r\n", dbus->ch0, dbus->ch1, dbus->ch2);
 #ifdef REFEREE
       print("ROBOTID: %d",referee->game_robot_status.robot_id);
