@@ -93,7 +93,7 @@ EngineerSteeringChassis::~EngineerSteeringChassis() {
 }
 
 
- // front -> positive, back -> negative
+  // front -> positive, back -> negative
   void EngineerSteeringChassis::SetXSpeed(float _vx){ vx = _vx; }
 
   // left -> positive, right -> negative
@@ -175,7 +175,7 @@ EngineerSteeringChassis::~EngineerSteeringChassis() {
 
     theta_fl_ = _theta_fl;
     theta_fr_ = _theta_fr;
-    theta_bl_ = _theta_bl;;
+    theta_bl_ = _theta_bl;
     theta_br_ = _theta_br;
 
 
@@ -218,10 +218,10 @@ EngineerSteeringChassis::~EngineerSteeringChassis() {
     if (abs(wrap<double>(_theta_br - _current_theta_br, -PI, PI)) <
         abs(wrap<double>(_theta_br_alt - _current_theta_br, -PI, PI))) {
       wheel_dir_br_ = 1.0;
-      steer_target_br_  = wrap<double>(_theta_bl, -PI, PI);
+      steer_target_br_  = wrap<double>(_theta_br, -PI, PI);
     } else {
       wheel_dir_br_ = -1.0;
-      steer_target_br_  = wrap<double>(_theta_bl_alt, -PI, PI);
+      steer_target_br_  = wrap<double>(_theta_br_alt, -PI, PI);
     }
     ret_br = br_steer_motor->SetTarget(steer_target_br_) == 0 ? false : true;
 
@@ -265,7 +265,7 @@ EngineerSteeringChassis::~EngineerSteeringChassis() {
     in_position = ret_fl && ret_fr && ret_bl && ret_br;
     in_position_detector->input(in_position);
 
-    }
+  }
 }
 
   void EngineerSteeringChassis::WheelUpdateSpeed(float wheel_speed_factor){

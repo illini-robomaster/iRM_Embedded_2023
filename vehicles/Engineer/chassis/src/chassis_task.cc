@@ -68,8 +68,8 @@ void chassisTask(void* arg){
         cos_yaw = cos(relative_angle);
         vx = cos_yaw * vx_set + sin_yaw * vy_set;
         vy = -sin_yaw * vx_set + cos_yaw * vy_set;
-        wz = std::min(FOLLOW_SPEED, FOLLOW_SPEED * dbus->ch2);       /* TODO : ASK IF GIMBAL EXIST, HOW CHASSIS MOVE */
-        // wz = dbus->ch2;
+        // wz = std::min(FOLLOW_SPEED, FOLLOW_SPEED * dbus->ch2);       /* TODO : ASK IF GIMBAL EXIST, HOW CHASSIS MOVE */
+        wz = dbus->ch2;
 #ifndef  SINGLEBOARD
         // wz = receive->relative_angle;
 #else
@@ -92,10 +92,10 @@ void chassisTask(void* arg){
                            referee->power_heat_data.chassis_power,
                            (float)referee->power_heat_data.chassis_power_buffer);
 #endif
-//        chass is->Update(0,
+//        chassis->Update(0,
 //                        0,
 //                        0);
-////
+//
 
         if (Dead) {
         chassis->SetSpeed(0,0,0);
