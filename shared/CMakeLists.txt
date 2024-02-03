@@ -44,3 +44,9 @@ irm_add_board_specific_library(DJI_Board_TypeC_irm
     SOURCES ${IRM_SOURCES}
     INCLUDES ${IRM_INCLUDES}
     DEPENDS eigen3)
+
+irm_add_board_specific_library(DM_MC_01_irm
+        TARGET DM_MC_01
+        SOURCES ${IRM_SOURCES}
+        INCLUDES ${IRM_INCLUDES}
+        DEPENDS eigen3)
