@@ -92,10 +92,10 @@ void chassisTask(void* arg){
                            referee->power_heat_data.chassis_power,
                            (float)referee->power_heat_data.chassis_power_buffer);
 #endif
-//        chassis->Update(0,
-//                        0,
-//                        0);
-//
+        chassis->Update(50,
+                       50,
+                       50);
+
 
         if (Dead) {
         chassis->SetSpeed(0,0,0);
