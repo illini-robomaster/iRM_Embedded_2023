@@ -18,43 +18,43 @@
  *                                                                          *
  ****************************************************************************/
 
-#include "encoder.h"
+#include "cmsis_os.h"
+#include "main.h"
+#include "cybergear.h"
+#include "bsp_gpio.h"
+#include "bsp_print.h"
+#include <cstdlib>
 
-#include "arm_math.h"
+static xiaomi::CAN* can = nullptr;
+static xiaomi::CyberGear* cybergear = nullptr;
+static bsp::GPIO* key = nullptr;
 
-using namespace bsp;
+void RM_RTOS_Init() {
+  print_use_usb();
 
-namespace control {
-
-//==================================================================================================
-// BRT Encoder
-//==================================================================================================
-
-static void can_encoder_callback(const uint8_t data[], const CAN_RxHeaderTypeDef& header, void* args) {
-  (void)header;
-  BRTEncoder* encoder = reinterpret_cast<BRTEncoder*>(args);
-  encoder->UpdateData(data);
+  key = new bsp::GPIO(KEY_GPIO_Port, KEY_Pin);
+  can = new xiaomi::CAN(&hcan1);
+  cybergear = new xiaomi::CyberGear(can, 126, xiaomi::Motion_mode);
 }
 
-BRTEncoder::BRTEncoder(CAN* can, uint16_t rx_id) : can_(can), rx_id_(rx_id) {
-  can->RegisterRxCallback(rx_id, can_encoder_callback, this);
-  angle_ = 0;
+void RM_RTOS_Default_Task(const void* args) {
+  UNUSED(args);
+
+  cybergear->SetZeroPosition();
+
+  while (true) {
+    if (key->Read() == 0) {
+      cybergear->Stop();
+      osDelay(100);
+    }
+
+    cybergear->SendMotionCommand(.1, 0., 0., 0., 0.);
+    print("angle: %.4f speed: %.4f torque: %.4f temp: %.4f master can ID: %d\r\n",
+         cybergear->GetAngle(),
+         cybergear->GetSpeed(),
+         cybergear->GetTorque(),
+         cybergear->GetTemperature(),
+         cybergear->GetMasterCanID());
+    osDelay(10);
+  }
 }
-
-void BRTEncoder::UpdateData(const uint8_t data[]) {
-  const uint32_t raw_angle = data[6] << 24 | data[5] << 16 | data[4] << 8 | data[3];
-
-  constexpr float THETA_SCALE = 2 * PI / 1024;  // digital -> rad
-                                                // the maximum digital value range is [0 - 1023]
-  angle_ = raw_angle * THETA_SCALE;
-
-  connection_flag_ = true;
-}
-
-void BRTEncoder::PrintData() const {
-  set_cursor(0, 0);
-  clear_screen();
-  print("angle: % .4f\r\n", angle_);
-}
-
-} /* namespace control */
