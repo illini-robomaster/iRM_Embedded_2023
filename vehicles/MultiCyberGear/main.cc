@@ -19,25 +19,23 @@
  ****************************************************************************/
 
 
-#include <cstdio>
-
 #include "bsp_print.h"
-#include "cmsis_os.h"
+#include "cmsis_os2.h"
 #include "main.h"
 
-const osThreadAttr_t imuTaskAttribute = {.name = "imuTask",
-                                         .attr_bits = osThreadDetached,
-                                         .cb_mem = nullptr,
-                                         .cb_size = 0,
-                                         .stack_mem = nullptr,
-                                         .stack_size = 512 * 4,
-                                         .priority = (osPriority_t)osPriorityRealtime,
-                                         .tz_module = 0,
-                                         .reserved = 0};
-osThreadId_t imuTaskHandle;
+const osTimerAttr_t controlTimerAttribute = {
+  .name = "controlTimer",
+  .attr_bits = 0,
+  .cb_mem = nullptr,
+  .cb_size = 0,
+};
 
-void imuTask(void* arg) {
+osTimerId_t controlTimer;
+
+void controlTask(void* arg) {
   UNUSED(arg);
+
+  //print("%lu\r\n", osKernelGetTickCount());
 }
 
 //==================================================================================================
@@ -48,12 +46,8 @@ void RM_RTOS_Init(void) {
   print_use_usb();
 }
 
-//==================================================================================================
-// RM Thread Init
-//==================================================================================================
-
-void RM_RTOS_Threads_Init(void) {
-  imuTaskHandle = osThreadNew(imuTask, nullptr, &imuTaskAttribute);
+void RM_RTOS_Timers_Init(void) {
+  //controlTimer = osTimerNew(controlTask, osTimerPeriodic, nullptr, &controlTimerAttribute);
 }
 
 //==================================================================================================
@@ -63,8 +57,11 @@ void RM_RTOS_Threads_Init(void) {
 void RM_RTOS_Default_Task(const void* arg) {
   UNUSED(arg);
 
+  //osTimerStart(controlTimer, 5U);
+
   while (true) {
-    osDelay(1);
+    print("%lu\r\n", osKernelGetTickCount());
+    osDelay(10);
   }
 }
 
