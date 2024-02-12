@@ -35,7 +35,7 @@ osTimerId_t controlTimer;
 void controlTask(void* arg) {
   UNUSED(arg);
 
-  //print("%lu\r\n", osKernelGetTickCount());
+  print("%lu\r\n", osKernelGetTickCount());
 }
 
 //==================================================================================================
@@ -47,7 +47,7 @@ void RM_RTOS_Init(void) {
 }
 
 void RM_RTOS_Timers_Init(void) {
-  //controlTimer = osTimerNew(controlTask, osTimerPeriodic, nullptr, &controlTimerAttribute);
+  controlTimer = osTimerNew(controlTask, osTimerPeriodic, nullptr, &controlTimerAttribute);
 }
 
 //==================================================================================================
@@ -57,12 +57,7 @@ void RM_RTOS_Timers_Init(void) {
 void RM_RTOS_Default_Task(const void* arg) {
   UNUSED(arg);
 
-  //osTimerStart(controlTimer, 5U);
-
-  while (true) {
-    print("%lu\r\n", osKernelGetTickCount());
-    osDelay(10);
-  }
+  osTimerStart(controlTimer, 2U);
 }
 
 //==================================================================================================
