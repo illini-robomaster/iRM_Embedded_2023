@@ -42,7 +42,7 @@
 #include "stepper.h"
 #include "iwdg.h"
 #include "minipc_protocol.h"
-#include "iwdg.h"
+
 
 static bsp::CAN* can1 = nullptr;
 static bsp::CAN* can2 = nullptr;
