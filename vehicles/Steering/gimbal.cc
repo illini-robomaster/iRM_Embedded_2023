@@ -664,6 +664,8 @@ void selfTestTask(void* arg) {
   UNUSED(arg);
   osDelay(100);
   MX_IWDG_Init();
+  // independent watch dog initialized
+  // signals could be wait for the other tasks in order to detect the error
   //Try to make the chassis Flags initialized at first.
 
   //Could need more time to test it out.

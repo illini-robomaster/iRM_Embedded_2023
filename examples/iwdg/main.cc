@@ -44,11 +44,11 @@ void RM_RTOS_Default_Task(const void* arguments){
     UNUSED(arguments);
     HAL_Init();
 //    reloop = 0;
-    MX_IWDG_Init();
+//    MX_IWDG_Init();
     // expected behavior: triggers a hard reset if not refreshed within the expected timeout
     while(true){
         print("%d\n", HAL_GetTick());
         osDelay(10);
-        HAL_IWDG_Refresh(&hiwdg);
+//        HAL_IWDG_Refresh(&hiwdg);
     }
 }
