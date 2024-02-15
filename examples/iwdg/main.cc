@@ -49,6 +49,6 @@ void RM_RTOS_Default_Task(const void* arguments){
     while(true){
         print("%d\n", HAL_GetTick());
         osDelay(10);
-//        HAL_IWDG_Refresh(&hiwdg);
+        HAL_IWDG_Refresh(&hiwdg);
     }
 }
