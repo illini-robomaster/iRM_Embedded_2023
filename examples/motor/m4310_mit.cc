@@ -30,7 +30,7 @@ static control::Motor4310* motor = nullptr;
 remote::DBUS* dbus = nullptr;
 
 void RM_RTOS_Init() {
-  print_use_uart(&huart1);
+//  print_use_uart(&huart5);
   can = new bsp::CAN(&hcan1, true);
 
   /* rx_id = Master id

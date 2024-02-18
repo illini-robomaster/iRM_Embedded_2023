@@ -64,6 +64,10 @@ irm_add_arm_executable(${PROJECT_NAME}_m4310_mit
         TARGET DJI_Board_TypeC
         SOURCES m4310_mit.cc)
 
+irm_add_arm_executable(${PROJECT_NAME}_m4310_mit_mc01
+        TARGET DM_MC_01
+        SOURCES m4310_mit.cc)
+
 irm_add_arm_executable(${PROJECT_NAME}_m4310_pos_vel
         TARGET DJI_Board_TypeC
         SOURCES m4310_pos_vel.cc)

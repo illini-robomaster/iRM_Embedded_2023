@@ -7,7 +7,7 @@
   ******************************************************************************
   * @attention
   *
-  * Copyright (c) 2024 STMicroelectronics.
+  * Copyright (c) 2023 STMicroelectronics.
   * All rights reserved.
   *
   * This software is licensed under terms that can be found in the LICENSE file
@@ -41,7 +41,9 @@ extern "C" {
 void MX_DMA_Init(void);
 
 /* USER CODE BEGIN Prototypes */
-
+void RM_DMA_SPI_IRQHandler(SPI_HandleTypeDef* hspi);
+void RM_DMA_I2C_IRQHandler(I2C_HandleTypeDef * hi2c);
+void MX_DMA_USART3_INIT(void);
 /* USER CODE END Prototypes */
 
 #ifdef __cplusplus
