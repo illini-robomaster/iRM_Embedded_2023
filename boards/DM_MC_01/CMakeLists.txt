@@ -43,14 +43,13 @@ target_link_options(${PROJECT_NAME}_interface INTERFACE
 target_link_libraries(${PROJECT_NAME}_interface INTERFACE board_interface)
 target_include_directories(${PROJECT_NAME}_interface INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Inc
-#    ${CMAKE_CURRENT_SOURCE_DIR}/FATFS/Target
-#    ${CMAKE_CURRENT_SOURCE_DIR}/FATFS/App
     ${CMAKE_CURRENT_SOURCE_DIR}/USB_DEVICE/App
     ${CMAKE_CURRENT_SOURCE_DIR}/USB_DEVICE/Target
     ${CMAKE_CURRENT_SOURCE_DIR}/Drivers/STM32F4xx_HAL_Driver/Inc
     ${CMAKE_CURRENT_SOURCE_DIR}/Drivers/STM32F4xx_HAL_Driver/Inc/Legacy
     ${CMAKE_CURRENT_SOURCE_DIR}/Drivers/CMSIS/Include
     ${CMAKE_CURRENT_SOURCE_DIR}/Drivers/CMSIS/Device/ST/STM32F4xx/Include
+    ${CMAKE_CURRENT_SOURCE_DIR}/Drivers/CMSIS/DSP/DSP_Lib_TestSuite/Common/JTest/inc
     ${CMAKE_CURRENT_SOURCE_DIR}/DSP/Include
     ${CMAKE_CURRENT_SOURCE_DIR}/Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Inc
     ${CMAKE_CURRENT_SOURCE_DIR}/Middlewares/ST/STM32_USB_Device_Library/Core/Inc
@@ -58,6 +57,31 @@ target_include_directories(${PROJECT_NAME}_interface INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/Middlewares/Third_Party/FreeRTOS/Source/include
     ${CMAKE_CURRENT_SOURCE_DIR}/Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2
     ${CMAKE_CURRENT_SOURCE_DIR}/Middlewares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM4F)
+
+#file(GLOB_RECURSE DRIVER_SOURCES_FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/*.*)
+#set(DRIVER_SOURCES
+#        ${DRIVER_SOURCES_FILES}
+#        ${CRC_CHECK_SOURCES})
+#set(DRIVER_INCLUDES
+#        ${CMAKE_CURRENT_SOURCE_DIR}/include
+#        ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/crc_check/include)
+#
+#file(GLOB_RECURSE DM_MC01_Specific_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/DM_MC01/src/*.*)
+#set(DM_MC01_Drivers_SOURCES
+#        ${DRIVER_SOURCES}
+#        ${DM_MC01_Specific_SOURCES})
+#set(DM_MC01_Drivers_INCLUDES
+#        ${DRIVER_INCLUDES}
+#        ${CMAKE_CURRENT_SOURCE_DIR}/DM_MC01/include)
+#rm_add_board_specific_library(DM_MC01_general_drivers
+#        TARGET DM_MC01_general
+#        SOURCES
+#        ${DM_MC01_Drivers_SOURCES}
+#
+#        INCLUDES
+#        ${DM_MC01_Drivers_INCLUDES}
+#        DEPENDS DM_MC01_general_platform DM_MC01_general_algorithm)
+#target_include_directories(DM_MC01_general_drivers PUBLIC ${DM_MC01_Drivers_INCLUDES})
 
 #####################################################
 # ----- create board specific arm dsp library ----- #
@@ -73,8 +97,7 @@ target_link_libraries(${PROJECT_NAME}_libDSP PRIVATE ${PROJECT_NAME}_interface)
 # ----- create board specific driver library -----#
 ###################################################
 file(GLOB_RECURSE CORE_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/*.c)
-#file(GLOB_RECURSE FATFS_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/FATFS/*.c)
-file(GLOB_RECURSE USB_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/USB_DEVICE/*.c)
+#file(GLOB_RECURSE USB_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/USB_DEVICE/*.c)
 file(GLOB_RECURSE DRIVER_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/Drivers/*.c)
 file(GLOB_RECURSE MIDDLEWARE_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/Middlewares/*.c)
 file(GLOB_RECURSE STARTUP_ASM ${CMAKE_CURRENT_SOURCE_DIR}/startup_stm32f446xx.s)
