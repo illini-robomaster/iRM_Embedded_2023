@@ -76,15 +76,15 @@ void RM_RTOS_Default_Task(const void* args) {
     float vel_2;
     float vel_3;
 
-    vel_1 = clip<float>(dbus->ch1 / 660.0 * 15.0, -15, 15);
+    vel_1 = clip<float>(dbus->ch0 / 660.0 * 15.0, -15, 15);
     pos_1 += vel_1 / 200;
     pos_1 = clip<float>(pos_1, min_pos, max_pos);   // clipping position within a range
 
-    vel_2 = clip<float>(dbus->ch2 / 660.0 * 15.0, -15, 15);
+    vel_2 = clip<float>(-dbus->ch3 / 660.0 * 15.0, -15, 15);
     pos_2 += vel_2 / 200;
     pos_2 = clip<float>(pos_2, -PI/2, PI/2);   // clipping position within a range
 
-    vel_3 = clip<float>(dbus->ch3 / 660.0 * 15.0, -15, 15);
+    vel_3 = clip<float>(dbus->ch2 / 660.0 * 15.0, -15, 15);
     pos_3 += vel_3 / 200;
     pos_3 = clip<float>(pos_3, min_pos, max_pos);   // clipping position within a range
 
