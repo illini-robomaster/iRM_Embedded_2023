@@ -61,8 +61,8 @@ void chassisTask(void* arg){
         vy_set = 0;
 #endif
 
-        vx_set = dbus->ch0;
-        vy_set = dbus->ch1;
+        vx_set = dbus->ch1;
+        vy_set = -dbus->ch0;
         chassis->SteerSetMaxSpeed(RUN_SPEED);
         sin_yaw = sin(relative_angle);
         cos_yaw = cos(relative_angle);
