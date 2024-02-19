@@ -61,16 +61,19 @@ void RM_RTOS_Default_Task(const void* argument) {
 
   auto minipc_session = communication::MinipcPort();
 
+  //communication::gimbal_data_t gimbal_data;
+  //communication::color_data_t color_data;
+  //communication::chassis_data_t chassis_data;
+  //communication::selfcheck_data_t selfcheck_data;
+  //communication::arm_data_t arm_data;
   communication::selfcheck_data_t selfcheck_data;
-  //if changed, please make sure the data type in `case Test.LATENCY` communicator.py in the vision repo is also changed
+  communication::arm_data_t arm_data;
 
   const communication::status_data_t* status_data;
 
-  selfcheck_data.mode = 0;
-  selfcheck_data.debug_int = 0;
-
   uint8_t packet_to_send[minipc_session.MAX_PACKET_LENGTH];
   uint8_t *data;
+  uint8_t recv_cmd_id;
   int32_t length;
 
   while (true) {
@@ -82,13 +85,57 @@ void RM_RTOS_Default_Task(const void* argument) {
     if (flags & RX_SIGNAL) {
       length = uart->Read(&data);
       minipc_session.ParseUartBuffer(data, length);
+
+      recv_cmd_id = minipc_session.GetCmdId();
       status_data = minipc_session.GetStatus();
 
+      switch (recv_cmd_id) {
+        case communication::GIMBAL_CMD_ID:
+            // Forward gimbal data
+            break;
+        case communication::COLOR_CMD_ID:
+            // Forward color data
+            break;
+        case communication::CHASSIS_CMD_ID:
+            // Forward gimbal data
+            break;
+        case communication::SELFCHECK_CMD_ID:
+            if (status_data->mode == 1){
+                selfcheck_data.mode = 1;
+                selfcheck_data.debug_int = status_data->debug_int;
 
-      selfcheck_data.mode = status_data->mode;
-      selfcheck_data.debug_int = status_data->debug_int;
-      minipc_session.Pack(packet_to_send, (void*)&selfcheck_data, communication::SELFCHECK_CMD_ID);
-      uart->Write(packet_to_send, minipc_session.GetPacketLen(communication::SELFCHECK_CMD_ID));
+                minipc_session.Pack(packet_to_send, (void*)&selfcheck_data, communication::SELFCHECK_CMD_ID);
+                uart->Write(packet_to_send, minipc_session.GetPacketLen(communication::SELFCHECK_CMD_ID));
+            } else if (status_data->mode == 2){
+                // Respond with ID:
+                //  BRD: 129 (129 - 127 = 2)
+                //  See repo irm_tele_arm `config.py` for details
+                selfcheck_data.mode = 2;
+                selfcheck_data.debug_int = 129;
+
+                minipc_session.Pack(packet_to_send, (void*)&selfcheck_data, communication::SELFCHECK_CMD_ID);
+                uart->Write(packet_to_send, minipc_session.GetPacketLen(communication::SELFCHECK_CMD_ID));
+            }
+            break;
+        case communication::ARM_CMD_ID:
+            arm_data.floats[0] = status_data->floats[0];
+            arm_data.floats[1] = status_data->floats[1];
+            arm_data.floats[2] = status_data->floats[2];
+            arm_data.floats[3] = status_data->floats[3];
+            arm_data.floats[4] = status_data->floats[4];
+            arm_data.floats[5] = status_data->floats[5];
+
+            minipc_session.Pack(packet_to_send, (void*)&arm_data, communication::ARM_CMD_ID);
+            uart->Write(packet_to_send, minipc_session.GetPacketLen(communication::ARM_CMD_ID));
+            break;
+        default:
+                selfcheck_data.mode = status_data->mode;
+                selfcheck_data.debug_int = 129;
+
+                minipc_session.Pack(packet_to_send, (void*)&selfcheck_data, communication::SELFCHECK_CMD_ID);
+                uart->Write(packet_to_send, minipc_session.GetPacketLen(communication::SELFCHECK_CMD_ID));
+            break;
+      }
 
     }
     osDelay(10);
