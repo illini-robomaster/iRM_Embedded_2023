@@ -28,8 +28,8 @@ static remote::DBUS* dbus;
 
 void RM_RTOS_Init(void) {
   //this uart config is for typeC board, if typeA, see /docs/config.md for which uart
-  print_use_uart(&huart1); 
-  dbus = new remote::DBUS(&huart3);
+  print_use_uart(&UART_HANDLE); 
+  dbus = new remote::DBUS(&DBUS_UART);
 }
 
 void RM_RTOS_Default_Task(const void* arguments) {
