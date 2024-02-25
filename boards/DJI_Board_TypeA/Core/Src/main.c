@@ -25,7 +25,6 @@
 #include "dma.h"
 #include "fatfs.h"
 #include "i2c.h"
-#include "iwdg.h"
 #include "sdio.h"
 #include "spi.h"
 #include "tim.h"
@@ -117,7 +116,6 @@ int main(void)
   MX_I2C2_Init();
   MX_FATFS_Init();
   MX_TIM2_Init();
-  MX_IWDG_Init();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
@@ -156,9 +154,8 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSI|RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
-  RCC_OscInitStruct.LSIState = RCC_LSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
   RCC_OscInitStruct.PLL.PLLM = 6;
@@ -217,10 +214,7 @@ void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
   /* User can add his own implementation to report the HAL error return state */
-    while(1){
-//        HAL_GPIO_TogglePin(LED_R_GPIO_Port, LED_R_Pin);
-        HAL_Delay(100);
-    }
+
   /* USER CODE END Error_Handler_Debug */
 }
 
