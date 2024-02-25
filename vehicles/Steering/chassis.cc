@@ -32,7 +32,6 @@
 #include "steering.h"
 #include "supercap.h"
 #include <cmath>
-#include "iwdg.h"
 
 static bsp::CAN* can1 = nullptr;
 static bsp::CAN* can2 = nullptr;
@@ -385,10 +384,11 @@ void chassisTask(void* arg) {
 void self_Check_Task(void* arg){
   UNUSED(arg);
 
-  MX_IWDG_Init();
+  
 
   while(true){
     osDelay(100);
+    
     motor8->connection_flag_ = false;
     motor7->connection_flag_ = false;
     motor6->connection_flag_ = false;
@@ -398,6 +398,7 @@ void self_Check_Task(void* arg){
     motor2->connection_flag_ = false;
     motor1->connection_flag_ = false;
     osDelay(100);
+    
     fl_wheel_motor_flag = motor8->connection_flag_;
     fr_wheel_motor_flag = motor7->connection_flag_;
     bl_wheel_motor_flag = motor6->connection_flag_;
@@ -415,6 +416,7 @@ void self_Check_Task(void* arg){
                    fr_wheel_motor_flag<<6|
                    fl_wheel_motor_flag<<7;
     osDelay(100);
+    
     if (flag_summary != EXPECTED_FLAG_SUMMARY){
       osEventFlagsSet(chassis_event_flags, CHASSIS_EVENT_FLAGS);
     }
@@ -424,7 +426,7 @@ void self_Check_Task(void* arg){
       receive->TransmitOutput();
     }
     transmission_flag = !transmission_flag;
-    HAL_IWDG_Refresh(&hiwdg);
+    
   }
 }
 void RM_RTOS_Init() {
@@ -521,10 +523,43 @@ void RM_RTOS_Init() {
   receive->TransmitOutput();
 }
 
+//==================================================================================================
+// Watch Dog
+//==================================================================================================
+const osThreadAttr_t rmWatchdogTaskAttribute = {.name = "rmWatchdogTask",
+                                                .attr_bits = osThreadDetached,
+                                                .cb_mem = nullptr,
+                                                .cb_size = 0,
+                                                .stack_mem = nullptr,
+                                                .stack_size = 256 * 4,
+                                                .priority = (osPriority_t)osPriorityRealtime4,
+                                                .tz_module = 0,
+                                                .reserved = 0};
+
+osThreadId_t rmWatchdogTaskHandle;
+
+IWDG_HandleTypeDef iwdg_handle;
+
+void RM_WATCHDOG(void *arg){
+  UNUSED(arg);
+  iwdg_handle.Instance = IWDG;
+  iwdg_handle.Init.Prescaler = IWDG_PRESCALER_32;
+  iwdg_handle.Init.Reload = 4000;
+  if (HAL_IWDG_Init(&iwdg_handle) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  while (true) {
+    HAL_IWDG_Refresh(&iwdg_handle);
+    osDelay(100);
+  }
+}
+
 void RM_RTOS_Threads_Init(void) {
   refereeTaskHandle = osThreadNew(refereeTask, nullptr, &refereeTaskAttribute);
   chassisTaskHandle = osThreadNew(chassisTask, nullptr, &chassisTaskAttribute);
   selfTestTaskHandle = osThreadNew(self_Check_Task, nullptr, &rmSelfTestingTask);
+  rmWatchdogTaskHandle = osThreadNew(RM_WATCHDOG, nullptr, &rmWatchdogTaskAttribute);
 }
 
 void KillAll() {

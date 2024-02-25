@@ -40,7 +40,6 @@
 #include "rgb.h"
 #include "shooter.h"
 #include "stepper.h"
-#include "iwdg.h"
 #include "minipc_protocol.h"
 
 
@@ -229,7 +228,6 @@ void gimbalTask(void* arg) {
 
     osDelay(GIMBAL_TASK_DELAY);
   }
-  HAL_IWDG_Refresh(&hiwdg);
   // prevent unexpected timeout
   print("Gimbal Begin!\r\n");
   RGB->Display(display::color_green);
@@ -249,7 +247,11 @@ void gimbalTask(void* arg) {
     if(gimbal_error_flag & GIMBAL_ERROR_DETECT) {
       Error_Handler();
     }
-    while (Dead || GimbalDead) osDelay(100);
+    
+    while (Dead || GimbalDead) {
+      osDelay(100);
+      
+    }
     // autoaim comflict with spinmode control
     if (dbus->keyboard.bit.F /*|| dbus->swl == remote::UP*/ || dbus->keyboard.bit.CTRL) {
       float abs_pitch_buffer = abs_pitch_jetson;
@@ -284,7 +286,7 @@ void gimbalTask(void* arg) {
       pitch_vel = -1 * clip<float>(dbus->ch3 / 660.0, -15, 15);
       pitch_pos += pitch_vel / 200 + dbus->mouse.y / 32767.0;
     }
-
+    
     if (pitch_reset) {
       // 4310 soft start
       pitch_motor->SetRelativeTarget(0);
@@ -314,6 +316,7 @@ void gimbalTask(void* arg) {
     control::MotorCANBase::TransmitOutput(motors_can1_gimbal, 1);
     control::Motor4310::TransmitOutput(motors_can1_pitch, 1);
     osDelay(GIMBAL_TASK_DELAY);
+    
   }
 }
 
@@ -578,7 +581,7 @@ void chassisTask(void* arg) {
   float vx_set, vy_set;
   uint32_t keymap_error_flag;
   while (true) {
-    ChangeSpinMode.input(dbus->keyboard.bit.SHIFT /*|| dbus->swl == remote::UP*/);
+    ChangeSpinMode.input(dbus->keyboard.bit.SHIFT || dbus->swl == remote::UP);
     if (ChangeSpinMode.posEdge()) SpinMode = !SpinMode;
 
     send->cmd.id = bsp::MODE;
@@ -663,15 +666,12 @@ static display::OLED* OLED = nullptr;
 void selfTestTask(void* arg) {
   UNUSED(arg);
   osDelay(100);
-  MX_IWDG_Init();
-  // independent watch dog initialized
-  // signals could be wait for the other tasks in order to detect the error
   //Try to make the chassis Flags initialized at first.
 
   //Could need more time to test it out.
   //The self test task for chassis will not update after the first check.
+  print("Self Test Begin!\r\n");
   OLED->ShowIlliniRMLOGO();
-  HAL_IWDG_Refresh(&hiwdg);
   buzzer->SingSong(Mario, [](uint32_t milli) { osDelay(milli); });
   OLED->OperateGram(display::PEN_CLEAR);
   OLED->ShowString(0, 0, (uint8_t*)"GP");
@@ -683,42 +683,48 @@ void selfTestTask(void* arg) {
   OLED->ShowString(3, 6, (uint8_t*)"Dbs");
   OLED->ShowString(4, 0, (uint8_t*)"Temp:");
   //  OLED->ShowString(4, 0, (uint8_t*)"Ref");
-
+  
   OLED->ShowString(0, 15, (uint8_t*)"S");
   OLED->ShowString(0, 18, (uint8_t*)"W");
-
+  
   OLED->ShowString(1, 12, (uint8_t*)"FL");
   OLED->ShowString(2, 12, (uint8_t*)"FR");
-//
   OLED->ShowString(3, 12, (uint8_t*)"BL");
   OLED->ShowString(4, 12, (uint8_t*)"BR");
-
+  
   selftestStart = send->self_check_flag;
+  
   while(!selftestStart){
       // wait for the self check signal
-    HAL_IWDG_Refresh(&hiwdg);
     selftestStart = send->self_check_flag;
     osDelay(100);
+    
+    print("wait for self check signal\r\n");
   }
+  
+  
   char temp[6] = "";
+  
   while (true) {
-    HAL_IWDG_Refresh(&hiwdg);
+    
     osDelay(100);
     pitch_motor->connection_flag_ = false;
     yaw_motor->connection_flag_ = false;
-    sl_motor->connection_flag_ = false;
     sr_motor->connection_flag_ = false;
     ld_motor->connection_flag_ = false;
-
+    
     referee->connection_flag_ = false;
     dbus->connection_flag_ = false;
+    
     osDelay(SELFTEST_TASK_DELAY);
+    
+    
     pitch_motor_flag = pitch_motor->connection_flag_;
     yaw_motor_flag = yaw_motor->connection_flag_;
     sl_motor_flag = sl_motor->connection_flag_;
     sr_motor_flag = sr_motor->connection_flag_;
     ld_motor_flag = ld_motor->connection_flag_;
-
+    
     chassis_flag_bitmap = send->chassis_flag;
     if (chassis_flag_bitmap != BITMAP_SUMMARY){
       osEventFlagsSet(keymap_error_event, ERROR_DETECT_SIGNAL);
@@ -747,6 +753,7 @@ void selfTestTask(void* arg) {
     calibration_flag = imu->CaliDone();
     //    referee_flag = referee->connection_flag_;
     dbus_flag = dbus->connection_flag_;
+    
     OLED->ShowBlock(0, 2, pitch_motor_flag);
     OLED->ShowBlock(0, 7, yaw_motor_flag);
     OLED->ShowBlock(1, 2, sl_motor_flag);
@@ -775,8 +782,39 @@ void selfTestTask(void* arg) {
     OLED->ShowBlock(4,15,br_steering_flag);
 
     OLED->RefreshGram();
+    
+  }
+}
 
+//==================================================================================================
+// Watch Dog
+//==================================================================================================
+const osThreadAttr_t rmWatchdogTaskAttribute = {.name = "rmWatchdogTask",
+                                             .attr_bits = osThreadDetached,
+                                             .cb_mem = nullptr,
+                                             .cb_size = 0,
+                                             .stack_mem = nullptr,
+                                             .stack_size = 256 * 4,
+                                             .priority = (osPriority_t)osPriorityRealtime4,
+                                             .tz_module = 0,
+                                             .reserved = 0};
 
+osThreadId_t rmWatchdogTaskHandle;
+
+IWDG_HandleTypeDef iwdg_handle;
+
+void RM_WATCHDOG(void *arg){
+  UNUSED(arg);
+  iwdg_handle.Instance = IWDG;
+  iwdg_handle.Init.Prescaler = IWDG_PRESCALER_32;
+  iwdg_handle.Init.Reload = 4000;
+  if (HAL_IWDG_Init(&iwdg_handle) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  while (true) {
+    HAL_IWDG_Refresh(&iwdg_handle);
+    osDelay(100);
   }
 }
 
@@ -856,6 +894,7 @@ void RM_RTOS_Threads_Init(void) {
   shooterTaskHandle = osThreadNew(shooterTask, nullptr, &shooterTaskAttribute);
   chassisTaskHandle = osThreadNew(chassisTask, nullptr, &chassisTaskAttribute);
   selfTestTaskHandle = osThreadNew(selfTestTask, nullptr, &rmSelfTestTaskAttribute);
+  rmWatchdogTaskHandle = osThreadNew(RM_WATCHDOG, nullptr, &rmWatchdogTaskAttribute);
   // jetsonCommTaskHandle = osThreadNew(jetsonCommTask, nullptr, &jetsonCommTaskAttribute);
 }
 
@@ -870,7 +909,6 @@ void KillAll() {
   laser->Off();
 
   while (true) {
-
     send->cmd.id = bsp::DEAD;
     send->cmd.data_bool = true;
     send->TransmitOutput();
@@ -981,9 +1019,7 @@ void RM_RTOS_Default_Task(const void* arg) {
 
       print("CH0: %-4d CH1: %-4d CH2: %-4d CH3: %-4d ", dbus->ch0, dbus->ch1, dbus->ch2, dbus->ch3);
       print("SWL: %d SWR: %d @ %d ms\r\n", dbus->swl, dbus->swr, dbus->timestamp);
-
     }
-
     osDelay(DEFAULT_TASK_DELAY);
   }
 }

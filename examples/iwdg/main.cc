@@ -19,12 +19,12 @@
  ****************************************************************************/
 
 #include "main.h"
-#include "iwdg.h"
 #include "cmsis_os.h"
 #include "bsp_print.h"
 #include "stm32f4xx_hal_iwdg.h"
 long reloop = 0;
 
+IWDG_HandleTypeDef iwdg_handle;
 void RM_RTOS_Init(void){
     print_use_uart(&huart1);
     // default &hiwdg got prescaler of 32 and reload of 1000
@@ -44,11 +44,17 @@ void RM_RTOS_Default_Task(const void* arguments){
     UNUSED(arguments);
     HAL_Init();
 //    reloop = 0;
-//    MX_IWDG_Init();
+    iwdg_handle.Instance = IWDG;
+    iwdg_handle.Init.Prescaler = IWDG_PRESCALER_32;
+    iwdg_handle.Init.Reload = 4000;
+    if (HAL_IWDG_Init(&iwdg_handle) != HAL_OK)
+    {
+      Error_Handler();
+    }
     // expected behavior: triggers a hard reset if not refreshed within the expected timeout
     while(true){
         print("%d\n", HAL_GetTick());
         osDelay(10);
-        HAL_IWDG_Refresh(&hiwdg);
+        HAL_IWDG_Refresh(&iwdg_handle);
     }
 }
