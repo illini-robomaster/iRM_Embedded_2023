@@ -31,6 +31,7 @@ remote::DBUS* dbus = nullptr;
 
 void RM_RTOS_Init() {
 //  print_use_uart(&huart5);
+  print_use_usb();
   can = new bsp::CAN(&hcan1, true);
 
   /* rx_id = Master id
@@ -43,6 +44,7 @@ void RM_RTOS_Init() {
   /* Make sure motor is set to the correct mode (in helper tool). Otherwise, motor won't start */
   motor = new control::Motor4310(can, 0x02, 0x01, control::MIT);
   dbus = new remote::DBUS(&huart3);
+  HAL_Delay(1000);
 }
 
 void RM_RTOS_Default_Task(const void* args) {
@@ -52,11 +54,14 @@ void RM_RTOS_Default_Task(const void* args) {
   control::Motor4310* motors[] = {motor};
 
   while(dbus->swr != remote::DOWN){}  // flip swr to start
+  print("start\r\n");
 
   /* Use SetZeroPos if you want to set current motor position as zero position. If uncommented, the
    * zero position is the zero position set before */
   motor->SetZeroPos();
   motor->MotorEnable();
+  osDelay(5000);
+  print("motor enabled\r\n" );
 
   float pos = 0;
   float min_pos = -PI/8;

@@ -61,11 +61,7 @@ irm_add_arm_executable(${PROJECT_NAME}_m2006_reload_modes
     SOURCES m2006_reload_modes.cc)
 
 irm_add_arm_executable(${PROJECT_NAME}_m4310_mit
-        TARGET DJI_Board_TypeC
-        SOURCES m4310_mit.cc)
-
-irm_add_arm_executable(${PROJECT_NAME}_m4310_mit_mc01
-        TARGET DM_MC_01
+        TARGET DJI_Board_TypeA
         SOURCES m4310_mit.cc)
 
 irm_add_arm_executable(${PROJECT_NAME}_m4310_pos_vel
@@ -83,3 +79,12 @@ irm_add_arm_executable(${PROJECT_NAME}_m3510
 irm_add_arm_executable(${PROJECT_NAME}_m3510_PID
         TARGET DJI_Board_TypeC
         SOURCES m3510_PID.cc)
+
+# DM-MC01
+irm_add_arm_executable(${PROJECT_NAME}_m3508_speed_mc01
+        TARGET DM_MC_01
+        SOURCES m3508_speed.cc)
+
+irm_add_arm_executable(${PROJECT_NAME}_m4310_mit_mc01
+        TARGET DM_MC_01
+        SOURCES m4310_mit.cc)
