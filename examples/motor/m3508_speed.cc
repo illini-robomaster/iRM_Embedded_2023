@@ -23,30 +23,52 @@
 #include "controller.h"
 #include "main.h"
 #include "motor.h"
+#include "dbus.h"
+#include "bsp_os.h"
 
-#define TARGET_SPEED 30
+#define TARGET_Position_positive 8*PI
 
 bsp::CAN* can = nullptr;
 control::MotorCANBase* motor = nullptr;
+remote::DBUS* dbus = nullptr;
+control::ServoMotor* servo = nullptr;
 
 void RM_RTOS_Init() {
   print_use_uart(&huart1);
+  bsp::SetHighresClockTimer(&htim5);
+
   can = new bsp::CAN(&hcan1, true);
-  motor = new control::Motor3508(can, 0x201);
+  motor = new control::Motor3508(can, 0x202);
+  dbus = new remote::DBUS(&huart3);
+
+
+  control::servo_t servo_data;
+  servo_data.motor = motor;
+  servo_data.max_speed = 30*PI;
+  servo_data.max_acceleration = 100*PI;
+  servo_data.transmission_ratio = M3508P19_RATIO;
+  servo_data.omega_pid_param = new float[3]{60, 0.5, 10};
+  servo_data.max_iout = 1000;
+  servo_data.max_out = 15000;
+  servo = new control::ServoMotor(servo_data);
 }
 
 void RM_RTOS_Default_Task(const void* args) {
   UNUSED(args);
 
   control::MotorCANBase* motors[] = {motor};
-  control::PIDController pid(20, 15, 30);
-
+  bool change_flag = false;
   while (true) {
-    float diff = motor->GetOmegaDelta(TARGET_SPEED);
-    int16_t out = pid.ComputeConstrainedOutput(diff);
-    motor->SetOutput(out);
+    if (motor->GetOmega() < 0.01 && change_flag == false) {
+      servo->SetTarget(-TARGET_Position_positive);
+      change_flag = true;
+
+    } else if (motor->GetOmega() < 0.01 && change_flag == true) {
+      servo->SetTarget(0);
+      change_flag = false;
+    }
+    servo->CalcOutput();
     control::MotorCANBase::TransmitOutput(motors, 1);
-    motor->PrintData();
     osDelay(10);
   }
 }
