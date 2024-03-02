@@ -646,7 +646,7 @@ const osThreadAttr_t rmSelfTestTaskAttribute = {.name = "selfTestTask",
                                               .cb_size = 0,
                                               .stack_mem = nullptr,
                                               .stack_size = 256 * 4,
-                                              .priority = (osPriority_t)osPriorityNormal,
+                                              .priority = (osPriority_t)osPriorityBelowNormal,
                                               .tz_module = 0,
                                               .reserved = 0};
 
@@ -694,13 +694,7 @@ void selfTestTask(void* arg) {
   
   selftestStart = send->self_check_flag;
   
-  while(!selftestStart){
-      // wait for the self check signal
-    selftestStart = send->self_check_flag;
-    osDelay(100);
-    
-    print("wait for self check signal\r\n");
-  }
+
   
   
   char temp[6] = "";
@@ -805,15 +799,21 @@ IWDG_HandleTypeDef iwdg_handle;
 
 void RM_WATCHDOG(void *arg){
   UNUSED(arg);
+  while (true) {
+
+    if (dbus->keyboard.bit.B || dbus->swr == remote::DOWN) break;
+    osDelay(100);
+  }
   iwdg_handle.Instance = IWDG;
-  iwdg_handle.Init.Prescaler = IWDG_PRESCALER_32;
-  iwdg_handle.Init.Reload = 4000;
+  iwdg_handle.Init.Prescaler = IWDG_PRESCALER_64;
+  iwdg_handle.Init.Reload = 20000;
   if (HAL_IWDG_Init(&iwdg_handle) != HAL_OK)
   {
     Error_Handler();
   }
   while (true) {
     HAL_IWDG_Refresh(&iwdg_handle);
+    print("Tick: %d\r\n", HAL_GetTick());
     osDelay(100);
   }
 }
