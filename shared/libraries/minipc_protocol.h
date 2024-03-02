@@ -59,6 +59,16 @@ typedef struct {
   float vw;
 } __packed chassis_data_t;
 
+typedef struct {
+  // FLUSH is 0. ECHO is 1. ID is 2.
+  uint8_t mode;
+  uint8_t debug_int;
+} __packed selfcheck_data_t;
+
+typedef struct {
+  float floats[6];
+} __packed arm_data_t;
+
 // summary of all information transmitted between minipc and stm32
 typedef struct {
   // RED is 0; BLUE is one
@@ -71,15 +81,20 @@ typedef struct {
   float vx;
   float vy;
   float vw;
+  float floats[6];
 } __packed status_data_t;
 
 // GIMBAL_CMD_ID  : 0x00 Autoaim gimbal RelYaw RelPitch
 // COLOR_CMD_ID   : 0x01
 // CHASSIS_CMD_ID : 0x02
+// SELFCHECK_CMD_ID :0x03
+// ARM_CMD-ID     : 0x04
 // TOTAL_NUM_OF_ID: length of the enum
 enum CMD_ID {GIMBAL_CMD_ID,
              COLOR_CMD_ID,
              CHASSIS_CMD_ID,
+             SELFCHECK_CMD_ID,
+             ARM_CMD_ID,
              TOTAL_NUM_OF_ID};
 
 // WARNING: THIS CLASS IS NOT THREAD SAFE!!!
@@ -96,6 +111,8 @@ class MinipcPort {
   void PackGimbalData(uint8_t* packet, gimbal_data_t* data);
   void PackColorData(uint8_t* packet, color_data_t* data);
   void PackChassisData(uint8_t* packet, chassis_data_t* data);
+  void PackSelfcheckData(uint8_t* packet, selfcheck_data_t* data);
+  void PackArmData(uint8_t* packet, arm_data_t* data);
 
   /**
    * @brief Total length of packet in bytes
@@ -130,16 +147,20 @@ class MinipcPort {
 
   /**
    * Length of the data section ONLY in bytes. Header/tail/crc8 (total len = 9) NOT included.
-   * Gimbal  CMD: id = 0x00, total packet length = 19 - 9 = 10
-   * Color   CMD: id = 0x01, total packet length = 10 - 9 = 1
-   * Chassis CMD: id = 0x02, total packet length = 21 - 9 = 12
+   * Gimbal    CMD: id = 0x00, total packet length = 19 - 9 = 10
+   * Color     CMD: id = 0x01, total packet length = 10 - 9 = 1
+   * Chassis   CMD: id = 0x02, total packet length = 21 - 9 = 12
+   * Selfcheck CMD: id = 0x03, total packet length = 11 - 9 = 2
+   * Arm       CMD: id = 0x04, total packet length = 33 - 9 = 24
    */
   static constexpr uint8_t CMD_TO_LEN[TOTAL_NUM_OF_ID] = {
                                                 sizeof(gimbal_data_t),
                                                 sizeof(color_data_t),
                                                 sizeof(chassis_data_t),
+                                                sizeof(selfcheck_data_t),
+                                                sizeof(arm_data_t),
                                                 };
-  static constexpr uint8_t MAX_PACKET_LENGTH = 21;
+  static constexpr uint8_t MAX_PACKET_LENGTH = 33;
   static constexpr uint8_t MIN_PACKET_LENGTH = 10;
   // sum of header and tail = 9. Total packet length = data length (CMD_TO_LEN) + 9
   static constexpr uint8_t HT_LEN = 9;

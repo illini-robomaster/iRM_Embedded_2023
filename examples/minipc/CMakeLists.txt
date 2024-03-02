@@ -40,3 +40,7 @@ irm_add_arm_executable(${PROJECT_NAME}_latency
     TARGET DJI_Board_TypeC
     SOURCES LatencyTest.cc)
 
+irm_add_arm_executable(${PROJECT_NAME}_minipccontroller
+    TARGET DJI_Board_TypeC
+    SOURCES MiniPCController.cc)
+
