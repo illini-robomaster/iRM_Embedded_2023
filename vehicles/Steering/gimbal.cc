@@ -169,6 +169,10 @@ static bsp::Laser* laser = nullptr;
 osEventFlagsId_t gimbal_motor_event = osEventFlagsNew(nullptr);
 #define GIMBAL_ERROR_DETECT (1 << 1)
 
+// iwdg startup flag
+osEventFlagsId_t iwdg_startup_event = osEventFlagsNew(nullptr);
+#define IWDG_STARTUP (1 << 2)
+
 void gimbalTask(void* arg) {
   UNUSED(arg);
 
@@ -242,6 +246,8 @@ void gimbalTask(void* arg) {
   float pitch_target = 0, yaw_target = 0;
   float pitch_vel = 0;
   float pitch_diff, yaw_diff;
+
+  osEventFlagsSet(iwdg_startup_event, osEventFlagsGet(iwdg_startup_event) | 1); // set first bit to 1
   while (true) {
     gimbal_error_flag = osEventFlagsWait(gimbal_motor_event, GIMBAL_ERROR_DETECT, osFlagsWaitAll, 0);
     if(gimbal_error_flag & GIMBAL_ERROR_DETECT) {
@@ -480,6 +486,8 @@ void shooterTask(void* arg) {
 
   while (!imu->CaliDone()) osDelay(100);
 
+  osEventFlagsSet(iwdg_startup_event, osEventFlagsGet(iwdg_startup_event) | 2); // set second bit to 1
+
   while (true) {
     while (Dead) osDelay(100);
     if (send->shooter_power && send->cooling_heat1 >= send->cooling_limit1 - 15) {
@@ -580,6 +588,7 @@ void chassisTask(void* arg) {
   float vx_remote, vy_remote;
   float vx_set, vy_set;
   uint32_t keymap_error_flag;
+  osEventFlagsSet(iwdg_startup_event, osEventFlagsGet(iwdg_startup_event) | 4); // set third bit to 1
   while (true) {
     ChangeSpinMode.input(dbus->keyboard.bit.SHIFT || dbus->swl == remote::UP);
     if (ChangeSpinMode.posEdge()) SpinMode = !SpinMode;
@@ -804,6 +813,7 @@ void RM_WATCHDOG(void *arg){
     if (dbus->keyboard.bit.B || dbus->swr == remote::DOWN) break;
     osDelay(100);
   }
+  osEventFlagsWait(iwdg_startup_event, IWDG_STARTUP, osFlagsWaitAll, osWaitForever);
   iwdg_handle.Instance = IWDG;
   iwdg_handle.Init.Prescaler = IWDG_PRESCALER_64;
   iwdg_handle.Init.Reload = 20000;
