@@ -798,7 +798,7 @@ const osThreadAttr_t rmWatchdogTaskAttribute = {.name = "rmWatchdogTask",
                                              .cb_size = 0,
                                              .stack_mem = nullptr,
                                              .stack_size = 256 * 4,
-                                             .priority = (osPriority_t)osPriorityRealtime4,
+                                             .priority = (osPriority_t)osPriorityRealtime,
                                              .tz_module = 0,
                                              .reserved = 0};
 
