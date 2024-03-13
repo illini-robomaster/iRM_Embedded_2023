@@ -24,7 +24,8 @@
 
 namespace control {
 
-static void supercap_callback(const uint8_t data[], void* args) {
+static void supercap_callback(const uint8_t data[], const CAN_RxHeaderTypeDef& header, void* args) {
+  (void)header;
   SuperCap* supercap = reinterpret_cast<SuperCap*>(args);
   supercap->UpdateData(data);
 }

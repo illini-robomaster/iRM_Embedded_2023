@@ -45,7 +45,8 @@ int16_t ClipMotorRange(float output) {
  * @param data data that come from motor
  * @param args pointer to a MotorCANBase instance
  */
-static void can_motor_callback(const uint8_t data[], void* args) {
+static void can_motor_callback(const uint8_t data[], const CAN_RxHeaderTypeDef& header, void* args) {
+  (void)header;
   MotorCANBase* motor = reinterpret_cast<MotorCANBase*>(args);
   motor->UpdateData(data);
 }
@@ -159,12 +160,12 @@ uint16_t Motor3508::GetTemp() const { return raw_temperature_; }
   /* implements data update callback */
   void Motor3510::UpdateData(const uint8_t data[]) {
     const int16_t raw_theta = data[0] << 8 | data[1];
-    const int16_t raw_torque = data[2] << 8 | data[3]; 
-    
-    constexpr float THETA_SCALE = 2 * PI / 8192; 
+    const int16_t raw_torque = data[2] << 8 | data[3];
+
+    constexpr float THETA_SCALE = 2 * PI / 8192;
     theta_ = (float)raw_theta * THETA_SCALE;
     torque_ = (float)raw_torque;
-    
+
     connection_flag_=true;
   }
 
@@ -173,7 +174,7 @@ uint16_t Motor3508::GetTemp() const { return raw_temperature_; }
     print("theta: %.4f ", theta_);
     print("raw_torque: %.4f \r\n", torque_);
   }
-  
+
   /* override base implementation with max current protection */
   void Motor3510::SetOutput(int16_t val){
     constexpr int16_t MAX_ABS_CURRENT = 29000;
@@ -328,7 +329,8 @@ void Motor2305::SetOutput(int16_t val) {
  * @param data data that come from motor
  * @param args pointer to a ServoMotor instance
  */
-static void servomotor_callback(const uint8_t data[], void* args) {
+static void servomotor_callback(const uint8_t data[], const CAN_RxHeaderTypeDef& header, void* args) {
+  (void)header;
   ServoMotor* servo = reinterpret_cast<ServoMotor*>(args);
   servo->UpdateData(data);
 }
@@ -632,7 +634,8 @@ bool SteeringMotor::CheckAlignment() {
  * @param data data that come from motor
  * @param args pointer to a MotorCANBase instance
  */
-static void can_motor_4310_callback(const uint8_t data[], void* args) {
+static void can_motor_4310_callback(const uint8_t data[], const CAN_RxHeaderTypeDef& header, void* args) {
+  (void)header;
   Motor4310* motor = reinterpret_cast<Motor4310*>(args);
   motor->UpdateData(data);
 }
@@ -755,7 +758,7 @@ void Motor4310::TransmitOutput(Motor4310* motors[], uint8_t num_motors) {
     } else {
       RM_EXPECT_TRUE(false, "Invalid mode number!");
     }
-    
+
     motors[i]->can_->Transmit(motors[i]->tx_id_actual_, data, 8);
   }
 }

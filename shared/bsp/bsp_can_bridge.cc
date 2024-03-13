@@ -24,7 +24,8 @@
 
 namespace bsp {
 
-static void bridge_callback(const uint8_t data[], void* args) {
+static void bridge_callback(const uint8_t data[], const CAN_RxHeaderTypeDef& header, void* args) {
+  (void)header;
   CanBridge* bridge = reinterpret_cast<CanBridge*>(args);
   bridge->UpdateData(data);
 }
