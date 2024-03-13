@@ -1,3 +1,4 @@
+#include "bsp_os.h"
 #include "cybergear.h"
 #include <cstring>
 
@@ -96,13 +97,15 @@ static void cybergear_callback(const uint8_t data[], const CAN_RxHeaderTypeDef& 
 }
 
 void CyberGear::UpdateData(const uint8_t data[], const CAN_RxHeaderTypeDef& header) {
-    angle_=uint16_to_float(data[0]<<8 | data[1], MIN_P, MAX_P, 16);
-    speed_=uint16_to_float(data[2]<<8 | data[3], V_MIN, V_MAX, 16);
-    torque_=uint16_to_float(data[4]<<8 | data[5], T_MIN, T_MAX, 16);
-    temp_=(data[6]<<8|data[7])*Temp_Gain;
+  timestamp_ = bsp::GetHighresTickMicroSec();
 
-    master_can_id_ = header.ExtId & 0xFF;
-    error_code_ = (header.ExtId & 0x1F0000)>>16;
+  angle_=uint16_to_float(data[0]<<8 | data[1], P_MIN, P_MAX, 16);
+  speed_=uint16_to_float(data[2]<<8 | data[3], V_MIN, V_MAX, 16);
+  torque_=uint16_to_float(data[4]<<8 | data[5], T_MIN, T_MAX, 16);
+  temp_=(data[6]<<8|data[7])*Temp_Gain;
+
+  master_can_id_ = header.ExtId & 0xFF;
+  error_code_ = (header.ExtId & 0x1F0000)>>16;
 }
 
 /**
@@ -259,6 +262,24 @@ void CyberGear::SendCurrentCommand(float current) {
   SetMotorParameter(Iq_Ref, current);
 }
 
+void CyberGear::SendPositionCommand(float position, float max_speed, float max_current) {
+  SetMotorParameter(Limit_Cur, max_current);
+  SetMotorParameter(Limit_Spd, max_speed);
+  SetMotorParameter(Loc_Ref, position);
+}
+
+void CyberGear::SetPositionKp(float kp) {
+  SetMotorParameter(Loc_Kp, kp);
+}
+
+void CyberGear::SetSpeedKp(float kp) {
+  SetMotorParameter(Spd_Kp, kp);
+}
+
+void CyberGear::SetSpeedKi(float kp) {
+  SetMotorParameter(Spd_Ki, kp);
+}
+
 float CyberGear::GetAngle() const {
   return angle_;
 }
@@ -277,6 +298,10 @@ float CyberGear::GetTemperature() const {
 
 uint8_t CyberGear::GetMasterCanID() const {
   return master_can_id_;
+}
+
+uint32_t CyberGear::GetTimeStamp() const {
+  return timestamp_;
 }
 
 } // namespace xiaomi

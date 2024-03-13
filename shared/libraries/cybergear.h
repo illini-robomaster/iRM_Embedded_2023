@@ -13,6 +13,8 @@
   @endverbatim
   ****************************(C)SWJTU_ROBOTCON****************************
   **/
+#pragma once
+
 #include "bsp_can.h"
 
 //控制参数最值，谨慎更改
@@ -26,8 +28,8 @@
 #define KD_MAX 5.0f
 #define T_MIN -12.0f
 #define T_MAX 12.0f
-#define MAX_P 720
-#define MIN_P -720
+// #define MAX_P 720
+// #define MIN_P -720
 //主机CANID设置
 #define Master_CAN_ID 0x00                      //主机ID
 //控制命令宏定义
@@ -43,6 +45,9 @@
 #define Communication_Type_SetSingleParameter 0x12	//设定单个参数
 #define Communication_Type_ErrorFeedback 0x15	    //故障反馈帧
 //参数读取宏定义
+#define Spd_Kp  0x2014
+#define Spd_Ki  0x2015
+#define Loc_Kp  0x2016
 #define Run_mode 0x7005
 #define Iq_Ref   0x7006
 #define Spd_Ref  0x700A
@@ -101,6 +106,10 @@ class CyberGear {           //小米电机结构体
   void SetMode(const control_mode_t &mode);
   void SendMotionCommand(float torque, float position, float speed, float kp, float kd);
   void SendCurrentCommand(float current);
+  void SendPositionCommand(float position, float max_speed = 1.0, float max_current = 23.0);
+  void SetPositionKp(float kp);
+  void SetSpeedKp(float kp);
+  void SetSpeedKi(float ki);
   void SetZeroPosition();
   void UpdateData(const uint8_t data[], const CAN_RxHeaderTypeDef& header);
 
@@ -109,6 +118,7 @@ class CyberGear {           //小米电机结构体
   float GetTorque() const;
   float GetTemperature() const;
   uint8_t GetMasterCanID() const;
+  uint32_t GetTimeStamp() const;
 
  private:
   void SetMotorParameter(uint16_t index, float value);
@@ -122,6 +132,8 @@ class CyberGear {           //小米电机结构体
 	float speed_;          //回传速度
 	float torque_;         //回传力矩
 	float temp_;			     //回传温度
+
+  uint32_t timestamp_;
 
   uint8_t master_can_id_;
 	uint8_t error_code_;

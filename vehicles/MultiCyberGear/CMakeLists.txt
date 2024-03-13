@@ -22,5 +22,6 @@ project(MultiCyberGear ASM C CXX)
 
 irm_add_arm_executable(multi_cybergear
     TARGET DJI_Board_TypeC
-    SOURCES main.cc)
+    SOURCES main.cc
+    DEPENDS eigen3)
 
