@@ -23,3 +23,7 @@ project(example_hero ASM C CXX)
 irm_add_arm_executable(${PROJECT_NAME}
         TARGET DJI_Board_TypeA
         SOURCES main.cc)
+
+irm_add_arm_executable(${PROJECT_NAME}_shooter_2023
+        TARGET DJI_Board_TypeC
+        SOURCES hero_shooter_2023.cc)

@@ -298,10 +298,6 @@ class Motor6623 : public MotorCANBase {
   static const int16_t CURRENT_CORRECTION = -1;  // current direction is reversed
 };
 
-
-
-
-
 //==================================================================================================
 // MotorPWMBase
 //==================================================================================================
@@ -338,6 +334,22 @@ class MotorPWMBase : public MotorBase {
 };
 
 //==================================================================================================
+// PDIHV
+//==================================================================================================
+
+/**
+ * @brief Hero Trigger servo
+ */
+class PDIHV : public MotorPWMBase {
+ public:
+  PDIHV(TIM_HandleTypeDef* htim, uint8_t channel, uint32_t clock_freq, uint32_t output_freq,
+           uint32_t idle_throttle);
+  /* override base implementation with max angle */
+  void SetOutPutAngle(float deg);
+  void SetOutput(int16_t val) override final;
+};
+
+//==================================================================================================
 // Motor2305
 //==================================================================================================
 
@@ -349,6 +361,8 @@ class Motor2305 : public MotorPWMBase {
   /* override base implementation with max current protection */
   void SetOutput(int16_t val) override final;
 };
+
+
 
 //==================================================================================================
 // ServoMotor
