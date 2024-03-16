@@ -171,7 +171,7 @@ osEventFlagsId_t gimbal_motor_event = osEventFlagsNew(nullptr);
 
 // iwdg startup flag
 osEventFlagsId_t iwdg_startup_event = osEventFlagsNew(nullptr);
-#define IWDG_STARTUP (1 << 2)
+#define IWDG_STARTUP 0b111
 
 void gimbalTask(void* arg) {
   UNUSED(arg);
@@ -236,7 +236,7 @@ void gimbalTask(void* arg) {
   print("Gimbal Begin!\r\n");
   RGB->Display(display::color_green);
   laser->On();
-
+  print("iwdg_bit_flag:%b\r\n", osEventFlagsGet(iwdg_startup_event));
   send->cmd.id = bsp::START;
   send->cmd.data_bool = true;
   send->TransmitOutput();
@@ -247,13 +247,14 @@ void gimbalTask(void* arg) {
   float pitch_vel = 0;
   float pitch_diff, yaw_diff;
 
-  osEventFlagsSet(iwdg_startup_event, osEventFlagsGet(iwdg_startup_event) | 1); // set first bit to 1
+//  osEventFlagsSet(iwdg_startup_event, osEventFlagsGet(iwdg_startup_event) | 1); // set first bit to 1
   while (true) {
     gimbal_error_flag = osEventFlagsWait(gimbal_motor_event, GIMBAL_ERROR_DETECT, osFlagsWaitAll, 0);
     if(gimbal_error_flag & GIMBAL_ERROR_DETECT) {
       Error_Handler();
     }
-    
+
+
     while (Dead || GimbalDead) {
       osDelay(100);
       
@@ -486,10 +487,11 @@ void shooterTask(void* arg) {
 
   while (!imu->CaliDone()) osDelay(100);
 
-  osEventFlagsSet(iwdg_startup_event, osEventFlagsGet(iwdg_startup_event) | 2); // set second bit to 1
-
+//  osEventFlagsSet(iwdg_startup_event, osEventFlagsGet(iwdg_startup_event) | 2); // set second bit to 1
+  print("shooterBegin!\r\n");
   while (true) {
     while (Dead) osDelay(100);
+
     if (send->shooter_power && send->cooling_heat1 >= send->cooling_limit1 - 15) {
       sl_motor->SetOutput(0);
       sr_motor->SetOutput(0);
@@ -588,7 +590,8 @@ void chassisTask(void* arg) {
   float vx_remote, vy_remote;
   float vx_set, vy_set;
   uint32_t keymap_error_flag;
-  osEventFlagsSet(iwdg_startup_event, osEventFlagsGet(iwdg_startup_event) | 4); // set third bit to 1
+  print("Chassis Begin!\r\n");
+//  osEventFlagsSet(iwdg_startup_event, osEventFlagsGet(iwdg_startup_event) | 4); // set third bit to 1
   while (true) {
     ChangeSpinMode.input(dbus->keyboard.bit.SHIFT || dbus->swl == remote::UP);
     if (ChangeSpinMode.posEdge()) SpinMode = !SpinMode;
@@ -642,6 +645,7 @@ void chassisTask(void* arg) {
     send->TransmitOutput();
 
     osDelay(CHASSIS_TASK_DELAY);
+    osEventFlagsSet(iwdg_startup_event, IWDG_STARTUP);
   }
 }
 
@@ -798,13 +802,14 @@ const osThreadAttr_t rmWatchdogTaskAttribute = {.name = "rmWatchdogTask",
                                              .cb_size = 0,
                                              .stack_mem = nullptr,
                                              .stack_size = 256 * 4,
-                                             .priority = (osPriority_t)osPriorityRealtime,
+                                             .priority = (osPriority_t)osPriorityNormal,
                                              .tz_module = 0,
                                              .reserved = 0};
 
 osThreadId_t rmWatchdogTaskHandle;
 
 IWDG_HandleTypeDef iwdg_handle;
+
 
 void RM_WATCHDOG(void *arg){
   UNUSED(arg);
@@ -813,18 +818,27 @@ void RM_WATCHDOG(void *arg){
     if (dbus->keyboard.bit.B || dbus->swr == remote::DOWN) break;
     osDelay(100);
   }
-  osEventFlagsWait(iwdg_startup_event, IWDG_STARTUP, osFlagsWaitAll, osWaitForever);
+  print("bitmap iwdg_startup:%b\r\n",IWDG_STARTUP);
+//  while(true){
+//  uint32_t iwdg_start_flag=
+  osEventFlagsWait(iwdg_startup_event, IWDG_STARTUP, osFlagsWaitAny, osWaitForever);
+//    if(iwdg_start_flag == IWDG_STARTUP){
+//      break;
+//    }
+//  }
+
   iwdg_handle.Instance = IWDG;
   iwdg_handle.Init.Prescaler = IWDG_PRESCALER_64;
   iwdg_handle.Init.Reload = 20000;
+  print("Watchdog Begin!\r\n");
   if (HAL_IWDG_Init(&iwdg_handle) != HAL_OK)
   {
     Error_Handler();
   }
   while (true) {
     HAL_IWDG_Refresh(&iwdg_handle);
-    print("Tick: %d\r\n", HAL_GetTick());
-    osDelay(100);
+    print("startup_event_after:%b\r\n",osEventFlagsGet(iwdg_startup_event));
+//    print("Tick: %d\r\n", HAL_GetTick());
   }
 }
 

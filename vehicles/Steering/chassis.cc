@@ -59,7 +59,7 @@ const osThreadAttr_t rmSelfTestingTask = {.name = "selfTestTask",
                                              .cb_size = 0,
                                              .stack_mem = nullptr,
                                              .stack_size = 256 * 4,
-                                             .priority = (osPriority_t)osPriorityNormal,
+                                             .priority = (osPriority_t)osPriorityBelowNormal,
                                              .tz_module = 0,
                                              .reserved = 0};
 osThreadId_t selfTestTaskHandle;
@@ -532,7 +532,7 @@ const osThreadAttr_t rmWatchdogTaskAttribute = {.name = "rmWatchdogTask",
                                                 .cb_size = 0,
                                                 .stack_mem = nullptr,
                                                 .stack_size = 256 * 4,
-                                                .priority = (osPriority_t)osPriorityRealtime,
+                                                .priority = (osPriority_t)osPriorityNormal,
                                                 .tz_module = 0,
                                                 .reserved = 0};
 
