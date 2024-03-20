@@ -1,6 +1,6 @@
 /****************************************************************************
  *                                                                          *
- *  Copyright (C) 2022 RoboMaster.                                          *
+ *  Copyright (C) 2023 RoboMaster.                                          *
  *  Illini RoboMaster @ University of Illinois at Urbana-Champaign          *
  *                                                                          *
  *  This program is free software: you can redistribute it and/or modify    *
@@ -30,32 +30,34 @@
 #include "autoaim_protocol.h"
 #include "filtering.h"
 
-/* Define Gimabal-related parameters */
+/* Define Gimbal-related parameters */
 
-#define NOTCH (2 * PI / 8)
-#define SERVO_SPEED (PI)
+#define NOTCH (2 * PI / 8)  // Define the notch for the gimbal
+#define SERVO_SPEED (PI)  // Define the speed of the servo
 
-#define KEY_GPIO_GROUP GPIOA
-#define KEY_GPIO_PIN GPIO_PIN_0
+#define KEY_GPIO_GROUP GPIOA  // Define the GPIO group for the key
+#define KEY_GPIO_PIN GPIO_PIN_0  // Define the GPIO pin for the key
 
+// Define the CAN interfaces
 bsp::CAN* can1 = nullptr;
 bsp::CAN* can2 = nullptr;
 
-bsp::GPIO* key = nullptr;
-control::MotorCANBase* pitch_motor = nullptr;
-control::MotorCANBase* yaw_motor = nullptr;
+bsp::GPIO* key = nullptr;  // Define the key
+control::MotorCANBase* pitch_motor = nullptr;  // Define the pitch motor
+control::MotorCANBase* yaw_motor = nullptr;  // Define the yaw motor
 
-control::gimbal_t gimbal_init_data;
-control::Gimbal* gimbal = nullptr;
-remote::DBUS* dbus = nullptr;
-bool status = false;
+control::gimbal_t gimbal_init_data;  // Define the gimbal initialization data
+control::Gimbal* gimbal = nullptr;  // Define the gimbal
+remote::DBUS* dbus = nullptr;  // Define the DBUS
+bool status = false;  // Define the status
 
-extern osThreadId_t defaultTaskHandle;
+extern osThreadId_t defaultTaskHandle;  // Define the default task handle
 
 /* Define COMM-related parameters */
 
-#define RX_SIGNAL (1 << 0)
+#define RX_SIGNAL (1 << 0)  // Define the RX signal
 
+// Define the attributes for the Jetson communication task
 const osThreadAttr_t jetsonCommTaskAttribute = {.name = "jetsonCommTask",
                                              .attr_bits = osThreadDetached,
                                              .cb_mem = nullptr,
@@ -65,8 +67,9 @@ const osThreadAttr_t jetsonCommTaskAttribute = {.name = "jetsonCommTask",
                                              .priority = (osPriority_t)osPriorityHigh,
                                              .tz_module = 0,
                                              .reserved = 0};
-osThreadId_t jetsonCommTaskHandle;
+osThreadId_t jetsonCommTaskHandle;  // Define the Jetson communication task handle
 
+// Define a custom UART class
 class CustomUART : public bsp::UART {
  public:
   using bsp::UART::UART;
@@ -76,15 +79,16 @@ class CustomUART : public bsp::UART {
   void RxCompleteCallback() override final { osThreadFlagsSet(jetsonCommTaskHandle, RX_SIGNAL); }
 };
 
-static display::RGB* led = nullptr;
+static display::RGB* led = nullptr;  // Define the LED
 
-/* Initialize autoaim parameters */
+/* Initialize auto aim parameters */
 
 // TODO: this is NOT thread-safe!
-float relative_yaw = 0;
-float relative_pitch = 0;
-float last_timestamp = 0;  // in milliseconds
+float relative_yaw = 0;  // Define the relative yaw
+float relative_pitch = 0;  // Define the relative pitch
+float last_timestamp = 0;  // Define the last timestamp in milliseconds
 
+// Initialize the RTOS
 void RM_RTOS_Init() {
   can1 = new bsp::CAN(&hcan1, 0x205, true);
   pitch_motor = new control::Motor6020(can1, 0x205);
@@ -100,6 +104,7 @@ void RM_RTOS_Init() {
   led = new display::RGB(&htim5, 3, 2, 1, 1000000);
 }
 
+// Define the Jetson communication task
 void jetsonCommTask(void* arg) {
   UNUSED(arg);
 
@@ -137,11 +142,12 @@ void jetsonCommTask(void* arg) {
   }
 }
 
+// Initialize the RTOS threads
 void RM_RTOS_Threads_Init(void) {
   jetsonCommTaskHandle = osThreadNew(jetsonCommTask, nullptr, &jetsonCommTaskAttribute);
 }
 
-// gimbal task
+// Define the default task for the RTOS
 void RM_RTOS_Default_Task(const void* args) {
   UNUSED(args);
 

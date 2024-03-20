@@ -24,7 +24,7 @@
 #include "tim.h"
 
 using Note = bsp::BuzzerNote;
-
+// Define the notes for the Mario song
 static bsp::BuzzerNoteDelayed Mario[] = {
     {Note::Mi3M, 80}, {Note::Silent, 80},  {Note::Mi3M, 80}, {Note::Silent, 240},
     {Note::Mi3M, 80}, {Note::Silent, 240}, {Note::Do1M, 80}, {Note::Silent, 80},
@@ -69,7 +69,12 @@ static bsp::BuzzerNoteDelayed War_Cant_of_Mars[] = {
     {Note::Silent, 0},
     {Note::Finish, 0},
 };
-
+/**
+ * @brief Initialize the RTOS for RoboMaster
+ *
+ * This function initializes the buzzer with the timer and frequency parameters.
+ * It then plays the Mario and War Cant of Mars songs.
+ */
 void RM_RTOS_Init(void) {
   bsp::Buzzer buzzer(&htim4, 3, 1000000);
   buzzer.SingSong(Mario);
