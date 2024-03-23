@@ -45,13 +45,13 @@ void RM_RTOS_Default_Task(const void* arguments) {
   OLED->OperateGram(display::PEN_CLEAR);
 
   while (true) {
-    OLED->Printf(0, 0, "Supercap: %.2f %.2f", supercap->info.voltage, supercap->info.energy);
+//    OLED->Printf(0, 0, "Supercap: %.2f %.2f", supercap->info.voltage, supercap->info.energy);
     osDelay(100);
     OLED->RefreshGram();
 
     set_cursor(0, 0);
     clear_screen();
-    print("Supercap\r\nVoltage: %.2f, Energy: %.2f\r\n", supercap->info.voltage,
-          supercap->info.energy);
+//    print("Supercap\r\nVoltage: %.2f, Energy: %.2f\r\n", supercap->info.voltage,
+//          supercap->info.energy);
   }
 }
