@@ -83,7 +83,7 @@ constexpr float ACCELERATION = (100 * PI);
 
 
 // speed for chassis rotation (no unit)
-constexpr float SPIN_SPEED = 80;
+constexpr float SPIN_SPEED = 100;
 constexpr float FOLLOW_SPEED = 40;
 
 
@@ -309,7 +309,7 @@ void chassisTask(void* arg) {
 
     chassis->SetSpeed(vx / 10, vy / 10, wz);
     chassis->SteerUpdateTarget();
-    constexpr float WHEEL_SPEED_FACTOR = 4;
+    constexpr float WHEEL_SPEED_FACTOR = 6;
     chassis->WheelUpdateSpeed(WHEEL_SPEED_FACTOR);
     chassis->SteerCalcOutput();
 
