@@ -112,6 +112,8 @@ static volatile bool selftestStart = false;
 
 static volatile bool robot_hp_begin = false;
 
+#define GEAR_GIMBAL   // comment this line if the gimbal is using belt
+
 //==================================================================================================
 // IMU
 //==================================================================================================
@@ -271,7 +273,11 @@ void gimbalTask(void* arg) {
     float yaw_theta_out = yaw_theta_pid->ComputeOutput(yaw_error);
     yaw_theta_out = clip<float>(yaw_theta_out, -15, 15);
 
-    yaw_motor->SetOutput(0, yaw_theta_out, 0, 1.5, 0);
+    #ifdef GEAR_GIMBAL
+      yaw_motor->SetOutput(0, -yaw_theta_out, 0, 1.5, 0);
+    #else
+      yaw_motor->SetOutput(0, yaw_theta_out, 0, 1.5, 0);
+    #endif
 
     control::Motor4310::TransmitOutput(motors_can1_gimbal, 2);
     osDelay(GIMBAL_TASK_DELAY);
@@ -574,7 +580,11 @@ void chassisTask(void* arg) {
     relative_angle = wrap<float>(yaw_motor->GetTheta(), -PI, PI);
 
     send->cmd.id = bsp::RELATIVE_ANGLE;
-    send->cmd.data_float = -relative_angle;
+    #ifdef GEAR_GIMBAL
+      send->cmd.data_float = relative_angle;
+    #else
+      send->cmd.data_float = -relative_angle;
+    #endif
     send->TransmitOutput();
 
     osDelay(CHASSIS_TASK_DELAY);
