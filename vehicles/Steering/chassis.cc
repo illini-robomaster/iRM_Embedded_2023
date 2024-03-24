@@ -77,14 +77,14 @@ static const int DEFAULT_TASK_DELAY = 100;
 static const int CHASSIS_TASK_DELAY = 2;
 
 // speed for steering motors (rad/s)
-constexpr float RUN_SPEED = (4 * PI);
+constexpr float RUN_SPEED = (5 * PI);
 constexpr float ALIGN_SPEED = (PI);
 constexpr float ACCELERATION = (100 * PI);
 
 
 // speed for chassis rotation (no unit)
-constexpr float SPIN_SPEED = 60;
-constexpr float FOLLOW_SPEED = 40;
+constexpr float SPIN_SPEED = 70;
+constexpr float FOLLOW_SPEED = 50;
 
 
 //==================================================================================================

@@ -486,9 +486,13 @@ void shooterTask(void* arg) {
           shooter->SlowContinueShoot();
         // fast shooting
         } else if ((dbus->mouse.r || dbus->wheel.wheel > remote::WheelDigitalValue)
-                  && send->cooling_heat1 < send->cooling_limit1 - 31) {
+                  && send->cooling_heat1 < send->cooling_limit1 - 21) {
           print("cooling_heat: %f\r\n",send->cooling_heat1);
-          shooter->FastContinueShoot();
+          if (send->cooling_heat1 < send->cooling_limit1 - 41) {
+            shooter->SlowContinueShoot();
+          } else {
+            shooter->FastContinueShoot();
+          }
         // triple shooting
         } else if (dbus->wheel.wheel == remote::WheelDigitalValue
                    && dbus->previous_wheel_value == remote::WheelDigitalValue) {
