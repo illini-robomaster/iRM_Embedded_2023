@@ -83,7 +83,7 @@ constexpr float ACCELERATION = (100 * PI);
 
 
 // speed for chassis rotation (no unit)
-constexpr float SPIN_SPEED = 100;
+constexpr float SPIN_SPEED = 60;
 constexpr float FOLLOW_SPEED = 40;
 
 

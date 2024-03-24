@@ -241,7 +241,7 @@ void gimbalTask(void* arg) {
     while (Dead || GimbalDead) osDelay(100);
 
     // autoaim comflict with spinmode control
-    if (dbus->keyboard.bit.F /*|| dbus->swl == remote::UP*/ || dbus->keyboard.bit.CTRL) {
+    if (dbus->keyboard.bit.F || dbus->swl == remote::UP || dbus->keyboard.bit.CTRL) {
       float abs_pitch_buffer = abs_pitch_jetson;
       float abs_yaw_buffer = abs_yaw_jetson;
 
@@ -482,15 +482,18 @@ void shooterTask(void* arg) {
         Antijam.input(dbus->keyboard.bit.G);
         // slow shooting
         if (dbus->mouse.l || dbus->swr == remote::UP) {
+          print("cooling_heat: %f\r\n",send->cooling_heat1);
           shooter->SlowContinueShoot();
         // fast shooting
         } else if ((dbus->mouse.r || dbus->wheel.wheel > remote::WheelDigitalValue)
-                  && send->cooling_heat1 < send->cooling_limit1 - 24) {
+                  && send->cooling_heat1 < send->cooling_limit1 - 31) {
+          print("cooling_heat: %f\r\n",send->cooling_heat1);
           shooter->FastContinueShoot();
         // triple shooting
         } else if (dbus->wheel.wheel == remote::WheelDigitalValue
                    && dbus->previous_wheel_value == remote::WheelDigitalValue) {
           if (!triple_shoot_detect) {
+            print("cooling_heat: %f\r\n",send->cooling_heat1);
             triple_shoot_detect = true;          
             shooter->TripleShoot();
           }
@@ -562,7 +565,7 @@ void chassisTask(void* arg) {
   float vx_set, vy_set;
 
   while (true) {
-    ChangeSpinMode.input(dbus->keyboard.bit.SHIFT /*|| dbus->swl == remote::UP*/);
+    ChangeSpinMode.input(dbus->keyboard.bit.SHIFT || dbus->swl == remote::UP);
     if (ChangeSpinMode.posEdge()) SpinMode = !SpinMode;
 
     send->cmd.id = bsp::MODE;
