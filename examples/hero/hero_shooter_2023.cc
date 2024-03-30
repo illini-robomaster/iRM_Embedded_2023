@@ -113,7 +113,7 @@ void RM_RTOS_Default_Task(const void* args) {
   float load_angle = 2 * PI / 6 * 99.506 / M3508P19_RATIO; // 99.506 is the ratio of the load servo, devide the 3508 ratio
   int i = 0;
   // force variable
-  bool force_week = false;
+  bool force_weak = false;
   bool force_strong = false;
   bool force_transforming = false;
   float force_pos = 0;
@@ -132,15 +132,15 @@ void RM_RTOS_Default_Task(const void* args) {
                             || (dbus->wheel.wheel == remote::WheelDigitalValue && dbus->previous_wheel_value == remote::WheelDigitalValue));
 
     // just execute force transform once
-    if (ForceWeakDetect.posEdge() && !ForceStrongDetect.posEdge() && !force_week) {
-      print("week");
+    if (ForceWeakDetect.posEdge() && !ForceStrongDetect.posEdge() && !force_weak) {
+      print("weak");
       force_transforming = true;
-      force_week = true;
+      force_weak = true;
       force_strong = false;
     } else if (ForceStrongDetect.posEdge() && !ForceWeakDetect.posEdge() && !force_strong) {
       print("strong");
       force_transforming = true;
-      force_week = false;
+      force_weak = false;
       force_strong = true;
     }
     // force transforming
@@ -152,9 +152,9 @@ void RM_RTOS_Default_Task(const void* args) {
         // set target pull position once
         if (i == 1) {
           // direction need test
-          if (force_week && !force_strong) {
+          if (force_weak && !force_strong) {
             force_pos += force_angle;
-          } else if (force_strong && !force_week) {
+          } else if (force_strong && !force_weak) {
             force_pos -= force_angle;
           }
           force_servo->SetTarget(force_pos);
