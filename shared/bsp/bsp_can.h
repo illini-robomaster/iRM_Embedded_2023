@@ -31,7 +31,7 @@
 namespace bsp {
 
 /* can callback function pointer */
-typedef void (*can_rx_callback_t)(const uint8_t data[], void* args);
+typedef void (*can_rx_callback_t)(const uint8_t data[], const CAN_RxHeaderTypeDef& header, void* args);
 
 class CAN {
   public:
@@ -76,13 +76,24 @@ class CAN {
     int Transmit(uint16_t id, const uint8_t data[], uint32_t length);
 
     /**
+     * @brief transmit can messages with extended frame
+     *
+     * @param id      tx id
+     * @param data[]  data bytes
+     * @param length  length of data, must be in (0, 8]
+     *
+     * @return  number of bytes transmitted, -1 if failed
+     */
+    int TransmitExt(uint32_t id, const uint8_t data[], uint32_t length);
+
+    /**
      * @brief callback wrapper called from IRQ context
      *
      * @note should not be called explicitly form the application side
      */
-    void RxCallback();
+    virtual void RxCallback();
 
-  private:
+  protected:
     void ConfigureFilter(bool is_master);
 
     CAN_HandleTypeDef* hcan_;

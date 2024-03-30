@@ -18,7 +18,9 @@
 #                                                                        #
 # ---------------------------------------------------------------------- #
 
-add_subdirectory(Fortress)
-add_subdirectory(Sentry)
-add_subdirectory(Steering)
-add_subdirectory(MultiCyberGear)
+project(example_cybergear ASM C CXX)
+
+irm_add_arm_executable(${PROJECT_NAME}
+    TARGET DJI_Board_TypeC
+    SOURCES main.cc)
+

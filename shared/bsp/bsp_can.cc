@@ -116,6 +116,30 @@ namespace bsp {
         return length;
     }
 
+    int CAN::TransmitExt(uint32_t id, const uint8_t data[], uint32_t length) {
+        RM_EXPECT_TRUE(IS_CAN_DLC(length), "CAN tx data length exceeds limit");
+        if (!IS_CAN_DLC(length))
+            return -1;
+
+        CAN_TxHeaderTypeDef header = {
+            .StdId = 0x0,
+            .ExtId = id,  // don't care since we use standard id mode
+            .IDE = CAN_ID_EXT,
+            .RTR = CAN_RTR_DATA,
+            .DLC = length,
+            .TransmitGlobalTime = DISABLE,
+        };
+
+        uint32_t mailbox;
+        if (HAL_CAN_AddTxMessage(hcan_, &header, (uint8_t*)data, &mailbox) != HAL_OK)
+            return -1;
+
+        // poll for can transmission to complete
+        while (HAL_CAN_IsTxMessagePending(hcan_, mailbox));
+
+        return length;
+    }
+
     void CAN::RxCallback() {
         CAN_RxHeaderTypeDef header;
         uint8_t data[MAX_CAN_DATA_SIZE];
@@ -127,7 +151,7 @@ namespace bsp {
         callback_id = it->second;
         // find corresponding callback
         if (rx_callbacks_[callback_id])
-            rx_callbacks_[callback_id](data, rx_args_[callback_id]);
+            rx_callbacks_[callback_id](data, header, rx_args_[callback_id]);
     }
 
     void CAN::ConfigureFilter(bool is_master) {

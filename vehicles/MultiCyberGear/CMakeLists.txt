@@ -1,6 +1,6 @@
 # ---------------------------------------------------------------------- #
 #                                                                        #
-#  Copyright (C) 2022                                                    #
+#  Copyright (C) 2024                                                    #
 #  Illini RoboMaster @ University of Illinois at Urbana-Champaign.       #
 #                                                                        #
 #  This program is free software: you can redistribute it and/or modify  #
@@ -18,7 +18,10 @@
 #                                                                        #
 # ---------------------------------------------------------------------- #
 
-add_subdirectory(Fortress)
-add_subdirectory(Sentry)
-add_subdirectory(Steering)
-add_subdirectory(MultiCyberGear)
+project(MultiCyberGear ASM C CXX)
+
+irm_add_arm_executable(multi_cybergear
+    TARGET DJI_Board_TypeC
+    SOURCES main.cc
+    DEPENDS eigen3)
+
