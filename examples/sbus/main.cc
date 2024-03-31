@@ -27,8 +27,8 @@
 static remote::SBUS* sbus;
 
 void RM_RTOS_Init(void) {
-  print_use_uart(&huart1);
-  sbus = new remote::SBUS(&huart3);
+  print_use_uart(&huart6);
+  sbus = new remote::SBUS(&huart1);
 }
 
 void RM_RTOS_Default_Task(const void* arguments) {

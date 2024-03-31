@@ -21,6 +21,6 @@
 project(example_sbus ASM C CXX)
 
 irm_add_arm_executable(${PROJECT_NAME}
-    TARGET DJI_Board_TypeC
+    TARGET DJI_Board_TypeA
     SOURCES main.cc)
 

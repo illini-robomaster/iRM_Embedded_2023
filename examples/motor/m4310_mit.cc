@@ -24,10 +24,12 @@
 #include "main.h"
 #include "motor.h"
 #include "dbus.h"
+#include "sbus.h"
 
 static bsp::CAN* can = nullptr;
 static control::Motor4310* motor = nullptr;
-remote::DBUS* dbus = nullptr;
+//remote::DBUS* dbus = nullptr;
+static remote::SBUS* sbus;
 
 void RM_RTOS_Init() {
   print_use_uart(&huart1);
@@ -41,8 +43,9 @@ void RM_RTOS_Init() {
    *  VEL: velocity mode  */
 
   /* Make sure motor is set to the correct mode (in helper tool). Otherwise, motor won't start */
-  motor = new control::Motor4310(can, 0x02, 0x01, control::MIT);
-  dbus = new remote::DBUS(&huart3);
+  motor = new control::Motor4310(can, 0x06, 0x05, control::MIT);
+//  dbus = new remote::DBUS(&huart3);
+  sbus = new remote::SBUS(&huart3);
 }
 
 void RM_RTOS_Default_Task(const void* args) {
@@ -51,7 +54,7 @@ void RM_RTOS_Default_Task(const void* args) {
 
   control::Motor4310* motors[] = {motor};
 
-  while(dbus->swr != remote::DOWN){}  // flip swr to start
+  while(sbus->ch[0] != 0){}  // flip swr to start
 
   /* Use SetZeroPos if you want to set current motor position as zero position. If uncommented, the
    * zero position is the zero position set before */
@@ -61,9 +64,12 @@ void RM_RTOS_Default_Task(const void* args) {
   float pos = 0;
   float min_pos = -PI/8;
   float max_pos = PI/6;
+  float zero = sbus->ch[4];
+  float diff = 0.0;
+  diff = sbus->ch[4] - zero;
   while (true) {
     float vel;
-    vel = clip<float>(dbus->ch1 / 660.0 * 15.0, -15, 15);
+    vel = clip<float>(diff / 660.0 * 15.0, -15, 15);
     pos += vel / 200;
     pos = clip<float>(pos, min_pos, max_pos);   // clipping position within a range
 
