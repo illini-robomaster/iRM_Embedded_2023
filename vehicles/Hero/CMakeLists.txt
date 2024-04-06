@@ -24,3 +24,7 @@ irm_add_arm_executable(Hero
     TARGET DJI_Board_TypeC
     SOURCES main.cc)
 
+irm_add_arm_executable(Hero2024_gimbal
+        TARGET DJI_Board_TypeC
+        SOURCES gimbal.cc)
+
