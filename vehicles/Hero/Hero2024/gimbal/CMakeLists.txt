@@ -18,5 +18,13 @@
 #                                                                        #
 # ---------------------------------------------------------------------- #
 
-add_subdirectory(Hero2023)
-add_subdirectory(Hero2024)
+project(Hero2024 ASM C CXX)
+
+irm_add_arm_executable(Hero2024_gimbal
+        TARGET DJI_Board_TypeC
+        SOURCES
+        #src/main.cc
+
+        INCLUDES include
+
+)
