@@ -38,7 +38,7 @@ Chassis::Chassis(const chassis_t chassis) : pids_() {
       motors_[FourWheel::back_left] = chassis.motors[FourWheel::back_left];
       motors_[FourWheel::back_right] = chassis.motors[FourWheel::back_right];
 
-      float* pid_param = new float[3]{40, 3, 0};
+      float* pid_param = new float[3]{40, 6, 1};
       float motor_max_iout = 2000;
       float motor_max_out = 20000;
       pids_[FourWheel::front_left].Reinit(pid_param, motor_max_iout, motor_max_out);
