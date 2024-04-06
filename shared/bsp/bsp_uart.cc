@@ -205,32 +205,33 @@ template int32_t UART::Read<false>(uint8_t** data);
 
 template <bool FromISR>
 int32_t UART::Write(const uint8_t* data, uint32_t length) {
-  // enter critical session
-  UBaseType_t isrflags;
-  if (FromISR) {
-    isrflags = taskENTER_CRITICAL_FROM_ISR();
-  } else {
-    taskENTER_CRITICAL();
-  }
-
-  if (huart_->gState == HAL_UART_STATE_BUSY_TX || tx_pending_) {
-    /* uart tx currently transmitting -> atomically queue up new data */
-    if (length + tx_pending_ > tx_size_) length = tx_size_ - tx_pending_;
-    memcpy(tx_write_ + tx_pending_, data, length);
-    tx_pending_ += length;
-  } else {
-    if (length > tx_size_) length = tx_size_;
-    /* directly write into the read buffer and start transmission */
+//  // enter critical session
+//  UBaseType_t isrflags;
+//  if (FromISR) {
+//    isrflags = taskENTER_CRITICAL_FROM_ISR();
+//  } else {
+//    taskENTER_CRITICAL();
+//  }
+//
+//  if (huart_->gState == HAL_UART_STATE_BUSY_TX || tx_pending_) {
+//    /* uart tx currently transmitting -> atomically queue up new data */
+//    if (length + tx_pending_ > tx_size_) length = tx_size_ - tx_pending_;
+//    memcpy(tx_write_ + tx_pending_, data, length);
+//    tx_pending_ += length;
+//  } else {
+//    if (length > tx_size_) length = tx_size_;
+//    /* directly write into the read buffer and start transmission */
     memcpy(tx_read_, data, length);
-    HAL_UART_Transmit_DMA(huart_, tx_read_, length);
-  }
+//    HAL_UART_Transmit_DMA(huart_, tx_read_, length);
+    HAL_UART_Transmit(huart_, tx_read_, length, 100);
+//  }
 
-  // exit critical session
-  if (FromISR) {
-    taskEXIT_CRITICAL_FROM_ISR(isrflags);
-  } else {
-    taskEXIT_CRITICAL();
-  }
+//  // exit critical session
+//  if (FromISR) {
+//    taskEXIT_CRITICAL_FROM_ISR(isrflags);
+//  } else {
+//    taskEXIT_CRITICAL();
+//  }
 
   return length;
 }

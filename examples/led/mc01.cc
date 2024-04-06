@@ -25,6 +25,7 @@
 static bsp::GPIO* led = nullptr;
 
 void RM_RTOS_Init(void) {
+  print_use_usb();
  led = new bsp::GPIO(LED_GPIO_Port, LED_Pin);
  HAL_Delay(3000);
 }
@@ -32,6 +33,7 @@ void RM_RTOS_Init(void) {
 void RM_RTOS_Default_Task(const void* args) {
  UNUSED(args);
  while (true) {
+   print("test\r\n");
    led->High();
    osDelay(1000);
    led->Low();
