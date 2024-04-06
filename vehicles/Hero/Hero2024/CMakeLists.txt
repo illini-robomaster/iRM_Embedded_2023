@@ -18,5 +18,7 @@
 #                                                                        #
 # ---------------------------------------------------------------------- #
 
-add_subdirectory(Hero2023)
-add_subdirectory(Hero2024)
+project(Hero2024 ASM C CXX)
+
+add_subdirectory(chassis)
+add_subdirectory(gimbal)
