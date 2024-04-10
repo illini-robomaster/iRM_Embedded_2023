@@ -52,14 +52,16 @@ osThreadId_t shooterTaskHandle;
 void RM_RTOS_Init(){
   print_use_uart(&huart1);
   // Initialize the CAN bus
-  can1 = new bsp::CAN(&hcan1);
-  can2 = new bsp::CAN(&hcan2);
+  can1 = new bsp::CAN(&hcan1, true);
+  can2 = new bsp::CAN(&hcan2, false);
   // Initialize the DBUS
   dbus = new remote::DBUS(&huart3);
   bsp::SetHighresClockTimer(&htim5);
   // Initialize the RGB LED
 //  RGB=new display::RGB(&htim5,3,2,1,1000000);
+  // shooter initialization
   init_shooter();
+  send = new bsp::CanBridge(can2, 0x20A, 0x20B);
 }
 
 void RM_RTOS_Threads_Init(){
