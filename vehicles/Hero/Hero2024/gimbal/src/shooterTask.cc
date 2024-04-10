@@ -45,8 +45,8 @@ void shooterTask(void* arg) {
   float shoot_speed = 30;
   // motor initialization
   control::MotorCANBase* can1_shooter_shoot[] = {shoot_front_motor, shoot_back_motor};
-  control::MotorCANBase* can1_shooter_force[] = {force_motor};
-  control::Motor4310* can1_shooter_load[] = {load_motor};
+//  control::MotorCANBase* can1_shooter_force[] = {force_motor};
+//  control::Motor4310* can1_shooter_load[] = {load_motor};
 
   // PID controller initialization
   float shoot_pid_params[3] = {20, 15, 10};
@@ -75,7 +75,19 @@ void shooterTask(void* arg) {
     }
     // TODO: needs a mode switch to control from moving mode to shooting mode / escalation mode
     // Bool Edge Detector for lob mode switch or osEventFlags wait for a signal from different threads
-
+    if(lob_mode){
+        // lob mode
+        // force_motor->SetOutput(0);
+        // force_servo->SetOutput(0);
+        // esca_motor->SetOutput(0);
+        // esca_servo->SetOutput(0);
+        } else {
+        // moving mode
+        force_motor->SetOutput(0);
+        force_servo->SetTarget(0);
+        esca_motor->SetOutput(0);
+        esca_servo->SetTarget(0);
+    }
     shoot_front_motor->SetOutput(shoot_front_out);
     shoot_back_motor->SetOutput(shoot_back_out);
     control::MotorCANBase::TransmitOutput(can1_shooter_shoot, 2);
@@ -115,14 +127,15 @@ void init_shooter() {
 
 void kill_shooter() {
   RM_EXPECT_TRUE(false, "Operation Killed!\r\n");
-  control::MotorCANBase* shooter_motors[] = {shoot_front_motor, shoot_back_motor, force_motor};
+  control::MotorCANBase* shooter_motors[] = {shoot_front_motor, shoot_back_motor, force_motor, esca_motor};
   control::Motor4310* load_motors[] = {load_motor};
   while (true){
     shoot_front_motor->SetOutput(0);
     shoot_back_motor->SetOutput(0);
     force_motor->SetOutput(0);
     load_motor->SetOutput(0);
-    control::MotorCANBase::TransmitOutput(shooter_motors, 3);
+    esca_motor->SetOutput(0);
+    control::MotorCANBase::TransmitOutput(shooter_motors, 4);
     control::Motor4310::TransmitOutput(load_motors, 1);
     osDelay(KILLALL_DELAY);
   }

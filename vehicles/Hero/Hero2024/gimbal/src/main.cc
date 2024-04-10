@@ -46,6 +46,8 @@ BoolEdgeDetector lob_mode_sw=BoolEdgeDetector(false);
 volatile bool lob_mode=false;
 //display::RGB* RGB = nullptr;
 
+osThreadId_t shooterTaskHandle;
+
 // Params Initialization
 void RM_RTOS_Init(){
   print_use_uart(&huart1);
