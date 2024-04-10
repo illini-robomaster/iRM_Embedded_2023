@@ -23,8 +23,7 @@ project(Hero2024 ASM C CXX)
 irm_add_arm_executable(Hero2024_gimbal
         TARGET DJI_Board_TypeC
         SOURCES
-        #src/main.cc
+        src/main.cc
+        src/shooterTask.cc
 
-        INCLUDES include
-
-)
+        INCLUDES includes)
