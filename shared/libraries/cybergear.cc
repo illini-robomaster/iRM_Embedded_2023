@@ -19,11 +19,6 @@ void CAN::RxCallback() {
   uint8_t data[MAX_CAN_DATA_SIZE];
   HAL_CAN_GetRxMessage(hcan_, CAN_RX_FIFO0, &header, data);
 
-  // TODO: ignore broadcast message for now
-  if (header.ExtId >> 24 == 0) {
-    return;
-  }
-
   uint16_t callback_id = get_motor_id(header.ExtId);
   const auto it = id_to_index_.find(callback_id);
   if (it == id_to_index_.end())
@@ -33,30 +28,6 @@ void CAN::RxCallback() {
   if (rx_callbacks_[callback_id])
       rx_callbacks_[callback_id](data, header, rx_args_[callback_id]);
 }
-
-// CAN_RxHeaderTypeDef rxMsg;//发送接收结构体
-// CAN_TxHeaderTypeDef txMsg;//发送配置结构体
-// uint8_t rx_data[8];       //接收数据
-// uint32_t Motor_Can_ID;    //接收数据电机ID
-// static uint8_t byte[4];          //转换临时数据
-// uint32_t send_mail_box = {0};//NONE
-
-/**
-  * @brief          浮点数转4字节函数
-  * @param[in]      f:浮点数
-  * @retval         4字节数组
-  * @description  : IEEE 754 协议
-  */
-// static uint8_t* float_to_byte(float f)
-// {
-//   unsigned long longdata = 0;
-//   memcpy(&f, &longdata, sizeof(float));
-//   byte[0] = (longdata & 0xFF000000) >> 24;
-//   byte[1] = (longdata & 0x00FF0000) >> 16;
-//   byte[2] = (longdata & 0x0000FF00) >> 8;
-//   byte[3] = (longdata & 0x000000FF);
-//   return byte;
-// }
 
 /**
   * @brief          小米电机回文16位数据转浮点
@@ -91,9 +62,26 @@ static int float_to_uint(float x, float x_min, float x_max, int bits)
 }
 
 static void cybergear_callback(const uint8_t data[], const CAN_RxHeaderTypeDef& header, void* args) {
-  (void)header;
   CyberGear* motor = reinterpret_cast<CyberGear*>(args);
-  motor->UpdateData(data, header);
+  switch (header.ExtId >> 24) {
+    // 通讯类型2
+    case Communication_Type_MotorRequest:
+      motor->UpdateData(data, header);
+      break;
+
+    // 通讯类型17
+    case Communication_Type_GetSingleParameter:
+      uint16_t index;
+      float value;
+      memcpy(&index, data, sizeof(uint16_t));
+      memcpy(&value, data + 4, sizeof(float));
+      motor->UpdateParameter(index, value);
+      break;
+
+    // TODO: ignore broadcast and all other message types for now
+    default:
+      return;
+  }
 }
 
 void CyberGear::UpdateData(const uint8_t data[], const CAN_RxHeaderTypeDef& header) {
@@ -108,6 +96,19 @@ void CyberGear::UpdateData(const uint8_t data[], const CAN_RxHeaderTypeDef& head
   error_code_ = (header.ExtId & 0x1F0000)>>16;
 }
 
+void CyberGear::UpdateParameter(uint16_t index, float value) {
+switch (index >> 8) {
+  case 0x20:
+    parameters_20_[index & 0xff] = value;
+    break;
+  case 0x70:
+    parameters_70_[index & 0xff] = value;
+    break;
+  default:
+    break;
+}
+}
+
 /**
   * @brief          写入电机参数
   * @param[in]      Motor:对应控制电机结构体
@@ -116,7 +117,7 @@ void CyberGear::UpdateData(const uint8_t data[], const CAN_RxHeaderTypeDef& head
   * @param[in]      Value_type:写入参数数据类型
   * @retval         none
   */
-void CyberGear::SetMotorParameter(uint16_t index, float value){
+void CyberGear::SetMotorParameter(uint16_t index, float value) {
   uint8_t tx_data[8];
   uint32_t ext_id = Communication_Type_SetSingleParameter<<24 | Master_CAN_ID<<8 | this->can_id_;
   tx_data[0]=index;
@@ -135,7 +136,7 @@ void CyberGear::SetMotorParameter(uint16_t index, float value){
   * @param[in]      Value_type:写入参数数据类型
   * @retval         none
   */
-void CyberGear::SetMotorParameter(uint16_t index, uint8_t value){
+void CyberGear::SetMotorParameter(uint16_t index, uint8_t value) {
   uint8_t tx_data[8];
   uint32_t ext_id = Communication_Type_SetSingleParameter<<24 | Master_CAN_ID<<8 | this->can_id_;
   tx_data[0]=index;
@@ -143,6 +144,20 @@ void CyberGear::SetMotorParameter(uint16_t index, uint8_t value){
   tx_data[2]=0x00;
   tx_data[3]=0x00;
   tx_data[4]=value;
+  tx_data[5]=0x00;
+  tx_data[6]=0x00;
+  tx_data[7]=0x00;
+  can_->TransmitExt(ext_id, tx_data, 8);
+}
+
+void CyberGear::GetMotorParameter(uint16_t index) {
+  uint8_t tx_data[8];
+  uint32_t ext_id = Communication_Type_GetSingleParameter<<24 | Master_CAN_ID<<8 | this->can_id_;
+  tx_data[0]=index;
+  tx_data[1]=index>>8;
+  tx_data[2]=0x00;
+  tx_data[3]=0x00;
+  tx_data[4]=0x00;
   tx_data[5]=0x00;
   tx_data[6]=0x00;
   tx_data[7]=0x00;
@@ -201,7 +216,7 @@ void CyberGear::Stop(bool clear_error)
   */
 void CyberGear::SetMode(const control_mode_t &mode)
 {
-  SetMotorParameter(Run_mode, (uint8_t)mode);
+  SetMotorParameter(PARAM_RUN_MODE, (uint8_t)mode);
 }
 
 /**
@@ -259,25 +274,25 @@ void CyberGear::SendMotionCommand(float torque, float position, float speed, flo
 }
 
 void CyberGear::SendCurrentCommand(float current) {
-  SetMotorParameter(Iq_Ref, current);
+  SetMotorParameter(PARAM_IQ_REF, current);
 }
 
 void CyberGear::SendPositionCommand(float position, float max_speed, float max_current) {
-  SetMotorParameter(Limit_Cur, max_current);
-  SetMotorParameter(Limit_Spd, max_speed);
-  SetMotorParameter(Loc_Ref, position);
+  SetMotorParameter(PARAM_LIMIT_CUR, max_current);
+  SetMotorParameter(PARAM_LIMIT_SPD, max_speed);
+  SetMotorParameter(PARAM_LOC_REF, position);
 }
 
 void CyberGear::SetPositionKp(float kp) {
-  SetMotorParameter(Loc_Kp, kp);
+  SetMotorParameter(PARAM_LOC_KP, kp);
 }
 
 void CyberGear::SetSpeedKp(float kp) {
-  SetMotorParameter(Spd_Kp, kp);
+  SetMotorParameter(PARAM_SPD_KP, kp);
 }
 
-void CyberGear::SetSpeedKi(float kp) {
-  SetMotorParameter(Spd_Ki, kp);
+void CyberGear::SetSpeedKi(float ki) {
+  SetMotorParameter(PARAM_SPD_KI, ki);
 }
 
 float CyberGear::GetAngle() const {
@@ -294,6 +309,18 @@ float CyberGear::GetTorque() const {
 
 float CyberGear::GetTemperature() const {
   return temp_;
+}
+
+float CyberGear::GetPositionKp() const {
+  return parameters_20_[0x16];
+}
+
+float CyberGear::GetSpeedKp() const {
+  return parameters_20_[0x14];
+}
+
+float CyberGear::GetSpeedKi() const {
+  return parameters_20_[0x15];
 }
 
 uint8_t CyberGear::GetMasterCanID() const {

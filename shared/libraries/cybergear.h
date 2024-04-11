@@ -40,24 +40,28 @@
 #define Communication_Type_MotorStop 0x04	    //电机停止运行
 #define Communication_Type_SetPosZero 0x06	    //设置电机机械零位
 #define Communication_Type_CanID 0x07	        //更改当前电机CAN_ID
-#define Communication_Type_Control_Mode 0x12
 #define Communication_Type_GetSingleParameter 0x11	//读取单个参数
 #define Communication_Type_SetSingleParameter 0x12	//设定单个参数
 #define Communication_Type_ErrorFeedback 0x15	    //故障反馈帧
 //参数读取宏定义
-#define Spd_Kp  0x2014
-#define Spd_Ki  0x2015
-#define Loc_Kp  0x2016
-#define Run_mode 0x7005
-#define Iq_Ref   0x7006
-#define Spd_Ref  0x700A
-#define Limit_Torque 0x700B
-#define Cur_Kp 0x7010
-#define Cur_Ki 0x7011
-#define Cur_Filt_Gain 0x7014
-#define Loc_Ref 0x7016
-#define Limit_Spd 0x7017
-#define Limit_Cur 0x7018
+#define PARAM_RUN_MODE 0x7005
+#define PARAM_IQ_REF   0x7006
+#define PARAM_SPD_REF  0x700A
+#define PARAM_LIMIT_TORQUE 0x700B
+#define PARAM_CUR_KP 0x7010
+#define PARAM_CUR_KI 0x7011
+#define PARAM_CUR_FILT_GAIN 0x7014
+#define PARAM_LOC_REF 0x7016
+#define PARAM_LIMIT_SPD 0x7017
+#define PARAM_LIMIT_CUR 0x7018
+#define PARAM_MECH_POS 0x7019
+#define PARAM_IQF 0x701A
+#define PARAM_MECH_VEL 0x701B
+#define PARAM_VBUS 0x701C
+#define PARAM_ROTATION 0x701D
+#define PARAM_LOC_KP  0x701E
+#define PARAM_SPD_KP  0x701F
+#define PARAM_SPD_KI  0x7020
 
 #define Gain_Angle 720/32767.0
 #define Bias_Angle 0x8000
@@ -106,25 +110,29 @@ class CyberGear {           //小米电机结构体
   void SetMode(const control_mode_t &mode);
   void SendMotionCommand(float torque, float position, float speed, float kp, float kd);
   void SendCurrentCommand(float current);
-  void SendPositionCommand(float position, float max_speed = 1.0, float max_current = 23.0);
+  void SendPositionCommand(float position, float max_speed = 2.0, float max_current = 23.0);
   void SetPositionKp(float kp);
   void SetSpeedKp(float kp);
   void SetSpeedKi(float ki);
   void SetZeroPosition();
   void UpdateData(const uint8_t data[], const CAN_RxHeaderTypeDef& header);
+  void UpdateParameter(uint16_t index, float value);
+
+  void SetMotorParameter(uint16_t index, float value);
+  void SetMotorParameter(uint16_t index, uint8_t value);
+  void GetMotorParameter(uint16_t index);
 
   float GetAngle() const;
   float GetSpeed() const;
   float GetTorque() const;
   float GetTemperature() const;
+  float GetPositionKp() const;
+  float GetSpeedKp() const;
+  float GetSpeedKi() const;
   uint8_t GetMasterCanID() const;
   uint32_t GetTimeStamp() const;
 
  private:
-  void SetMotorParameter(uint16_t index, float value);
-  void SetMotorParameter(uint16_t index, uint8_t value);
-
-
   CAN* can_;
 	uint8_t can_id_;       //CAN ID
 
@@ -132,6 +140,9 @@ class CyberGear {           //小米电机结构体
 	float speed_;          //回传速度
 	float torque_;         //回传力矩
 	float temp_;			     //回传温度
+
+  float parameters_20_[32]; //parameters with address 0x20XX
+  float parameters_70_[32]; //parameters with address 0x70XX
 
   uint32_t timestamp_;
 
