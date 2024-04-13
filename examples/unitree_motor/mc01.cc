@@ -98,37 +98,22 @@ void RM_RTOS_Default_Task(const void* arguments) {
 
   print("Open loop spin test\r\n");
   A1->Test(2);
-  HAL_UART_Transmit(&huart1, (uint8_t*)(&(A1->send.data)), A1->send_length, 100);
+  A1_uart->Write((uint8_t*)(&(A1->send.data)), A1->send_length);
   osDelay(3000);
 
   print("Motor stop\r\n");
   A1->Stop(2);
-  HAL_UART_Transmit(&huart1, (uint8_t*)(&(A1->send.data)), A1->send_length, 100);
+  A1_uart->Write((uint8_t*)(&(A1->send.data)), A1->send_length);
   osDelay(3000);
 
   print("Constant speed mode\r\n");
   A1->Control(2, 0.0, -1.0, 0.0, 0.0, 3.0); // constant speed mode
-  HAL_UART_Transmit(&huart1, (uint8_t*)(&(A1->send.data)), A1->send_length, 100);
+  A1_uart->Write((uint8_t*)(&(A1->send.data)), A1->send_length);
   osDelay(3000);
-// for (int i = 0; i < 30; ++i) {
-//   HAL_UART_Transmit(&huart1, (uint8_t*)(&(A1->send.data)), A1->send_length, 100);
-//   //    A1_uart->Write((uint8_t*)(&(A1->send.data)), A1->send_length);
-//   set_cursor(0, 0);
-//   clear_screen();
-//   print("Motor ID: %d\r\n", A1->recv.id);
-//   print("Mode    : %d\r\n", A1->recv.mode);
-//   print("Temp    : %d\r\n", A1->recv.Temp);
-//   print("MError  : %d\r\n", A1->recv.MError);
-//   print("Torque  : %.3f\r\n", A1->recv.T);
-//   print("Speed   : %.3f\r\n", A1->recv.W);
-//   print("Accel   : %d\r\n", A1->recv.Acc);
-//   print("Position: %.3f\r\n", A1->recv.Pos);
-//   osDelay(100);
-// }
 
   print("Motor stop\r\n");
   A1->Stop(2);
-  HAL_UART_Transmit(&huart1, (uint8_t*)(&(A1->send.data)), A1->send_length, 100);
+  A1_uart->Write((uint8_t*)(&(A1->send.data)), A1->send_length);
   osDelay(3000);
 
   print("Position control mode (with remote control)\r\n");
@@ -137,32 +122,20 @@ void RM_RTOS_Default_Task(const void* arguments) {
     float vel;
     vel = dbus->ch1 / 660.0 * 15;
     pos += vel / 150.0;
-//    A1->Control(2, 0.0, vel, 0.0, 0.0, 3.0);
     A1->Control(2, 0.0, 0.0, pos, 0.05, 3.0);
-    HAL_UART_Transmit(&huart1, (uint8_t*)(&(A1->send.data)), A1->send_length, 100);
+    A1_uart->Write((uint8_t*)(&(A1->send.data)), A1->send_length);
+
+    set_cursor(0, 0);
+    clear_screen();
+    print("Motor ID: %d\r\n", A1->recv.id);
+    print("Mode    : %d\r\n", A1->recv.mode);
+    print("Temp    : %d\r\n", A1->recv.Temp);
+    print("MError  : %d\r\n", A1->recv.MError);
+    print("Torque  : %.3f\r\n", A1->recv.T);
+    print("Speed   : %.3f\r\n", A1->recv.W);
+    print("Accel   : %d\r\n", A1->recv.Acc);
+    print("Position: %.3f\r\n", A1->recv.Pos);
     osDelay(10);
   }
-//  A1->Control(2, 0.0, vel, 0.0, 0.0, 3.0);
-//  HAL_UART_Transmit(&huart1, (uint8_t*)(&(A1->send.data)), A1->send_length, 100);
-//  osDelay(3000);
 
-//  print("Zero torque mode\r\n");
-//  A1->Control(2, 0.0, 0.0, 0.0, 0.0, 0.0); // zero torque mode
-//  HAL_UART_Transmit(&huart1, (uint8_t*)(&(A1->send.data)), A1->send_length, 100);
-//  osDelay(3000);
-// while (true) {
-//   HAL_UART_Transmit(&huart1, (uint8_t*)(&(A1->send.data)), A1->send_length, 100);
-//   //    A1_uart->Write((uint8_t*)(&(A1->send.data)), A1->send_length);
-//   set_cursor(0, 0);
-//   clear_screen();
-//   print("Motor ID: %d\r\n", A1->recv.id);
-//   print("Mode    : %d\r\n", A1->recv.mode);
-//   print("Temp    : %d\r\n", A1->recv.Temp);
-//   print("MError  : %d\r\n", A1->recv.MError);
-//   print("Torque  : %.3f\r\n", A1->recv.T);
-//   print("Speed   : %.3f\r\n", A1->recv.W);
-//   print("Accel   : %d\r\n", A1->recv.Acc);
-//   print("Position: %.3f\r\n", A1->recv.Pos);
-//   osDelay(100);
-// }
 }
