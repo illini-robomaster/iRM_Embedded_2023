@@ -1,14 +1,13 @@
 #pragma once
-#include "utils.h"
+
 #include "cmsis_os.h"
 #include "motor.h"
 #include "dbus.h"
-#include "bsp_can.h"
-#include <arm_math.h>
+#include "can.h"
 #include "bsp_gpio.h"
 #include "bsp_print.h"
 #include "controller.h"
-#include "utils.h"
+// #include "utils.h"
 
 
 extern osThreadId_t armTranslateTaskHandle;
@@ -30,14 +29,14 @@ void kill_arm_translate();
 
 /* M3508 params start */
 const int BASE_TRANSLATE_ID = 0x201;
-GPIO_TypeDef* BASE_TRANSLATE_CALI_GPIO_PORT = GPIOI;
-uint16_t BASE_TRANSLATE_CALI_GPIO_PIN = GPIO_PIN_7;  // PWM pin 1 on C board
+//const GPIO_TypeDef* BASE_TRANS_INIT_GPIO_PORT = GPIOI;
+//const uint16_t BASE_TRANS_INIT_GPIO_PIN = GPIO_PIN_7;  // PWM pin 1 on C board
 
 // M3508 steering params. (translate 3508 motor) */
 const float BASE_TRANSLATE_MAX = PI;
 const float BASE_TRANSLATE_MIN = -PI;
 const float BASE_TRANSLATE_RUN_SPEED = (1 * PI);
-const float BASE_TRANSLATE_ALIGN_SPEED = (0 * PI);
+const float BASE_TRANSLATE_ALIGN_SPEED = (0.5 * PI);
 const float BASE_TRANSLATE_ACCELERATION = (100 * PI);
 
 /* M3508 params end */

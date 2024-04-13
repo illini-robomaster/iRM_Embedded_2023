@@ -25,6 +25,7 @@
 #include "dbus.h"
 #include "rgb.h"
 #include "chassis_task.h"
+#include "arm_translate_task.h"
 //  #include "ui_task.h"
 #ifdef REFEREE
 #include "referee_task.h"
@@ -33,6 +34,7 @@
 //#define SINGLEBOARD
 //
 osThreadId_t chassisTaskHandle;
+osThreadId_t armTranslateTaskHandle;
 osThreadId_t UITaskHandle;
 osThreadId_t testTaskHandle;
 #ifdef REFEREE
@@ -75,6 +77,7 @@ void RM_RTOS_Init() {
    receive = new bsp::CanBridge(can2,0x20B,0x20A);
 #endif
     init_chassis();
+    init_arm_translate();
     set_cursor(0,0);
     clear_screen();
 }
@@ -82,6 +85,7 @@ void RM_RTOS_Init() {
 
 void RM_RTOS_Threads_Init(void) {
     chassisTaskHandle = osThreadNew(chassisTask,nullptr,&chassisTaskAttribute);
+    armTranslateTaskHandle = osThreadNew(armTranslateTask, nullptr, &armTranslateAttribute);
 #ifdef REFEREE
     refereeTaskHandle = osThreadNew(refereeTask,nullptr,&refereeTaskAttribute);
 #endif
@@ -91,6 +95,7 @@ void RM_RTOS_Threads_Init(void) {
 
 void KillAll() {
     kill_chassis();
+    kill_arm_translate();
 }
 
 

@@ -1,5 +1,4 @@
 #pragma once
-
 #include "cmsis_os.h"
 #include "motor.h"
 #include "engineer_steering.h"

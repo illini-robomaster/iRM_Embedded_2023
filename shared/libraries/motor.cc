@@ -549,7 +549,7 @@ float SteeringMotor::GetTheta(GetThetaMode mode) const {
 }
 
 void SteeringMotor::PrintData() const {
-  print("current_target: %10.4  ", current_target_);
+  print("current_target: %10.4f  ", current_target_);
   print("current_theta: %10.4f  ", this->GetTheta(relative_mode));
   print("align_angle: %10.4f  ", align_angle_);
   print("align_complete: %d\r\n", align_complete_);
@@ -592,7 +592,6 @@ bool SteeringMotor::Calibrate() {
     // mark alignment as complete and keep align_angle for next alignment
     align_angle_ = wrap<float>(GetTheta(relative_mode) + calibrate_offset_, 0, 2 * PI);
     align_complete_ = true;
-
     return true;
   } else {
     // rotate slowly with TEST_SPEED, try to hit the calibration sensor

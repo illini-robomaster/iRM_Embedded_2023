@@ -29,16 +29,16 @@
 **/
 
 /* M3508 params start */
-const int BASE_TRANSLATE_ID = 0x201;
-const GPIO_TypeDef* BASE_TRANSLATE_CALI_GPIO_PORT = GPIOC;
-const uint16_t BASE_TRANSLATE_CALI_GPIO_PIN = GPIO_PIN_2;
+//const int BASE_TRANSLATE_ID = 0x201;
+//const GPIO_TypeDef* BASE_TRANSLATE_CALI_GPIO_PORT = GPIOC;
+//const uint16_t BASE_TRANSLATE_CALI_GPIO_PIN = GPIO_PIN_2;
 
 // M3508 steering params. (translate 3508 motor) */
-const float BASE_TRANSLATE_MAX = PI;
-const float BASE_TRANSLATE_MIN = -PI;
-const float RUN_SPEED = (1 * PI);
-const float ALIGN_SPEED = (0.5 * PI);
-const float ACCELERATION = (100 * PI);
+//const float BASE_TRANSLATE_MAX = PI;
+//const float BASE_TRANSLATE_MIN = -PI;
+//const float RUN_SPEED = (1 * PI);
+//const float ALIGN_SPEED = (0.5 * PI);
+//const float ACCELERATION = (100 * PI);
 
 /* M3508 params end */
 

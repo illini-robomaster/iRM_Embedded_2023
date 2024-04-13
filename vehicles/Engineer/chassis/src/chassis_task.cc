@@ -83,7 +83,7 @@ void chassisTask(void* arg){
         chassis->SteerCalcOutput();
 
         if(loop_count == 100){
-            chassis->PrintData();
+//            chassis->PrintData();
             loop_count = 0;
         }
         loop_count ++;
