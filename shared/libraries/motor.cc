@@ -550,7 +550,7 @@ float SteeringMotor::GetTheta(GetThetaMode mode) const {
 
 void SteeringMotor::PrintData() const {
   print("current_target: %10.4f  ", current_target_);
-  print("current_theta: %10.4f  ", this->GetTheta(relative_mode));
+  print("current_theta: %10.4f  ", this->GetTheta(absolute_mode));
   print("align_angle: %10.4f  ", align_angle_);
   print("align_complete: %d\r\n", align_complete_);
 }
@@ -617,6 +617,129 @@ void SteeringMotor::SetAlignFalse() {
 }
 
 bool SteeringMotor::CheckAlignment() {
+  return align_complete_;
+}
+// ==================================================================
+// ServoMotor with LG 
+// ==================================================================
+ServoMotorWithLG::ServoMotorWithLG(servoLG_t data) {
+  servo_t servo_data;
+  servo_data.motor = data.motor;
+  servo_data.max_speed = data.max_speed;
+  servo_data.max_acceleration = data.max_acceleration;
+  servo_data.transmission_ratio = data.transmission_ratio;
+  servo_data.omega_pid_param = data.omega_pid_param;
+  servo_data.max_iout = data.max_iout;
+  servo_data.max_out = data.max_out;
+  servo_ = new ServoMotor(servo_data);
+
+  // Soft limit
+  forward_soft_limit = data.forward_soft_limit;
+  reverse_soft_limit = data.reverse_soft_limit;
+
+  align_detect_func_ = data.align_detect_func;
+  calibrate_offset_ = data.calibrate_offset;
+  align_angle_ = 0;
+  align_complete_ = false;
+  current_target_ = 0;
+}
+
+float ServoMotorWithLG::GetTheta(GetThetaMode mode) const {
+  return servo_->GetTheta(mode);
+}
+
+void ServoMotorWithLG::PrintData() const {
+  print("current_target: %10.4f  ", current_target_);
+  print("current_theta: %10.4f  ", this->GetTheta(absolute_mode));
+  print("align_angle: %10.4f  ", align_angle_);
+  print("align_complete: %d\r\n", align_complete_);
+}
+
+int ServoMotorWithLG::TurnRelative(float angle, bool override) {
+  float new_target = current_target_ + angle;
+
+  if(align_complete_ && (new_target - align_angle_ >  forward_soft_limit || new_target - align_angle_ < reverse_soft_limit)){
+    return 1;
+  } 
+
+  int servo_status = servo_->SetTarget(new_target, override);
+
+  // if servo motor rejects (not holding), don't update the current_target
+  if (servo_status == INPUT_REJECT) {
+    return 1;
+  } else {
+    current_target_ += angle;
+    return 0;
+  }
+}
+
+int ServoMotorWithLG::TurnAbsolute(float angle, bool override) {
+
+  // soft limit
+  if(align_complete_ && (angle - align_angle_ > forward_soft_limit || angle - align_angle_ < reverse_soft_limit)){
+    return 1;
+  }
+  int servo_status = servo_->SetTarget(angle, override);
+
+  // if servo motor rejects (not holding), don't update the current_target
+  if (servo_status == INPUT_REJECT) {
+    return 1;
+  } else {
+    current_target_ = angle;
+    return 0;
+  }
+}
+
+int ServoMotorWithLG::ReAlign() {
+  // turn iff alignment is completed
+  if (!align_complete_) {
+    return 2;
+  }
+
+  int ret = 0;
+  // erase previous target
+  ret = TurnRelative(0, true) || ret;
+
+  // if calibration complete, go to recorded align_angle
+  ret = TurnRelative(align_angle_ - GetTheta(relative_mode)) || ret;
+  return ret;
+}
+
+bool ServoMotorWithLG::Calibrate() {
+  if (align_complete_) {
+    return true;
+
+  } else if (align_detect_func_ != nullptr && align_detect_func_()) {
+    // if calibration sensor returns True, move for calibration offset and stop.
+    current_target_ = GetTheta(absolute_mode);
+    // mark alignment as complete and keep align_angle for next alignment
+    align_angle_ = GetTheta(absolute_mode) + calibrate_offset_;
+    align_complete_ = true;
+    return true;
+  } else {
+    // rotate slowly with TEST_SPEED, try to hit the calibration sensor
+    TurnRelative(2 * PI);
+  }
+  return false;
+}
+
+void ServoMotorWithLG::SetMaxSpeed(const float max_speed) {
+  servo_->SetMaxSpeed(max_speed);
+}
+
+void ServoMotorWithLG::CalcOutput() {
+  servo_->CalcOutput();
+}
+
+void ServoMotorWithLG::UpdateData(const uint8_t data[]) {
+  servo_->UpdateData(data);
+}
+
+void ServoMotorWithLG::SetAlignFalse() {
+  align_complete_ = false;
+}
+
+bool ServoMotorWithLG::CheckAlignment() {
   return align_complete_;
 }
 
