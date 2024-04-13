@@ -658,9 +658,15 @@ void ServoMotorWithLG::PrintData() const {
 int ServoMotorWithLG::TurnRelative(float angle, bool override) {
   float new_target = current_target_ + angle;
 
-  if(align_complete_ && (new_target - align_angle_ >  forward_soft_limit || new_target - align_angle_ < reverse_soft_limit)){
+  // forward soft limit
+  if(align_complete_ && (new_target > current_target_ &&  new_target - align_angle_ >  forward_soft_limit)) {
     return 1;
-  } 
+  }
+
+  // reverse soft limit
+  if(align_complete_ && (new_target < current_target_ && new_target - align_angle_ < reverse_soft_limit)) {
+    return 1;
+  }
 
   int servo_status = servo_->SetTarget(new_target, override);
 

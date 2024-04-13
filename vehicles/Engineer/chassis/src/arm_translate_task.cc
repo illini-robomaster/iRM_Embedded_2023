@@ -36,30 +36,29 @@ void armTranslateTask(void* arg){
                 }
 		osDelay(2);
 	}
-        base_translate_motor->ReAlign();
-        base_translate_motor->TurnRelative(0);
-        base_translate_motor->SetMaxSpeed(BASE_TRANSLATE_RUN_SPEED);
-        control::MotorCANBase::TransmitOutput(&motor9, 1);
+	base_translate_motor->ReAlign();
+	base_translate_motor->TurnRelative(0);
+	base_translate_motor->SetMaxSpeed(BASE_TRANSLATE_RUN_SPEED);
+	control::MotorCANBase::TransmitOutput(&motor9, 1);
 
-		// Start normal operation
+	// Start normal operation
+	while(1) {
+		loop_cnt++;
+		if(loop_cnt >= 100) {
+		set_cursor(0, 0);
+		clear_screen();
+		base_translate_motor->PrintData();
+		// motor9->PrintData();
+		loop_cnt = 0;
+		print("dbus ch2: %f \r\n", dbus->ch3/660.0/200);
 
-        while(1) {
-          loop_cnt++;
-          if(loop_cnt >= 100) {
-            set_cursor(0, 0);
-            clear_screen();
-            base_translate_motor->PrintData();
-            // motor9->PrintData();
-            loop_cnt = 0;
-            print("dbus ch2: %f \r\n", dbus->ch3/660.0/200);
+		}
 
-          }
-
-          base_translate_motor->TurnRelative(dbus->ch3 / 660.0 / 50);
-          base_translate_motor->CalcOutput();
-          control::MotorCANBase::TransmitOutput(&motor9, 1);
-          osDelay(2);
-        }
+		base_translate_motor->TurnRelative(dbus->ch3 / 660.0 / 50);
+		base_translate_motor->CalcOutput();
+		control::MotorCANBase::TransmitOutput(&motor9, 1);
+		osDelay(2);
+	}
 }
 
 
@@ -82,7 +81,7 @@ void init_arm_translate() {
 	// TODO measure the calibrate offset for base translate motor
 	servoLG_data.calibrate_offset = 0;
 	servoLG_data.forward_soft_limit = 0;
-	servoLG_data.reverse_soft_limit = -20;
+	servoLG_data.reverse_soft_limit = -25.5;
 	servoLG_data.align_detect_func = base_translate_align_detect;
 
 	base_translate_motor = new control::ServoMotorWithLG(servoLG_data);
@@ -94,8 +93,6 @@ void kill_arm_translate(){
 	while(true){
 		motor9->SetOutput(0);
 		control::MotorCANBase::TransmitOutput(&motor9, 1);
-
 		osDelay(100);
-	}	
-
+	}
 }

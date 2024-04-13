@@ -35,7 +35,7 @@ const int BASE_TRANSLATE_ID = 0x201;
 // M3508 steering params. (translate 3508 motor) */
 const float BASE_TRANSLATE_MAX = PI;
 const float BASE_TRANSLATE_MIN = -PI;
-const float BASE_TRANSLATE_RUN_SPEED = (1 * PI);
+const float BASE_TRANSLATE_RUN_SPEED = (2 * PI);
 const float BASE_TRANSLATE_ALIGN_SPEED = (0.5 * PI);
 const float BASE_TRANSLATE_ACCELERATION = (100 * PI);
 
