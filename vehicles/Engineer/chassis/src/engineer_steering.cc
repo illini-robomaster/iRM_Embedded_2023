@@ -71,7 +71,7 @@ namespace control{
   // Init private variables ends
 //   SteerThetaReset();
   // just for wheel speed pid (not for steer motor)
-  float* pid_params = new float[3]{12, 3, 1};
+  float* pid_params = new float[3]{40, 0, 0};
   float motor_max_iout = 20000;
   float motor_max_out = 20000;
   for (int i = 0; i < MOTOR_NUM; i++) {
@@ -102,12 +102,25 @@ EngineerSteeringChassis::~EngineerSteeringChassis() {
   // counterclockwise -> positive
   void EngineerSteeringChassis::SetWSpeed(float _vw){ vw = _vw; }
 
+  int loop_count = 0;
+
   void EngineerSteeringChassis::Update(float _power_limit, float _chassis_power, float _chassis_power_buffer){
     // Update Wheels
     float PID_output[MOTOR_NUM];
     float output[MOTOR_NUM];
 
     // compute PID output
+    if(loop_count == 100){
+      print("fl_wheel error: %f\r\n", fl_wheel_motor->GetOmegaDelta(v_fl_));
+      print("fr_wheel error: %f\r\n", fr_wheel_motor->GetOmegaDelta(v_fr_));
+      print("bl_wheel error: %f\r\n", bl_wheel_motor->GetOmegaDelta(v_bl_));
+      print("br_wheel error: %f\r\n", br_wheel_motor->GetOmegaDelta(v_br_));
+
+      loop_count = 0;
+    }
+    loop_count ++;
+
+
     PID_output[0] = pids[0].ComputeOutput(fl_wheel_motor->GetOmegaDelta(v_fl_));
     PID_output[1] = pids[1].ComputeOutput(fr_wheel_motor->GetOmegaDelta(v_fr_));
     PID_output[2] = pids[2].ComputeOutput(bl_wheel_motor->GetOmegaDelta(v_bl_));

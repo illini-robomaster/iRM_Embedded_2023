@@ -698,6 +698,9 @@ class SteeringMotor {
 
 
 // =================================================================================================
+// ServoMotorWithLG 
+// =================================================================================================
+// This is a ServoMotor with light gate calibration and forward & reverse soft limits
 
 /**
  * @brief structure used when steering motor instance is initialized

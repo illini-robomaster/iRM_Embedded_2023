@@ -51,7 +51,7 @@ namespace control{
         diff = motor_->GetThetaDelta(target_angle_);
         out = omega_pid_.ComputeOutput(diff);
 
-        // print("Motor output : %4d",command);
+        // print("Motor output : %4d",diff);
         motor_->SetOutput(out);
     }
 

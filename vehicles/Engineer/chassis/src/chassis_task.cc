@@ -7,6 +7,15 @@ static const int KILLALL_DELAY = 100;
 static const int DEFAULT_TASK_DELAY = 100;
 static const int CHASSIS_TASK_DELAY = 2;
 
+static const float NORMALIZATION_FACTOR = 1;
+  // Prevent vehicle from flipping due to sudden changes in velocity.
+  // Speed at which safety will not kick in
+  // TODO: Find good numbers
+static const float MOMENTUM_SAFE_SPEED = 660 * 0.4; // Magic number
+static const float MOMENTUM_SAFE_FACTOR_LINE = 0.3;   // also ^
+static const float MOMENTUM_SAFE_FACTOR_TURN = 0.3;   // also ^
+static const float MOMENTUM_FACTOR = 0.75;  
+
 /*Args*/
 static control::MotorCANBase* motor1 = nullptr;
 static control::MotorCANBase* motor2 = nullptr;
@@ -36,21 +45,25 @@ void chassisTask(void* arg){
     control::MotorCANBase* wheel_motors[] = {motor5, motor6, motor7, motor8};
 
     chassis->SteerSetMaxSpeed(ALIGN_SPEED);
-
-    bool aligned = false;
-    while(!aligned){
-        aligned = chassis->Calibrate();
-        chassis->SteerCalcOutput();
-        control::MotorCANBase::TransmitOutput(steer_motors, 4);
-        osDelay(1);
-    }
+	chassis->Calibrate();
+    // bool aligned = false;
+    // while(!aligned){
+    //     aligned = chassis->Calibrate();
+    //     chassis->SteerCalcOutput();
+    //     control::MotorCANBase::TransmitOutput(steer_motors, 4);
+	// 	
+    //     osDelay(1);
+    // }
 
     chassis->SteerSetMaxSpeed(RUN_SPEED);
     chassis->SetWheelSpeed(0,0,0,0);
 
+	float prev_vx = 0;
+	float prev_vy = 0;
+	float prev_mag = 0;
     while (true) {
         float relative_angle = 0;
-        float sin_yaw, cos_yaw, vx_set, vy_set;
+        float sin_yaw, cos_yaw, vx_set, vy_set, v_mag, v_perp;
         float vx, vy, wz;
 
 #ifndef SINGLEBOARD
@@ -82,11 +95,19 @@ void chassisTask(void* arg){
         chassis->WheelUpdateSpeed(WHEEL_SPEED_FACTOR);
         chassis->SteerCalcOutput();
 
-        if(loop_count == 100){
-//            chassis->PrintData();
+
+		if(loop_count == 100){
+			clear_screen();
+   			set_cursor(0, 0);
+
+            print("fl_steer error: %f \r\n", chassis_data->fl_steer_motor->GetTarget()-chassis_data->fl_steer_motor->GetTheta());
+			print("fr_steer error: %f \r\n", chassis_data->fl_steer_motor->GetTarget()-chassis_data->fr_steer_motor->GetTheta());
+			print("bl_steer error: %f \r\n", chassis_data->bl_steer_motor->GetTarget()-chassis_data->bl_steer_motor->GetTheta());
+			print("br_steer error: %f \r\n", chassis_data->br_steer_motor->GetTarget()-chassis_data->br_steer_motor->GetTheta());
             loop_count = 0;
         }
         loop_count ++;
+        
 #ifdef REFEREE
         chassis->Update((float)referee->game_robot_status.chassis_power_limit,
                            referee->power_heat_data.chassis_power,
@@ -136,13 +157,14 @@ void init_chassis(){
   servo_data.max_speed = RUN_SPEED;
   servo_data.max_acceleration = ACCELERATION;
   servo_data.transmission_ratio = 1;
-  servo_data.omega_pid_param = new float[3]{20000, 100, 500};
+  servo_data.omega_pid_param = new float[3]{80000, 0, 2000};
+//   servo_data.omega_pid_param = new float[3]{0, 0, 0};
   servo_data.max_iout = 30000;
   servo_data.max_out = 20000;
-  servo_data.install_offset = BL_MOTOR_OFFSET;
 
 
   /*ALIGNMENT IS NOT APPLICABLE IN THIS VEHICLE*/
+  servo_data.install_offset = BL_MOTOR_OFFSET;
   steering_motor1 = new control::Steering6020(servo_data);
   servo_data.motor = motor2;
   servo_data.install_offset = BR_MOTOR_OFFSET;

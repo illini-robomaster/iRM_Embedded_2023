@@ -10,10 +10,10 @@
 #include "bsp_can_bridge.h"
 
 //MAGIC NUMBERS, Represent motor physical install angle offsets.
-#define FL_MOTOR_OFFSET 4.76
-#define FR_MOTOR_OFFSET 0.77
-#define BL_MOTOR_OFFSET 6.26
-#define BR_MOTOR_OFFSET 5.96
+#define FL_MOTOR_OFFSET 4.663
+#define FR_MOTOR_OFFSET 0.771
+#define BL_MOTOR_OFFSET 6.110
+#define BR_MOTOR_OFFSET 6.065
 // #define FL_MOTOR_OFFSET 0
 // #define FR_MOTOR_OFFSET 0
 // #define BL_MOTOR_OFFSET 0
