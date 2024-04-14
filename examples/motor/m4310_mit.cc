@@ -30,8 +30,7 @@ static control::Motor4310* motor = nullptr;
 remote::DBUS* dbus = nullptr;
 
 void RM_RTOS_Init() {
-//  print_use_uart(&huart5);
-  print_use_usb();
+  print_use_uart(&huart4);
   can = new bsp::CAN(&hcan1, true);
 
   /* rx_id = Master id
@@ -44,7 +43,6 @@ void RM_RTOS_Init() {
   /* Make sure motor is set to the correct mode (in helper tool). Otherwise, motor won't start */
   motor = new control::Motor4310(can, 0x02, 0x01, control::MIT);
   dbus = new remote::DBUS(&huart3);
-  HAL_Delay(1000);
 }
 
 void RM_RTOS_Default_Task(const void* args) {
@@ -52,7 +50,6 @@ void RM_RTOS_Default_Task(const void* args) {
   UNUSED(args);
 
   control::Motor4310* motors[] = {motor};
-
   while(dbus->swr != remote::DOWN){}  // flip swr to start
   print("start\r\n");
 

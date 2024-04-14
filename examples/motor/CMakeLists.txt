@@ -61,7 +61,7 @@ irm_add_arm_executable(${PROJECT_NAME}_m2006_reload_modes
     SOURCES m2006_reload_modes.cc)
 
 irm_add_arm_executable(${PROJECT_NAME}_m4310_mit
-        TARGET DJI_Board_TypeA
+        TARGET DJI_Board_TypeC
         SOURCES m4310_mit.cc)
 
 irm_add_arm_executable(${PROJECT_NAME}_m4310_pos_vel
