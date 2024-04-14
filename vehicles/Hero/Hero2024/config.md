@@ -13,7 +13,6 @@
 | Motor3508  | `shoot_back_motor`  | `CAN1` | `0x200` | `0x202` |
 | Motor3508  |    `force_motor`    | `CAN1` | `0x200` | `0x203` |
 | Motor3508  |    `esca_motor`     | `CAN1` | `0x200` | `0x204` |
-|            |                     |        |         |         |
 
 ## RC Switch Definition:
 
