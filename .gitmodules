@@ -1,0 +1,3 @@
+[submodule "boards/DJI_Board_TypeC/micro_ros_stm32cubemx_utils"]
+	path = boards/DJI_Board_TypeC/micro_ros_stm32cubemx_utils
+	url = https://github.com/micro-ROS/micro_ros_stm32cubemx_utils.git

@@ -69,6 +69,20 @@ target_compile_options(${PROJECT_NAME}_libDSP PRIVATE -Wno-strict-aliasing)
 target_compile_definitions(${PROJECT_NAME}_libDSP PRIVATE __FPU_PRESENT)
 target_link_libraries(${PROJECT_NAME}_libDSP PRIVATE ${PROJECT_NAME}_interface)
 
+########################
+# ----- micro-ROS -----#
+########################
+add_library(${PROJECT_NAME}_libUROS
+    ${CMAKE_CURRENT_SOURCE_DIR}/micro_ros_stm32cubemx_utils/extra_sources/custom_memory_manager.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/micro_ros_stm32cubemx_utils/extra_sources/microros_allocators.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/micro_ros_stm32cubemx_utils/extra_sources/microros_time.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/micro_ros_stm32cubemx_utils/extra_sources/microros_transports/usb_cdc_transport.c
+)
+target_link_libraries(${PROJECT_NAME}_libUROS PUBLIC ${PROJECT_NAME}_interface
+    ${CMAKE_CURRENT_SOURCE_DIR}/micro_ros_stm32cubemx_utils/microros_static_library/libmicroros/libmicroros.a)
+target_include_directories(${PROJECT_NAME}_libUROS PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/micro_ros_stm32cubemx_utils/microros_static_library/libmicroros/microros_include)
+target_compile_options(${PROJECT_NAME}_libUROS PRIVATE -Wno-unused-parameter)
+
 ###################################################
 # ----- create board specific driver library -----#
 ###################################################
@@ -88,4 +102,6 @@ target_compile_options(${PROJECT_NAME} PRIVATE
 # link against board specific arm dsp library and interface
 target_link_libraries(${PROJECT_NAME}
     PRIVATE ${PROJECT_NAME}_libDSP
+    PUBLIC ${PROJECT_NAME}_libUROS
     PUBLIC ${PROJECT_NAME}_interface)
+
