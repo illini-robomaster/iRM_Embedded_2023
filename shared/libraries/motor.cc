@@ -449,7 +449,7 @@ void ServoMotor::CalcOutput() {
     detect_head_ = detect_head_ + 1 < detect_period_ ? detect_head_ + 1 : 0;
     // detect if motor is jammed
     // detect total is used as filter.
-    if (detect_total_ >= jam_threshold_) {
+    if (abs(detect_total_) >= abs(jam_threshold_)) {
       omega_pid_.Reset();
       servo_jam_t data;
       data.speed = max_speed_;
