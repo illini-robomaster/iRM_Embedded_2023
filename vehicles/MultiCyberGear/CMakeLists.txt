@@ -25,3 +25,8 @@ irm_add_arm_executable(multi_cybergear
     SOURCES main.cc
     DEPENDS eigen3)
 
+irm_add_arm_executable(comp_cybergear
+    TARGET DJI_Board_TypeC
+    SOURCES compensation.cc
+    DEPENDS eigen3)
+
