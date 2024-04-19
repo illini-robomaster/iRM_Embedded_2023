@@ -21,8 +21,8 @@
 project(Hero2024 ASM C CXX)
 
 irm_add_arm_executable(Hero2024_chassis
-    TARGET DJI_Board_TypeC
-    SOURCES
-
-    INCLUDES includes
+#    TARGET DJI_Board_TypeC
+#    SOURCES
+#
+#    INCLUDES includes
 )
