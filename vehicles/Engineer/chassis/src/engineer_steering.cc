@@ -71,7 +71,8 @@ namespace control{
   // Init private variables ends
 //   SteerThetaReset();
   // just for wheel speed pid (not for steer motor)
-  float* pid_params = new float[3]{40, 0, 0};
+
+  float* pid_params = new float[3]{200, 0, 0};
   float motor_max_iout = 20000;
   float motor_max_out = 20000;
   for (int i = 0; i < MOTOR_NUM; i++) {
@@ -110,21 +111,13 @@ EngineerSteeringChassis::~EngineerSteeringChassis() {
     float output[MOTOR_NUM];
 
     // compute PID output
-    if(loop_count == 100){
-      print("fl_wheel error: %f\r\n", fl_wheel_motor->GetOmegaDelta(v_fl_));
-      print("fr_wheel error: %f\r\n", fr_wheel_motor->GetOmegaDelta(v_fr_));
-      print("bl_wheel error: %f\r\n", bl_wheel_motor->GetOmegaDelta(v_bl_));
-      print("br_wheel error: %f\r\n", br_wheel_motor->GetOmegaDelta(v_br_));
-
-      loop_count = 0;
-    }
-    loop_count ++;
+    
 
 
-    PID_output[0] = pids[0].ComputeOutput(fl_wheel_motor->GetOmegaDelta(v_fl_));
-    PID_output[1] = pids[1].ComputeOutput(fr_wheel_motor->GetOmegaDelta(v_fr_));
-    PID_output[2] = pids[2].ComputeOutput(bl_wheel_motor->GetOmegaDelta(v_bl_));
-    PID_output[3] = pids[3].ComputeOutput(br_wheel_motor->GetOmegaDelta(v_br_));
+    PID_output[0] = pids[0].ComputeOutput(fl_wheel_motor->GetOmegaDelta(v_fl_ *M3508P19_RATIO / 0.06)); // m/s to rad/s
+    PID_output[1] = pids[1].ComputeOutput(fr_wheel_motor->GetOmegaDelta(v_fr_ *M3508P19_RATIO / 0.06));
+    PID_output[2] = pids[2].ComputeOutput(bl_wheel_motor->GetOmegaDelta(v_bl_ *M3508P19_RATIO / 0.06));
+    PID_output[3] = pids[3].ComputeOutput(br_wheel_motor->GetOmegaDelta(v_br_ *M3508P19_RATIO / 0.06));
 
     // compute power limit
     power_limit_info.power_limit = _power_limit;
@@ -140,6 +133,22 @@ EngineerSteeringChassis::~EngineerSteeringChassis() {
     fr_wheel_motor->SetOutput(PID_output[1]);
     bl_wheel_motor->SetOutput(PID_output[2]);
     br_wheel_motor->SetOutput(PID_output[3]);
+
+    if(loop_count == 100){
+      set_cursor(0, 0);
+      clear_screen();
+      print("fl_wheel target %5.2f error %5.2f m/s\r\n", v_fl_, v_fl_ - fl_wheel_motor->GetOmega()/M3508P19_RATIO*0.06); //0.06 = wheel radius
+      print("pid out %5.2f \r\n", PID_output[0]);
+      print("fr_wheel target %5.2f error %5.2f m/s\r\n", v_fr_, v_fr_ - fr_wheel_motor->GetOmega()/M3508P19_RATIO*0.06);
+      print("pid out %5.2f \r\n", PID_output[1]);
+      print("bl_wheel target %5.2f error %5.2f m/s\r\n", v_bl_, v_bl_ - bl_wheel_motor->GetOmega()/M3508P19_RATIO*0.06);
+      print("pid out %5.2f \r\n", PID_output[2]);
+      print("br_wheel target %5.2f error %5.2f m/s\r\n", v_br_, v_br_ - br_wheel_motor->GetOmega()/M3508P19_RATIO*0.06);
+      print("pid out %5.2f \r\n", PID_output[3]);
+
+      loop_count = 0;
+    }
+    loop_count ++;
   }
 
   void EngineerSteeringChassis::SetSpeed(const float _vx, const float _vy, const float _vw){
@@ -281,7 +290,7 @@ EngineerSteeringChassis::~EngineerSteeringChassis() {
   }
 }
 
-  void EngineerSteeringChassis::WheelUpdateSpeed(float wheel_speed_factor){
+  void EngineerSteeringChassis::WheelUpdateSpeed(){
      // Stay at current position when no command is given
     if (vx == 0 && vy == 0 && vw == 0) {
         SetWheelSpeed(0,0,0,0);
@@ -295,10 +304,19 @@ EngineerSteeringChassis::~EngineerSteeringChassis() {
         v_bl_ = wheel_dir_bl_ * sqrt(pow(vy - vw * cos(PI / 4), 2.0) + pow(vx - vw * sin(PI / 4), 2.0));
         v_br_ = wheel_dir_br_ * sqrt(pow(vy - vw * cos(PI / 4), 2.0) + pow(vx + vw * sin(PI / 4), 2.0));
 
-        v_fl_ = v_fl_ * wheel_speed_factor;
-        v_fr_ = v_fr_ * wheel_speed_factor;
-        v_bl_ = v_bl_ * wheel_speed_factor;
-        v_br_ = v_br_ * wheel_speed_factor;
+        // check if the speed of each wheel is greater than limit of m3508
+        // if yes, scale down the speed of each wheel
+
+        // Another option is ensure translation first, then rotation, but need to discuss which is better
+        const float M3508_MAX_SPEED = M3508_MAX_OMEGA * WHEEL_RADIUS;
+
+        if(v_fl_ > M3508_MAX_SPEED || v_fr_ > M3508_MAX_SPEED || v_bl_ > M3508_MAX_SPEED || v_br_ > M3508_MAX_SPEED){
+            float max_speed = max(v_fl_, max(v_fr_, max(v_bl_, v_br_)));
+            v_fl_ = v_fl_ / max_speed * M3508_MAX_SPEED;
+            v_fr_ = v_fr_ / max_speed * M3508_MAX_SPEED;
+            v_bl_ = v_bl_ / max_speed * M3508_MAX_SPEED;
+            v_br_ = v_br_ / max_speed * M3508_MAX_SPEED;
+        }
     }
   }
 

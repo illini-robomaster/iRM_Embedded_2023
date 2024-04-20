@@ -11,10 +11,13 @@ static const float NORMALIZATION_FACTOR = 1;
   // Prevent vehicle from flipping due to sudden changes in velocity.
   // Speed at which safety will not kick in
   // TODO: Find good numbers
-static const float MOMENTUM_SAFE_SPEED = 660 * 0.4; // Magic number
+
+static const float MOMENTUM_SAFE_SPEED = V_MAX * 0.3; // Magic number
 static const float MOMENTUM_SAFE_FACTOR_LINE = 0.3;   // also ^
 static const float MOMENTUM_SAFE_FACTOR_TURN = 0.3;   // also ^
-static const float MOMENTUM_FACTOR = 0.75;  
+static const float MOMENTUM_FACTOR_PER_SEC = 0.1;     // the velocity at half a second before only have 10% impact on curr target
+static const float MOMENTUM_FACTOR = 1-pow(MOMENTUM_FACTOR_PER_SEC, 1.0/500/0.5);  
+
 
 /*Args*/
 static control::MotorCANBase* motor1 = nullptr;
@@ -60,10 +63,11 @@ void chassisTask(void* arg){
 
 	float prev_vx = 0;
 	float prev_vy = 0;
-	float prev_mag = 0;
+	// float prev_mag = 0;
+
     while (true) {
         float relative_angle = 0;
-        float sin_yaw, cos_yaw, vx_set, vy_set, v_mag, v_perp;
+        float sin_yaw, cos_yaw, vx_set, vy_set;
         float vx, vy, wz;
 
 #ifndef SINGLEBOARD
@@ -74,39 +78,99 @@ void chassisTask(void* arg){
         vy_set = 0;
 #endif
 
-        vx_set = dbus->ch1;
-        vy_set = -dbus->ch0;
+
+        // The following is for joystick only, not for keyboard
+        // Max joy stick max = 660
+        float joy_x = dbus->ch1 / 660.0;
+        float joy_y = dbus->ch0 / 660.0;    
+
+        // Deadzone
+        const float DEADZONE = 0.1;
+        if (fabs(joy_x) < DEADZONE) joy_x = 0;
+        if (fabs(joy_y) < DEADZONE) joy_y = 0;
+
+        // Continous mapping at the edge of the deadzone
+        if (joy_x > DEADZONE) joy_x = (joy_x-DEADZONE) / (1-DEADZONE);
+        if (joy_x < -DEADZONE) joy_x = (joy_x+DEADZONE) / (1-DEADZONE);
+        if (joy_y > DEADZONE) joy_y = (joy_y-DEADZONE) / (1-DEADZONE);
+        if (joy_y < -DEADZONE) joy_y = (joy_y+DEADZONE) / (1-DEADZONE);
+
+
+        // To change direction, change the signs of joy_x and joy_y
+        vx_set = joy_x * V_TRANS_MAX; // in m/s
+        vy_set = -joy_y * V_TRANS_MAX; // in m/s
+
+        
+        // Normalize the vector
+        float norm_scale_factor = 1;
+        float mag = sqrt(vx_set * vx_set + vy_set * vy_set);
+        if (mag > V_TRANS_MAX){
+            norm_scale_factor = 1 / mag;
+        }
+
+		vx_set *= norm_scale_factor;
+		vy_set *= norm_scale_factor;
+
+		// "Momentum" smoothing mechanism
+        // Deprecated now
+		vx_set = vx_set * MOMENTUM_FACTOR +
+				prev_vx * (1 - MOMENTUM_FACTOR);
+		vy_set = vy_set * MOMENTUM_FACTOR +
+				prev_vy * (1 - MOMENTUM_FACTOR);
+
+        // Translational acceleration kinematic constraints
+        // The benefit of this compared to the previous one is that it has a constant acceleration and converges faster
+        // Calculate the delta V
+        float delta_vx = vx_set - prev_vx;
+        float delta_vy = vy_set - prev_vy;
+        // find the maximum delta V that is under the acceleration limit
+        float max_delta_v_mag = ACC_TRANS_MAX * CHASSIS_TASK_DELAY / 1000.0; 
+        // cap delta_v to this magnitude
+        float delta_v_mag = sqrt(delta_vx * delta_vx + delta_vy * delta_vy);
+        if (delta_v_mag > max_delta_v_mag){
+            float scale_factor = max_delta_v_mag / delta_v_mag;
+            delta_vx *= scale_factor;
+            delta_vy *= scale_factor;
+        }
+        // v_set = v_prev + delta_v
+        vx_set = prev_vx + delta_vx;
+        vy_set = prev_vy + delta_vy;
+
+        // TODO: Rotational acceleration constraints (which needs to deal with each module's angle)
+
+		prev_vx = vx_set;
+		prev_vy = vy_set;
+
         chassis->SteerSetMaxSpeed(RUN_SPEED);
         sin_yaw = sin(relative_angle);
         cos_yaw = cos(relative_angle);
         vx = cos_yaw * vx_set + sin_yaw * vy_set;
         vy = -sin_yaw * vx_set + cos_yaw * vy_set;
         // wz = std::min(FOLLOW_SPEED, FOLLOW_SPEED * dbus->ch2);       /* TODO : ASK IF GIMBAL EXIST, HOW CHASSIS MOVE */
-        wz = dbus->ch2;
+        wz = dbus->ch2 / 660.0 * V_ROT_MAX; // in m/s
 #ifndef  SINGLEBOARD
         // wz = receive->relative_angle;
 #else
         wz = 0;
 #endif
         // if (-CHASSIS_DEADZONE < relative_angle && relative_angle < CHASSIS_DEADZONE) wz = 0;
-        chassis->SetSpeed(vx / 10, vy / 10, wz/10);
+        chassis->SetSpeed(vx, vy, wz);
         chassis->SteerUpdateTarget();
-        constexpr float WHEEL_SPEED_FACTOR = 4;
-        chassis->WheelUpdateSpeed(WHEEL_SPEED_FACTOR);
+        chassis->WheelUpdateSpeed();
         chassis->SteerCalcOutput();
 
 
-		if(loop_count == 100){
-			clear_screen();
-   			set_cursor(0, 0);
+		// if(loop_count == 100){
+		// 	clear_screen();
+   		// 	set_cursor(0, 0);
 
-            print("fl_steer error: %f \r\n", chassis_data->fl_steer_motor->GetTarget()-chassis_data->fl_steer_motor->GetTheta());
-			print("fr_steer error: %f \r\n", chassis_data->fl_steer_motor->GetTarget()-chassis_data->fr_steer_motor->GetTheta());
-			print("bl_steer error: %f \r\n", chassis_data->bl_steer_motor->GetTarget()-chassis_data->bl_steer_motor->GetTheta());
-			print("br_steer error: %f \r\n", chassis_data->br_steer_motor->GetTarget()-chassis_data->br_steer_motor->GetTheta());
-            loop_count = 0;
-        }
-        loop_count ++;
+        //     print("fl_steer error: %f \r\n", chassis_data->fl_steer_motor->GetTarget()-chassis_data->fl_steer_motor->GetTheta());
+		// 	print("fr_steer error: %f \r\n", chassis_data->fl_steer_motor->GetTarget()-chassis_data->fr_steer_motor->GetTheta());
+		// 	print("bl_steer error: %f \r\n", chassis_data->bl_steer_motor->GetTarget()-chassis_data->bl_steer_motor->GetTheta());
+		// 	print("br_steer error: %f \r\n", chassis_data->br_steer_motor->GetTarget()-chassis_data->br_steer_motor->GetTheta());
+        //     loop_count = 0;
+        // }
+        // loop_count ++;
         
 #ifdef REFEREE
         chassis->Update((float)referee->game_robot_status.chassis_power_limit,
@@ -131,9 +195,6 @@ void chassisTask(void* arg){
 
 
         osDelay(CHASSIS_TASK_DELAY);
-
-
-
     }
 }
 

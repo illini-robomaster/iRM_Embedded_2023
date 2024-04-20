@@ -7,6 +7,20 @@
 #include "steering_6020.h"
 
 
+static const float WHEEL_RADIUS = 0.06; // m
+static const float M3508_MAX_OMEGA = 482.0 / 60.0 * 2.0 * PI; // rpm -> rad/s, this is the omega of the output shaft (not the rotor)
+
+// Theoretical maximum velocity in m/s 
+// DO NOT CHANGE if no mechanical change is made 
+static const float V_MAX = M3508_MAX_OMEGA * WHEEL_RADIUS; // m/s
+
+// Change these to change the maximum chassis speed
+// Will map the controller automatically
+static const float V_TRANS_MAX = 3.0; // Desired maximum translation speed, In m/s
+static const float V_ROT_MAX = 1.0; // In m/s
+static const float ACC_TRANS_MAX = 3.0; // m/s^2
+
+
 namespace control {
 
 constexpr uint16_t MOTOR_NUM = 4;
@@ -93,7 +107,7 @@ public:
    *        When vx, vy, and vw are all 0s, speed = 0
    * @note  Only update member variables, need to SetOutput()
    */
-  void WheelUpdateSpeed(float wheel_speed_factor);
+  void WheelUpdateSpeed();
 
   /**
    * @brief Call SetMaxSpeed() for all 4 Steering Motor

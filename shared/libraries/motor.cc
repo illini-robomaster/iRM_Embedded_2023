@@ -137,6 +137,11 @@ void Motor3508::PrintData() const {
   print("raw current get: % d \r\n", raw_current_get_);
 }
 
+
+/**
+ * @brief set the desired target current of the 3508 motor
+ * @param val clipped to -12288 (-20A) ~ 12288 (20A)
+*/
 void Motor3508::SetOutput(int16_t val) {
   constexpr int16_t MAX_ABS_CURRENT = 12288;  // ~20A
   output_ = clip<int16_t>(val, -MAX_ABS_CURRENT, MAX_ABS_CURRENT);
