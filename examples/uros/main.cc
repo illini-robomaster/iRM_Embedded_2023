@@ -86,6 +86,7 @@ void uROSTask(void* argument) {
   // publish loop
   std_msgs__msg__Int32 msg;
   msg.data = 0;
+
   while (true) {
     if (rcl_publish(&publisher, &msg, nullptr) != RCL_RET_OK) {
       // error handling
