@@ -733,6 +733,9 @@ void RM_RTOS_Init() {
 
   // Relay initialization
   relay = new bsp::Relay(RELAY_1_GPIO_Port, RELAY_1_Pin); /* USE GPIO_1 (PB14)->PIN 7 in the board */
+
+  buzzer = new bsp::Buzzer(&htim4, 3, 1000000);
+  OLED = new display::OLED(&hi2c2, 0x3C);
 }
 
 //==================================================================================================

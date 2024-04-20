@@ -28,6 +28,25 @@ extern "C" void* __wrap_malloc(size_t size) { return pvPortMalloc(size); }
 
 extern "C" void __wrap_free(void* ptr) { vPortFree(ptr); }
 
+extern "C" void* __wrap_realloc(void* ptr, size_t new_size) {
+  if (ptr == NULL) {
+    return pvPortMalloc(new_size);
+  } else {
+    vPortFree(ptr);
+    return pvPortMalloc(new_size);
+  }
+}
+
+extern "C" void* __wrap_calloc(size_t size) {
+  void* ret = pvPortMalloc(size);
+
+  for (size_t i = 0; i < size; ++i) {
+    *((char*)ret + i) = 0;
+  }
+
+  return ret;
+}
+
 /* overload c++ default dynamic memory allocator */
 
 void* operator new(size_t size) { return pvPortMalloc(size); }
