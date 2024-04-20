@@ -63,17 +63,17 @@ void RM_RTOS_Init(){
   // Initialize the RGB LED
 //  RGB=new display::RGB(&htim5,3,2,1,1000000);
   // shooter initialization
-//  init_shooter();
+  init_shooter();
   init_gimbal();
 }
 
 void RM_RTOS_Threads_Init(){
-//    shooterTaskHandle = osThreadNew(shooterTask, nullptr,&shooterTaskAttribute);
+    shooterTaskHandle = osThreadNew(shooterTask, nullptr,&shooterTaskAttribute);
     gimbalTaskHandle = osThreadNew(gimbalTask, nullptr,&gimbalTaskAttribute);
 }
 
 void KillAll(){
-//  kill_shooter();
+  kill_shooter();
   kill_gimbal();
 }
 
