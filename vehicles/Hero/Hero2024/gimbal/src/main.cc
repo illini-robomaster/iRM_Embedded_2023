@@ -35,6 +35,7 @@
 #include "oled.h"
 #include "bsp_buzzer.h"
 #include "shooterTask.h"
+#include "gimbalTask.h"
 
 remote::DBUS* dbus = nullptr;
 bsp::CAN* can1 = nullptr;
@@ -47,6 +48,7 @@ volatile bool lob_mode=false;
 //display::RGB* RGB = nullptr;
 
 osThreadId_t shooterTaskHandle;
+osThreadId_t gimbalTaskHandle;
 
 // Params Initialization
 void RM_RTOS_Init(){
@@ -57,19 +59,22 @@ void RM_RTOS_Init(){
   // Initialize the DBUS
   dbus = new remote::DBUS(&huart3);
   bsp::SetHighresClockTimer(&htim5);
+  send = new bsp::CanBridge(can2, 0x20A, 0x20B);
   // Initialize the RGB LED
 //  RGB=new display::RGB(&htim5,3,2,1,1000000);
   // shooter initialization
-  init_shooter();
-  send = new bsp::CanBridge(can2, 0x20A, 0x20B);
+//  init_shooter();
+  init_gimbal();
 }
 
 void RM_RTOS_Threads_Init(){
-    shooterTaskHandle = osThreadNew(shooterTask, nullptr,&shooterTaskAttribute);
+//    shooterTaskHandle = osThreadNew(shooterTask, nullptr,&shooterTaskAttribute);
+    gimbalTaskHandle = osThreadNew(gimbalTask, nullptr,&gimbalTaskAttribute);
 }
 
 void KillAll(){
-  kill_shooter();
+//  kill_shooter();
+  kill_gimbal();
 }
 
 void RM_RTOS_Default_Task(const void* args) {

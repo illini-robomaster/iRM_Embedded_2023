@@ -25,5 +25,5 @@ irm_add_arm_executable(Hero2024_gimbal
         SOURCES
         src/main.cc
         src/shooterTask.cc
-
+        src/gimbalTask.cc
         INCLUDES includes)
