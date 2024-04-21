@@ -1,6 +1,6 @@
 # ---------------------------------------------------------------------- #
 #                                                                        #
-#  Copyright (C) 2023                                                    #
+#  Copyright (C) 2022                                                    #
 #  Illini RoboMaster @ University of Illinois at Urbana-Champaign.       #
 #                                                                        #
 #  This program is free software: you can redistribute it and/or modify  #
@@ -18,12 +18,9 @@
 #                                                                        #
 # ---------------------------------------------------------------------- #
 
-project(example_hero ASM C CXX)
+project(Hero ASM C CXX)
 
-irm_add_arm_executable(${PROJECT_NAME}
-        TARGET DJI_Board_TypeA
-        SOURCES main.cc)
+irm_add_arm_executable(Hero
+    TARGET DJI_Board_TypeC
+    SOURCES main.cc)
 
-irm_add_arm_executable(${PROJECT_NAME}_shooter_2023
-        TARGET DJI_Board_TypeC
-        SOURCES hero_shooter_2023.cc)
