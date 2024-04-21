@@ -1,6 +1,6 @@
 # ---------------------------------------------------------------------- #
 #                                                                        #
-#  Copyright (C) 2022                                                    #
+#  Copyright (C) 2023                                                    #
 #  Illini RoboMaster @ University of Illinois at Urbana-Champaign.       #
 #                                                                        #
 #  This program is free software: you can redistribute it and/or modify  #
@@ -18,8 +18,12 @@
 #                                                                        #
 # ---------------------------------------------------------------------- #
 
-add_subdirectory(Engineer)
-add_subdirectory(Fortress)
-add_subdirectory(Sentry)
-add_subdirectory(Steering)
-add_subdirectory(Hero)
+project(Engineer ASM C CXX)
+
+irm_add_arm_executable(Engineer
+    TARGET DJI_Board_TypeC
+    SOURCES arm.cc)
+
+irm_add_arm_executable(ArmTest
+    TARGET DJI_Board_TypeC
+    SOURCES arm_test.cc)
