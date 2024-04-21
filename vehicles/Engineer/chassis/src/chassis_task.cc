@@ -1,5 +1,6 @@
 
 #include "chassis_task.h"
+#include "geometry.h"
 //#define SINGLEBOARD
 
 //Constants 
@@ -61,100 +62,90 @@ void chassisTask(void* arg){
     chassis->SteerSetMaxSpeed(RUN_SPEED);
     chassis->SetWheelSpeed(0,0,0,0);
 
-	float prev_vx = 0;
-	float prev_vy = 0;
+	Vector2d prev_target_vel(0, 0);
 	// float prev_mag = 0;
+
+    int loop_cnt = 0;
 
     while (true) {
         float relative_angle = 0;
-        float sin_yaw, cos_yaw, vx_set, vy_set;
-        float vx, vy, wz;
+        float wz = 0;
 
-#ifndef SINGLEBOARD
-         vx_set = -receive->vx;
-         vy_set = receive->vy;
-#else
-        vx_set = 0;
-        vy_set = 0;
-#endif
+// #ifndef SINGLEBOARD
+//          vx_set = -receive->vx;
+//          vy_set = receive->vy;
+// #else
+//         vx_set = 0;
+//         vy_set = 0;
+// #endif
 
 
         // The following is for joystick only, not for keyboard
         // Max joy stick max = 660
-        float joy_x = dbus->ch1 / 660.0;
-        float joy_y = dbus->ch0 / 660.0;    
+        Vector2d joystick_vector(dbus->ch1/ 660.0, dbus->ch0/660.0);
+
 
         // Deadzone
         const float DEADZONE = 0.1;
-        if (fabs(joy_x) < DEADZONE) joy_x = 0;
-        if (fabs(joy_y) < DEADZONE) joy_y = 0;
-
-        // Continous mapping at the edge of the deadzone
-        if (joy_x > DEADZONE) joy_x = (joy_x-DEADZONE) / (1-DEADZONE);
-        if (joy_x < -DEADZONE) joy_x = (joy_x+DEADZONE) / (1-DEADZONE);
-        if (joy_y > DEADZONE) joy_y = (joy_y-DEADZONE) / (1-DEADZONE);
-        if (joy_y < -DEADZONE) joy_y = (joy_y+DEADZONE) / (1-DEADZONE);
-
-
-        // To change direction, change the signs of joy_x and joy_y
-        vx_set = joy_x * V_TRANS_MAX; // in m/s
-        vy_set = -joy_y * V_TRANS_MAX; // in m/s
-
-        
-        // Normalize the vector
-        float norm_scale_factor = 1;
-        float mag = sqrt(vx_set * vx_set + vy_set * vy_set);
-        if (mag > V_TRANS_MAX){
-            norm_scale_factor = 1 / mag;
+        if (joystick_vector.getMagnitude() < DEADZONE){
+            joystick_vector = Vector2d(0, 0);
+        }
+        else{ 
+            // make vector continous at the edge of the deadzone
+            // (v - 0.1 / |v| * v) / 0.9 
+            joystick_vector = joystick_vector.minus(joystick_vector.normalize().times(0.1)).times(1.0/(1-DEADZONE));
         }
 
-		vx_set *= norm_scale_factor;
-		vy_set *= norm_scale_factor;
+        // Normalize the vector if it is too large
+        if (joystick_vector.getMagnitude() > 1){
+            joystick_vector = joystick_vector.normalize();
+        }
 
-		// "Momentum" smoothing mechanism
-        // Deprecated now
-		vx_set = vx_set * MOMENTUM_FACTOR +
-				prev_vx * (1 - MOMENTUM_FACTOR);
-		vy_set = vy_set * MOMENTUM_FACTOR +
-				prev_vy * (1 - MOMENTUM_FACTOR);
+        // To change direction, change the signs of joy_x and joy_y
+        Vector2d target_vel(joystick_vector.getX() * V_TRANS_MAX, -joystick_vector.getY() * V_TRANS_MAX); // in m/s
 
         // Translational acceleration kinematic constraints
         // The benefit of this compared to the previous one is that it has a constant acceleration and converges faster
         // Calculate the delta V
-        float delta_vx = vx_set - prev_vx;
-        float delta_vy = vy_set - prev_vy;
+
+        Vector2d delta_v = target_vel.minus(prev_target_vel);
         // find the maximum delta V that is under the acceleration limit
         float max_delta_v_mag = ACC_TRANS_MAX * CHASSIS_TASK_DELAY / 1000.0; 
         // cap delta_v to this magnitude
-        float delta_v_mag = sqrt(delta_vx * delta_vx + delta_vy * delta_vy);
-        if (delta_v_mag > max_delta_v_mag){
-            float scale_factor = max_delta_v_mag / delta_v_mag;
-            delta_vx *= scale_factor;
-            delta_vy *= scale_factor;
+        if (delta_v.getMagnitude() > max_delta_v_mag){
+            delta_v = delta_v.normalize().times(max_delta_v_mag);
         }
         // v_set = v_prev + delta_v
-        vx_set = prev_vx + delta_vx;
-        vy_set = prev_vy + delta_vy;
-
+        target_vel = prev_target_vel.plus(delta_v);
         // TODO: Rotational acceleration constraints (which needs to deal with each module's angle)
+        prev_target_vel = target_vel;
 
-		prev_vx = vx_set;
-		prev_vy = vy_set;
+        if(loop_cnt == 100){
+            loop_cnt = 0;
+            set_cursor(0, 0);
+            clear_screen();
+            print("joy_x: %f, joy_y: %f \r\n", joystick_vector.getX(), joystick_vector.getY());
+            print("vx: %f, vy: %f, wz: %f \r\n", target_vel.getX(), target_vel.getY(), wz);
+        }
+        loop_cnt++;
 
-        chassis->SteerSetMaxSpeed(RUN_SPEED);
-        sin_yaw = sin(relative_angle);
-        cos_yaw = cos(relative_angle);
-        vx = cos_yaw * vx_set + sin_yaw * vy_set;
-        vy = -sin_yaw * vx_set + cos_yaw * vy_set;
+        // calculate camera oriented velocity vector
+        Vector2d target_vel_cam = target_vel.rotateBy(Angle2d(relative_angle)); // now relative_angle is 0
+
         // wz = std::min(FOLLOW_SPEED, FOLLOW_SPEED * dbus->ch2);       /* TODO : ASK IF GIMBAL EXIST, HOW CHASSIS MOVE */
         wz = dbus->ch2 / 660.0 * V_ROT_MAX; // in m/s
+
+        
 #ifndef  SINGLEBOARD
         // wz = receive->relative_angle;
 #else
         wz = 0;
 #endif
+
+
         // if (-CHASSIS_DEADZONE < relative_angle && relative_angle < CHASSIS_DEADZONE) wz = 0;
-        chassis->SetSpeed(vx, vy, wz);
+        chassis->SteerSetMaxSpeed(RUN_SPEED);
+        chassis->SetSpeed(target_vel_cam.getX(), target_vel_cam.getY(), wz);
         chassis->SteerUpdateTarget();
         chassis->WheelUpdateSpeed();
         chassis->SteerCalcOutput();

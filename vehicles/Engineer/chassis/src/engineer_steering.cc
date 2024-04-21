@@ -134,21 +134,21 @@ EngineerSteeringChassis::~EngineerSteeringChassis() {
     bl_wheel_motor->SetOutput(PID_output[2]);
     br_wheel_motor->SetOutput(PID_output[3]);
 
-    if(loop_count == 100){
-      set_cursor(0, 0);
-      clear_screen();
-      print("fl_wheel target %5.2f error %5.2f m/s\r\n", v_fl_, v_fl_ - fl_wheel_motor->GetOmega()/M3508P19_RATIO*0.06); //0.06 = wheel radius
-      print("pid out %5.2f \r\n", PID_output[0]);
-      print("fr_wheel target %5.2f error %5.2f m/s\r\n", v_fr_, v_fr_ - fr_wheel_motor->GetOmega()/M3508P19_RATIO*0.06);
-      print("pid out %5.2f \r\n", PID_output[1]);
-      print("bl_wheel target %5.2f error %5.2f m/s\r\n", v_bl_, v_bl_ - bl_wheel_motor->GetOmega()/M3508P19_RATIO*0.06);
-      print("pid out %5.2f \r\n", PID_output[2]);
-      print("br_wheel target %5.2f error %5.2f m/s\r\n", v_br_, v_br_ - br_wheel_motor->GetOmega()/M3508P19_RATIO*0.06);
-      print("pid out %5.2f \r\n", PID_output[3]);
+    // if(loop_count == 100){
+    //   set_cursor(0, 0);
+    //   clear_screen();
+    //   print("fl_wheel target %5.2f error %5.2f m/s\r\n", v_fl_, v_fl_ - fl_wheel_motor->GetOmega()/M3508P19_RATIO*0.06); //0.06 = wheel radius
+    //   print("pid out %5.2f \r\n", PID_output[0]);
+    //   print("fr_wheel target %5.2f error %5.2f m/s\r\n", v_fr_, v_fr_ - fr_wheel_motor->GetOmega()/M3508P19_RATIO*0.06);
+    //   print("pid out %5.2f \r\n", PID_output[1]);
+    //   print("bl_wheel target %5.2f error %5.2f m/s\r\n", v_bl_, v_bl_ - bl_wheel_motor->GetOmega()/M3508P19_RATIO*0.06);
+    //   print("pid out %5.2f \r\n", PID_output[2]);
+    //   print("br_wheel target %5.2f error %5.2f m/s\r\n", v_br_, v_br_ - br_wheel_motor->GetOmega()/M3508P19_RATIO*0.06);
+    //   print("pid out %5.2f \r\n", PID_output[3]);
 
-      loop_count = 0;
-    }
-    loop_count ++;
+    //   loop_count = 0;
+    // }
+    // loop_count ++;
   }
 
   void EngineerSteeringChassis::SetSpeed(const float _vx, const float _vy, const float _vw){
@@ -297,6 +297,7 @@ EngineerSteeringChassis::~EngineerSteeringChassis() {
     // TODO: Potential bug, wheel will rotate during turning.
     // } else if (in_position_detector->posEdge()) {
     } else {
+
 
         // Wheels move only when all SteeringMotors are in position
         v_fl_ = wheel_dir_fl_ * sqrt(pow(vy + vw * cos(PI / 4), 2.0) + pow(vx - vw * sin(PI / 4), 2.0));
