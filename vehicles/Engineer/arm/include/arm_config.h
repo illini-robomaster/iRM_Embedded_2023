@@ -48,7 +48,7 @@ const int BASE_VERT_ROTATE_ID = 1;
 const int ELBOW_ROTATE_ID = 0;
 const int A1_CONTROL_DELAY = 2;
 
-UART_HandleTypeDef* A1_UART = &huart6;
+UART_HandleTypeDef* A1_UART = &huart1;
 
 // base vertical rotation motor params. (rotate the entire arm around an vertical axis)
 //const float BASE_VERT_ROTATE_MAX = 0.7692307692;

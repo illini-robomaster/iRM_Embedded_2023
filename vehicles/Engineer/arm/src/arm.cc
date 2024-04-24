@@ -43,7 +43,7 @@ static remote::SBUS* sbus = nullptr;
 static control::BRTEncoder* encoder0= nullptr;
 static control::BRTEncoder* encoder1= nullptr;
 static float A1_zero[3] = {0, 0, 0};
-static bsp::Relay* pump = nullptr;
+// static bsp::Relay* pump = nullptr;
 #ifndef SINGLE_BOARD
 static bsp::CAN* can2 = nullptr;
 static bsp::CanBridge* send = nullptr;
@@ -121,35 +121,19 @@ static joint_state_t current_joint_state = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 // TODO fix transmit output for 4310 multi motors
 
 void RM_RTOS_Init() {
-  print_use_uart(&huart8);
+  print_use_uart(&huart4);
   bsp::SetHighresClockTimer(&htim5);
 //   control::steering_t steering_data;
   can1 = new bsp::CAN(&hcan1);
-  sbus = new remote::SBUS(&huart1);
+  sbus = new remote::SBUS(&huart3);
   encoder0 = new control::BRTEncoder(can1,0x0A);
   encoder1 = new control::BRTEncoder(can1,0x01);
-  pump = new bsp::Relay(K2_GPIO_Port,K2_Pin);
+  // pump = new bsp::Relay(K2_GPIO_Port,K2_Pin);
 
 #ifndef SINGLE_BOARD
   can2 = new bsp::CAN(&hcan2, false);
   send = new bsp::CanBridge(can2,0x20A, 0x20B);
 #endif
-  // Init m3508 * 1
-//   motor1 = new control::Motor3508(can1, BASE_TRANSLATE_ID);
-//   base_translate_pe_sensor = new bsp::GPIO(BASE_TRANSLATE_CALI_GPIO_PORT,
-//                                            BASE_TRANSLATE_CALI_GPIO_PIN);
-//   steering_data.motor = motor1;
-//   steering_data.max_speed = RUN_SPEED;
-//   steering_data.max_acceleration = ACCELERATION;
-//   // TODO make sure the gear ratio is correct
-//   steering_data.transmission_ratio = M3508P19_RATIO;
-//   steering_data.omega_pid_param = new float[3]{140, 1.2, 25};
-//   steering_data.max_iout = 1000;
-//   steering_data.max_out = 13000;
-//   // TODO measure the calibrate offset for base translate motor
-//   steering_data.calibrate_offset = 0;
-//   steering_data.align_detect_func = base_translate_align_detect;
-//   base_translate_motor = new control::SteeringMotor(steering_data);
 
   // Init M4310 * 3
   /* rx_id = Master id
@@ -183,26 +167,12 @@ void RM_RTOS_Default_Task(const void* args) {
   //Add 1s Time for 4310 start up.
   print("START\r\n");
   osDelay(3000);
-//   base_translate_motor->SetMaxSpeed(ALIGN_SPEED)
-
-  // base translate calibration
-//   bool base_translate_alignment_complete = false;
-//   while (!base_translate_alignment_complete) {
-//     base_translate_motor->CalcOutput();
-//     control::MotorCANBase::TransmitOutput(m3508s, 1);
-//     base_translate_alignment_complete = base_translate_motor->Calibrate();
-//     osDelay(2);
-//   }
-
-//   base_translate_motor->ReAlign();
-//   //base_translate_motor->SetMaxSpeed(RUN_SPEED);
-//   control::MotorCANBase::TransmitOutput(m3508s, 1);
 
 //   4310 init state
   // TODO: config zero pos with 4310 config assist
 
-// forearm_rotate_motor->SetZeroPos();
-// osDelay(20);
+forearm_rotate_motor->SetZeroPos();
+osDelay(20);
    forearm_rotate_motor->MotorEnable();
 // osDelay(20);
 // wrist_rotate_motor->SetZeroPos();
@@ -214,22 +184,22 @@ void RM_RTOS_Default_Task(const void* args) {
    hand_rotate_motor->MotorEnable();
 
   // A1 init state
-   A1->Stop(0);
-   A1_uart->Write((uint8_t*)(&A1->send[0].data), A1->send_length);
-   osDelay(A1_CONTROL_DELAY);
-   A1->Stop(1);
-   A1_uart->Write((uint8_t*)(&A1->send[1].data), A1->send_length);
-   osDelay(A1_CONTROL_DELAY);
-   A1->Stop(2);
-   A1_uart->Write((uint8_t*)(&A1->send[2].data), A1->send_length);
-   osDelay(A1_CONTROL_DELAY);
-   A1_zero[0] = A1->recv[0].Pos+ELBOW_ENCODER_OFFSET-encoder0->angle_;
-   A1_zero[1] = A1->recv[1].Pos+BASE_VERT_ENCODER_OFFSET-encoder1->angle_;
-   A1_zero[2] = A1->recv[2].Pos;
+  //  A1->Stop(0);
+  //  A1_uart->Write((uint8_t*)(&A1->send[0].data), A1->send_length);
+  //  osDelay(A1_CONTROL_DELAY);
+  //  A1->Stop(1);
+  //  A1_uart->Write((uint8_t*)(&A1->send[1].data), A1->send_length);
+  //  osDelay(A1_CONTROL_DELAY);
+  //  A1->Stop(2);
+  //  A1_uart->Write((uint8_t*)(&A1->send[2].data), A1->send_length);
+  //  osDelay(A1_CONTROL_DELAY);
+  //  A1_zero[0] = A1->recv[0].Pos+ELBOW_ENCODER_OFFSET-encoder0->angle_;
+  //  A1_zero[1] = A1->recv[1].Pos+BASE_VERT_ENCODER_OFFSET-encoder1->angle_;
+  //  A1_zero[2] = A1->recv[2].Pos;
 
-//   joint_state_t target = {PI / 16, PI / 16, PI / 16, PI / 16, PI / 16, PI / 16, PI / 16};
+  // joint_state_t target = {PI / 16, PI / 16, PI / 16, PI / 16, PI / 16, PI / 16, PI / 16};
   joint_state_t target = {0, 0, 0, 0, 0, 0, 0};
-UNUSED(target);
+// UNUSED(target);
 //   turn each motor for PI/16 degree every 2 seconds.
 //   Should stop at defined limitation, see arm_config.h
   //MOTOR 0-5
@@ -238,27 +208,27 @@ UNUSED(target);
   while (true) {
 #ifndef SINGLE_BOARD
     send->cmd.id = bsp::VX;
-    send->cmd.data_float = sbus->ch[7];
+    send->cmd.data_float = 0; // sbus->ch[0]
     send->TransmitOutput();
 
     send->cmd.id = bsp::VY;
-    send->cmd.data_float = sbus->ch[6];
+    send->cmd.data_float = 0; // sbus->ch[1]
     send->TransmitOutput();
 
     send->cmd.id = bsp::RELATIVE_ANGLE;
-    send->cmd.data_float = sbus->ch[8];
+    send->cmd.data_float = 0; // sbus->ch[2]
     send->TransmitOutput();
 #endif
 //
-    pump->Off();
-    if (sbus->ch[10] > 0.5) {
-      pump->On();
-    }
-    ArmPrintData();
-    forearm_rotate_motor->connection_flag_ = false;
-    wrist_rotate_motor->connection_flag_ = false;
-    hand_rotate_motor->connection_flag_ = false;
-//    UNUSED(A1_zero);
+    // pump->Off();
+    // if (sbus->ch[10] > 0.5) {
+      // pump->On();
+    // }
+//     ArmPrintData();
+//     forearm_rotate_motor->connection_flag_ = false;
+//     wrist_rotate_motor->connection_flag_ = false;
+//     hand_rotate_motor->connection_flag_ = false;
+// //    UNUSED(A1_zero);
 
     target.forearm_rotate = (sbus->ch[3] - FOREARM_ROTATE_OFFSET) / sbus->CHANNEL_MAX * PI;
     target.wrist_rotate = (sbus->ch[4] - WRIST_ROTATE_OFFSET) / sbus->CHANNEL_MAX * PI;
@@ -277,21 +247,21 @@ UNUSED(target);
     A1->connection_flag_[0] = false;
     A1->connection_flag_[1] = false;
     A1->connection_flag_[2] = false;
-//    A1->Stop(0);
-//    osDelay(A1_CONTROL_DELAY);
-//    A1->Stop(1);
-//    osDelay(A1_CONTROL_DELAY);
-//    A1->Stop(2);
-//    osDelay(A1_CONTROL_DELAY);
-//        forearm_rotate_motor->SetOutput(0,M4310_VEL,0.1,0.1,0);
+   A1->Stop(0);
+   osDelay(A1_CONTROL_DELAY);
+   A1->Stop(1);
+   osDelay(A1_CONTROL_DELAY);
+   A1->Stop(2);
+   osDelay(A1_CONTROL_DELAY);
+       forearm_rotate_motor->SetOutput(0,M4310_VEL,0.1,0.1,0);
         // HAND ROTATE OFFSET : 402
         // WRIST ROTATE OFFSET : 756
         //FOREARM ROTATE OFFSET :1023
         //FPREARM OFFSET :-967
         //GREATARM OFFSET : 1023
         //BASE OFFSET: 320
-//    set_cursor(0, 0);
-//    clear_screen();
+    set_cursor(0, 0);
+    clear_screen();
     print("Target( H:%.3f V:%.3f E:%.3f )", target.base_hor_rotate, target.base_vert_rotate, target.elbow_rotate);
     print("Current( H:%.3f W:%.3f F:%.3f\r\n )", current_joint_state.base_hor_rotate,current_joint_state.base_vert_rotate,current_joint_state.elbow_rotate);
     print("FLag : %s\r\n", hand_rotate_motor->connection_flag_==true ? "true" : "false");
@@ -299,7 +269,6 @@ UNUSED(target);
     print("CH4: %-4d CH5: %-4d CH6: %-4d CH7: %-4d ", sbus->ch[4], sbus->ch[5], sbus->ch[6], sbus->ch[7]);
     print("CH8: %-4d CH9: %-4d CH10: %-4d CH11: %-4d ", sbus->ch[8], sbus->ch[9], sbus->ch[10], sbus->ch[11]);
     print("CH12: %-4d CH13: %-4d CH14: %-4d CH15: %-4d ", sbus->ch[12], sbus->ch[13], sbus->ch[14], sbus->ch[15]);
-//    print("\r\n");
     print("ELBOW: %03f HOR: %03f\r\n" ,encoder0->angle_, encoder1->angle_);
     print("Zero[0] %03f Zer0[1] %03f Zero[2] %03f", A1_zero[0], A1_zero[1], A1_zero[2]);
     ArmTransmitOutput();

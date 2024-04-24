@@ -50,20 +50,11 @@ void chassisTask(void* arg){
 
     chassis->SteerSetMaxSpeed(ALIGN_SPEED);
 	chassis->Calibrate();
-    // bool aligned = false;
-    // while(!aligned){
-    //     aligned = chassis->Calibrate();
-    //     chassis->SteerCalcOutput();
-    //     control::MotorCANBase::TransmitOutput(steer_motors, 4);
-	// 	
-    //     osDelay(1);
-    // }
 
     chassis->SteerSetMaxSpeed(RUN_SPEED);
     chassis->SetWheelSpeed(0,0,0,0);
 
 	Vector2d prev_target_vel(0, 0);
-	// float prev_mag = 0;
 
     int loop_cnt = 0;
 
@@ -71,19 +62,17 @@ void chassisTask(void* arg){
         float relative_angle = 0;
         float wz = 0;
 
-// #ifndef SINGLEBOARD
-//          vx_set = -receive->vx;
-//          vy_set = receive->vy;
-// #else
-//         vx_set = 0;
-//         vy_set = 0;
-// #endif
+        Vector2d joystick_vector(0, 0);
+
+#ifndef SINGLEBOARD
+        joystick_vector = Vector2d(receive->vx, receive->vy);
+#else
+        joystick_vector = Vector2d(dbus->ch1/ 660.0, dbus->ch0/660.0)
+#endif
 
 
         // The following is for joystick only, not for keyboard
         // Max joy stick max = 660
-        Vector2d joystick_vector(dbus->ch1/ 660.0, dbus->ch0/660.0);
-
 
         // Deadzone
         const float DEADZONE = 0.1;
@@ -137,7 +126,7 @@ void chassisTask(void* arg){
 
         
 #ifndef  SINGLEBOARD
-        // wz = receive->relative_angle;
+        wz = receive->relative_angle;
 #else
         wz = 0;
 #endif
