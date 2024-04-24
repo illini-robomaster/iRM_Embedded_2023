@@ -40,7 +40,9 @@
 #include "rgb.h"
 #include "shooter.h"
 #include "stepper.h"
-#include "autoaim_protocol.h"
+#include "minipc_protocol.h"
+
+
 
 static bsp::CAN* can1 = nullptr;
 static bsp::CAN* can2 = nullptr;
@@ -375,53 +377,55 @@ class CustomUART : public bsp::UART {
 
 void jetsonCommTask(void* arg) {
   UNUSED(arg);
-
-  uint32_t length;
-  uint8_t* data;
-
-  auto uart = std::make_unique<CustomUART>(&huart1);  // see cmake for which uart
-  uart->SetupRx(50);
-  uart->SetupTx(50);
-
-  auto miniPCreceiver = communication::AutoaimProtocol();
-
-  while (!imu->CaliDone()) {
-    osDelay(10);
-  }
-
-  int total_receive_count = 0;
-
-  while (true) {
-    uint32_t flags = osThreadFlagsGet();
-    if (flags & JETSON_RX_SIGNAL) {
-      /* time the non-blocking rx / tx calls (should be <= 1 osTick) */
-
-      // max length of the UART buffer at 150Hz is ~50 bytes
-      length = uart->Read(&data);
-
-      miniPCreceiver.Receive(data, length);
-
-      if (miniPCreceiver.get_valid_flag()) {
-        // there is at least one unprocessed valid packet
-        abs_yaw_jetson = miniPCreceiver.get_relative_yaw();
-        abs_pitch_jetson = miniPCreceiver.get_relative_pitch();
-        total_receive_count++;
-      }
-    }
-    // send IMU data anyway
-    communication::STMToJetsonData packet_to_send;
-    uint8_t my_color; // 1 for blue; 0 for red
-    if (send->is_my_color_blue) {
-      my_color = 1;
-    } else {
-      my_color = 0;
-    }
-    const float pitch_curr = pitch_pos;
-    const float yaw_curr = imu->INS_angle[0];
-    miniPCreceiver.Send(&packet_to_send, my_color, yaw_curr, pitch_curr, 0);
-    uart->Write((uint8_t*)&packet_to_send, sizeof(communication::STMToJetsonData));
-    osDelay(2);
-  }
+// Comment because of upstream AutoaimProtocol Class rewrite in progress
+// youhy, 2023.10
+//
+//  uint32_t length;
+//  uint8_t* data;
+//
+//  auto uart = std::make_unique<CustomUART>(&huart1);  // see cmake for which uart
+//  uart->SetupRx(50);
+//  uart->SetupTx(50);
+//
+//  auto miniPCreceiver = communication::AutoaimProtocol();
+//
+//  while (!imu->CaliDone()) {
+//    osDelay(10);
+//  }
+//
+//  int total_receive_count = 0;
+//
+//  while (true) {
+//    uint32_t flags = osThreadFlagsGet();
+//    if (flags & JETSON_RX_SIGNAL) {
+//      /* time the non-blocking rx / tx calls (should be <= 1 osTick) */
+//
+//      // max length of the UART buffer at 150Hz is ~50 bytes
+//      length = uart->Read(&data);
+//
+//      miniPCreceiver.Receive(data, length);
+//
+//      if (miniPCreceiver.get_valid_flag()) {
+//        // there is at least one unprocessed valid packet
+//        abs_yaw_jetson = miniPCreceiver.get_relative_yaw();
+//        abs_pitch_jetson = miniPCreceiver.get_relative_pitch();
+//        total_receive_count++;
+//      }
+//    }
+//    // send IMU data anyway
+//    communication::STMToJetsonData packet_to_send;
+//    uint8_t my_color; // 1 for blue; 0 for red
+//    if (send->is_my_color_blue) {
+//      my_color = 1;
+//    } else {
+//      my_color = 0;
+//    }
+//    const float pitch_curr = pitch_pos;
+//    const float yaw_curr = imu->INS_angle[0];
+//    miniPCreceiver.Send(&packet_to_send, my_color, yaw_curr, pitch_curr, 0);
+//    uart->Write((uint8_t*)&packet_to_send, sizeof(communication::STMToJetsonData));
+//    osDelay(2);
+//  }
 }
 
 //==================================================================================================
@@ -444,22 +448,16 @@ static control::MotorCANBase* sl_motor = nullptr;
 static control::MotorCANBase* sr_motor = nullptr;
 static control::MotorCANBase* ld_motor = nullptr;
 static control::Shooter* shooter = nullptr;
-static control::Stepper* stepper = nullptr;
 
 static volatile bool flywheelFlag = false;
 
-static unsigned stepper_length = 700;
-static unsigned stepper_speed = 1000;
-static bool stepper_direction = true;
-// The self defined delay for shooter mode
 static const int SHOOTER_MODE_DELAY = 350;
 
 void shooterTask(void* arg) {
   UNUSED(arg);
 
   control::MotorCANBase* motors_can1_shooter[] = {sl_motor, sr_motor, ld_motor};
-  uint32_t start_time = 0;
-  bool slow_shoot_detect = false;
+  bool triple_shoot_detect = false;
 
   while (true) {
     if (dbus->keyboard.bit.B || dbus->swr == remote::DOWN) break;
@@ -468,59 +466,43 @@ void shooterTask(void* arg) {
 
   while (!imu->CaliDone()) osDelay(100);
 
-  for (int i = 0; i < 2; ++i) {
-    stepper->Move(control::FORWARD, stepper_speed);
-    osDelay(stepper_length);
-    stepper->Move(control::BACKWARD, stepper_speed);
-    osDelay(stepper_length);
-  }
-  stepper->Stop();
-
   while (true) {
     while (Dead) osDelay(100);
 
-    if (send->shooter_power && send->cooling_heat1 > send->cooling_limit1 - 20) {
+    if (send->shooter_power && send->cooling_heat1 >= send->cooling_limit1 - 15) {
       sl_motor->SetOutput(0);
       sr_motor->SetOutput(0);
       ld_motor->SetOutput(0);
       control::MotorCANBase::TransmitOutput(motors_can1_shooter, 3);
       osDelay(100);
-      if (stepper_direction) {
-        stepper->Move(control::FORWARD, stepper_speed);
-        osDelay(stepper_length);
-        stepper->Stop();
-      } else {
-        stepper->Move(control::BACKWARD, stepper_speed);
-        osDelay(stepper_length);
-        stepper->Stop();
-      }
-      stepper_direction = !stepper_direction;
-    }
-    
-    if (GimbalDead) {
+    } else if (GimbalDead) {
       shooter->DialStop();
-    } else {
-      if (send->shooter_power && send->cooling_heat1 < send->cooling_limit1 - 20) {
+    } else if (send->shooter_power) {
         // for manual antijam 
         Antijam.input(dbus->keyboard.bit.G);
-
+        // slow shooting
         if (dbus->mouse.l || dbus->swr == remote::UP) {
-          if ((bsp::GetHighresTickMicroSec() - start_time) / 1000 > SHOOTER_MODE_DELAY) {
-            shooter->SlowContinueShoot();
-          } else if (slow_shoot_detect == false) {
-            slow_shoot_detect = true;
-            shooter->DoubleShoot();
-          }
-        } else if (dbus->mouse.r) {
+          shooter->SlowContinueShoot();
+        // fast shooting
+        } else if ((dbus->mouse.r || dbus->wheel.wheel > remote::WheelDigitalValue)
+                  && send->cooling_heat1 < send->cooling_limit1 - 24) {
           shooter->FastContinueShoot();
+        // triple shooting
+        } else if (dbus->wheel.wheel == remote::WheelDigitalValue
+                   && dbus->previous_wheel_value == remote::WheelDigitalValue) {
+          if (!triple_shoot_detect) {
+            triple_shoot_detect = true;          
+            shooter->TripleShoot();
+          }
+        // manual antijam
         } else if (Antijam.posEdge()) {
           shooter->Antijam();
-        }else {
+        // stop
+        } else {
           shooter->DialStop();
-          start_time = bsp::GetHighresTickMicroSec();
-          slow_shoot_detect = false;
+          triple_shoot_detect = false;
         }
-      }
+        dbus->previous_wheel_value = dbus->wheel.wheel;
     }
 
     if (GimbalDead) {
@@ -536,7 +518,7 @@ void shooterTask(void* arg) {
           shooter->SetFlywheelSpeed(437);  // 445 MAX
         } else if (send->speed_limit1 >= 18) {
           flywheelFlag = true;
-          shooter->SetFlywheelSpeed(482);  // 490 MAX
+          shooter->SetFlywheelSpeed(770);  // 490 MAX
         } else {
           flywheelFlag = false;
           shooter->SetFlywheelSpeed(0);
@@ -580,7 +562,7 @@ void chassisTask(void* arg) {
   float vx_set, vy_set;
 
   while (true) {
-    ChangeSpinMode.input(dbus->keyboard.bit.SHIFT || dbus->swl == remote::UP);
+    ChangeSpinMode.input(dbus->keyboard.bit.SHIFT /*|| dbus->swl == remote::UP*/);
     if (ChangeSpinMode.posEdge()) SpinMode = !SpinMode;
 
     send->cmd.id = bsp::MODE;
@@ -763,7 +745,7 @@ void selfTestTask(void* arg) {
 }
 
 void RM_RTOS_Init(void) {
-  // print_use_uart(&huart1);
+  print_use_uart(&huart1);
   bsp::SetHighresClockTimer(&htim5);
 
   can1 = new bsp::CAN(&hcan1, true);
@@ -822,8 +804,8 @@ void RM_RTOS_Init(void) {
   shooter_data.load_motor = ld_motor;
   shooter_data.model = control::SHOOTER_STANDARD;
   shooter = new control::Shooter(shooter_data);
-  stepper = new control::Stepper(&htim1, 1, 1000000, DIR_GPIO_Port, DIR_Pin, ENABLE_GPIO_Port,
-                                 ENABLE_Pin);
+  // stepper = new control::Stepper(&htim1, 1, 1000000, DIR_GPIO_Port, DIR_Pin, ENABLE_GPIO_Port,
+  //                                ENABLE_Pin);
 
   buzzer = new bsp::Buzzer(&htim4, 3, 1000000);
   OLED = new display::OLED(&hi2c2, 0x3C);
@@ -838,7 +820,7 @@ void RM_RTOS_Threads_Init(void) {
   shooterTaskHandle = osThreadNew(shooterTask, nullptr, &shooterTaskAttribute);
   chassisTaskHandle = osThreadNew(chassisTask, nullptr, &chassisTaskAttribute);
   selfTestTaskHandle = osThreadNew(selfTestTask, nullptr, &selfTestTaskAttribute);
-  jetsonCommTaskHandle = osThreadNew(jetsonCommTask, nullptr, &jetsonCommTaskAttribute);
+  // jetsonCommTaskHandle = osThreadNew(jetsonCommTask, nullptr, &jetsonCommTaskAttribute);
 }
 
 void KillAll() {

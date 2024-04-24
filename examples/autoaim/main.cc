@@ -27,7 +27,7 @@
 #include "gimbal.h"
 #include "rgb.h"
 #include "bsp_gpio.h"
-#include "autoaim_protocol.h"
+#include "minipc_protocol.h"
 #include "filtering.h"
 #include "i2c.h"
 #include "bsp_imu.h"

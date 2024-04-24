@@ -28,3 +28,6 @@ irm_add_arm_executable(${PROJECT_NAME}_spin
     TARGET DJI_Board_TypeA
     SOURCES spinlock.cc)
 
+irm_add_arm_executable(${PROJECT_NAME}_eventflag
+    TARGET DJI_Board_TypeA
+    SOURCES eventflag.cc)

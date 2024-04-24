@@ -31,8 +31,8 @@
 #define LEFT_MOTOR_PWM_CHANNEL 1
 #define RIGHT_MOTOR_PWM_CHANNEL 4
 #define TIM_CLOCK_FREQ 1000000
-#define MOTOR_OUT_FREQ 500
-#define SNAIL_IDLE_THROTTLE 1080
+#define MOTOR_OUT_FREQ 1500
+#define SNAIL_IDLE_THROTTLE 500
 
 control::MotorPWMBase* motor1;
 control::MotorPWMBase* motor2;

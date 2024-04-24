@@ -314,6 +314,32 @@ void MotorPWMBase::SetOutput(int16_t val) {
 }
 
 //==================================================================================================
+// PDI_HV Servo
+//==================================================================================================
+PDIHV::PDIHV(TIM_HandleTypeDef* htim, uint8_t channel, uint32_t clock_freq,
+                   uint32_t output_freq, uint32_t idle_throttle)
+    : MotorPWMBase(htim, channel, clock_freq, output_freq, idle_throttle) {
+
+}
+
+void PDIHV::SetOutPutAngle(float degree) {
+        float slope = (2036.0-972.0) / 160.0;
+        int16_t val = int16_t (clip<float>(degree, -80, 80) * slope + 1470);
+        constexpr int16_t MIN_OUTPUT = 972;
+        constexpr int16_t MAX_OUTPUT = 1947;
+//        972 to 1947 for pulse width input u second
+//        -80 to 80 for angle input
+
+        this->SetOutput(clip<int16_t>(val, MIN_OUTPUT, MAX_OUTPUT));
+        this->SetOutput(val);
+}
+
+void PDIHV::SetOutput(int16_t val) {
+  constexpr int16_t MIN_OUTPUT = 972;
+  constexpr int16_t MAX_OUTPUT = 1947;
+  MotorPWMBase::SetOutput(clip<int16_t>(val, MIN_OUTPUT, MAX_OUTPUT));
+}
+//==================================================================================================
 // Motor2305
 //==================================================================================================
 
@@ -429,6 +455,7 @@ void ServoMotor::CalcOutput() {
     // detect if motor is jammed
     // detect total is used as filter.
     if (detect_total_ >= jam_threshold_) {
+      omega_pid_.Reset();
       servo_jam_t data;
       data.speed = max_speed_;
       // this function is in shooter.cc called jam_callback.
