@@ -50,13 +50,15 @@ void RM_RTOS_Default_Task(const void* args) {
   UNUSED(args);
 
   control::Motor4310* motors[] = {motor};
-
   while(dbus->swr != remote::DOWN){}  // flip swr to start
+  print("start\r\n");
 
   /* Use SetZeroPos if you want to set current motor position as zero position. If uncommented, the
    * zero position is the zero position set before */
   motor->SetZeroPos();
   motor->MotorEnable();
+  osDelay(5000);
+  print("motor enabled\r\n" );
 
   float pos = 0;
   float min_pos = -PI/8;
