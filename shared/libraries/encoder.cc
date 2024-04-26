@@ -50,9 +50,7 @@ void BRTEncoder::UpdateData(const uint8_t data[]) {
   connection_flag_ = true;
 }
 
-void BRTEncoder::PrintData() const {
-  set_cursor(0, 0);
-  clear_screen();
+void BRTEncoder::PrintData() const { 
   print("angle: % .4f\r\n", angle_);
 }
 

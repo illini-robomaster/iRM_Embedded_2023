@@ -19,13 +19,13 @@
  ****************************************************************************/
 
 typedef struct {
-  float base_translate;     /* translate 3508 motor                           */
-  float base_vert_rotate;   /* rotate the entire arm around an vertical axis  */
-  float base_hor_rotate;    /* rotate the entire arm around a horizontal axis */
-  float elbow_rotate;       /* rotate the forearm on a horizontal axis        */
-  float forearm_rotate;     /* rotate the forearm on its axis                 */
-  float wrist_rotate;       /* rotate the hand around an vertical axis        */
-  float hand_rotate;        /* rotate the hand on its axis                    */
+  float base_translate_0;     /* translate 3508 motor                           */
+  float base_yaw_rotate_1;   /* rotate the entire arm around an vertical axis  */
+  float base_pitch_rotate_2;    /* rotate the entire arm around a horizontal axis */
+  float forearm_pitch_3;       /* rotate the forearm on a horizontal axis        */
+  float forearm_roll_4;     /* rotate the forearm on its axis                 */
+  float wrist_5;       /* rotate the hand around an vertical axis        */
+  float end_6;        /* rotate the hand on its axis                    */
 } joint_state_t;
 
 /**

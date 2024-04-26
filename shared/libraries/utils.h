@@ -71,6 +71,27 @@ T wrap(T value, T min, T max) {
 }
 
 /**
+ * @brief wrap around a value to fall into a given range, can deal with offset of >1 cycle
+ *
+ * @tparam T    type of the value
+ * @param value value to be wrapped around
+ * @param min   range min
+ * @param max   range max
+ *
+ * @return wrapped around value that falls in the range [min, max]
+ *
+ * @note undefined behavior if value is more than one cycle away from min or max
+ */
+template <typename T>
+T hard_wrap(T value, T min, T max) {
+  const T range = max - min;
+  while(value < min) value += range;
+  while(value > max) value -= range;
+  return value;
+}
+
+
+/**
  * @brief clip a value to fall into a given range; can wrap around domain
  *                        (designed for angle-based control 2*pi!)
  *

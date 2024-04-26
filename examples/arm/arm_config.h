@@ -43,9 +43,9 @@ const float ACCELERATION = (100 * PI);
 /* M3508 params end */
 
 /* A1 params start */
-const int BASE_HOR_ROTATE_ID = 2;
-const int BASE_VERT_ROTATE_ID = 1;
-const int ELBOW_ROTATE_ID = 0;
+const int BASE_YAW_ID = 2;
+const int BASE_PITCH_ID = 1;
+const int ELBOW_PITCH_ID = 0;
 const int A1_CONTROL_DELAY = 2;
 
 UART_HandleTypeDef* A1_UART = &huart1;

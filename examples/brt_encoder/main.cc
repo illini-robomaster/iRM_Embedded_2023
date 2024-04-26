@@ -26,18 +26,23 @@
 
 static bsp::CAN* can = nullptr;
 static control::BRTEncoder* encoder = nullptr;
+static control::BRTEncoder* encoder2 = nullptr;
 
 void RM_RTOS_Init(void) {
-  print_use_uart(&UART_HANDLE);
+  print_use_uart(&huart4);
   can = new bsp::CAN(&hcan1);
-  encoder = new control::BRTEncoder(can, 0x0A);
+  encoder = new control::BRTEncoder(can, 0x01);
+  encoder2 = new control::BRTEncoder(can, 0x0A);
 }
 
 void RM_RTOS_Default_Task(const void* args) {
   UNUSED(args);
 
   while (true) {
+    set_cursor(0, 0);
+    clear_screen();
     encoder->PrintData();
+    encoder2->PrintData();
     osDelay(100);
   }
 }
