@@ -61,14 +61,13 @@ void RM_RTOS_Default_Task(const void* argument) {
 
   auto minipc_session = communication::MinipcPort();
 
-  communication::chassis_data_t chassis_data; // this has to be the data type that has the maximum size
+  communication::selfcheck_data_t selfcheck_data;
   //if changed, please make sure the data type in `case Test.LATENCY` communicator.py in the vision repo is also changed
 
   const communication::status_data_t* status_data;
 
-  chassis_data.vx = 0.0;
-  chassis_data.vy = 0.0;
-  chassis_data.vw = 0.0;
+  selfcheck_data.mode = 0;
+  selfcheck_data.debug_int = 0;
 
   uint8_t packet_to_send[minipc_session.MAX_PACKET_LENGTH];
   uint8_t *data;
@@ -86,9 +85,10 @@ void RM_RTOS_Default_Task(const void* argument) {
       status_data = minipc_session.GetStatus();
 
 
-      chassis_data.vx = status_data->vx;
-      minipc_session.Pack(packet_to_send, (void*)&chassis_data, communication::CHASSIS_CMD_ID);
-      uart->Write(packet_to_send, minipc_session.GetPacketLen(communication::CHASSIS_CMD_ID));
+      selfcheck_data.mode = status_data->mode;
+      selfcheck_data.debug_int = status_data->debug_int;
+      minipc_session.Pack(packet_to_send, (void*)&selfcheck_data, communication::SELFCHECK_CMD_ID);
+      uart->Write(packet_to_send, minipc_session.GetPacketLen(communication::SELFCHECK_CMD_ID));
 
     }
     osDelay(10);

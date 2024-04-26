@@ -49,6 +49,11 @@ void MinipcPort::Pack(uint8_t* packet, void* data, uint8_t cmd_id) {
     case CHASSIS_CMD_ID:
       PackChassisData(packet, static_cast<chassis_data_t*>(data));
       break;
+    case SELFCHECK_CMD_ID:
+      PackSelfcheckData(packet, static_cast<selfcheck_data_t*>(data));
+      break;
+    case ARM_CMD_ID:
+      PackArmData(packet, static_cast<arm_data_t*>(data));
   }
 }
 
@@ -73,6 +78,24 @@ void MinipcPort::PackChassisData(uint8_t* packet, chassis_data_t* data) {
   memcpy(&packet[4 + DATA_OFFSET], &data->vy, sizeof(float));
   memcpy(&packet[8 + DATA_OFFSET], &data->vw, sizeof(float));
   AddCRC8(packet, CHASSIS_CMD_ID);
+}
+
+void MinipcPort::PackSelfcheckData(uint8_t* packet, selfcheck_data_t* data) {
+  AddHeaderTail(packet, SELFCHECK_CMD_ID);
+  packet[0 + DATA_OFFSET] = data->mode;
+  packet[1 + DATA_OFFSET] = data->debug_int;
+  AddCRC8(packet, SELFCHECK_CMD_ID);
+}
+
+void MinipcPort::PackArmData(uint8_t* packet, arm_data_t* data) {
+  AddHeaderTail(packet, ARM_CMD_ID);
+  memcpy(&packet[0 + DATA_OFFSET], &data->floats[0], sizeof(float));
+  memcpy(&packet[4 + DATA_OFFSET], &data->floats[1], sizeof(float));
+  memcpy(&packet[8 + DATA_OFFSET], &data->floats[2], sizeof(float));
+  memcpy(&packet[12 + DATA_OFFSET], &data->floats[3], sizeof(float));
+  memcpy(&packet[16 + DATA_OFFSET], &data->floats[4], sizeof(float));
+  memcpy(&packet[20 + DATA_OFFSET], &data->floats[5], sizeof(float));
+  AddCRC8(packet, ARM_CMD_ID);
 }
 
 uint8_t MinipcPort::GetPacketLen(uint8_t cmd_id) {
@@ -257,6 +280,18 @@ void MinipcPort::ParseData(uint8_t cmd_id) {
       memcpy(&(status_.vx), &possible_packet[0 + DATA_OFFSET], sizeof(float));
       memcpy(&(status_.vy), &possible_packet[4 + DATA_OFFSET], sizeof(float));
       memcpy(&(status_.vw), &possible_packet[8 + DATA_OFFSET], sizeof(float));
+      break;
+    case SELFCHECK_CMD_ID:
+      status_.mode = possible_packet[0 + DATA_OFFSET];
+      status_.debug_int = possible_packet[1 + DATA_OFFSET];
+      break;
+    case ARM_CMD_ID:
+      memcpy(&(status_.floats[0]),   &possible_packet[0 + DATA_OFFSET], sizeof(float));
+      memcpy(&(status_.floats[1]),   &possible_packet[4 + DATA_OFFSET], sizeof(float));
+      memcpy(&(status_.floats[2]),   &possible_packet[8 + DATA_OFFSET], sizeof(float));
+      memcpy(&(status_.floats[3]),   &possible_packet[12 + DATA_OFFSET], sizeof(float));
+      memcpy(&(status_.floats[4]),   &possible_packet[16 + DATA_OFFSET], sizeof(float));
+      memcpy(&(status_.floats[5]),   &possible_packet[20 + DATA_OFFSET], sizeof(float));
       break;
   }
 }

@@ -222,7 +222,12 @@ int32_t UART::Write(const uint8_t* data, uint32_t length) {
     if (length > tx_size_) length = tx_size_;
     /* directly write into the read buffer and start transmission */
     memcpy(tx_read_, data, length);
-    HAL_UART_Transmit_DMA(huart_, tx_read_, length);
+    /* check if dma is enabled */
+    if (huart_->hdmatx != NULL) {
+      HAL_UART_Transmit_DMA(huart_, tx_read_, length);
+    } else {
+      HAL_UART_Transmit(huart_, tx_read_, length, 100);
+    }
   }
 
   // exit critical session

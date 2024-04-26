@@ -486,7 +486,7 @@ void shooterTask(void* arg) {
         // fast shooting
         } else if ((dbus->mouse.r || dbus->wheel.wheel > remote::WheelDigitalValue)
                   && send->cooling_heat1 < send->cooling_limit1 - 24) {
-          shooter->FastContinueShoot(); 
+          shooter->FastContinueShoot();
         // triple shooting
         } else if (dbus->wheel.wheel == remote::WheelDigitalValue
                    && dbus->previous_wheel_value == remote::WheelDigitalValue) {
@@ -518,7 +518,7 @@ void shooterTask(void* arg) {
           shooter->SetFlywheelSpeed(437);  // 445 MAX
         } else if (send->speed_limit1 >= 18) {
           flywheelFlag = true;
-          shooter->SetFlywheelSpeed(482);  // 490 MAX
+          shooter->SetFlywheelSpeed(770);  // 490 MAX
         } else {
           flywheelFlag = false;
           shooter->SetFlywheelSpeed(0);
