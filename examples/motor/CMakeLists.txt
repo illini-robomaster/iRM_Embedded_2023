@@ -82,3 +82,7 @@ irm_add_arm_executable(${PROJECT_NAME}_m3510_PID
 irm_add_arm_executable(${PROJECT_NAME}_HERO_SERVO
         TARGET DJI_Board_TypeC
         SOURCES HERO_SERVO.cc)
+
+irm_add_arm_executable(${PROJECT_NAME}_m4310_mit_mc01
+        TARGET DM_MC_01
+        SOURCES m4310_mit_mc01.cc)
