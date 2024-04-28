@@ -27,8 +27,8 @@ void armTranslateTask(void* arg){
 		loop_cnt++;
 		if(loop_cnt == 100) {
                   loop_cnt = 0;
-                  set_cursor(0, 0);
-                  clear_screen();
+                //   set_cursor(0, 0);
+                //   clear_screen();
 //                print("aligned: %d .. \r\n", base_translate_motor->Calibrate());
                   print("HAL tick: %d \r\n", HAL_GetTick());
                 //   base_translate_motor->PrintData();
@@ -54,7 +54,7 @@ void armTranslateTask(void* arg){
 
 		// }
 
-		base_translate_motor->TurnRelative(dbus->ch3 / 660.0 / 50);
+		base_translate_motor->TurnRelative(sbus->ch[3] / 660.0 / 50);
 		base_translate_motor->CalcOutput();
 		control::MotorCANBase::TransmitOutput(&motor9, 1);
 		osDelay(2);

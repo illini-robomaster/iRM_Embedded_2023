@@ -2,7 +2,7 @@
 
 #include "cmsis_os.h"
 #include "motor.h"
-#include "dbus.h"
+#include "sbus.h"
 #include "can.h"
 #include "bsp_gpio.h"
 #include "bsp_print.h"
@@ -40,6 +40,6 @@ const float BASE_TRANSLATE_ALIGN_SPEED = (0.5 * PI);
 const float BASE_TRANSLATE_ACCELERATION = (100 * PI);
 
 /* M3508 params end */
-extern remote::DBUS* dbus;
+extern remote::SBUS* sbus;
 extern bsp::CAN* can1;
 extern bsp::CAN* can2;

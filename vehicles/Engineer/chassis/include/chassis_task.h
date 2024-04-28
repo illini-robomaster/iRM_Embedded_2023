@@ -3,7 +3,7 @@
 #include "motor.h"
 #include "engineer_steering.h"
 #include "steering_6020.h"
-#include "dbus.h"
+#include "sbus.h"
 #include "can.h"
 #include "rgb.h"
 #include "protocol.h"
@@ -35,7 +35,7 @@ void init_chassis();
 void kill_chassis();
 
 
-extern remote::DBUS* dbus;
+extern remote::SBUS* sbus;
 extern bsp::CAN* can1;
 extern bsp::CAN* can2;
 extern display::RGB* RGB;

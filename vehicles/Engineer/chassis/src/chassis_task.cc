@@ -1,7 +1,7 @@
 
 #include "chassis_task.h"
 #include "geometry.h"
-//#define SINGLEBOARD
+#define SINGLEBOARD
 
 //Constants 
 static const int KILLALL_DELAY = 100;
@@ -57,6 +57,7 @@ void chassisTask(void* arg){
 	Vector2d prev_target_vel(0, 0);
 
     int loop_cnt = 0;
+    int last = HAL_GetTick();
 
     while (true) {
         float relative_angle = 0;
@@ -67,7 +68,7 @@ void chassisTask(void* arg){
 #ifndef SINGLEBOARD
         joystick_vector = Vector2d(receive->vx, receive->vy);
 #else
-        joystick_vector = Vector2d(dbus->ch1/ 660.0, dbus->ch0/660.0)
+        joystick_vector = Vector2d(sbus->ch[1]/ 660.0, sbus->ch[0]/660.0);
 #endif
 
 
@@ -108,6 +109,7 @@ void chassisTask(void* arg){
         target_vel = prev_target_vel.plus(delta_v);
         // TODO: Rotational acceleration constraints (which needs to deal with each module's angle)
         prev_target_vel = target_vel;
+        wz = sbus->ch[2] / 660.0 * V_ROT_MAX; // in m/s
 
         if(loop_cnt == 100){
             loop_cnt = 0;
@@ -115,20 +117,22 @@ void chassisTask(void* arg){
             clear_screen();
             print("joy_x: %f, joy_y: %f \r\n", joystick_vector.getX(), joystick_vector.getY());
             print("vx: %f, vy: %f, wz: %f \r\n", target_vel.getX(), target_vel.getY(), wz);
+            print("DELTA T: %d \r\n", HAL_GetTick() - last);
         }
+        last = HAL_GetTick();
         loop_cnt++;
+
 
         // calculate camera oriented velocity vector
         Vector2d target_vel_cam = target_vel.rotateBy(Angle2d(relative_angle)); // now relative_angle is 0
 
         // wz = std::min(FOLLOW_SPEED, FOLLOW_SPEED * dbus->ch2);       /* TODO : ASK IF GIMBAL EXIST, HOW CHASSIS MOVE */
-        wz = dbus->ch2 / 660.0 * V_ROT_MAX; // in m/s
-
+        // print("primary chassis_task loop entered \r\n");
         
 #ifndef  SINGLEBOARD
         wz = receive->relative_angle;
 #else
-        wz = 0;
+        // wz = 0;
 #endif
 
 
@@ -138,7 +142,7 @@ void chassisTask(void* arg){
         chassis->SteerUpdateTarget();
         chassis->WheelUpdateSpeed();
         chassis->SteerCalcOutput();
-
+        // print("chassis_task loop entered 2\r\n");
 
 		// if(loop_count == 100){
 		// 	clear_screen();
@@ -152,7 +156,7 @@ void chassisTask(void* arg){
         // }
         // loop_count ++;
         
-#ifdef REFEREE
+#ifdef REFEREEsteer_motors
         chassis->Update((float)referee->game_robot_status.chassis_power_limit,
                            referee->power_heat_data.chassis_power,
                            (float)referee->power_heat_data.chassis_power_buffer);
@@ -172,7 +176,9 @@ void chassisTask(void* arg){
         // chassis->PrintData();
         control::MotorCANBase::TransmitOutput(wheel_motors, 4);
         control::MotorCANBase::TransmitOutput(steer_motors, 4);
-
+        UNUSED(steer_motors);
+        UNUSED(wheel_motors);
+        // print("chassis motor output transmitted \r\n");
 
         osDelay(CHASSIS_TASK_DELAY);
     }

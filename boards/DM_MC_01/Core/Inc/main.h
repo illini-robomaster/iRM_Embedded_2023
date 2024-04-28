@@ -105,6 +105,8 @@ void RM_RTOS_Default_Task(const void *argument);
 #define LCD_RES_GPIO_Port GPIOB
 #define IMU_TEMP_Pin GPIO_PIN_5
 #define IMU_TEMP_GPIO_Port GPIOB
+#define IN1_GPIO_Port GPIOC
+#define IN1_Pin GPIO_PIN_6
 
 /* USER CODE BEGIN Private defines */
 #define DM_MC01_GENERAL

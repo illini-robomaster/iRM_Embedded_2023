@@ -28,26 +28,53 @@ typedef struct {
   float end_6;        /* rotate the hand on its axis                    */
 } joint_state_t;
 
+extern osThreadId_t armA1TaskHandle;
+const osThreadAttr_t armA1TaskAttribute = {.name = "armA1Task",
+                                             .attr_bits = osThreadDetached,
+                                             .cb_mem = nullptr,
+                                             .cb_size = 0,
+                                             .stack_mem = nullptr,
+                                             .stack_size = 512 * 4,
+                                             .priority = (osPriority_t)osPriorityAboveNormal,
+                                             .tz_module = 0,
+                                             .reserved = 0};
+
+
 /**
- * @brief turn to a relative position
- * @note software range limitation defined in arm_config.h
- * @return 0 when the command is accepted, 1 otherwise
- */
-int ArmTurnRelative(joint_state_t target_joint_state);
+ * @brief task to receive data from A1, currently not functioning
+*/
+void A1Task(void* arg);
+
+
+/**
+ * @brief initialize the arm A1s
+*/
+void init_arm_A1();
+
+void kill_arm_A1();
+
+/**
+ * @brief main A1 task
+*/
+void armA1Task(void* args);
 
 /**
  * @brief turn to an absolute position
  * @note software range limitation defined in arm_config.h
  * @return 0 when the command is accepted, 1 otherwise
  */
-int ArmTurnAbsolute(joint_state_t target_joint_state);
+int ArmA1TurnAbsolute(joint_state_t target_joint_state);
 
 /**
  * @brief Call all TransmitOutput() or equivalent function for each motor
  */
-void ArmTransmitOutput();
+void ArmA1TransmitOutput();
 
 /**
  * @brief print arm data
  */
-void ArmPrintData();
+void ArmA1PrintData();
+
+extern remote::SBUS* sbus;
+extern bsp::CAN* can1;
+extern bsp::CAN* can2;

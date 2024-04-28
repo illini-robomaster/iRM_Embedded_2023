@@ -36,29 +36,22 @@
 #include "encoder.h"
 #include "bsp_relay.h"
 
-//#define SINGLE_BOARD
+#define SINGLE_BOARD
 
-static bsp::CAN* can1 = nullptr;
-static remote::DBUS* sbus = nullptr;
+// static bsp::CAN* can1 = nullptr;
+// static remote::DBUS* sbus = nullptr;
 static control::BRTEncoder* encoder0= nullptr;
 static control::BRTEncoder* encoder1= nullptr;
 static float A1_zero[3] = {0.39, 0, 0};
 // static bsp::Relay* pump = nullptr;
 #ifndef SINGLE_BOARD
-static bsp::CAN* can2 = nullptr;
+// static bsp::CAN* can2 = nullptr;
 static bsp::CanBridge* send = nullptr;
-static const int ARM_TASK_DELAY = 2;
-
 #endif
 
-// 3508
-//static control::MotorCANBase* motor1 = nullptr;
-//static control::SteeringMotor* base_translate_motor = nullptr;
+static const int ARM_TASK_DELAY = 2;
 
-//static bsp::GPIO* base_translate_pe_sensor = nullptr;
-//bool base_translate_align_detect() {
-//  return base_translate_pe_sensor->Read() == true;
-//}
+
 
 /**
  * forearm_rotate_motor     RX=0x02 TX=0x01
@@ -70,8 +63,9 @@ static const int ARM_TASK_DELAY = 2;
  * base_motor               ID=2
 */
 
- #define RX_SIGNAL (1 << 0)
 
+// for receving data from A1, currently not functioning
+ #define RX_SIGNAL (1 << 0)
  const osThreadAttr_t A1TaskAttribute = {.name = "A1Task",
          .attr_bits = osThreadDetached,
          .cb_mem = nullptr,
@@ -95,22 +89,26 @@ static const int ARM_TASK_DELAY = 2;
   static CustomUART* A1_uart = nullptr;
   static control::UnitreeMotor* A1 = nullptr;
 
- void A1Task(void* arg) {
-     UNUSED(arg);
-     uint32_t length;
-     uint8_t* data;
+//  void A1Task(void* arg) {
+//      UNUSED(arg);
+//      uint32_t length;
+//      uint8_t* data;
 
-     while (true) {
-         /* wait until rx data is available */
-         uint32_t flags = osThreadFlagsWait(RX_SIGNAL, osFlagsWaitAll, osWaitForever);
-         if (flags & RX_SIGNAL) {  // unnecessary check
-             /* time the non-blocking rx / tx calls (should be <= 1 osTick) */
-             length = A1_uart->Read(&data);
-             if ((int)length == A1->recv_length)
-               A1->ExtractData(communication::package_t{data, (int)length});
-         }
-     }
- }
+//      while (true) {
+//          /* wait until rx data is available */
+//          uint32_t flags = osThreadFlagsWait(RX_SIGNAL, osFlagsWaitAll, osWaitForever);
+//          if (flags & RX_SIGNAL) {  // unnecessary check
+//              /* time the non-blocking rx / tx calls (should be <= 1 osTick) */
+//              length = A1_uart->Read(&data);
+//              if ((int)length == A1->recv_length)
+//                A1->ExtractData(communication::package_t{data, (int)length});
+//          }
+//      }
+//  }
+
+
+
+
 
 // 4310
 static control::Motor4310* forearm_rotate_motor = nullptr;
@@ -122,12 +120,12 @@ static joint_state_t current_joint_state = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
 // TODO fix transmit output for 4310 multi motors
 
-void RM_RTOS_Init() {
-  print_use_uart(&huart4);
+void init_arm_A1() {
+  // print_use_uart(&huart4);
   bsp::SetHighresClockTimer(&htim5);
 //   control::steering_t steering_data;
-  can1 = new bsp::CAN(&hcan1);
-  sbus = new remote::DBUS(&huart3);
+  // can1 = new bsp::CAN(&hcan1);
+  // sbus = new remote::DBUS(&huart3);
   encoder0 = new control::BRTEncoder(can1,0x0A, true);
   encoder1 = new control::BRTEncoder(can1,0x01, true);
   // pump = new bsp::Relay(K2_GPIO_Port,K2_Pin);
@@ -162,11 +160,12 @@ void RM_RTOS_Init() {
 
 }
 
- void RM_RTOS_Threads_Init(void) {
-   A1TaskHandle = osThreadNew(A1Task, nullptr, &A1TaskAttribute);
- }
+//  void RM_RTOS_Threads_Init(void) {
+//    A1TaskHandle = osThreadNew(A1Task, nullptr, &A1TaskAttribute);
 
-void RM_RTOS_Default_Task(const void* args) {
+//  }
+
+void armA1Task(void* args) {
   UNUSED(args);
   //Add 1s Time for 4310 start up.
   print("START\r\n");
@@ -291,28 +290,12 @@ void RM_RTOS_Default_Task(const void* args) {
 
   while (true) {
   
-// #ifndef SINGLE_BOARD
-//     send->cmd.id = bsp::VX;
-//     send->cmd.data_float = 0; // sbus->ch[0]
-//     send->TransmitOutput();
 
-//     send->cmd.id = bsp::VY;
-//     send->cmd.data_float = 0; // sbus->ch[1]
-//     send->TransmitOutput();
-
-//     send->cmd.id = bsp::RELATIVE_ANGLE;
-//     send->cmd.data_float = 0; // sbus->ch[2]
-//     send->TransmitOutput();
-// #endif
-//
     // pump->Off();
     // if (sbus->ch[10] > 0.5) {
       // pump->On();
     // }
 //     ArmPrintData();
-//     forearm_rotate_motor->connection_flag_ = false;
-//     wrist_rotate_motor->connection_flag_ = false;
-//     hand_rotate_motor->connection_flag_ = false;
   
     float temp[16];
 
@@ -330,9 +313,9 @@ void RM_RTOS_Default_Task(const void* args) {
     // }
 
 
-    temp[1] = clip<float>(sbus->ch1, -SBUS_CHANNEL_MAX, SBUS_CHANNEL_MAX);
-    temp[2] = clip<float>(sbus->ch2, -SBUS_CHANNEL_MAX, SBUS_CHANNEL_MAX);
-    temp[3] = clip<float>(sbus->ch3, -SBUS_CHANNEL_MAX, SBUS_CHANNEL_MAX);
+    temp[1] = clip<float>(sbus->ch[4], -SBUS_CHANNEL_MAX, SBUS_CHANNEL_MAX);
+    temp[2] = clip<float>(sbus->ch[5], -SBUS_CHANNEL_MAX, SBUS_CHANNEL_MAX);
+    temp[3] = clip<float>(sbus->ch[6], -SBUS_CHANNEL_MAX, SBUS_CHANNEL_MAX);
 
     joint_state_t field_angles = {0,0,0,0,0,0,0};
     // map sbus input to A1 range
@@ -378,7 +361,7 @@ void RM_RTOS_Default_Task(const void* args) {
 
     // target.base_pitch_rotate_2 = base_pitch_A1_init_target;
     // target.base_pitch_rotate_2 = 0;
-    ArmTurnAbsolute(target);
+    ArmA1TurnAbsolute(target);
 //        print("Target : %f %f %f %f %f %f %f\r\n", target.base_translate, target.base_vert_rotate, target.base_hor_rotate,
 //              target.elbow_rotate, target.forearm_rotate, target.wrist_rotate, target.hand_rotate);
 //        print("Current: %f %f %f %f %f %f %f\r\n",
@@ -429,42 +412,19 @@ void RM_RTOS_Default_Task(const void* args) {
       // print("Encoder Positions: %.6f %.6f\r\n", encoder0->angle_, encoder1->angle_);
       // print("Delta T : %d\r\n", HAL_GetTick()- last); 
 
-      print("data: %f %f %f %f %f\r\n", target.base_pitch_rotate_2, target_encoder[2], base_pitch_A1_init_target, base_pitch_a1_minus_encoder, encoder1->getData());
+      // print("data: %f %f %f %f %f\r\n", target.base_pitch_rotate_2, target_encoder[2], base_pitch_A1_init_target, base_pitch_a1_minus_encoder, encoder1->getData());
 
     }
 
     // last = HAL_GetTick();
-    ArmTransmitOutput();
+    ArmA1TransmitOutput();
     osDelay(ARM_TASK_DELAY);
   }
 }
 
-// cannot be used, because cannot receive from A1.
-int ArmTurnRelative(joint_state_t target) {
-  joint_state_t abs_target = joint_state_t();
-  abs_target.base_translate_0 = current_joint_state.base_translate_0 + target.base_translate_0;
-  abs_target.base_yaw_rotate_1 = current_joint_state.base_yaw_rotate_1 + target.base_yaw_rotate_1;
-  abs_target.base_pitch_rotate_2 = current_joint_state.base_pitch_rotate_2 + target.base_pitch_rotate_2;
-  abs_target.forearm_pitch_3 = current_joint_state.forearm_pitch_3 + target.forearm_pitch_3;
-  abs_target.forearm_roll_4 = current_joint_state.forearm_roll_4 + target.forearm_roll_4;
-  abs_target.wrist_5 = current_joint_state.wrist_5 + target.wrist_5;
-  abs_target.end_6 = current_joint_state.end_6 + target.end_6;
-  return ArmTurnAbsolute(abs_target);
-}
-
 static const float A1_Kp = 0.05, A1_Kd = 1.0;
 static const float m4310_Kp= 3, m4310_Kd = 1;
-int ArmTurnAbsolute(joint_state_t target) {
-  // M3508
-//   if (target->base_translate >= BASE_TRANSLATE_MAX) {
-//     base_translate_motor->TurnRelative(BASE_TRANSLATE_MAX-current_joint_state.base_translate);
-//   } else if (target->base_translate <= BASE_TRANSLATE_MIN) {
-//     base_translate_motor->TurnRelative(BASE_TRANSLATE_MIN-current_joint_state.base_translate);
-//   } else {
-//     base_translate_motor->TurnRelative(target->base_translate-current_joint_state.base_translate);
-//   }
-//   current_joint_state.base_translate = target->base_translate;
-
+int ArmA1TurnAbsolute(joint_state_t target) {
   // A1
    current_joint_state.base_yaw_rotate_1 = target.base_yaw_rotate_1;
    A1->Control(BASE_YAW_ID,   0.0, 0.0, current_joint_state.base_yaw_rotate_1  +A1_zero[0], A1_Kp, A1_Kd);
@@ -510,7 +470,14 @@ int ArmTurnAbsolute(joint_state_t target) {
   return 0;
 }
 
-void ArmTransmitOutput() {
+void kill_arm_A1() {
+  A1->Stop(0);
+  A1->Stop(1);
+  A1->Stop(2);
+  A1_uart->Write((uint8_t*)(&A1->send[0].data), A1->send_length);
+}
+
+void ArmA1TransmitOutput() {
 //  control::MotorCANBase::TransmitOutput(m3508s, 1);
 
    A1_uart->Write((uint8_t*)(&A1->send[0].data), A1->send_length);
@@ -524,20 +491,6 @@ void ArmTransmitOutput() {
   //  control::Motor4310::TransmitOutput(forearm_motors, 3);
 }
 
-void ArmPrintData() {
-//   print("Base Translate   : %10.4f\r\n", current_joint_state.base_translate);
-//   print("Base Vert Rotate : %10.4f\r\n", current_joint_state.base_vert_rotate);
-//   print("Base Hor  Rotate : %10.4f\r\n", current_joint_state.base_hor_rotate);
-//   print("Elbow Rotate     : %10.4f\r\n", current_joint_state.elbow_rotate);
-//   print("Forearm Rotate   : %10.4f\r\n", current_joint_state.forearm_rotate);
-//   print("Wrist Rotate     : %10.4f\r\n", current_joint_state.wrist_rotate);
-//   print("Hand Rotate      : %10.4f\r\n", current_joint_state.hand_rotate);
-   set_cursor(0, 0);
-   clear_screen();
-   print("ID 0, flag: %s, Pos %04f\r\n", A1->connection_flag_[0] ? "true" : "false", A1->recv[0].Pos);
-   print("ID 1, flag: %s, Pos %04f\r\n", A1->connection_flag_[1] ? "true" : "false", A1->recv[1].Pos);
-   print("ID 2, flag: %s, Pos %04f\r\n", A1->connection_flag_[2] ? "true" : "false", A1->recv[2].Pos);
-//  print("Forearm POS: %04f\r\n",forearm_rotate_motor->GetTheta());
-//  print("Wrist POS: %04f\r\n",wrist_rotate_motor->GetTheta());
-//  print("Hand POS: %04f\r\n",hand_rotate_motor->GetTheta());
+void ArmA1PrintData() {
+
 }

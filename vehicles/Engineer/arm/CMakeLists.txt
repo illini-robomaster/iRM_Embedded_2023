@@ -31,7 +31,7 @@ project(Engineer ASM C CXX)
 irm_add_arm_executable(Engineer_arm_dm
     TARGET DM_MC_01
     SOURCES
-    src/arm.cc
+    # src/arm.cc
     # src/chassis_task.cc
     # src/main.cc
     INCLUDES include)

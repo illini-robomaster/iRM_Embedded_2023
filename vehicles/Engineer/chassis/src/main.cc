@@ -18,23 +18,29 @@
  *                                                                          *
  ****************************************************************************/
 // #define REFEREE
+#define SINGLEBOARD
+#define CHASSIS
+// #define ARM_A1
+
+
 #include "main.h"
 
 #include "bsp_os.h"
 #include "can.h"
-#include "dbus.h"
+#include "sbus.h"
 #include "rgb.h"
 #include "chassis_task.h"
 #include "arm_translate_task.h"
+#include "arm.h"
 //  #include "ui_task.h"
 #ifdef REFEREE
 #include "referee_task.h"
 #endif
 #include "bsp_print.h"
-//#define SINGLEBOARD
 //
 osThreadId_t chassisTaskHandle;
 osThreadId_t armTranslateTaskHandle;
+osThreadId_t armA1TaskHandle;
 osThreadId_t UITaskHandle;
 osThreadId_t testTaskHandle;
 #ifdef REFEREE
@@ -45,7 +51,7 @@ osThreadId_t refereeTaskHandle;
 bsp::CAN* can1 = nullptr;
 bsp::CAN* can2 = nullptr;
 
-remote::DBUS* dbus = nullptr;
+remote::SBUS* sbus = nullptr;
 // display::RGB* RGB = nullptr;
 #ifdef REFEREE
  RefereeUART* referee_uart = nullptr;
@@ -60,10 +66,10 @@ remote::DBUS* dbus = nullptr;
 
 
 void RM_RTOS_Init() {
-    print_use_uart(&huart1);
+    print_use_uart(&huart4);
     bsp::SetHighresClockTimer(&htim5);
 
-    dbus = new remote::DBUS(&huart3);
+    sbus = new remote::SBUS(&huart3);
 
     can1 = new bsp::CAN(&hcan1, true);
     can2 = new bsp::CAN(&hcan2, false);
@@ -76,16 +82,30 @@ void RM_RTOS_Init() {
 #ifndef SINGLEBOARD
    receive = new bsp::CanBridge(can2,0x20B,0x20A);
 #endif
+
+#ifdef CHASSIS
     init_chassis();
     init_arm_translate();
+#endif
+
+#ifdef ARM_A1
+    init_arm_A1();
+#endif
     set_cursor(0,0);
     clear_screen();
 }
 
 
 void RM_RTOS_Threads_Init(void) {
+#ifdef CHASSIS
     chassisTaskHandle = osThreadNew(chassisTask,nullptr,&chassisTaskAttribute);
     armTranslateTaskHandle = osThreadNew(armTranslateTask, nullptr, &armTranslateAttribute);
+#endif
+
+#ifdef ARM_A1
+    armA1TaskHandle = osThreadNew(armA1Task, nullptr, &armA1TaskAttribute);
+#endif
+
 #ifdef REFEREE
     refereeTaskHandle = osThreadNew(refereeTask,nullptr,&refereeTaskAttribute);
 #endif
@@ -94,8 +114,15 @@ void RM_RTOS_Threads_Init(void) {
 
 
 void KillAll() {
+#ifdef CHASSIS
     kill_chassis();
+#endif
+
+#ifdef ARM_A1
     kill_arm_translate();
+#endif
+
+    kill_arm_A1();
 }
 
 
@@ -105,7 +132,7 @@ void RM_RTOS_Default_Task(const void* args) {
       set_cursor(0,0);
       clear_screen();
       print("HAL Tick: %d \r\n", HAL_GetTick());
-      print("vx: %d, vy: %d, wz; %d \r\n", dbus->ch0, dbus->ch1, dbus->ch2);
+      print("vx: %d, vy: %d, wz; %d \r\n", sbus->ch[0], sbus->ch[1], sbus->ch[2]);
 #ifdef REFEREE
       print("ROBOTID: %d",referee->game_robot_status.robot_id);
 #endif
