@@ -40,6 +40,23 @@ T clip(T value, T min, T max) {
 }
 
 /**
+ * @brief map a value between -1 and 1 to a given range
+ *
+ * @tparam T    type of the value
+ * @param value value to the clipped
+ * @param min   range min
+ * @param max   range max
+ *
+ * @return clipped value that falls in the range [min, max]
+ *
+ * @note undefined behavior if min > max
+ */
+template <typename T>
+T map(T value, T min, T max) {
+  return value * (max - min) / 2 + (max - min) / 2 + min;
+}
+
+/**
  * @brief absolute value
  *
  * @tparam T type of the value

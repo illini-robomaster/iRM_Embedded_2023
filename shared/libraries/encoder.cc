@@ -37,7 +37,7 @@ static void can_encoder_callback(const uint8_t data[], void* args) {
 
 BRTEncoder::BRTEncoder(CAN* can, uint16_t rx_id) : can_(can), rx_id_(rx_id) {
   can->RegisterRxCallback(rx_id, can_encoder_callback, this);
-  angle_ = 0;
+  angle_ = 0.0;
 }
 
 void BRTEncoder::UpdateData(const uint8_t data[]) {
@@ -46,7 +46,6 @@ void BRTEncoder::UpdateData(const uint8_t data[]) {
   constexpr float THETA_SCALE = 2 * PI / 1024;  // digital -> rad 
                                                 // the maximum digital value range is [0 - 1023]
   angle_ = raw_angle * THETA_SCALE;
-
   connection_flag_ = true;
 }
 

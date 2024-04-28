@@ -41,6 +41,9 @@ class BRTEncoder {
   /* implements data printout */
   void PrintData() const;
   float angle_;
+  bool is_connected(){
+    return connection_flag_;
+  }
 
  private:
   bsp::CAN* can_;

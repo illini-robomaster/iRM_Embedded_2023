@@ -199,7 +199,8 @@ public:
 
   const int send_length = 34; // send data package length
   const int recv_length = 78; // recv data package length
-  
+  const float gear_ratio = 9.07; // A1 Gear Ratio
+
 private:
   /**
    * @brief CRC32 verification function
@@ -210,7 +211,8 @@ private:
    */
   uint32_t crc32_core(uint32_t* ptr, uint32_t len);
 
-  const float gear_ratio = 9.1; // A1 Gear Ratio
 };
+
+
 
 }
