@@ -102,7 +102,7 @@ void gimbalTask(void* args) {
       // set escalation servo to original position
       escalation_servo->SetTarget(calibrated_theta);
     }
-    print("current theta: %f\r\n", escalation_servo->GetTheta());
+//    print("current theta: %f\r\n", escalation_servo->GetTheta());
     escalation_servo->CalcOutput();
     control::MotorCANBase::TransmitOutput(can1_escalation, 1);
     osDelay(GIMBAL_TASK_DELAY);
@@ -117,7 +117,8 @@ void init_gimbal() {
   esca_servo_data.max_speed = 2 * PI; // TODO: params need test
   esca_servo_data.max_acceleration = 100 * PI;
   esca_servo_data.transmission_ratio = M3508P19_RATIO;
-  esca_servo_data.omega_pid_param = new float [3] {225, 1.8, 7.5};
+  esca_servo_data.omega_pid_param = new float [3] {450, 3.6, 20};
+//  esca_servo_data.omega_pid_param = new float [3] {150, 1.2, 5};
   esca_servo_data.max_iout = 1000;
   esca_servo_data.max_out = 13000;
   escalation_servo = new control::ServoMotor(esca_servo_data);

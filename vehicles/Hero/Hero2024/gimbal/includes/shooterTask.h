@@ -43,8 +43,6 @@ extern bsp::CAN* can2;
 extern BoolEdgeDetector lob_mode_sw;
 extern volatile bool lob_mode;
 
-extern osEventFlagsId_t startEventFlag;
-#define START_FLAG (1 << 0)
 
 void shooterTask(void* arg);
 void init_shooter();

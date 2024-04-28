@@ -439,8 +439,8 @@ void ServoMotor::CalcOutput() {
   } else {
     command = omega_pid_.ComputeConstrainedOutput(motor_->GetOmegaDelta(target_diff * 50));
   }
+  print("command: %d\r\n", command);
   motor_->SetOutput(command);
-  print("target diff: %f, command: %d\r\n", target_diff, command);
   // jam detection mechanism
   if (detect_buf_ != nullptr) {
     // update rolling sum and circular buffer
