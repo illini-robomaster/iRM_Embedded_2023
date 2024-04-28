@@ -35,7 +35,7 @@ static void can_encoder_callback(const uint8_t data[], void* args) {
   encoder->UpdateData(data);
 }
 
-BRTEncoder::BRTEncoder(CAN* can, uint16_t rx_id) : can_(can), rx_id_(rx_id) {
+BRTEncoder::BRTEncoder(CAN* can, uint16_t rx_id, bool invert) : can_(can), rx_id_(rx_id), invert_(invert) {
   can->RegisterRxCallback(rx_id, can_encoder_callback, this);
   angle_ = 0.0;
 }

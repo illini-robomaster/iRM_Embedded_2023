@@ -128,8 +128,8 @@ void RM_RTOS_Init() {
 //   control::steering_t steering_data;
   can1 = new bsp::CAN(&hcan1);
   sbus = new remote::DBUS(&huart3);
-  encoder0 = new control::BRTEncoder(can1,0x0A);
-  encoder1 = new control::BRTEncoder(can1,0x01);
+  encoder0 = new control::BRTEncoder(can1,0x0A, true);
+  encoder1 = new control::BRTEncoder(can1,0x01, true);
   // pump = new bsp::Relay(K2_GPIO_Port,K2_Pin);
 
 #ifndef SINGLE_BOARD
@@ -194,13 +194,9 @@ void RM_RTOS_Default_Task(const void* args) {
 
   const float SBUS_CHANNEL_MAX = 660;
 
-  const float BASE_PITCH_FIELD_ZERO_ENCODER_VAL = 2.448; // the encoder value when the big arm is pointing upwards
-  const float ELBOW_PITCH_FIELD_ZERO_ENCODER_VAL = 2.448; // TODO: the encoder value when the small arm is pointing upwards
+  const float BASE_PITCH_FIELD_ZERO_ENCODER_VAL = -2.448; // the encoder value when the big arm is pointing upwards
+  const float ELBOW_PITCH_FIELD_ZERO_ENCODER_VAL = -2.448; // TODO: the encoder value when the small arm is pointing upwards
  
-  UNUSED(BASE_PITCH_FIELD_ZERO_ENCODER_VAL);
-  UNUSED(ELBOW_PITCH_FIELD_ZERO_ENCODER_VAL);
-
-
   // When no power, A1 absolute rotor encoder can only store 0~2PI,
   // After powered on, A1 encoder will be able to record multiple turns.
 
@@ -209,12 +205,11 @@ void RM_RTOS_Default_Task(const void* args) {
   // ===========================================================================================================
 
   // Find A1 Rotor Encoder reading (0~2PI) in terms of A1 Rotor
-  const float BASE_PITCH_A1_ZERO_ENCODER_VAL = 2.252; // the base encoder value when A1 absolute encoder reads 0.
+  const float BASE_PITCH_A1_ZERO_ENCODER_VAL = -2.252; // the base encoder value when A1 absolute encoder reads 0.
   // 3.632, 2.939, 1.552, 2.2519
 
-  const float ELBOW_PITCH_A1_ZERO_ENCODER_VAL = 3.804;// TODO: the elbow encoder value when A1 absolute encoder reads 0.
-  UNUSED(BASE_PITCH_A1_ZERO_ENCODER_VAL);
-  UNUSED(ELBOW_PITCH_A1_ZERO_ENCODER_VAL);
+  const float ELBOW_PITCH_A1_ZERO_ENCODER_VAL = -3.804;// TODO: the elbow encoder value when A1 absolute encoder reads 0.
+
 
   // (+-) Current Encoder Reading = n* Encoder Delta Per A1 Rotor Turn + A1 Rotor Encoder Reading + Encoder Value When A1 Rotor Is Zero
   // -> A1 Rotor Encoder Reading = (+-) Current Encoder Reading - n* Encoder Delta Per A1 Rotor Turn - Encoder Value When A1 Rotor Is Zero
@@ -242,7 +237,7 @@ void RM_RTOS_Default_Task(const void* args) {
   // make sure A1 not at the edge by speed mode
   // do {
   // while(true){
-  base_pitch_A1_rotor_encoder_reading = hard_wrap<float>((-encoder1->angle_ + BASE_PITCH_A1_ZERO_ENCODER_VAL)*A1->gear_ratio, 0, 2*PI);
+  base_pitch_A1_rotor_encoder_reading = hard_wrap<float>((encoder1->getData() - BASE_PITCH_A1_ZERO_ENCODER_VAL)*A1->gear_ratio, 0, 2*PI);
   base_pitch_A1_init_target = base_pitch_A1_rotor_encoder_reading / A1->gear_ratio; // A1->gear_ratio is A1 gear ratio  
     // print("Encoder Reading: %f\r\n", -encoder1->angle_);
     // print("Init_Target: %f\r\n", base_pitch_A1_init_target);
@@ -263,11 +258,11 @@ void RM_RTOS_Default_Task(const void* args) {
   // osDelay(5000);
 
   // do {
-  elbow_pitch_A1_rotor_encoder_reading = hard_wrap<float>((-encoder0->angle_ + ELBOW_PITCH_A1_ZERO_ENCODER_VAL)*A1->gear_ratio, 0, 2*PI);
+  elbow_pitch_A1_rotor_encoder_reading = hard_wrap<float>((encoder0->getData() - ELBOW_PITCH_A1_ZERO_ENCODER_VAL)*A1->gear_ratio, 0, 2*PI);
   elbow_pitch_A1_init_target = elbow_pitch_A1_rotor_encoder_reading / A1->gear_ratio; // A1->gear_ratio is A1 gear ratio
   // } while (elbow_pitch_A1_init_target < 0.1 || elbow_pitch_A1_init_target > 2*PI/A1->gear_ratio-0.1);
-  const float base_pitch_a1_minus_encoder = base_pitch_A1_init_target - (-encoder1->angle_); // external encoder have different direction
-  const float elbow_pitch_a1_minus_encoder = elbow_pitch_A1_init_target - (-encoder0->angle_);
+  const float base_pitch_a1_minus_encoder = base_pitch_A1_init_target - (encoder1->getData()); // external encoder have different direction
+  const float elbow_pitch_a1_minus_encoder = elbow_pitch_A1_init_target - (encoder0->getData());
   
 
   // The difference between the a1 encoder and external encoder is now fixed (powered on)
@@ -355,8 +350,8 @@ void RM_RTOS_Default_Task(const void* args) {
     float target_encoder[4]; 
     UNUSED(BASE_PITCH_FIELD_ZERO_ENCODER_VAL);
     target_encoder[1] = field_angles.base_yaw_rotate_1; // no encoder, so assume original position is 0.
-    target_encoder[2] = field_angles.base_pitch_rotate_2 - BASE_PITCH_FIELD_ZERO_ENCODER_VAL;
-    target_encoder[3] = field_angles.forearm_pitch_3 - ELBOW_PITCH_FIELD_ZERO_ENCODER_VAL;
+    target_encoder[2] = field_angles.base_pitch_rotate_2 + BASE_PITCH_FIELD_ZERO_ENCODER_VAL;
+    target_encoder[3] = field_angles.forearm_pitch_3 + ELBOW_PITCH_FIELD_ZERO_ENCODER_VAL;
 
     // Convert Encoder Value to A1 .
     target.base_yaw_rotate_1 = target_encoder[1];
@@ -434,7 +429,7 @@ void RM_RTOS_Default_Task(const void* args) {
       // print("Encoder Positions: %.6f %.6f\r\n", encoder0->angle_, encoder1->angle_);
       // print("Delta T : %d\r\n", HAL_GetTick()- last); 
 
-      print("data: %f %f %f %f %f\r\n", target.base_pitch_rotate_2, target_encoder[2], base_pitch_A1_init_target, base_pitch_a1_minus_encoder, encoder1->angle_);
+      print("data: %f %f %f %f %f\r\n", target.base_pitch_rotate_2, target_encoder[2], base_pitch_A1_init_target, base_pitch_a1_minus_encoder, encoder1->getData());
 
     }
 
