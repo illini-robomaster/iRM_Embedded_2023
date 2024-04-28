@@ -81,6 +81,6 @@ void KillAll(){
 void RM_RTOS_Default_Task(const void* args) {
   UNUSED(args);
   while (true) {
-    osDelay(1000);
+    osDelay(100);
   }
 }

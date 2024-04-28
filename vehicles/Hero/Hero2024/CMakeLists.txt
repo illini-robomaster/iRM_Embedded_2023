@@ -18,7 +18,6 @@
 #                                                                        #
 # ---------------------------------------------------------------------- #
 
-project(Hero2024 ASM C CXX)
 
 # TODO: add the subdirectory back when the chassis is ready
 #add_subdirectory(chassis)

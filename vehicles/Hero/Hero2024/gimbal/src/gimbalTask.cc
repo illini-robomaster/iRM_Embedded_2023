@@ -26,7 +26,7 @@
 // Params Initialization
 
 static const int KILLALL_DELAY = 100;
-static const int GIMBAL_TASK_DELAY = 10;
+static const int GIMBAL_TASK_DELAY = 1;
 
 static control::MotorCANBase* esca_motor = nullptr;
 static control::ServoMotor* escalation_servo = nullptr;
@@ -83,7 +83,7 @@ void gimbalTask(void* args) {
   while (true) {
     // Bool Edge Detector for lob mode switch or osEventFlags wait for a signal from different threads
     lob_mode_sw.input(dbus->keyboard.bit.SHIFT || dbus->swl == remote::UP);
-    if (lob_mode_sw.posEdge()){
+    if (lob_mode_sw.posEdge()&& dbus->swr == remote::MID){
       lob_mode = !lob_mode;
       // TODO: after implementing chassis, uncomment the lob_mode bsp::CanBridge flag transmission
 //      send->cmd.id = bsp::LOB_MODE;
@@ -92,7 +92,7 @@ void gimbalTask(void* args) {
       escalation_servo->SetMaxSpeed(4 * PI);
       print("lob_mode: %d\n", lob_mode);
     }
-    if(lob_mode && dbus->swr == remote::MID){
+    if(lob_mode){
       // please make sure the calibration is all done
       // lob mode
       escalation_servo->SetTarget(calibrated_theta + PI * 12.1);
@@ -115,9 +115,9 @@ void init_gimbal() {
   control::servo_t esca_servo_data;
   esca_servo_data.motor = esca_motor;
   esca_servo_data.max_speed = 2 * PI; // TODO: params need test
-  esca_servo_data.max_acceleration = 30 * PI;
+  esca_servo_data.max_acceleration = 100 * PI;
   esca_servo_data.transmission_ratio = M3508P19_RATIO;
-  esca_servo_data.omega_pid_param = new float [3] {150, 1.2, 5}; // TODO: PID params might need tuning
+  esca_servo_data.omega_pid_param = new float [3] {225, 1.8, 7.5};
   esca_servo_data.max_iout = 1000;
   esca_servo_data.max_out = 13000;
   escalation_servo = new control::ServoMotor(esca_servo_data);

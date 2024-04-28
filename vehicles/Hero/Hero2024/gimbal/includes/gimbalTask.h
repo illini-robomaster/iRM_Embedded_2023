@@ -35,6 +35,7 @@
 #include "rgb.h"
 #include "oled.h"
 #include "bsp_buzzer.h"
+#include "shooterTask.h"
 
 extern osThreadId_t gimbalTaskHandle;
 
@@ -43,10 +44,12 @@ const osThreadAttr_t gimbalTaskAttribute = {.name = "gimbalTask",
         .cb_mem = nullptr,
         .cb_size = 0,
         .stack_mem = nullptr,
-        .stack_size = 256 * 4,
-        .priority = (osPriority_t)osPriorityNormal,
+        .stack_size = 512 * 4,
+        .priority = (osPriority_t)osPriorityHigh,
         .tz_module = 0,
         .reserved = 0};
+
+
 extern remote::DBUS* dbus;
 extern bsp::CAN* can1;
 extern bsp::CAN* can2;
