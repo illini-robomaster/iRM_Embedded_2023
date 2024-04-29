@@ -111,8 +111,8 @@ static joint_state_t current_joint_state = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 void init_arm_A1() {
   // print_use_uart(&huart4);
   bsp::SetHighresClockTimer(&htim5);
-  encoder0 = new control::BRTEncoder(can1,0x0A, true);
-  encoder1 = new control::BRTEncoder(can1,0x01, false);
+  encoder0 = new control::BRTEncoder(can1,0x0A, false);
+  encoder1 = new control::BRTEncoder(can1,0x01, true);
   // pump = new bsp::Relay(K2_GPIO_Port,K2_Pin);
 
 
@@ -371,7 +371,7 @@ void armA1Task(void* args) {
       // print("CH12: %-4d CH13: %-4d CH14: %-4d CH15: %-4d \r\n", sbus->ch[12], sbus->ch[13], sbus->ch[14], sbus->ch[15]);
       // print("ELBOW: %03f HOR: %03f\r\n" ,encoder0->angle_, encoder1->angle_);
       // print("Zero[0] %03f Zer0[1] %03f Zero[2] %03f \r\n", A1_zero[0], A1_zero[1], A1_zero[2]);    
-      // print("Diff A1: %.3f %.3f\r\n", base_pitch_a1_minus_encoder, elbow_pitch_a1_minus_encoder);
+      print("Diff A1: %.3f %.3f\r\n", base_pitch_a1_minus_encoder, elbow_pitch_a1_minus_encoder);
       print("A1 Init Target: Base%.3f Elbow%.3f\r\n", base_pitch_A1_init_target, elbow_pitch_A1_init_target);
       print("Encoder Positions: %.6f %.6f\r\n", encoder0->getData(), encoder1->getData());
       // print("Delta T : %d\r\n", HAL_GetTick()- last); 
