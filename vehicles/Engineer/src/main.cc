@@ -18,16 +18,12 @@
  *                                                                          *
  ****************************************************************************/
 // #define REFEREE
-#define SINGLEBOARD
-#define CHASSIS
-// #define ARM_A1
-
+// #define CHASSIS
+#define ARM_A1
 
 #include "main.h"
-
 #include "bsp_os.h"
 #include "can.h"
-#include "sbus.h"
 #include "rgb.h"
 #include "chassis_task.h"
 #include "arm_translate_task.h"
@@ -37,6 +33,12 @@
 #include "referee_task.h"
 #endif
 #include "bsp_print.h"
+
+#ifdef USING_DBUS
+#include "dbus.h"
+#else
+#include "sbus.h"
+#endif
 //
 osThreadId_t chassisTaskHandle;
 osThreadId_t armTranslateTaskHandle;
@@ -51,16 +53,18 @@ osThreadId_t refereeTaskHandle;
 bsp::CAN* can1 = nullptr;
 bsp::CAN* can2 = nullptr;
 
+
+#ifdef USING_DBUS
+remote::DBUS* dbus = nullptr;
+#else
 remote::SBUS* sbus = nullptr;
+#endif
 // display::RGB* RGB = nullptr;
 #ifdef REFEREE
  RefereeUART* referee_uart = nullptr;
  communication::Referee* referee = nullptr;
 #endif
 
-#ifndef SINGLEBOARD
- bsp::CanBridge* receive = nullptr;
-#endif
 
 
 
@@ -68,19 +72,17 @@ remote::SBUS* sbus = nullptr;
 void RM_RTOS_Init() {
     print_use_uart(&huart4);
     bsp::SetHighresClockTimer(&htim5);
-
+#ifdef USING_DBUS
+    dbus = new remote::DBUS(&huart3);
+#else
     sbus = new remote::SBUS(&huart3);
-
+#endif
     can1 = new bsp::CAN(&hcan1, true);
     can2 = new bsp::CAN(&hcan2, false);
     // RGB = new display::RGB(&htim5, 3, 2, 1, 1000000);
 #ifdef REFEREE
    referee_uart = new RefereeUART(&huart6);
    referee = new communication::Referee();
-#endif
-
-#ifndef SINGLEBOARD
-   receive = new bsp::CanBridge(can2,0x20B,0x20A);
 #endif
 
 #ifdef CHASSIS
@@ -132,7 +134,12 @@ void RM_RTOS_Default_Task(const void* args) {
       set_cursor(0,0);
       clear_screen();
       print("HAL Tick: %d \r\n", HAL_GetTick());
+#ifdef USING_DBUS
+        print("vx: %d, vy: %d, wz; %d \r\n", dbus->ch0, dbus->ch1, dbus->ch2);
+#else
       print("vx: %d, vy: %d, wz; %d \r\n", sbus->ch[0], sbus->ch[1], sbus->ch[2]);
+#endif
+
 #ifdef REFEREE
       print("ROBOTID: %d",referee->game_robot_status.robot_id);
 #endif

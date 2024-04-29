@@ -30,13 +30,12 @@
 #include "unitree_motor.h"
 #include "utils.h"
 #include "bsp_can_bridge.h"
+#include "moving_average.h"
 
 #include "arm.h"
 #include "arm_config.h"
 #include "encoder.h"
 #include "bsp_relay.h"
-
-#define SINGLE_BOARD
 
 // static bsp::CAN* can1 = nullptr;
 // static remote::DBUS* sbus = nullptr;
@@ -44,10 +43,7 @@ static control::BRTEncoder* encoder0= nullptr;
 static control::BRTEncoder* encoder1= nullptr;
 static float A1_zero[3] = {0.39, 0, 0};
 // static bsp::Relay* pump = nullptr;
-#ifndef SINGLE_BOARD
-// static bsp::CAN* can2 = nullptr;
-static bsp::CanBridge* send = nullptr;
-#endif
+
 
 static const int ARM_TASK_DELAY = 2;
 
@@ -107,14 +103,6 @@ static const int ARM_TASK_DELAY = 2;
 //  }
 
 
-
-
-
-// 4310
-static control::Motor4310* forearm_rotate_motor = nullptr;
-static control::Motor4310* wrist_rotate_motor = nullptr;
-static control::Motor4310* hand_rotate_motor = nullptr;
-
 // entire arm
 static joint_state_t current_joint_state = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
@@ -123,26 +111,16 @@ static joint_state_t current_joint_state = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 void init_arm_A1() {
   // print_use_uart(&huart4);
   bsp::SetHighresClockTimer(&htim5);
-//   control::steering_t steering_data;
-  // can1 = new bsp::CAN(&hcan1);
-  // sbus = new remote::DBUS(&huart3);
   encoder0 = new control::BRTEncoder(can1,0x0A, true);
-  encoder1 = new control::BRTEncoder(can1,0x01, true);
+  encoder1 = new control::BRTEncoder(can1,0x01, false);
   // pump = new bsp::Relay(K2_GPIO_Port,K2_Pin);
 
-#ifndef SINGLE_BOARD
-  can2 = new bsp::CAN(&hcan2, false);
-  send = new bsp::CanBridge(can2,0x20A, 0x20B);
-#endif
 
   // Init M4310 * 3
   /* rx_id = Master id
    * tx_id = CAN id
    * see example/m4310_mit.cc
    */
-  forearm_rotate_motor = new control::Motor4310(can1, FOREARM_ROTATE_RX_ID, FOREARM_ROTATE_TX_ID, control::MIT);
-  wrist_rotate_motor = new control::Motor4310(can1, WRIST_ROTATE_RX_ID, WRIST_ROTATE_TX_ID, control::MIT);
-  hand_rotate_motor = new control::Motor4310(can1, HAND_ROTATE_RX_ID, HAND_ROTATE_TX_ID, control::MIT);
 
   // Init A1 * 3
    A1_uart = new CustomUART(A1_UART);
@@ -171,26 +149,6 @@ void armA1Task(void* args) {
   print("START\r\n");
   osDelay(1000);
 
-  // 4310 init state
-  // TODO: config zero pos with 4310 config assist
-
-  // forearm_rotate_motor->SetZeroPos();
-  // osDelay(20);
-  // forearm_rotate_motor->MotorEnable();
-  // osDelay(20);
-  // wrist_rotate_motor->SetZeroPos();
-  // osDelay(20);
-  // wrist_rotate_motor->MotorEnable();
-  // osDelay(20);
-  // hand_rotate_motor->SetZeroPos();
-  // osDelay(20);
-  // hand_rotate_motor->MotorEnable(); 
-   
-  //MOTOR 0-5
-  //6lv  7lh  8rv
-  //9 base
-
-
   const float SBUS_CHANNEL_MAX = 660;
 
   const float BASE_PITCH_FIELD_ZERO_ENCODER_VAL = -2.448; // the encoder value when the big arm is pointing upwards
@@ -215,7 +173,9 @@ void armA1Task(void* args) {
 
   print("encoder(s) not connected");
 
-  while(/*!encoder0->is_connected() ||*/ !encoder1->is_connected()){
+  while(!encoder0->is_connected() || !encoder1->is_connected()){
+    encoder0->PrintData();
+    encoder1->PrintData();
     osDelay(100);
   }
 
@@ -249,6 +209,7 @@ void armA1Task(void* args) {
   while (base_pitch_A1_init_target < 0.05 || base_pitch_A1_init_target > 2*PI/A1->gear_ratio-0.05) {
     osDelay(100);
   }
+
   // A1->Stop(BASE_PITCH_ID);
   // A1_uart->Write((uint8_t*)(&A1->send[1].data), A1->send_length);
 
@@ -288,6 +249,8 @@ void armA1Task(void* args) {
   int loop_cnt = 0;
   // uint32_t last = HAL_GetTick();
 
+  MovingAverage moving_average[7];
+
   while (true) {
   
 
@@ -295,27 +258,26 @@ void armA1Task(void* args) {
     // if (sbus->ch[10] > 0.5) {
       // pump->On();
     // }
-//     ArmPrintData();
   
     float temp[16];
 
     UNUSED(last_sbus_values);
     // read and filter sbus
     // TODO: moving average filter
-    // for(int i = 0; i < 16; i++){
-    //   // if(sbus->ch[i] > SBUS_CHANNEL_MAX || sbus->ch[i] < -SBUS_CHANNEL_MAX){
-    //     // temp[i] = last_sbus_values[i];
-    //   // } else {
-    //     // temp[i] = sbus->ch[i];
-    //     // last_sbus_values[i] = sbus->ch[i];
-    //   // }
-    //   temp[i] = clip<float>(sbus->ch[i], -SBUS_CHANNEL_MAX, SBUS_CHANNEL_MAX);
-    // }
+#ifdef USING_DBUS
+    moving_average[1].AddSample(dbus->ch1); // base_yaw
+    moving_average[2].AddSample(dbus->ch2); // base_pitch
+    moving_average[3].AddSample(dbus->ch3); // elbow_pitch
+#else
+    moving_average[1].AddSample(sbus->ch[4]); // base_yaw
+    moving_average[2].AddSample(sbus->ch[5]); // base_pitch
+    moving_average[3].AddSample(sbus->ch[6]); // elbow_pitch
+#endif
 
+    temp[1] = clip<float>(moving_average[1].GetAverage(), -SBUS_CHANNEL_MAX, SBUS_CHANNEL_MAX);
+    temp[2] = clip<float>(moving_average[2].GetAverage(), -SBUS_CHANNEL_MAX, SBUS_CHANNEL_MAX);
+    temp[3] = clip<float>(moving_average[3].GetAverage(), -SBUS_CHANNEL_MAX, SBUS_CHANNEL_MAX);
 
-    temp[1] = clip<float>(sbus->ch[4], -SBUS_CHANNEL_MAX, SBUS_CHANNEL_MAX);
-    temp[2] = clip<float>(sbus->ch[5], -SBUS_CHANNEL_MAX, SBUS_CHANNEL_MAX);
-    temp[3] = clip<float>(sbus->ch[6], -SBUS_CHANNEL_MAX, SBUS_CHANNEL_MAX);
 
     joint_state_t field_angles = {0,0,0,0,0,0,0};
     // map sbus input to A1 range
@@ -361,6 +323,8 @@ void armA1Task(void* args) {
 
     // target.base_pitch_rotate_2 = base_pitch_A1_init_target;
     // target.base_pitch_rotate_2 = 0;
+
+    target.forearm_pitch_3 = 0;
     ArmA1TurnAbsolute(target);
 //        print("Target : %f %f %f %f %f %f %f\r\n", target.base_translate, target.base_vert_rotate, target.base_hor_rotate,
 //              target.elbow_rotate, target.forearm_rotate, target.wrist_rotate, target.hand_rotate);
@@ -394,10 +358,10 @@ void armA1Task(void* args) {
 
 
     if(loop_cnt % 100 == 0){
-      // set_cursor(0, 0);
-      // clear_screen();
+      set_cursor(0, 0);
+      clear_screen();
       // print("Field Angle: J1%.3f J2%.3f J3%.3f\r\n", field_angles.base_yaw_rotate_1, field_angles.base_pitch_rotate_2, field_angles.forearm_pitch_3);
-      // print("Target( J1:%.3f J2:%.3f J3:%3f )\r\n", target.base_yaw_rotate_1, target.base_pitch_rotate_2, target.forearm_pitch_3);
+      print("Target( J1:%.3f J2:%.3f J3:%3f )\r\n", target.base_yaw_rotate_1, target.base_pitch_rotate_2, target.forearm_pitch_3);
       // print("Target Encoder( J1:%.3f J2:%.3f J3:%3f )\r\n", target_encoder[1], target_encoder[2], target_encoder[3]);
       // print("Current( J1:%.3f J2:%.3f J3:%.3f) \r\n ", current_joint_state.base_yaw_rotate_2,current_joint_state.base_pitch_rotate_3,current_joint_state.forearm_pitch_4);
       // // print("FLag : %s\r\n", hand_rotate_motor->connection_flag_==true ? "true" : "false");
@@ -408,8 +372,8 @@ void armA1Task(void* args) {
       // print("ELBOW: %03f HOR: %03f\r\n" ,encoder0->angle_, encoder1->angle_);
       // print("Zero[0] %03f Zer0[1] %03f Zero[2] %03f \r\n", A1_zero[0], A1_zero[1], A1_zero[2]);    
       // print("Diff A1: %.3f %.3f\r\n", base_pitch_a1_minus_encoder, elbow_pitch_a1_minus_encoder);
-      // print("A1 Init Target: Base%.3f Elbow%.3f\r\n", base_pitch_A1_init_target, elbow_pitch_A1_init_target);
-      // print("Encoder Positions: %.6f %.6f\r\n", encoder0->angle_, encoder1->angle_);
+      print("A1 Init Target: Base%.3f Elbow%.3f\r\n", base_pitch_A1_init_target, elbow_pitch_A1_init_target);
+      print("Encoder Positions: %.6f %.6f\r\n", encoder0->getData(), encoder1->getData());
       // print("Delta T : %d\r\n", HAL_GetTick()- last); 
 
       // print("data: %f %f %f %f %f\r\n", target.base_pitch_rotate_2, target_encoder[2], base_pitch_A1_init_target, base_pitch_a1_minus_encoder, encoder1->getData());
@@ -434,38 +398,6 @@ int ArmA1TurnAbsolute(joint_state_t target) {
 
    current_joint_state.forearm_pitch_3 = target.forearm_pitch_3;
    A1->Control(ELBOW_PITCH_ID,0.0, 0.0, current_joint_state.forearm_pitch_3    +A1_zero[2], A1_Kp, A1_Kd);
-
-  // M4310
-  //TODO: Adjust VALUE For TESTING
- if (target.forearm_roll_4 > FOREARM_ROTATE_MAX) {
-   forearm_rotate_motor->SetOutput(FOREARM_ROTATE_MAX, 0, m4310_Kp, m4310_Kd, 0);
-   target.forearm_roll_4 = FOREARM_ROTATE_MAX;
- } else if (target.forearm_roll_4 < FOREARM_ROTATE_MIN) {
-   forearm_rotate_motor->SetOutput(FOREARM_ROTATE_MIN, 0, m4310_Kp, m4310_Kd, 0);
-   target.forearm_roll_4 = FOREARM_ROTATE_MIN;
- } else
-   forearm_rotate_motor->SetOutput(target.forearm_roll_4, 0, m4310_Kp, m4310_Kd, 0);
- current_joint_state.forearm_roll_4 = target.forearm_roll_4;
-
- if (target.wrist_5 > WRIST_ROTATE_MAX) {
-   wrist_rotate_motor->SetOutput(WRIST_ROTATE_MAX, 0, m4310_Kp, m4310_Kd, 0);
-   target.wrist_5 = WRIST_ROTATE_MAX;
- } else if (target.wrist_5 < WRIST_ROTATE_MIN) {
-   wrist_rotate_motor->SetOutput(WRIST_ROTATE_MIN, 0, m4310_Kp, m4310_Kd, 0);
-   target.wrist_5 = WRIST_ROTATE_MIN;
- } else
-   wrist_rotate_motor->SetOutput(target.wrist_5, 0, m4310_Kp, m4310_Kd, 0);
- current_joint_state.wrist_5 = target.wrist_5;
-
- if (target.end_6 > HAND_ROTATE_MAX) {
-   hand_rotate_motor->SetOutput(HAND_ROTATE_MAX, 0, m4310_Kp, m4310_Kd, 0);
-   target.end_6 = HAND_ROTATE_MAX;
- } else if (target.end_6 < HAND_ROTATE_MIN) {
-   hand_rotate_motor->SetOutput(HAND_ROTATE_MIN, 0, m4310_Kp, m4310_Kd, 0);
-   target.end_6 = HAND_ROTATE_MIN;
- } else
-   hand_rotate_motor->SetOutput(target.end_6, 0, m4310_Kp, m4310_Kd, 0);
- current_joint_state.end_6 = target.end_6;
 
   return 0;
 }

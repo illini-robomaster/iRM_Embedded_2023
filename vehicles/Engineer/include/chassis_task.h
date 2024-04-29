@@ -3,11 +3,17 @@
 #include "motor.h"
 #include "engineer_steering.h"
 #include "steering_6020.h"
-#include "sbus.h"
 #include "can.h"
 #include "rgb.h"
 #include "protocol.h"
 #include "bsp_can_bridge.h"
+
+#ifdef USING_DBUS
+
+#include "dbus.h"
+#else
+#include "sbus.h"
+#endif
 
 //MAGIC NUMBERS, Represent motor physical install angle offsets.
 #define FL_MOTOR_OFFSET 4.663
@@ -34,8 +40,12 @@ void chassisTask(void* arg);
 void init_chassis();
 void kill_chassis();
 
-
+#ifdef USING_DBUS
+extern remote::DBUS* dbus;
+#else
 extern remote::SBUS* sbus;
+#endif
+
 extern bsp::CAN* can1;
 extern bsp::CAN* can2;
 extern display::RGB* RGB;

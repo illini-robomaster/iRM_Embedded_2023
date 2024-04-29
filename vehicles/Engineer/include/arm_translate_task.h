@@ -2,13 +2,17 @@
 
 #include "cmsis_os.h"
 #include "motor.h"
-#include "sbus.h"
+
 #include "can.h"
 #include "bsp_gpio.h"
 #include "bsp_print.h"
 #include "controller.h"
 // #include "utils.h"
-
+#ifdef USING_DBUS
+#include "dbus.h"
+#else
+#include "sbus.h"
+#endif
 
 extern osThreadId_t armTranslateTaskHandle;
 const osThreadAttr_t armTranslateAttribute = {.name = "armTranslateTask",
@@ -40,6 +44,11 @@ const float BASE_TRANSLATE_ALIGN_SPEED = (0.5 * PI);
 const float BASE_TRANSLATE_ACCELERATION = (100 * PI);
 
 /* M3508 params end */
+#ifdef USING_DBUS
+extern remote::DBUS* dbus;
+#else
 extern remote::SBUS* sbus;
+#endif
+
 extern bsp::CAN* can1;
 extern bsp::CAN* can2;

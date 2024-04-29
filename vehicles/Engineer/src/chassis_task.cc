@@ -1,7 +1,7 @@
 
 #include "chassis_task.h"
 #include "geometry.h"
-#define SINGLEBOARD
+#include "moving_average.h"
 
 //Constants 
 static const int KILLALL_DELAY = 100;
@@ -13,11 +13,11 @@ static const float NORMALIZATION_FACTOR = 1;
   // Speed at which safety will not kick in
   // TODO: Find good numbers
 
-static const float MOMENTUM_SAFE_SPEED = V_MAX * 0.3; // Magic number
-static const float MOMENTUM_SAFE_FACTOR_LINE = 0.3;   // also ^
-static const float MOMENTUM_SAFE_FACTOR_TURN = 0.3;   // also ^
-static const float MOMENTUM_FACTOR_PER_SEC = 0.1;     // the velocity at half a second before only have 10% impact on curr target
-static const float MOMENTUM_FACTOR = 1-pow(MOMENTUM_FACTOR_PER_SEC, 1.0/500/0.5);  
+// static const float MOMENTUM_SAFE_SPEED = V_MAX * 0.3; // Magic number
+// static const float MOMENTUM_SAFE_FACTOR_LINE = 0.3;   // also ^
+// static const float MOMENTUM_SAFE_FACTOR_TURN = 0.3;   // also ^
+// static const float MOMENTUM_FACTOR_PER_SEC = 0.1;     // the velocity at half a second before only have 10% impact on curr target
+// static const float MOMENTUM_FACTOR = 1-pow(MOMENTUM_FACTOR_PER_SEC, 1.0/500/0.5);  
 
 
 /*Args*/
@@ -59,18 +59,25 @@ void chassisTask(void* arg){
     int loop_cnt = 0;
     int last = HAL_GetTick();
 
+    MovingAverage x(10);
+    MovingAverage y(10);
+
     while (true) {
         float relative_angle = 0;
         float wz = 0;
 
         Vector2d joystick_vector(0, 0);
 
-#ifndef SINGLEBOARD
-        joystick_vector = Vector2d(receive->vx, receive->vy);
+#ifdef USING_DBUS
+        x.AddSample(dbus->ch1/660.0);
+        y.AddSample(dbus->ch0/660.0);
 #else
-        joystick_vector = Vector2d(sbus->ch[1]/ 660.0, sbus->ch[0]/660.0);
+        x.AddSample(sbus->ch[0]/660.0);
+        y.AddSample(sbus->ch[1]/660.0);
+        // joystick_vector = Vector2d(sbus->ch[0]/ 660.0, sbus->ch[1]/660.0);
 #endif
-
+        
+        joystick_vector = Vector2d(x.GetAverage(), y.GetAverage());
 
         // The following is for joystick only, not for keyboard
         // Max joy stick max = 660
@@ -109,7 +116,11 @@ void chassisTask(void* arg){
         target_vel = prev_target_vel.plus(delta_v);
         // TODO: Rotational acceleration constraints (which needs to deal with each module's angle)
         prev_target_vel = target_vel;
+#ifdef USING_DBUS
+        wz = dbus->ch2 / 660.0 * V_ROT_MAX; // in m/s
+#else
         wz = sbus->ch[2] / 660.0 * V_ROT_MAX; // in m/s
+#endif
 
         if(loop_cnt == 100){
             loop_cnt = 0;
@@ -126,17 +137,6 @@ void chassisTask(void* arg){
         // calculate camera oriented velocity vector
         Vector2d target_vel_cam = target_vel.rotateBy(Angle2d(relative_angle)); // now relative_angle is 0
 
-        // wz = std::min(FOLLOW_SPEED, FOLLOW_SPEED * dbus->ch2);       /* TODO : ASK IF GIMBAL EXIST, HOW CHASSIS MOVE */
-        // print("primary chassis_task loop entered \r\n");
-        
-#ifndef  SINGLEBOARD
-        wz = receive->relative_angle;
-#else
-        // wz = 0;
-#endif
-
-
-        // if (-CHASSIS_DEADZONE < relative_angle && relative_angle < CHASSIS_DEADZONE) wz = 0;
         chassis->SteerSetMaxSpeed(RUN_SPEED);
         chassis->SetSpeed(target_vel_cam.getX(), target_vel_cam.getY(), wz);
         chassis->SteerUpdateTarget();

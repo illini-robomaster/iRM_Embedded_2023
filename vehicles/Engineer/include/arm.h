@@ -74,7 +74,11 @@ void ArmA1TransmitOutput();
  * @brief print arm data
  */
 void ArmA1PrintData();
-
+#ifdef USING_DBUS
+extern remote::DBUS* dbus;
+#else
 extern remote::SBUS* sbus;
+#endif
+
 extern bsp::CAN* can1;
 extern bsp::CAN* can2;

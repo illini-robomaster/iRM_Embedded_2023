@@ -51,6 +51,7 @@ void BRTEncoder::UpdateData(const uint8_t data[]) {
 
 void BRTEncoder::PrintData() const { 
   print("angle: % .4f\r\n", angle_);
+  print("connection: %d\r\n", connection_flag_);
 }
 
 } /* namespace control */
