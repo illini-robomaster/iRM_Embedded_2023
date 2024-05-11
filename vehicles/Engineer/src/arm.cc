@@ -189,12 +189,12 @@ void armA1Task(void* args) {
     osDelay(100);
   }
 
-  // forearm_rotate_motor_4->SetZeroPos();
-  // forearm_rotate_motor_4->MotorEnable();
-  // wrist_rotate_motor_5->SetZeroPos();
-  // wrist_rotate_motor_5->MotorEnable();
-  // hand_rotate_motor_6->SetZeroPos();
-  // hand_rotate_motor_6->MotorEnable();
+  forearm_rotate_motor_4->SetZeroPos();
+  forearm_rotate_motor_4->MotorEnable();
+  wrist_rotate_motor_5->SetZeroPos();
+  wrist_rotate_motor_5->MotorEnable();
+  hand_rotate_motor_6->SetZeroPos();
+  hand_rotate_motor_6->MotorEnable();
 
   float base_pitch_A1_rotor_encoder_reading = 0;
   float elbow_pitch_A1_rotor_encoder_reading = 0;
@@ -216,6 +216,7 @@ void armA1Task(void* args) {
   // safety
   while (base_pitch_A1_init_target < 0.05 || base_pitch_A1_init_target > 2*PI/A1->gear_ratio-0.05) {
     osDelay(100);
+    print("base pitch safety\r\n");
   }
   
   elbow_pitch_A1_rotor_encoder_reading = hard_wrap<float>((encoder0->getData() - ELBOW_PITCH_A1_ZERO_ENCODER_VAL)*A1->gear_ratio, 0, 2*PI);
@@ -224,9 +225,10 @@ void armA1Task(void* args) {
   const float elbow_pitch_a1_minus_encoder = elbow_pitch_A1_init_target - (encoder0->getData());
   
   
-  // while (elbow_pitch_A1_init_target < 0.05 || elbow_pitch_A1_init_target > 2*PI/A1->gear_ratio-0.05) {
-  //   osDelay(100);
-  // }
+  while (elbow_pitch_A1_init_target < 0.05 || elbow_pitch_A1_init_target > 2*PI/A1->gear_ratio-0.05) {
+    osDelay(100);
+    print("elbow safety\r\n");
+  }
 
   // The difference between the a1 encoder and external encoder is now fixed (powered on)
  
@@ -254,6 +256,11 @@ void armA1Task(void* args) {
 
   MovingAverage moving_average[7];
 
+  while(sbus->ch[4] < 100){
+    osDelay(100);
+    print("waiting for sbus channel 5 to be greater than 100\r\n");
+  }
+
   while (true) {
     // pump->Off();
     // if (sbus->ch[10] > 0.5) {
@@ -270,12 +277,12 @@ void armA1Task(void* args) {
     moving_average[2].AddSample(dbus->ch2); // base_pitch
     moving_average[3].AddSample(dbus->ch3); // elbow_pitch
 #else
-    moving_average[1].AddSample(sbus->ch[1]); // base_yaw
-    moving_average[2].AddSample(sbus->ch[2]); // base_pitch
-    moving_average[3].AddSample(sbus->ch[3]); // elbow_pitch
-    moving_average[4].AddSample(sbus->ch[4]); // forearm_roll
-    moving_average[5].AddSample(sbus->ch[5]); // wrist
-    moving_average[6].AddSample(sbus->ch[6]); // end
+    moving_average[1].AddSample(sbus->ch[7]); // base_yaw
+    moving_average[2].AddSample(sbus->ch[8]); // base_pitch
+    moving_average[3].AddSample(sbus->ch[9]); // elbow_pitch
+    moving_average[4].AddSample(sbus->ch[1]); // forearm_roll
+    moving_average[5].AddSample(sbus->ch[2]); // wrist
+    moving_average[6].AddSample(sbus->ch[3]); // end
 #endif
 
     temp[1] = clip<float>(moving_average[1].GetAverage(), -SBUS_CHANNEL_MAX, SBUS_CHANNEL_MAX);
