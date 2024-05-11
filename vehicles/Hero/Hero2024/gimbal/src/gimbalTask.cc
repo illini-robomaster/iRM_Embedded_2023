@@ -31,7 +31,10 @@ static const int GIMBAL_TASK_DELAY = 1;
 static control::MotorCANBase* esca_motor = nullptr;
 static control::ServoMotor* escalation_servo = nullptr;
 
+
 static control::MotorCANBase* pitch_motor = nullptr;
+static control::ServoMotor* pitch_servo = nullptr;
+
 static control::Motor4310* yaw_motor = nullptr;
 
 
@@ -58,7 +61,7 @@ void empty_callback(control::ServoMotor* servo, const control::servo_jam_t data)
 void gimbalTask(void* args) {
   UNUSED(args);
   control::MotorCANBase* can1_escalation[] = {esca_motor};
-
+  control::MotorCANBase* can1_pitch[] = {pitch_motor};
   while (true) {
     if (dbus->keyboard.bit.B || dbus->swr == remote::DOWN) break;
     osDelay(100);
@@ -80,6 +83,9 @@ void gimbalTask(void* args) {
   escalation_servo->SetTarget(calibrated_theta,true);
   // update jam callback threshold
   escalation_servo->RegisterJamCallback(empty_callback, 0.205);
+
+  float pitch_ratio = 0.0;
+  float pitch_target = 0.0;
   while (true) {
     // Bool Edge Detector for lob mode switch or osEventFlags wait for a signal from different threads
     lob_mode_sw.input(dbus->keyboard.bit.SHIFT || dbus->swl == remote::UP);
@@ -102,9 +108,12 @@ void gimbalTask(void* args) {
       // set escalation servo to original position
       escalation_servo->SetTarget(calibrated_theta);
     }
-//    print("current theta: %f\r\n", escalation_servo->GetTheta());
+    pitch_target = dbus->ch3 / 600.0;
+    pitch_servo->SetTarget(pitch_servo->GetTheta() + pitch_target);
+    pitch_servo->CalcOutput();
     escalation_servo->CalcOutput();
     control::MotorCANBase::TransmitOutput(can1_escalation, 1);
+    control::MotorCANBase::TransmitOutput(can1_pitch, 1);
     osDelay(GIMBAL_TASK_DELAY);
   }
 }
@@ -125,6 +134,15 @@ void init_gimbal() {
   escalation_servo->RegisterJamCallback(jam_callback, 0.205);
 
   pitch_motor = new control::Motor2006(can1, 0x205);
+  control::servo_t pitch_servo_data;
+  pitch_servo_data.motor = pitch_motor;
+  pitch_servo_data.max_speed = 100 * PI; // TODO: params need test
+  pitch_servo_data.max_acceleration = 100 * PI;
+  pitch_servo_data.transmission_ratio = M2006P36_RATIO;
+  pitch_servo_data.omega_pid_param = new float [3] {150, 1.2, 5};
+  pitch_servo_data.max_iout = 1000;
+  pitch_servo_data.max_out = 13000;
+  pitch_servo = new control::ServoMotor(pitch_servo_data);
   yaw_motor = new control::Motor4310(can1, 0x03, 0x01, control::POS_VEL);
 }
 

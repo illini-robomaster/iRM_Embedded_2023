@@ -21,7 +21,7 @@
 #define FORCE_1_ANGLE 2 * PI
 #define FORCE_2_ANGLE 4 * PI
 #define FORCE_3_ANGLE 6 * PI
-
+extern bsp::Buzzer *buzzer;
 
 extern osThreadId_t shooterTaskHandle;
 const osThreadAttr_t shooterTaskAttribute = {.name = "shooterTask",

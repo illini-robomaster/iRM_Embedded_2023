@@ -42,6 +42,8 @@ bsp::CAN* can1 = nullptr;
 bsp::CAN* can2 = nullptr;
 bsp::CanBridge* send = nullptr;
 
+bsp::Buzzer *buzzer = nullptr;
+
 // lob mode switch
 BoolEdgeDetector lob_mode_sw=BoolEdgeDetector(false);
 volatile bool lob_mode=false;
@@ -61,6 +63,9 @@ void RM_RTOS_Init(){
   dbus = new remote::DBUS(&huart3);
   bsp::SetHighresClockTimer(&htim5);
   send = new bsp::CanBridge(can2, 0x20A, 0x20B);
+
+  buzzer = new bsp::Buzzer(&htim4, 3, 1000000);
+  print("initialized\r\n");
   // Initialize the RGB LED
 //  RGB=new display::RGB(&htim5,3,2,1,1000000);
   // shooter initialization
