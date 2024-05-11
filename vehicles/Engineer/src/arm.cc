@@ -49,9 +49,8 @@ static float A1_zero[3] = {0.39, 0, 0};
 static control::Motor4310* forearm_rotate_motor_4 = nullptr;
 static control::Motor4310* wrist_rotate_motor_5 = nullptr;
 static control::Motor4310* hand_rotate_motor_6 = nullptr;
-static control::Motor4310* motors4310[] = {forearm_rotate_motor_4, wrist_rotate_motor_5, hand_rotate_motor_6};
 
-static const int ARM_TASK_DELAY = 2;
+static const int ARM_TASK_DELAY = 10;
 
 
 
@@ -122,7 +121,7 @@ void init_arm_A1() {
   // pump = new bsp::Relay(K2_GPIO_Port,K2_Pin);
 
   // motor 4310
-  forearm_rotate_motor_4 = new control::Motor4310(can1, 0x02, 0x01, control::MIT);
+  forearm_rotate_motor_4 = new control::Motor4310(can1, 0x08, 0x07, control::MIT);
   wrist_rotate_motor_5 = new control::Motor4310(can1, 0x04, 0x03, control::MIT);
   hand_rotate_motor_6 = new control::Motor4310(can1, 0x06, 0x05, control::MIT);
 
@@ -184,8 +183,12 @@ void armA1Task(void* args) {
   print("encoder(s) not connected");
 
   while(!encoder0->is_connected() || !encoder1->is_connected()){
-    encoder0->PrintData();
-    encoder1->PrintData();
+    if(!encoder0->is_connected()){
+      print("encoder 0 not connected\r\n");
+    }
+    if (!encoder1->is_connected()){
+      print("encoder 1 not connected\r\n");
+    }
     osDelay(100);
   }
 
@@ -193,17 +196,17 @@ void armA1Task(void* args) {
     osDelay(100);
     print("waiting for sbus channel 5 to be greater than 100\r\n");
    }
-  // forearm_rotate_motor_4->SetZeroPos();
-  // forearm_rotate_motor_4->MotorEnable();
-  // wrist_rotate_motor_5->SetZeroPos();
-  // wrist_rotate_motor_5->MotorEnable();
+  forearm_rotate_motor_4->SetZeroPos();
+  forearm_rotate_motor_4->MotorEnable();
+  wrist_rotate_motor_5->SetZeroPos();
+  wrist_rotate_motor_5->MotorEnable();
   hand_rotate_motor_6->SetZeroPos();
   hand_rotate_motor_6->MotorEnable();
 
-  // while(true){
-  //   print("infinite loop\r\n");
-  //   osDelay(1000);
-  // }
+  while(sbus->ch[4] > -100){
+    osDelay(100);
+    print("waiting for sbus channel 5 to be greater than 100\r\n");
+  }
 
   float base_pitch_A1_rotor_encoder_reading = 0;
   float elbow_pitch_A1_rotor_encoder_reading = 0;
@@ -283,12 +286,12 @@ void armA1Task(void* args) {
     moving_average[2].AddSample(dbus->ch2); // base_pitch
     moving_average[3].AddSample(dbus->ch3); // elbow_pitch
 #else
-    moving_average[1].AddSample(sbus->ch[7]); // base_yaw
-    moving_average[2].AddSample(sbus->ch[8]); // base_pitch
-    moving_average[3].AddSample(sbus->ch[9]); // elbow_pitch
-    moving_average[4].AddSample(sbus->ch[1]); // forearm_roll
-    moving_average[5].AddSample(sbus->ch[2]); // wrist
-    moving_average[6].AddSample(sbus->ch[3]); // end
+    moving_average[1].AddSample(sbus->ch[3]); // base_yaw
+    moving_average[2].AddSample(sbus->ch[4]); // base_pitch
+    moving_average[3].AddSample(sbus->ch[5]); // elbow_pitch
+    moving_average[4].AddSample(sbus->ch[0]); // forearm_roll
+    moving_average[5].AddSample(sbus->ch[1]); // wrist
+    moving_average[6].AddSample(sbus->ch[2]); // end
 #endif
 
     temp[1] = clip<float>(moving_average[1].GetAverage(), -SBUS_CHANNEL_MAX, SBUS_CHANNEL_MAX);
@@ -409,7 +412,7 @@ void armA1Task(void* args) {
       print("A1 Init Target: Base%.3f Elbow%.3f\r\n", base_pitch_A1_init_target, elbow_pitch_A1_init_target);
       print("Encoder Positions: %.6f %.6f\r\n", encoder0->getData(), encoder1->getData());
       // print("Delta T : %d\r\n", HAL_GetTick()- last); 
-
+      print("HAL Get Tick: %d\r\n", HAL_GetTick());
       // print("data: %f %f %f %f %f\r\n", target.base_pitch_rotate_2, target_encoder[2], base_pitch_A1_init_target, base_pitch_a1_minus_encoder, encoder1->getData());
 
     }
@@ -457,9 +460,9 @@ void ArmTransmitOutput() {
    osDelay(A1_CONTROL_DELAY);
    A1_uart->Write((uint8_t*)(&A1->send[2].data), A1->send_length);
    osDelay(A1_CONTROL_DELAY);
-
-  //  control::Motor4310* forearm_motors[3] = {forearm_rotate_motor, wrist_rotate_motor, hand_rotate_motor};
-  // control::Motor4310::TransmitOutput(motors4310, 3);
+  
+   control::Motor4310* forearm_motors[3] = {forearm_rotate_motor_4, wrist_rotate_motor_5, hand_rotate_motor_6};
+  control::Motor4310::TransmitOutput(forearm_motors, 3);
 }
 
 void ArmA1PrintData() {

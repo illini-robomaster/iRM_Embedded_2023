@@ -60,7 +60,7 @@ void RM_RTOS_Default_Task(const void* args) {
   motor->SetZeroPos();
   motor->MotorEnable();
 
-  while(key->Read());
+  while(dbus->ch[4] < 100){}  // flip swr t;
   print("motor enabled\r\n" );
 
   float pos = 0;
