@@ -23,7 +23,7 @@ project(Engineer ASM C CXX)
 
 # If using DBUS, don't run arm and chassis at the same time
 # comment one of the definitions in main.cc
-add_compile_definitions(USING_DBUS)
+# add_compile_definitions(USING_DBUS)
 
 irm_add_arm_executable(Engineer_dm
     TARGET DM_MC_01

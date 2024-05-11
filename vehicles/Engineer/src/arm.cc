@@ -269,9 +269,9 @@ void armA1Task(void* args) {
     moving_average[2].AddSample(dbus->ch2); // base_pitch
     moving_average[3].AddSample(dbus->ch3); // elbow_pitch
 #else
-    moving_average[1].AddSample(sbus->ch[4]); // base_yaw
-    moving_average[2].AddSample(sbus->ch[5]); // base_pitch
-    moving_average[3].AddSample(sbus->ch[6]); // elbow_pitch
+    moving_average[1].AddSample(sbus->ch[1]); // base_yaw
+    moving_average[2].AddSample(sbus->ch[2]); // base_pitch
+    moving_average[3].AddSample(sbus->ch[3]); // elbow_pitch
 #endif
 
     temp[1] = clip<float>(moving_average[1].GetAverage(), -SBUS_CHANNEL_MAX, SBUS_CHANNEL_MAX);
@@ -324,7 +324,7 @@ void armA1Task(void* args) {
     // target.base_pitch_rotate_2 = base_pitch_A1_init_target;
     // target.base_pitch_rotate_2 = 0;
 
-    target.forearm_pitch_3 = 0;
+    // target.forearm_pitch_3 = 0;
     ArmA1TurnAbsolute(target);
 //        print("Target : %f %f %f %f %f %f %f\r\n", target.base_translate, target.base_vert_rotate, target.base_hor_rotate,
 //              target.elbow_rotate, target.forearm_rotate, target.wrist_rotate, target.hand_rotate);
