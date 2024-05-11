@@ -27,7 +27,7 @@
 #include "sbus.h"
 #include "utils.h"
 
-#define SBUS_START_IDX 0
+#define SBUS_START_IDX 1
 #define WINDOW_SIZE 50
 #define FILTER_THRESHOLD 850
 
@@ -79,6 +79,7 @@ void RM_RTOS_Default_Task(const void* args) {
   motor2->MotorEnable();
   motor3->SetZeroPos();
   motor3->MotorEnable();
+  osDelay(5000);
 
   float J4_pos = 0.0;
   float J5_pos = 0.0;
@@ -132,14 +133,14 @@ void RM_RTOS_Default_Task(const void* args) {
 
 //    updateFilter(sbus->ch[10], filter_window, window_size, filtered_output);
 
-    J4_pos = clip<float>(sbus_avg[3] / 660.0 * PI, J4_min, J4_max);
-    J5_pos = clip<float>(sbus_avg[4] / 660.0 * PI, J5_min, J5_max);
-    J6_pos = clip<float>(sbus_avg[5] / 660.0 * PI, J6_min, J6_max);
+    J4_pos = clip<float>(sbus_avg[0] / 660.0 * PI, J4_min, J4_max);
+    J5_pos = clip<float>(sbus_avg[1] / 660.0 * PI, J5_min, J5_max);
+    J6_pos = clip<float>(sbus_avg[2] / 660.0 * PI, J6_min, J6_max);
 
     set_cursor(0, 0);
     clear_screen();
     //   print("d: %-4d, %-4d, %-4d, %-4d, %-4d, %-4d\n", sbus->ch[10], sbus->ch[11], sbus->ch[12], sbus->ch[13], sbus->ch[14], sbus->ch[15]);
-    print("d: %-4d, %-4f, %-4f, %-4f\n", sbus->ch[10], J4_pos, J5_pos, J6_pos);
+    print("d: %-4d, %-4f, %-4f, %-4f\n", sbus->ch[0], J4_pos, J5_pos, J6_pos);
     //   print("d: %-4d, %-4d, %-4d\n", sbus->ch[0], sbus_actual, sbus_derivative);
     //   print("d: %-4d, %-4d, %-4d\n", sbus->ch[1], sbus_actual2, sbus_derivative2);
 
