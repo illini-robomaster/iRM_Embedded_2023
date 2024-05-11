@@ -27,7 +27,7 @@
 #include "sbus.h"
 #include "utils.h"
 
-#define SBUS_START_IDX 5
+#define SBUS_START_IDX 0
 #define WINDOW_SIZE 50
 #define FILTER_THRESHOLD 850
 

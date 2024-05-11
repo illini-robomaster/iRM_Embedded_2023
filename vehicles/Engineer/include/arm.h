@@ -68,7 +68,7 @@ int ArmA1TurnAbsolute(joint_state_t target_joint_state);
 /**
  * @brief Call all TransmitOutput() or equivalent function for each motor
  */
-void ArmA1TransmitOutput();
+void ArmTransmitOutput();
 
 /**
  * @brief print arm data

@@ -45,6 +45,12 @@ static float A1_zero[3] = {0.39, 0, 0};
 // static bsp::Relay* pump = nullptr;
 
 
+// Motor 4310
+static control::Motor4310* forearm_rotate_motor_4 = nullptr;
+static control::Motor4310* wrist_rotate_motor_5 = nullptr;
+static control::Motor4310* hand_rotate_motor_6 = nullptr;
+static control::Motor4310* motors4310[] = {forearm_rotate_motor_4, wrist_rotate_motor_5, hand_rotate_motor_6};
+
 static const int ARM_TASK_DELAY = 2;
 
 
@@ -115,6 +121,10 @@ void init_arm_A1() {
   encoder1 = new control::BRTEncoder(can1,0x01, true);
   // pump = new bsp::Relay(K2_GPIO_Port,K2_Pin);
 
+  // motor 4310
+  forearm_rotate_motor_4 = new control::Motor4310(can1, 0x02, 0x01, control::MIT);
+  wrist_rotate_motor_5 = new control::Motor4310(can1, 0x04, 0x03, control::MIT);
+  hand_rotate_motor_6 = new control::Motor4310(can1, 0x06, 0x05, control::MIT);
 
   // Init M4310 * 3
   /* rx_id = Master id
@@ -146,13 +156,14 @@ void init_arm_A1() {
 void armA1Task(void* args) {
   UNUSED(args);
   //Add 1s Time for 4310 start up.
+
   print("START\r\n");
   osDelay(1000);
 
   const float SBUS_CHANNEL_MAX = 660;
 
   const float BASE_PITCH_FIELD_ZERO_ENCODER_VAL = -2.448; // the encoder value when the big arm is pointing upwards
-  const float ELBOW_PITCH_FIELD_ZERO_ENCODER_VAL = -2.448; // TODO: the encoder value when the small arm is pointing upwards
+  const float ELBOW_PITCH_FIELD_ZERO_ENCODER_VAL = 3.0; // TODO: the encoder value when the small arm is pointing upwards
  
   // When no power, A1 absolute rotor encoder can only store 0~2PI,
   // After powered on, A1 encoder will be able to record multiple turns.
@@ -165,8 +176,7 @@ void armA1Task(void* args) {
   const float BASE_PITCH_A1_ZERO_ENCODER_VAL = -2.252; // the base encoder value when A1 absolute encoder reads 0.
   // 3.632, 2.939, 1.552, 2.2519
 
-  const float ELBOW_PITCH_A1_ZERO_ENCODER_VAL = -3.804;// TODO: the elbow encoder value when A1 absolute encoder reads 0.
-
+  const float ELBOW_PITCH_A1_ZERO_ENCODER_VAL = 2.32;// TODO: the elbow encoder value when A1 absolute encoder reads 0.
 
   // (+-) Current Encoder Reading = n* Encoder Delta Per A1 Rotor Turn + A1 Rotor Encoder Reading + Encoder Value When A1 Rotor Is Zero
   // -> A1 Rotor Encoder Reading = (+-) Current Encoder Reading - n* Encoder Delta Per A1 Rotor Turn - Encoder Value When A1 Rotor Is Zero
@@ -179,51 +189,44 @@ void armA1Task(void* args) {
     osDelay(100);
   }
 
+  // forearm_rotate_motor_4->SetZeroPos();
+  // forearm_rotate_motor_4->MotorEnable();
+  // wrist_rotate_motor_5->SetZeroPos();
+  // wrist_rotate_motor_5->MotorEnable();
+  // hand_rotate_motor_6->SetZeroPos();
+  // hand_rotate_motor_6->MotorEnable();
+
   float base_pitch_A1_rotor_encoder_reading = 0;
   float elbow_pitch_A1_rotor_encoder_reading = 0;
   float base_pitch_A1_init_target = 0;
   float elbow_pitch_A1_init_target = 0;
+  // float J4_pos = 0.0;
+  // float J5_pos = 0.0;
+  // float J6_pos = 0.0;
 
   UNUSED(base_pitch_A1_rotor_encoder_reading);
   UNUSED(elbow_pitch_A1_rotor_encoder_reading);
   UNUSED(base_pitch_A1_init_target);
-  UNUSED(elbow_pitch_A1_init_target);
-
-  // A1->Control(BASE_PITCH_ID, 0, 0, 0, 0.03, 1.0);
-  // A1_uart->Write((uint8_t*)(&A1->send[1].data), A1->send_length);
-  // osDelay(1000);
+  UNUSED(elbow_pitch_A1_init_target); 
 
   // make sure A1 not at the edge by speed mode
-  // do {
-  // while(true){
   base_pitch_A1_rotor_encoder_reading = hard_wrap<float>((encoder1->getData() - BASE_PITCH_A1_ZERO_ENCODER_VAL)*A1->gear_ratio, 0, 2*PI);
   base_pitch_A1_init_target = base_pitch_A1_rotor_encoder_reading / A1->gear_ratio; // A1->gear_ratio is A1 gear ratio  
-    // print("Encoder Reading: %f\r\n", -encoder1->angle_);
-    // print("Init_Target: %f\r\n", base_pitch_A1_init_target);
-    // A1->Control(BASE_PITCH_ID, 0.0, 0.5, 0.0, 0.0, 3.0);
-    // A1_uart->Write((uint8_t*)(&A1->send[1].data), A1->send_length);    
-    // osDelay(20);
-  // }
 
   // safety
   while (base_pitch_A1_init_target < 0.05 || base_pitch_A1_init_target > 2*PI/A1->gear_ratio-0.05) {
     osDelay(100);
   }
-
-  // A1->Stop(BASE_PITCH_ID);
-  // A1_uart->Write((uint8_t*)(&A1->send[1].data), A1->send_length);
-
-  // print("data: %f %f %f\r\n", base_pitch_A1_init_target, base_pitch_a1_minus_encoder, encoder1->angle_);
-
-  // osDelay(5000);
-
-  // do {
+  
   elbow_pitch_A1_rotor_encoder_reading = hard_wrap<float>((encoder0->getData() - ELBOW_PITCH_A1_ZERO_ENCODER_VAL)*A1->gear_ratio, 0, 2*PI);
   elbow_pitch_A1_init_target = elbow_pitch_A1_rotor_encoder_reading / A1->gear_ratio; // A1->gear_ratio is A1 gear ratio
-  // } while (elbow_pitch_A1_init_target < 0.1 || elbow_pitch_A1_init_target > 2*PI/A1->gear_ratio-0.1);
   const float base_pitch_a1_minus_encoder = base_pitch_A1_init_target - (encoder1->getData()); // external encoder have different direction
   const float elbow_pitch_a1_minus_encoder = elbow_pitch_A1_init_target - (encoder0->getData());
   
+  
+  // while (elbow_pitch_A1_init_target < 0.05 || elbow_pitch_A1_init_target > 2*PI/A1->gear_ratio-0.05) {
+  //   osDelay(100);
+  // }
 
   // The difference between the a1 encoder and external encoder is now fixed (powered on)
  
@@ -241,8 +244,8 @@ void armA1Task(void* args) {
   // const float A1_MAX_POS[] = {0, PI/2, PI/2, PI/2}; // maximum position for every joint
   // const float A1_MIN_POS[] = {0, -PI/2, -PI/2, -PI/2}; // minimum position for every joint
 
-  joint_state_t MAX_POS = {0, PI/2, PI/4, PI/8, 0, 0, 0};
-  joint_state_t MIN_POS = {0, -PI/2, -PI/4, -PI/8, 0, 0, 0};
+  joint_state_t MAX_POS = {0, PI/2, PI/4, PI/8, PI/2, PI/2, PI/2};
+  joint_state_t MIN_POS = {0, -PI/2, -PI/4, -PI/8, -PI/2, -PI/2, -PI/2};
 
   int last_sbus_values[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}; // for filtering
 
@@ -252,8 +255,6 @@ void armA1Task(void* args) {
   MovingAverage moving_average[7];
 
   while (true) {
-  
-
     // pump->Off();
     // if (sbus->ch[10] > 0.5) {
       // pump->On();
@@ -272,11 +273,17 @@ void armA1Task(void* args) {
     moving_average[1].AddSample(sbus->ch[1]); // base_yaw
     moving_average[2].AddSample(sbus->ch[2]); // base_pitch
     moving_average[3].AddSample(sbus->ch[3]); // elbow_pitch
+    moving_average[4].AddSample(sbus->ch[4]); // forearm_roll
+    moving_average[5].AddSample(sbus->ch[5]); // wrist
+    moving_average[6].AddSample(sbus->ch[6]); // end
 #endif
 
     temp[1] = clip<float>(moving_average[1].GetAverage(), -SBUS_CHANNEL_MAX, SBUS_CHANNEL_MAX);
     temp[2] = clip<float>(moving_average[2].GetAverage(), -SBUS_CHANNEL_MAX, SBUS_CHANNEL_MAX);
     temp[3] = clip<float>(moving_average[3].GetAverage(), -SBUS_CHANNEL_MAX, SBUS_CHANNEL_MAX);
+    temp[4] = clip<float>(moving_average[4].GetAverage(), -SBUS_CHANNEL_MAX, SBUS_CHANNEL_MAX);
+    temp[5] = clip<float>(moving_average[5].GetAverage(), -SBUS_CHANNEL_MAX, SBUS_CHANNEL_MAX);
+    temp[6] = clip<float>(moving_average[6].GetAverage(), -SBUS_CHANNEL_MAX, SBUS_CHANNEL_MAX);
 
 
     joint_state_t field_angles = {0,0,0,0,0,0,0};
@@ -284,6 +291,10 @@ void armA1Task(void* args) {
     field_angles.base_yaw_rotate_1   = map<float>(temp[1]/SBUS_CHANNEL_MAX, MIN_POS.base_yaw_rotate_1,   MAX_POS.base_yaw_rotate_1);
     field_angles.base_pitch_rotate_2 = map<float>(temp[2]/SBUS_CHANNEL_MAX, MIN_POS.base_pitch_rotate_2, MAX_POS.base_pitch_rotate_2);
     field_angles.forearm_pitch_3     = map<float>(temp[3]/SBUS_CHANNEL_MAX, MIN_POS.forearm_pitch_3,     MAX_POS.forearm_pitch_3);
+    field_angles.forearm_roll_4      = map<float>(temp[4]/SBUS_CHANNEL_MAX, MIN_POS.forearm_roll_4,      MAX_POS.forearm_roll_4);
+    field_angles.wrist_5             = map<float>(temp[5]/SBUS_CHANNEL_MAX, MIN_POS.wrist_5,             MAX_POS.wrist_5);
+    field_angles.end_6               = map<float>(temp[6]/SBUS_CHANNEL_MAX, MIN_POS.end_6,               MAX_POS.end_6);
+
 
     // field_angles.base_yaw_rotate_1 =   temp[1]/SBUS_CHANNEL_MAX * (MAX_POS.base_yaw_rotate_1-MIN_POS.base_yaw_rotate_1)/2 + MIN_POS.base_yaw_rotate_1 + (MAX_POS.base_yaw_rotate_1 - MIN_POS.base_yaw_rotate_1)/2; 
     // field_angles.base_pitch_rotate_2 = temp[2]/SBUS_CHANNEL_MAX * (MAX_POS.base_pitch_rotate_2-MIN_POS.base_pitch_rotate_2)/2 + MIN_POS.base_pitch_rotate_2 + (MAX_POS.base_pitch_rotate_2 - MIN_POS.base_pitch_rotate_2)/2;
@@ -302,17 +313,26 @@ void armA1Task(void* args) {
     target.base_yaw_rotate_1 = target_encoder[1];
     target.base_pitch_rotate_2 = base_pitch_a1_minus_encoder + target_encoder[2];
     target.forearm_pitch_3 = elbow_pitch_a1_minus_encoder + target_encoder[3];
+    target.forearm_roll_4 = field_angles.forearm_roll_4;
+    target.wrist_5 = field_angles.wrist_5;
+    target.end_6 = field_angles.end_6;
     
     // Clip between last_target_pose +- MAX_DELTA
     target.base_yaw_rotate_1 =   clip<float>(target.base_yaw_rotate_1,   last_target.base_yaw_rotate_1   - A1_MAX_DELTA, last_target.base_yaw_rotate_1   + A1_MAX_DELTA); 
     target.base_pitch_rotate_2 = clip<float>(target.base_pitch_rotate_2, last_target.base_pitch_rotate_2 - A1_MAX_DELTA, last_target.base_pitch_rotate_2 + A1_MAX_DELTA);
     target.forearm_pitch_3 =     clip<float>(target.forearm_pitch_3,     last_target.forearm_pitch_3     - A1_MAX_DELTA, last_target.forearm_pitch_3     + A1_MAX_DELTA);
+    target.forearm_roll_4 =      clip<float>(target.forearm_roll_4,      last_target.forearm_roll_4      - A1_MAX_DELTA, last_target.forearm_roll_4      + A1_MAX_DELTA);
+    target.wrist_5 =             clip<float>(target.wrist_5,             last_target.wrist_5             - A1_MAX_DELTA, last_target.wrist_5             + A1_MAX_DELTA);
+    target.end_6 =               clip<float>(target.end_6,               last_target.end_6               - A1_MAX_DELTA, last_target.end_6               + A1_MAX_DELTA);
     // print("Clipped Target: %f %f %f\r\n", target.base_yaw_rotate_2, target.base_pitch_rotate_3, target.forearm_pitch_4);
 
     last_target.base_yaw_rotate_1   = target.base_yaw_rotate_1;
     last_target.base_pitch_rotate_2 = target.base_pitch_rotate_2;
     last_target.forearm_pitch_3     = target.forearm_pitch_3;
-  
+    last_target.forearm_roll_4      = target.forearm_roll_4;
+    last_target.wrist_5             = target.wrist_5;
+    last_target.end_6               = target.end_6;
+
     // target.forearm_roll_5 = (sbus->ch[3] - FOREARM_ROTATE_OFFSET) / sbus->CHANNEL_MAX * PI;
     // target.wrist_6 = (sbus->ch[4] - WRIST_ROTATE_OFFSET) / sbus->CHANNEL_MAX * PI;
     // target.end_7 = (sbus->ch[5] - HAND_ROTATE_OFFSET) / sbus->CHANNEL_MAX * PI;
@@ -362,6 +382,7 @@ void armA1Task(void* args) {
       clear_screen();
       // print("Field Angle: J1%.3f J2%.3f J3%.3f\r\n", field_angles.base_yaw_rotate_1, field_angles.base_pitch_rotate_2, field_angles.forearm_pitch_3);
       print("Target( J1:%.3f J2:%.3f J3:%3f )\r\n", target.base_yaw_rotate_1, target.base_pitch_rotate_2, target.forearm_pitch_3);
+      print("J4 %.3f J5 %.3f J6 %.3f\r\n", target.forearm_roll_4, target.wrist_5, target.end_6);
       // print("Target Encoder( J1:%.3f J2:%.3f J3:%3f )\r\n", target_encoder[1], target_encoder[2], target_encoder[3]);
       // print("Current( J1:%.3f J2:%.3f J3:%.3f) \r\n ", current_joint_state.base_yaw_rotate_2,current_joint_state.base_pitch_rotate_3,current_joint_state.forearm_pitch_4);
       // // print("FLag : %s\r\n", hand_rotate_motor->connection_flag_==true ? "true" : "false");
@@ -381,7 +402,7 @@ void armA1Task(void* args) {
     }
 
     // last = HAL_GetTick();
-    ArmA1TransmitOutput();
+    ArmTransmitOutput();
     osDelay(ARM_TASK_DELAY);
   }
 }
@@ -399,6 +420,11 @@ int ArmA1TurnAbsolute(joint_state_t target) {
    current_joint_state.forearm_pitch_3 = target.forearm_pitch_3;
    A1->Control(ELBOW_PITCH_ID,0.0, 0.0, current_joint_state.forearm_pitch_3    +A1_zero[2], A1_Kp, A1_Kd);
 
+  // 4310
+  forearm_rotate_motor_4->SetOutput(target.forearm_roll_4, target.forearm_roll_4, 10, 0.5, 0);
+  wrist_rotate_motor_5->SetOutput(target.wrist_5, target.wrist_5, 10, 0.5, 0);
+  hand_rotate_motor_6->SetOutput(target.end_6, target.end_6, 10, 0.5, 0);
+
   return 0;
 }
 
@@ -409,7 +435,7 @@ void kill_arm_A1() {
   A1_uart->Write((uint8_t*)(&A1->send[0].data), A1->send_length);
 }
 
-void ArmA1TransmitOutput() {
+void ArmTransmitOutput() {
 //  control::MotorCANBase::TransmitOutput(m3508s, 1);
 
    A1_uart->Write((uint8_t*)(&A1->send[0].data), A1->send_length);
@@ -420,7 +446,7 @@ void ArmA1TransmitOutput() {
    osDelay(A1_CONTROL_DELAY);
 
   //  control::Motor4310* forearm_motors[3] = {forearm_rotate_motor, wrist_rotate_motor, hand_rotate_motor};
-  //  control::Motor4310::TransmitOutput(forearm_motors, 3);
+  // control::Motor4310::TransmitOutput(motors4310, 3);
 }
 
 void ArmA1PrintData() {
