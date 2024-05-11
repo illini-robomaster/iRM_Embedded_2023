@@ -28,10 +28,12 @@
 static bsp::CAN* can = nullptr;
 static control::Motor4310* motor = nullptr;
 remote::SBUS* dbus = nullptr;
+bsp::GPIO* key = nullptr;
 
 void RM_RTOS_Init() {
   print_use_uart(&huart4);
   can = new bsp::CAN(&hcan1, true);
+  key = new bsp::GPIO(GPIOA, GPIO_PIN_15);
 
   /* rx_id = Master id
    * tx_id = CAN id
@@ -57,7 +59,8 @@ void RM_RTOS_Default_Task(const void* args) {
    * zero position is the zero position set before */
   motor->SetZeroPos();
   motor->MotorEnable();
-  osDelay(5000);
+
+  while(key->Read());
   print("motor enabled\r\n" );
 
   float pos = 0;
