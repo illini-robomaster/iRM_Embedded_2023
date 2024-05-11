@@ -189,12 +189,21 @@ void armA1Task(void* args) {
     osDelay(100);
   }
 
-  forearm_rotate_motor_4->SetZeroPos();
-  forearm_rotate_motor_4->MotorEnable();
-  wrist_rotate_motor_5->SetZeroPos();
-  wrist_rotate_motor_5->MotorEnable();
+   while(sbus->ch[4] < 100){
+    osDelay(100);
+    print("waiting for sbus channel 5 to be greater than 100\r\n");
+   }
+  // forearm_rotate_motor_4->SetZeroPos();
+  // forearm_rotate_motor_4->MotorEnable();
+  // wrist_rotate_motor_5->SetZeroPos();
+  // wrist_rotate_motor_5->MotorEnable();
   hand_rotate_motor_6->SetZeroPos();
   hand_rotate_motor_6->MotorEnable();
+
+  // while(true){
+  //   print("infinite loop\r\n");
+  //   osDelay(1000);
+  // }
 
   float base_pitch_A1_rotor_encoder_reading = 0;
   float elbow_pitch_A1_rotor_encoder_reading = 0;
@@ -256,10 +265,7 @@ void armA1Task(void* args) {
 
   MovingAverage moving_average[7];
 
-  while(sbus->ch[4] < 100){
-    osDelay(100);
-    print("waiting for sbus channel 5 to be greater than 100\r\n");
-  }
+  
 
   while (true) {
     // pump->Off();
