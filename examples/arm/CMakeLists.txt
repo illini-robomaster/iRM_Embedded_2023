@@ -1,6 +1,6 @@
 # ---------------------------------------------------------------------- #
 #                                                                        #
-#  Copyright (C) 2021                                                    #
+#  Copyright (C) 2024                                                    #
 #  Illini RoboMaster @ University of Illinois at Urbana-Champaign.       #
 #                                                                        #
 #  This program is free software: you can redistribute it and/or modify  #
@@ -18,13 +18,8 @@
 #                                                                        #
 # ---------------------------------------------------------------------- #
 
-project(example_Engineer ASM C CXX)
+project(example_arm ASM C CXX)
 
-irm_add_arm_executable(${PROJECT_NAME}_test
-    TARGET DJI_Board_TypeC
-    SOURCES arm_test.cc)
-
-irm_add_arm_executable(${PROJECT_NAME}_dbus
-    TARGET DJI_Board_TypeC
-    SOURCES arm_controller.cc
-    INCLUDES ./)
+irm_add_arm_executable(${PROJECT_NAME}_typeC
+        TARGET DJI_Board_TypeC
+        SOURCES typeC.cc)
