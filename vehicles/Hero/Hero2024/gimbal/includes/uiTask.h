@@ -19,47 +19,26 @@
  ****************************************************************************/
 
 #pragma once
+#include <algorithm>
+#include <cmath>
+#include <cstdio>
+#include <cstring>
 
-#include "chassis.h"
-
-#include "bsp_gpio.h"
-#include "bsp_can_bridge.h"
-#include "bsp_os.h"
-#include "bsp_print.h"
-#include "bsp_relay.h"
-#include "cmsis_os.h"
-#include "controller.h"
-#include "dbus.h"
-#include "motor.h"
+#include "user_interface.h"
+#include "cmsis_os2.h"
+#include "gimbalTask.h"
+#include "main.h"
 #include "protocol.h"
-#include "rgb.h"
-#include "oled.h"
-#include "bsp_buzzer.h"
-#include "shooterTask.h"
-#include "encoder.h"
 
-extern osThreadId_t gimbalTaskHandle;
-
-const osThreadAttr_t gimbalTaskAttribute = {.name = "gimbal_task",
+extern osThreadId_t uiTaskHandle;
+const osThreadAttr_t uiTaskAttribute = {.name = "UI_task",
         .attr_bits = osThreadDetached,
         .cb_mem = nullptr,
         .cb_size = 0,
         .stack_mem = nullptr,
-        .stack_size = 512 * 4,
-        .priority = (osPriority_t)osPriorityHigh,
+        .stack_size = 1024 * 4,
+        .priority = (osPriority_t)osPriorityBelowNormal,
         .tz_module = 0,
         .reserved = 0};
 
-
-extern remote::DBUS* dbus;
-extern bsp::CAN* can1;
-extern bsp::CAN* can2;
-extern bsp::CanBridge* send;
-
-extern BoolEdgeDetector lob_mode_sw;
-extern volatile bool lob_mode;
-
-
-void gimbal_task(void *arg);
-void init_gimbal();
-void kill_gimbal();
+void UI_task(void* arg);

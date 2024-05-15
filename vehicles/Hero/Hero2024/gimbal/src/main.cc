@@ -36,6 +36,7 @@
 #include "protocol.h"
 #include "rgb.h"
 #include "shooterTask.h"
+#include "uiTask.h"
 
 remote::DBUS* dbus = nullptr;
 bsp::CAN* can1 = nullptr;
@@ -51,6 +52,7 @@ volatile bool lob_mode=false;
 
 osThreadId_t shooterTaskHandle;
 osThreadId_t gimbalTaskHandle;
+osThreadId_t uiTaskHandle;
 
 
 // Params Initialization
@@ -74,8 +76,9 @@ void RM_RTOS_Init(){
 }
 
 void RM_RTOS_Threads_Init(void){
-    shooterTaskHandle = osThreadNew(shooterTask, nullptr,&shooterTaskAttribute);
-    gimbalTaskHandle = osThreadNew(gimbalTask, nullptr,&gimbalTaskAttribute);
+    shooterTaskHandle = osThreadNew(shooter_task, nullptr, &shooterTaskAttribute);
+    gimbalTaskHandle = osThreadNew(gimbal_task, nullptr, &gimbalTaskAttribute);
+    uiTaskHandle = osThreadNew(UI_task, nullptr, &uiTaskAttribute);
 }
 
 void KillAll(){

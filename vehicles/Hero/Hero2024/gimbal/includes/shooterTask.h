@@ -24,7 +24,7 @@
 extern bsp::Buzzer *buzzer;
 
 extern osThreadId_t shooterTaskHandle;
-const osThreadAttr_t shooterTaskAttribute = {.name = "shooterTask",
+const osThreadAttr_t shooterTaskAttribute = {.name = "shooter_task",
         .attr_bits = osThreadDetached,
         .cb_mem = nullptr,
         .cb_size = 0,
@@ -44,6 +44,6 @@ extern BoolEdgeDetector lob_mode_sw;
 extern volatile bool lob_mode;
 
 
-void shooterTask(void* arg);
+void shooter_task(void* arg);
 void init_shooter();
 void kill_shooter();

@@ -37,6 +37,8 @@ static control::ServoMotor* pitch_servo = nullptr;
 
 static control::Motor4310* yaw_motor = nullptr;
 
+static control::BRTEncoder *pitch_encoder = nullptr;
+
 
 bool exit_flag = false;
 
@@ -58,7 +60,7 @@ void empty_callback(control::ServoMotor* servo, const control::servo_jam_t data)
   UNUSED(data);
 }
 
-void gimbalTask(void* args) {
+void gimbal_task(void* args) {
   UNUSED(args);
   control::MotorCANBase* can1_escalation[] = {esca_motor};
   control::MotorCANBase* can1_pitch[] = {pitch_motor};
@@ -78,14 +80,14 @@ void gimbalTask(void* args) {
     }
   }
   calibrated_theta = escalation_servo->GetTheta();
-  print("gimbalTask entering loop\r\n");
+  print("gimbal_task entering loop\r\n");
   print("calibrated_theta: %f\r\n", calibrated_theta);
   escalation_servo->SetTarget(calibrated_theta,true);
   // update jam callback threshold
   escalation_servo->RegisterJamCallback(empty_callback, 0.205);
 
-  float pitch_ratio = 0.0;
   float pitch_target = 0.0;
+  float pitch_curr = 0.0;
   while (true) {
     // Bool Edge Detector for lob mode switch or osEventFlags wait for a signal from different threads
     lob_mode_sw.input(dbus->keyboard.bit.SHIFT || dbus->swl == remote::UP);
@@ -109,6 +111,7 @@ void gimbalTask(void* args) {
       escalation_servo->SetTarget(calibrated_theta);
     }
     pitch_target = dbus->ch3 / 600.0;
+
     pitch_servo->SetTarget(pitch_servo->GetTheta() + pitch_target);
     pitch_servo->CalcOutput();
     escalation_servo->CalcOutput();
@@ -143,7 +146,9 @@ void init_gimbal() {
   pitch_servo_data.max_iout = 1000;
   pitch_servo_data.max_out = 13000;
   pitch_servo = new control::ServoMotor(pitch_servo_data);
-  yaw_motor = new control::Motor4310(can1, 0x03, 0x01, control::POS_VEL);
+  yaw_motor = new control::Motor4310(can1, 0x03, 0x02, control::POS_VEL);
+
+  pitch_encoder = new control::BRTEncoder(can1,0x01);
 }
 
 void kill_gimbal() {
