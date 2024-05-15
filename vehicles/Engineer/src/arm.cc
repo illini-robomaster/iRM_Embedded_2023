@@ -192,10 +192,18 @@ void armA1Task(void* args) {
     osDelay(100);
   }
 
+  #ifdef USING_DBUS
+  while(dbus->swr != remote::DOWN){
+    osDelay(100);
+    print("waiting for dbus swr to be down\r\n");
+  }
+  #else
    while(sbus->ch[4] < 100){
     osDelay(100);
     print("waiting for sbus channel 5 to be greater than 100\r\n");
    }
+  #endif
+
   forearm_rotate_motor_4->SetZeroPos();
   forearm_rotate_motor_4->MotorEnable();
   wrist_rotate_motor_5->SetZeroPos();
@@ -203,10 +211,17 @@ void armA1Task(void* args) {
   hand_rotate_motor_6->SetZeroPos();
   hand_rotate_motor_6->MotorEnable();
 
-  while(sbus->ch[4] > -100){
+  #ifdef USING_DBUS
+  while(dbus->swr != remote::DOWN){
+    osDelay(100);
+    print("waiting for dbus swr to be down\r\n");
+  }
+  #else
+   while(sbus->ch[4] > -100){
     osDelay(100);
     print("waiting for sbus channel 5 to be greater than 100\r\n");
-  }
+   }
+  #endif
 
   float base_pitch_A1_rotor_encoder_reading = 0;
   float elbow_pitch_A1_rotor_encoder_reading = 0;
