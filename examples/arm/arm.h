@@ -18,48 +18,36 @@
  *                                                                          *
  ****************************************************************************/
 
-#include "bsp_gpio.h"
-#include "bsp_print.h"
-#include "cmsis_os.h"
-#include "main.h"
-#include "motor.h"
+typedef struct {
+  float base_translate_0;     /* translate 3508 motor                           */
+  float base_yaw_rotate_1;   /* rotate the entire arm around an vertical axis  */
+  float base_pitch_rotate_2;    /* rotate the entire arm around a horizontal axis */
+  float forearm_pitch_3;       /* rotate the forearm on a horizontal axis        */
+  float forearm_roll_4;     /* rotate the forearm on its axis                 */
+  float wrist_5;       /* rotate the hand around an vertical axis        */
+  float end_6;        /* rotate the hand on its axis                    */
+} joint_state_t;
 
-#define KEY_GPIO_GROUP GPIOA
-#define KEY_GPIO_PIN GPIO_PIN_0
+/**
+ * @brief turn to a relative position
+ * @note software range limitation defined in arm_config.h
+ * @return 0 when the command is accepted, 1 otherwise
+ */
+int ArmTurnRelative(joint_state_t* target_joint_state);
 
-bsp::CAN* can1 = NULL;
-bsp::GPIO* key = nullptr;
-control::MotorCANBase* motor1 = NULL;
-control::MotorCANBase* motor2 = NULL;
+/**
+ * @brief turn to an absolute position
+ * @note software range limitation defined in arm_config.h
+ * @return 0 when the command is accepted, 1 otherwise
+ */
+int ArmTurnAbsolute(joint_state_t* target_joint_state);
 
-void RM_RTOS_Init() {
-  print_use_uart(&huart4);
+/**
+ * @brief Call all TransmitOutput() or equivalent function for each motor
+ */
+void ArmTransmitOutput();
 
-  can1 = new bsp::CAN(&hcan1, true);
-  motor1 = new control::Motor6020(can1, 0x206);
-  // motor2 = new control::Motor6020(can1, 0x207);
-  key = new bsp::GPIO(KEY_GPIO_GROUP, KEY_GPIO_PIN);
-}
-
-void RM_RTOS_Default_Task(const void* args) {
-  UNUSED(args);
-  control::MotorCANBase* motors[] = {motor1};
-
-  // while(!key->Read());
-
-  // while(key->Read());
-
-  print("ok!\r\n");
-
-  while (true) {
-    // if (key->Read()) {
-      // motor2->SetOutput(0);
-      // motor1->SetOutput(0);
-    // } else {
-      motor1->SetOutput(3200);
-      print("%10.4f ", motor1->GetTheta());
-    // }
-    control::MotorCANBase::TransmitOutput(motors, 1);
-    osDelay(2);
-  }
-}
+/**
+ * @brief print arm data
+ */
+void ArmPrintData();

@@ -150,6 +150,7 @@ class MotorCANBase : public MotorBase {
    *        many of the private parameters of MotorCANBase.
    */
   friend class ServoMotor;
+  friend class Steering6020;
 
   volatile bool connection_flag_ = false;
 
@@ -708,6 +709,134 @@ class SteeringMotor {
   float align_angle_;               /* store calibration angle                                                              */
   bool align_complete_;             /* if calibration is previously done, use the align_angle_                              */
 };
+
+
+// =================================================================================================
+// ServoMotorWithLG 
+// =================================================================================================
+// This is a ServoMotor with light gate calibration and forward & reverse soft limits
+
+/**
+ * @brief structure used when steering motor instance is initialized
+ */
+typedef struct {
+  MotorCANBase* motor;              /* motor instance to be wrapped as a servomotor       */
+  float max_speed;                  /* max turning speed of motor shaft, in [rad/s]       */
+  float max_acceleration;           /* desired acceleration of motor shaft, in [rad/s^2]  */
+  float transmission_ratio;         /* transmission ratio of motor                        */
+  float* omega_pid_param;           /* pid parameter used to control speed of motor       */
+  float max_iout;
+  float max_out;
+  align_detect_t align_detect_func; /* function pointer for calibration function*/
+  float calibrate_offset;           /* angle from calibration sensor to starting location */
+  float reverse_soft_limit;
+  float forward_soft_limit;
+} servoLG_t;
+
+// mode that can turn relative angles in [rad]
+class ServoMotorWithLG {// light gate
+ public:
+  ServoMotorWithLG(servoLG_t data);
+  /**
+   * @brief Call ServoMotor::GetTheta() and return theta in [rad]
+   *
+   * @ param mode   if mode == absolute_mode, range -> [-inf to +inf]
+   *                if mode == relative_mode, range -> [0 to 2pi]
+   */
+  float GetTheta(GetThetaMode mode = absolute_mode) const;
+
+  /**
+   * @brief Print out motor data
+   */
+  void PrintData() const;
+
+  /**
+   * @brief Set the target to a relative angle in [rad]
+   *        if the underlying servomotor is not holding, the motor won't turn
+   * @param override if true, override current target even if motor is not holding right now
+   * @return 0 when the command is accepted, 1 otherwise
+   */
+  int TurnRelative(float angle, bool override = false);
+
+
+  /**
+   * @brief Set the target to an absolute angle in [rad]
+   *        if the underlying servomotor is not holding, the motor won't turn 
+   * @param override if true, override current targeteven if motor is not holding right now
+   * @return 0 when the command is accepted, 1 otherwise        
+  */
+  int TurnAbsolute(float angle_rad, bool override = false);
+
+
+  /**
+   * @brief Turn the motor to the aligned position
+   *        Do nothing if the motor doesn't have an aligned position
+   * @return 2 if the motor doesn't have an aligned position
+   *         1 if the motor has one but failed to reach it
+   *         0 if success
+   */
+  int ReAlign();
+
+  /**
+   * @brief find the aligned position
+   *        If the motor doesn't have an aligned position, the motor keeps rotating until the detector returns True.
+   *        If the motor has one, the motor does nothing and return True.
+   * @note  Calibrate() only find the aligned position, it doesn't guarantee the motor ends in the aligned position or stops
+   *
+   *
+   * @return True when the motor has a aligned position
+   */
+  bool Calibrate();
+
+  /**
+   * @brief set turning speed of motor when moving
+   *        Call ServoMotor::SetMaxSpeed()
+   *
+   * @note should always be positive, negative inputs will be ignored
+   *
+   * @param max_speed speed of desired motor shaft turning speed, in [rad/s]
+   */
+  void SetMaxSpeed(const float max_speed);
+
+  /**
+   * @brief Call Servomotor::CalcOutput()
+   */
+  void CalcOutput();
+
+  /**
+   * @brief Call ServoMotor::UpdateData()
+   * @note only used in CAN callback, do not call elsewhere
+   *
+   * @param data[]  raw data bytes
+   */
+  void UpdateData(const uint8_t data[]);
+
+  /**
+   * @brief Set align_complete_ of the motor to False
+   */
+  void SetAlignFalse();
+
+  /**
+   * @brief Check the motor's align_complete_ flag
+   * @return True if motor's align_complete_ flag is true, false otherwise
+   */
+  bool CheckAlignment();
+
+ private:
+  ServoMotor* servo_;
+
+  align_detect_t align_detect_func_;/* function pointer for the calibration sensor, see comments for align_detect_t typedef */
+  float calibrate_offset_;          /* difference between calibration sensor and desired starting position                  */
+  float current_target_;            /* current absolute position in [rad] to drive the underlying servo motor               */
+  float reverse_soft_limit;         /* forward soft limit relative to calib position */
+  float forward_soft_limit;         /* reverse soft limit relative to calib position */
+
+  float align_angle_;               /* angle relative to motor start position                                                              */
+  bool align_complete_;             /* if calibration is previously done, use the align_angle_                              */
+};
+
+
+// =================================================================================================
 
 //==================================================================================================
 // Motor4310
