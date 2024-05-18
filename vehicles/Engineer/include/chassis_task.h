@@ -51,6 +51,7 @@ extern bsp::CAN* can2;
 extern display::RGB* RGB;
 extern communication::Referee* referee;
 extern bsp::CanBridge* receive;
+extern control::Motor4310* rotate_motor;
 
 
 // speed for steering motors (rad/s)

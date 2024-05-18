@@ -39,6 +39,7 @@ static control::engineer_steering_chassis_t* chassis_data;
 static control::EngineerSteeringChassis* chassis;
 
 static volatile bool Dead = false;
+static BoolEdgeDetector RotateBarrel(false);
 
 int16_t loop_count = 0;
 
@@ -61,6 +62,15 @@ void chassisTask(void* arg){
 
     MovingAverage x(10);
     MovingAverage y(10);
+
+    control::Motor4310* motors[] = {rotate_motor};
+
+    while(dbus->swr != remote::DOWN){}  // flip swr to start
+
+    // rotate_motor->SetZeroPos();
+    rotate_motor->MotorEnable();
+
+    float pos = 0;
 
     while (true) {
         float relative_angle = 0;
@@ -122,16 +132,19 @@ void chassisTask(void* arg){
         wz = sbus->ch[2] / 660.0 * V_ROT_MAX; // in m/s
 #endif
 
-        if(loop_cnt == 100){
-            loop_cnt = 0;
-            set_cursor(0, 0);
-            clear_screen();
-            print("joy_x: %f, joy_y: %f \r\n", joystick_vector.getX(), joystick_vector.getY());
-            print("vx: %f, vy: %f, wz: %f \r\n", target_vel.getX(), target_vel.getY(), wz);
-            print("DELTA T: %d \r\n", HAL_GetTick() - last);
-        }
-        last = HAL_GetTick();
-        loop_cnt++;
+        // if(loop_cnt == 100){
+        //     loop_cnt = 0;
+        //     set_cursor(0, 0);
+        //     clear_screen();
+        //     print("joy_x: %f, joy_y: %f \r\n", joystick_vector.getX(), joystick_vector.getY());
+        //     print("vx: %f, vy: %f, wz: %f \r\n", target_vel.getX(), target_vel.getY(), wz);
+        //     print("DELTA T: %d \r\n", HAL_GetTick() - last);
+        // }
+        // last = HAL_GetTick();
+        // loop_cnt++;
+        UNUSED(loop_cnt);
+        UNUSED(last);
+
 
 
         // calculate camera oriented velocity vector
@@ -155,7 +168,7 @@ void chassisTask(void* arg){
         //     loop_count = 0;
         // }
         // loop_count ++;
-        
+
 #ifdef REFEREEsteer_motors
         chassis->Update((float)referee->game_robot_status.chassis_power_limit,
                            referee->power_heat_data.chassis_power,
@@ -179,6 +192,17 @@ void chassisTask(void* arg){
         UNUSED(steer_motors);
         UNUSED(wheel_motors);
         // print("chassis motor output transmitted \r\n");
+
+        RotateBarrel.input(dbus->swr == remote::UP);
+
+        // flip swr to UP to rotate barrel
+        if (RotateBarrel.posEdge()){
+            pos += 2.0 * PI / 5.0;
+            print("Pos: %f \r\n", pos);
+        }
+
+        rotate_motor->SetOutput(pos, 10);
+        control::Motor4310::TransmitOutput(motors, 1);
 
         osDelay(CHASSIS_TASK_DELAY);
     }

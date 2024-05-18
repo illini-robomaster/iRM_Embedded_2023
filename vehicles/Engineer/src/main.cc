@@ -18,8 +18,8 @@
  *                                                                          *
  ****************************************************************************/
 // #define REFEREE
-// #define CHASSIS
-#define ARM_A1
+#define CHASSIS
+// #define ARM_A1
 
 #include "main.h"
 #include "bsp_os.h"
@@ -52,6 +52,7 @@ osThreadId_t refereeTaskHandle;
 
 bsp::CAN* can1 = nullptr;
 bsp::CAN* can2 = nullptr;
+control::Motor4310* rotate_motor = nullptr;
 
 
 #ifdef USING_DBUS
@@ -87,8 +88,10 @@ void RM_RTOS_Init() {
 
 #ifdef CHASSIS
     init_chassis();
-    init_arm_translate();
+    // init_arm_translate();
 #endif
+
+rotate_motor = new control::Motor4310(can1, 0x30, 0x31, control::POS_VEL);
 
 #ifdef ARM_A1
     init_arm_A1();
@@ -101,7 +104,7 @@ void RM_RTOS_Init() {
 void RM_RTOS_Threads_Init(void) {
 #ifdef CHASSIS
     chassisTaskHandle = osThreadNew(chassisTask,nullptr,&chassisTaskAttribute);
-    armTranslateTaskHandle = osThreadNew(armTranslateTask, nullptr, &armTranslateAttribute);
+    // armTranslateTaskHandle = osThreadNew(armTranslateTask, nullptr, &armTranslateAttribute);
 #endif
 
 #ifdef ARM_A1
