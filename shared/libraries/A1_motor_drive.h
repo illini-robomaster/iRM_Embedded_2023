@@ -5,13 +5,13 @@
 #include "motor_msg.h"
 #include "usart.h"
 
-extern motor_send_t MotorA1_send_left;  // 左腿一号电机数据体
+extern motor_send_t MotorA1_send;  // 左腿一号电机数据体
 extern motor_send_t MotorA1_send_right; // 右腿一号电机数据体
 
-extern motor_recv_t Date_left;        // 左腿电机接收数据体
-extern motor_recv_t MotorA1_recv_left_id00;   // 左腿00号电机接收数据体
-extern motor_recv_t MotorA1_recv_left_id01;   // 左腿01号电机接收数据体
-extern motor_recv_t MotorA1_recv_left_id02;   // 左腿02号电机接收数据体
+extern motor_recv_t Data;        // 左腿电机接收数据体
+extern motor_recv_t MotorA1_recv_id00;   // 左腿00号电机接收数据体
+extern motor_recv_t MotorA1_recv_id01;   // 左腿01号电机接收数据体
+extern motor_recv_t MotorA1_recv_id02;   // 左腿02号电机接收数据体
 
 extern motor_recv_t Date_right;       // 右腿电机接收数据体
 extern motor_recv_t MotorA1_recv_right_id00;  // 右腿00号电机接收数据体
@@ -38,7 +38,7 @@ void modfiy_torque_cmd(motor_send_t *send,uint8_t id, float torque);
 /// @brief 用来和电机通讯的代码，将获取的数据存入对应结构体中
 /// @param huart 需要使用的串口，huart1为左侧，6为右侧
 
-void unitreeA1_rxtx();
+void unitreeA1_rxtx(UART_HandleTypeDef send_uart, UART_HandleTypeDef receive_uart);
 
 uint32_t crc32_core(uint32_t *ptr, uint32_t len);
 

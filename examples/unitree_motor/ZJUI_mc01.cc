@@ -40,14 +40,17 @@ void RM_RTOS_Init(void) {
 void RM_RTOS_Threads_Init(void) {
 }
 
+double start_time;
+
 void RM_RTOS_Default_Task(const void* arguments) {
   UNUSED(arguments);
 
-  print("Press key to start\r\n");
-  while(user_key->Read()); // wait for key press
+  // print("Press key to start\r\n");
+  // while(user_key->Read()); // wait for key press
+  osDelay(1000);
   print("Open loop spin test\r\n");
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_15, GPIO_PIN_SET); // 485_1 in write mode
-  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_3, GPIO_PIN_RESET); // 485_2 in write mode
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_3, GPIO_PIN_RESET); // 485_2 in read mode
   // A1->Test(2);
   // A1_write_uart->Write((uint8_t*)(&(A1->send[2].data)), A1->send_length);
   // osDelay(3000);
@@ -67,8 +70,16 @@ void RM_RTOS_Default_Task(const void* arguments) {
   // A1_write_uart->Write((uint8_t*)(&(A1->send[2].data)), A1->send_length);
   // osDelay(3000);
 
-  modfiy_speed_cmd(&MotorA1_send_left,2,0.1);
-  unitreeA1_rxtx();
-  osDelay(1);
+  start_time = HAL_GetTick();
+  while(HAL_GetTick() - start_time < 2000){
+    modfiy_speed_cmd(&MotorA1_send,2,2);
+    unitreeA1_rxtx(huart1, huart1);
+    print("pos %f\r\n", MotorA1_recv_id02.Pos);
+    print("omega %f\r\n", MotorA1_recv_id02.W);
+    osDelay(1);
+  }
+  modfiy_speed_cmd(&MotorA1_send,2,0);
+  unitreeA1_rxtx(huart1, huart1);
+  print("finished\r\n");
 
 }
