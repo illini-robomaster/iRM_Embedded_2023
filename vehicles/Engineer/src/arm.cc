@@ -162,7 +162,8 @@ void armA1Task(void* args) {
   const float SBUS_CHANNEL_MAX = 660;
 
   const float BASE_PITCH_FIELD_ZERO_ENCODER_VAL = -2.448; // the encoder value when the big arm is pointing upwards
-  const float ELBOW_PITCH_FIELD_ZERO_ENCODER_VAL = 3.0; // TODO: the encoder value when the small arm is pointing upwards
+  
+  const float ELBOW_PITCH_FIELD_ZERO_ENCODER_DIFF_VAL = 0.8; // TODO: the difference in encoder value when the small arm is pointing upwards
  
   // When no power, A1 absolute rotor encoder can only store 0~2PI,
   // After powered on, A1 encoder will be able to record multiple turns.
@@ -175,7 +176,12 @@ void armA1Task(void* args) {
   const float BASE_PITCH_A1_ZERO_ENCODER_VAL = -2.252; // the base encoder value when A1 absolute encoder reads 0.
   // 3.632, 2.939, 1.552, 2.2519
 
-  const float ELBOW_PITCH_A1_ZERO_ENCODER_VAL = 2.32;// TODO: the elbow encoder value when A1 absolute encoder reads 0.
+  const float ELBOW_PITCH_A1_ZERO_ENCODER_DIFF_VAL = 0.94;// elbow encoder value - base encoder value when A1 absolute encoder reads 0.
+  // the A1 angle of the elbow is determined using the difference of two encoders
+  // At one of the zero positions (set A1 to go to position = 0):
+  // base encoder reads 2.718, elbow encoder reads 3.6631
+  // or base encoder reads 2.3746, elbow encoder reads 3.3073
+  // -> difference is 0.9327, 0.9451 -> round to 0.94
 
   // (+-) Current Encoder Reading = n* Encoder Delta Per A1 Rotor Turn + A1 Rotor Encoder Reading + Encoder Value When A1 Rotor Is Zero
   // -> A1 Rotor Encoder Reading = (+-) Current Encoder Reading - n* Encoder Delta Per A1 Rotor Turn - Encoder Value When A1 Rotor Is Zero
@@ -198,9 +204,9 @@ void armA1Task(void* args) {
     print("waiting for dbus swr to be down\r\n");
   }
   #else
-   while(sbus->ch[4] < 100){
+   while(sbus->ch[9] < 100){
     osDelay(100);
-    print("waiting for sbus channel 5 to be greater than 100\r\n");
+    print("waiting for sbus channel 10 to be greater than 100\r\n");
    }
   #endif
 
@@ -217,7 +223,7 @@ void armA1Task(void* args) {
     print("waiting for dbus swr to be down\r\n");
   }
   #else
-   while(sbus->ch[4] > -100){
+   while(sbus->ch[9] > -100){
     osDelay(100);
     print("waiting for sbus channel 5 to be greater than 100\r\n");
    }
@@ -246,7 +252,7 @@ void armA1Task(void* args) {
     print("base pitch safety\r\n");
   }
   
-  elbow_pitch_A1_rotor_encoder_reading = hard_wrap<float>((encoder0->getData() - ELBOW_PITCH_A1_ZERO_ENCODER_VAL)*A1->gear_ratio, 0, 2*PI);
+  elbow_pitch_A1_rotor_encoder_reading = hard_wrap<float>((encoder0->getData() + encoder1->getData() - ELBOW_PITCH_A1_ZERO_ENCODER_DIFF_VAL)*A1->gear_ratio, 0, 2*PI);
   elbow_pitch_A1_init_target = elbow_pitch_A1_rotor_encoder_reading / A1->gear_ratio; // A1->gear_ratio is A1 gear ratio
   const float base_pitch_a1_minus_encoder = base_pitch_A1_init_target - (encoder1->getData()); // external encoder have different direction
   const float elbow_pitch_a1_minus_encoder = elbow_pitch_A1_init_target - (encoder0->getData());
@@ -338,7 +344,7 @@ void armA1Task(void* args) {
     UNUSED(BASE_PITCH_FIELD_ZERO_ENCODER_VAL);
     target_encoder[1] = field_angles.base_yaw_rotate_1; // no encoder, so assume original position is 0.
     target_encoder[2] = field_angles.base_pitch_rotate_2 + BASE_PITCH_FIELD_ZERO_ENCODER_VAL;
-    target_encoder[3] = field_angles.forearm_pitch_3 + ELBOW_PITCH_FIELD_ZERO_ENCODER_VAL;
+    target_encoder[3] = field_angles.forearm_pitch_3 + ELBOW_PITCH_FIELD_ZERO_ENCODER_DIFF_VAL;
 
     // Convert Encoder Value to A1 .
     target.base_yaw_rotate_1 = target_encoder[1];
@@ -425,7 +431,7 @@ void armA1Task(void* args) {
       // print("Zero[0] %03f Zer0[1] %03f Zero[2] %03f \r\n", A1_zero[0], A1_zero[1], A1_zero[2]);    
       print("Diff A1: %.3f %.3f\r\n", base_pitch_a1_minus_encoder, elbow_pitch_a1_minus_encoder);
       print("A1 Init Target: Base%.3f Elbow%.3f\r\n", base_pitch_A1_init_target, elbow_pitch_A1_init_target);
-      print("Encoder Positions: %.6f %.6f\r\n", encoder0->getData(), encoder1->getData());
+      print("Encoder Positions: %.6f %.6f\r\n", encoder0->getData()+encoder1->getData(), encoder1->getData());
       // print("Delta T : %d\r\n", HAL_GetTick()- last); 
       print("HAL Get Tick: %d\r\n", HAL_GetTick());
       // print("data: %f %f %f %f %f\r\n", target.base_pitch_rotate_2, target_encoder[2], base_pitch_A1_init_target, base_pitch_a1_minus_encoder, encoder1->getData());
