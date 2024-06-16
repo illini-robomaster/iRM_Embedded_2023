@@ -86,17 +86,21 @@ void gimbal_task(void* args) {
   // update jam callback threshold
   escalation_servo->RegisterJamCallback(empty_callback, 0.205);
 
-  float pitch_target = 0.0;
-  float pitch_curr = 0.0;
+  pitch_target = 0.0;
+  pitch_curr = -1.0; // make sure it is initialized.
+
+  pitch_cmd = 0.0;
+  pitch_cmd = 0.0;
+
   while (true) {
     // Bool Edge Detector for lob mode switch or osEventFlags wait for a signal from different threads
     lob_mode_sw.input(dbus->keyboard.bit.SHIFT || dbus->swl == remote::UP);
     if (lob_mode_sw.posEdge()&& dbus->swr == remote::MID){
       lob_mode = !lob_mode;
       // TODO: after implementing chassis, uncomment the lob_mode bsp::CanBridge flag transmission
-//      send->cmd.id = bsp::LOB_MODE;
-//      send->cmd.data_bool = lob_mode;
-//      send->TransmitOutput();
+      send->cmd.id = bsp::LOB_MODE;
+      send->cmd.data_bool = lob_mode;
+      send->TransmitOutput();
       escalation_servo->SetMaxSpeed(4 * PI);
       print("lob_mode: %d\n", lob_mode);
     }
@@ -115,6 +119,7 @@ void gimbal_task(void* args) {
     pitch_servo->SetTarget(pitch_servo->GetTheta() + pitch_target);
     pitch_servo->CalcOutput();
     escalation_servo->CalcOutput();
+    pitch_curr = pitch_encoder->getData();
     control::MotorCANBase::TransmitOutput(can1_escalation, 1);
     control::MotorCANBase::TransmitOutput(can1_pitch, 1);
     osDelay(GIMBAL_TASK_DELAY);
@@ -147,8 +152,7 @@ void init_gimbal() {
   pitch_servo_data.max_out = 13000;
   pitch_servo = new control::ServoMotor(pitch_servo_data);
   yaw_motor = new control::Motor4310(can1, 0x03, 0x02, control::POS_VEL);
-
-  pitch_encoder = new control::BRTEncoder(can1,0x01);
+  pitch_encoder = new control::BRTEncoder(can1,0x01,false);
 }
 
 void kill_gimbal() {

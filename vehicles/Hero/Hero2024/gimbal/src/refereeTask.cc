@@ -18,53 +18,28 @@
  *                                                                          *
  ****************************************************************************/
 
-#pragma once
+#include "refereeTask.h"
 
-#include "chassis.h"
+RefereeUART* referee_uart = nullptr;
+communication::Referee* referee = nullptr;
 
-#include "bsp_gpio.h"
-#include "bsp_can_bridge.h"
-#include "bsp_os.h"
-#include "bsp_print.h"
-#include "bsp_relay.h"
-#include "cmsis_os.h"
-#include "controller.h"
-#include "dbus.h"
-#include "motor.h"
-#include "protocol.h"
-#include "rgb.h"
-#include "oled.h"
-#include "bsp_buzzer.h"
-#include "shooterTask.h"
-#include "encoder.h"
+void init_referee() {
+  referee_uart = new RefereeUART(&huart6);
+  referee_uart->SetupRx(300);
+  referee_uart->SetupTx(300);
+  referee = new communication::Referee;
+}
 
-extern osThreadId_t gimbalTaskHandle;
+void refereeTask(void* arg) {
+  UNUSED(arg);
+  uint32_t length;
+  uint8_t* data;
 
-const osThreadAttr_t gimbalTaskAttribute = {.name = "gimbal_task",
-        .attr_bits = osThreadDetached,
-        .cb_mem = nullptr,
-        .cb_size = 0,
-        .stack_mem = nullptr,
-        .stack_size = 512 * 4,
-        .priority = (osPriority_t)osPriorityHigh,
-        .tz_module = 0,
-        .reserved = 0};
-
-
-extern remote::DBUS* dbus;
-extern bsp::CAN* can1;
-extern bsp::CAN* can2;
-extern bsp::CanBridge* send;
-
-extern BoolEdgeDetector lob_mode_sw;
-extern volatile bool lob_mode;
-
-float pitch_curr;
-float pitch_target;
-
-float pitch_cmd;
-float yaw_cmd;
-
-void gimbal_task(void *arg);
-void init_gimbal();
-void kill_gimbal();
+  while (true) {
+    uint32_t flags = osThreadFlagsWait(REFEREE_RX_SIGNAL, osFlagsWaitAll, osWaitForever);
+    if (flags & REFEREE_RX_SIGNAL) {
+      length = referee_uart->Read(&data);
+      referee->Receive(communication::package_t{data, (int)length});
+    }
+  }
+}

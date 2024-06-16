@@ -48,12 +48,13 @@ bsp::Buzzer *buzzer = nullptr;
 // lob mode switch
 BoolEdgeDetector lob_mode_sw=BoolEdgeDetector(false);
 volatile bool lob_mode=false;
+
 //display::RGB* RGB = nullptr;
 
 osThreadId_t shooterTaskHandle;
 osThreadId_t gimbalTaskHandle;
 osThreadId_t uiTaskHandle;
-
+osThreadId_t refereeTaskHandle;
 
 // Params Initialization
 void RM_RTOS_Init(){

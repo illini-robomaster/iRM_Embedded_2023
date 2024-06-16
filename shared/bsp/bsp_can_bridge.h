@@ -42,7 +42,8 @@ typedef enum {
   GIMBAL_POWER,
   RECALIBRATE,
   IS_MY_COLOR_BLUE,
-  SELF_CHECK_FLAG
+  SELF_CHECK_FLAG,
+  LOB_MODE
 } can_bridge_cmd;
 
 typedef struct {
@@ -80,6 +81,7 @@ class CanBridge {
   bool recalibrate = false;
   bool is_my_color_blue = false;
   bool self_check_flag = false;
+  bool lob_mode = false;
   // each bit represents a flag correspond to specific motor e.g.(at index 0, it represents the motor 1's connection flag)
  private:
   bsp::CAN* can_;

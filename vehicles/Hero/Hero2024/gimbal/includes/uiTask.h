@@ -41,4 +41,5 @@ const osThreadAttr_t uiTaskAttribute = {.name = "UI_task",
         .tz_module = 0,
         .reserved = 0};
 
+
 void UI_task(void* arg);

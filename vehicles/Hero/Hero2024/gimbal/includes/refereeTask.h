@@ -17,54 +17,34 @@
  *  along with this program. If not, see <http://www.gnu.org/licenses/>.    *
  *                                                                          *
  ****************************************************************************/
-
 #pragma once
-
-#include "chassis.h"
-
-#include "bsp_gpio.h"
-#include "bsp_can_bridge.h"
-#include "bsp_os.h"
 #include "bsp_print.h"
-#include "bsp_relay.h"
-#include "cmsis_os.h"
-#include "controller.h"
+#include "bsp_uart.h"
+#include "cmsis_os2.h"
 #include "dbus.h"
-#include "motor.h"
+#include "main.h"
 #include "protocol.h"
-#include "rgb.h"
-#include "oled.h"
-#include "bsp_buzzer.h"
-#include "shooterTask.h"
-#include "encoder.h"
 
-extern osThreadId_t gimbalTaskHandle;
+#define REFEREE_RX_SIGNAL (1 << 0)
 
-const osThreadAttr_t gimbalTaskAttribute = {.name = "gimbal_task",
+
+extern osThreadId_t refereeTaskHandle;
+const osThreadAttr_t refereeTaskAttribute = {.name = "refereeTask",
         .attr_bits = osThreadDetached,
         .cb_mem = nullptr,
         .cb_size = 0,
         .stack_mem = nullptr,
-        .stack_size = 512 * 4,
-        .priority = (osPriority_t)osPriorityHigh,
+        .stack_size = 1024 * 4,
+        .priority = (osPriority_t)osPriorityAboveNormal,
         .tz_module = 0,
         .reserved = 0};
 
+extern communication::Referee* referee;
+class RefereeUART : public bsp::UART {
+public:
+    using bsp::UART::UART;
 
-extern remote::DBUS* dbus;
-extern bsp::CAN* can1;
-extern bsp::CAN* can2;
-extern bsp::CanBridge* send;
-
-extern BoolEdgeDetector lob_mode_sw;
-extern volatile bool lob_mode;
-
-float pitch_curr;
-float pitch_target;
-
-float pitch_cmd;
-float yaw_cmd;
-
-void gimbal_task(void *arg);
-void init_gimbal();
-void kill_gimbal();
+protected:
+    void RxCompleteCallback() final { osThreadFlagsSet(refereeTaskHandle, REFEREE_RX_SIGNAL); }
+};
+extern RefereeUART* referee_uart;
