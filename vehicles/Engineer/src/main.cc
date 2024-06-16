@@ -18,8 +18,8 @@
  *                                                                          *
  ****************************************************************************/
 // #define REFEREE
-#define CHASSIS
-// #define ARM_A1
+// #define CHASSIS
+#define ARM_A1
 
 #include "main.h"
 #include "bsp_os.h"
@@ -108,7 +108,7 @@ void RM_RTOS_Threads_Init(void) {
 #endif
 
 #ifdef ARM_A1
-    armA1TaskHandle = osThreadNew(armA1Task, nullptr, &armA1TaskAttribute);
+    armA1TaskHandle = osThreadNew(armTask, nullptr, &armA1TaskAttribute);
 #endif
 
 #ifdef REFEREE
@@ -121,31 +121,25 @@ void RM_RTOS_Threads_Init(void) {
 void KillAll() {
 #ifdef CHASSIS
     kill_chassis();
+    // kill_arm_translate();
+
 #endif
 
 #ifdef ARM_A1
-    kill_arm_translate();
+    kill_arm_A1();
 #endif
 
-    kill_arm_A1();
 }
 
 
 void RM_RTOS_Default_Task(const void* args) {
     UNUSED(args);
     while(false){ //if want to print, make sure nothing is print somewhere else
-      set_cursor(0,0);
-      clear_screen();
-      print("HAL Tick: %d \r\n", HAL_GetTick());
-#ifdef USING_DBUS
-        print("vx: %d, vy: %d, wz; %d \r\n", dbus->ch0, dbus->ch1, dbus->ch2);
-#else
-      print("vx: %d, vy: %d, wz; %d \r\n", sbus->ch[0], sbus->ch[1], sbus->ch[2]);
-#endif
+
 
 #ifdef REFEREE
-      print("ROBOTID: %d",referee->game_robot_status.robot_id);
+        print("ROBOTID: %d",referee->game_robot_status.robot_id);
 #endif
-      osDelay(10);
+        osDelay(10);
     }
 }

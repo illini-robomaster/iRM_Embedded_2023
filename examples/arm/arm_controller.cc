@@ -97,37 +97,37 @@ int ArmTurnRelative(joint_state_t* target) {
   return ArmTurnAbsolute(abs_target);
 }
 
-const float A1_Kp = 0.0025, A1_Kd = 0.004;
+const float A1_Kp = 0.0025, A1_Kw = 0.004;
 
 int ArmTurnAbsolute(joint_state_t* target) {
   if (target->base_yaw_rotate_1 >= BASE_VERT_ROTATE_MAX) {
-    base_vert_rotate_motor->Control(BASE_PITCH_ID, 0.0, 0.0, BASE_VERT_ROTATE_MAX, A1_Kp, A1_Kd);
+    base_vert_rotate_motor->Control(BASE_PITCH_ID, 0.0, 0.0, BASE_VERT_ROTATE_MAX, A1_Kp, A1_Kw);
     target->base_yaw_rotate_1 = BASE_VERT_ROTATE_MAX;
   } else if (target->base_yaw_rotate_1 <= BASE_VERT_ROTATE_MIN) {
-    base_vert_rotate_motor->Control(BASE_PITCH_ID, 0.0, 0.0, BASE_VERT_ROTATE_MIN,  A1_Kp, A1_Kd);
+    base_vert_rotate_motor->Control(BASE_PITCH_ID, 0.0, 0.0, BASE_VERT_ROTATE_MIN,  A1_Kp, A1_Kw);
     target->base_yaw_rotate_1 = BASE_VERT_ROTATE_MIN;
   } else
-    base_vert_rotate_motor->Control(BASE_PITCH_ID, 0.0, 0.0, target->base_yaw_rotate_1,  A1_Kp, A1_Kd);
+    base_vert_rotate_motor->Control(BASE_PITCH_ID, 0.0, 0.0, target->base_yaw_rotate_1,  A1_Kp, A1_Kw);
   current_joint_state.base_yaw_rotate_1 = target->base_yaw_rotate_1;
 
   if (target->base_pitch_rotate_2 >= BASE_HOR_ROTATE_MAX) {
-    base_hor_rotate_motor->Control(BASE_YAW_ID, 0.0, 0.0, BASE_HOR_ROTATE_MAX,  A1_Kp, A1_Kd);
+    base_hor_rotate_motor->Control(BASE_YAW_ID, 0.0, 0.0, BASE_HOR_ROTATE_MAX,  A1_Kp, A1_Kw);
     target->base_pitch_rotate_2 = BASE_HOR_ROTATE_MAX;
   } else if (target->base_pitch_rotate_2 <= BASE_HOR_ROTATE_MIN) {
-    base_hor_rotate_motor->Control(BASE_YAW_ID, 0.0, 0.0, BASE_HOR_ROTATE_MIN,  A1_Kp, A1_Kd);
+    base_hor_rotate_motor->Control(BASE_YAW_ID, 0.0, 0.0, BASE_HOR_ROTATE_MIN,  A1_Kp, A1_Kw);
     target->base_pitch_rotate_2 = BASE_HOR_ROTATE_MIN;
   } else
-    base_hor_rotate_motor->Control(BASE_YAW_ID, 0.0, 0.0, target->base_pitch_rotate_2,  A1_Kp, A1_Kd);
+    base_hor_rotate_motor->Control(BASE_YAW_ID, 0.0, 0.0, target->base_pitch_rotate_2,  A1_Kp, A1_Kw);
   current_joint_state.base_pitch_rotate_2 = target->base_pitch_rotate_2;
 
   if (target->forearm_pitch_3 >= ELBOW_ROTATE_MAX) {
-    elbow_rotate_motor->Control(ELBOW_PITCH_ID, 0.0, 0.0, ELBOW_ROTATE_MAX,  A1_Kp, A1_Kd);
+    elbow_rotate_motor->Control(ELBOW_PITCH_ID, 0.0, 0.0, ELBOW_ROTATE_MAX,  A1_Kp, A1_Kw);
     target->forearm_pitch_3 = ELBOW_ROTATE_MAX;
   } else if (target->forearm_pitch_3 <= ELBOW_ROTATE_MIN) {
-    elbow_rotate_motor->Control(ELBOW_PITCH_ID, 0.0, 0.0, ELBOW_ROTATE_MIN,  A1_Kp, A1_Kd);
+    elbow_rotate_motor->Control(ELBOW_PITCH_ID, 0.0, 0.0, ELBOW_ROTATE_MIN,  A1_Kp, A1_Kw);
     target->forearm_pitch_3 = ELBOW_ROTATE_MIN;
   } else
-    elbow_rotate_motor->Control(ELBOW_PITCH_ID, 0.0, 0.0, target->forearm_pitch_3,  A1_Kp, A1_Kd);
+    elbow_rotate_motor->Control(ELBOW_PITCH_ID, 0.0, 0.0, target->forearm_pitch_3,  A1_Kp, A1_Kw);
   current_joint_state.forearm_pitch_3 = target->forearm_pitch_3;
 
   return 0;

@@ -29,7 +29,7 @@ typedef struct {
 } joint_state_t;
 
 extern osThreadId_t armA1TaskHandle;
-const osThreadAttr_t armA1TaskAttribute = {.name = "armA1Task",
+const osThreadAttr_t armA1TaskAttribute = {.name = "armTask",
                                              .attr_bits = osThreadDetached,
                                              .cb_mem = nullptr,
                                              .cb_size = 0,
@@ -56,24 +56,20 @@ void kill_arm_A1();
 /**
  * @brief main A1 task
 */
-void armA1Task(void* args);
+void armTask(void* args);
 
 /**
  * @brief turn to an absolute position
  * @note software range limitation defined in arm_config.h
  * @return 0 when the command is accepted, 1 otherwise
  */
-int ArmA1TurnAbsolute(joint_state_t target_joint_state);
+int ArmTurnAbsolute(joint_state_t target_joint_state);
 
 /**
  * @brief Call all TransmitOutput() or equivalent function for each motor
  */
 void ArmTransmitOutput();
 
-/**
- * @brief print arm data
- */
-void ArmA1PrintData();
 #ifdef USING_DBUS
 extern remote::DBUS* dbus;
 #else
