@@ -1,6 +1,6 @@
 
 #include "chassis_task.h"
-#include "geometry.h"
+#include "geometry/geometry.h"
 #include "moving_average.h"
 
 //Constants 
@@ -65,7 +65,9 @@ void chassisTask(void* arg){
 
     control::Motor4310* motors[] = {rotate_motor};
 
+#ifdef USING_DBUS
     while(dbus->swr != remote::DOWN){}  // flip swr to start
+#endif
 
     // rotate_motor->SetZeroPos();
     rotate_motor->MotorEnable();
@@ -193,7 +195,9 @@ void chassisTask(void* arg){
         UNUSED(wheel_motors);
         // print("chassis motor output transmitted \r\n");
 
+#ifdef USING_DBUS
         RotateBarrel.input(dbus->swr == remote::UP);
+#endif
 
         // flip swr to UP to rotate barrel
         if (RotateBarrel.posEdge()){

@@ -39,9 +39,11 @@ void RM_RTOS_Default_Task(const void* args) {
   UNUSED(args);
 
   while (true) {
-    set_cursor(0, 0);
-    clear_screen();
+    // set_cursor(0, 0);
+    // clear_screen();
+    print("1:");
     encoder->PrintData();
+    print("2:");
     encoder2->PrintData();
     osDelay(100);
   }

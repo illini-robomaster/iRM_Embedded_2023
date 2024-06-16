@@ -49,37 +49,23 @@ void RM_RTOS_Default_Task(const void* arguments) {
   // while(user_key->Read()); // wait for key press
   osDelay(1000);
   print("Open loop spin test\r\n");
-  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_15, GPIO_PIN_SET); // 485_1 in write mode
-  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_3, GPIO_PIN_RESET); // 485_2 in read mode
-  // A1->Test(2);
-  // A1_write_uart->Write((uint8_t*)(&(A1->send[2].data)), A1->send_length);
-  // osDelay(3000);
 
-  // print("Motor stop\r\n");
-  // A1->Stop(2);
-  // A1_write_uart->Write((uint8_t*)(&(A1->send[2].data)), A1->send_length);
-  // osDelay(3000);
-
-  // print("Constant speed mode\r\n");
-  // A1->Control(2, 0.0, -1.0, 0.0, 0.0, 3.0); // constant speed mode
-  // A1_write_uart->Write((uint8_t*)(&(A1->send[2].data)), A1->send_length);
-  // osDelay(3000);
-
-  // print("Motor stop\r\n");
-  // A1->Stop(2);
-  // A1_write_uart->Write((uint8_t*)(&(A1->send[2].data)), A1->send_length);
-  // osDelay(3000);
 
   start_time = HAL_GetTick();
+  int last_print_time = HAL_GetTick();
   while(HAL_GetTick() - start_time < 2000){
-    modfiy_speed_cmd(&MotorA1_send,2,2);
-    unitreeA1_rxtx(huart1, huart1);
-    print("pos %f\r\n", MotorA1_recv_id02.Pos);
-    print("omega %f\r\n", MotorA1_recv_id02.W);
+    modify_stop_cmd(&MotorA1_send,2);
+    unitreeA1_rxtx(huart1);
+
+    if(HAL_GetTick() - last_print_time > 100){
+      last_print_time = HAL_GetTick();
+      print("d: %f, %f\r\n", MotorA1_recv_id02.Pos, MotorA1_recv_id02.W);
+    }
+    
     osDelay(1);
   }
-  modfiy_speed_cmd(&MotorA1_send,2,0);
-  unitreeA1_rxtx(huart1, huart1);
+  modify_speed_cmd(&MotorA1_send,2,0);
+  unitreeA1_rxtx(huart1);
   print("finished\r\n");
 
 }

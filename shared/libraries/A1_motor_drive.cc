@@ -51,7 +51,7 @@ uint32_t crc32_core_Ver3(uint32_t *ptr, uint32_t len)
 }
 
 // 电机位置修改
-void modfiy_pos_cmd(motor_send_t *send,uint8_t id, float Pos, float KP, float KW)
+void modify_pos_cmd(motor_send_t *send,uint8_t id, float Pos, float KP, float KW)
 {
 
     send->hex_len = 34;
@@ -59,7 +59,7 @@ void modfiy_pos_cmd(motor_send_t *send,uint8_t id, float Pos, float KP, float KW
     send->mode = 10;
 	send->id   = id;
 
-    send->Pos  = 2*PI/360*9.1*Pos;  // 6.2832 = 2 PI // 原先为 6.2832*9.1*2*Pos
+    send->Pos  = 9.1*Pos;  // 6.2832 = 2 PI // 原先为 6.2832*9.1*2*Pos
     send->W    = 0;
     send->T    = 0.0;
     send->K_P  = KP;
@@ -67,7 +67,7 @@ void modfiy_pos_cmd(motor_send_t *send,uint8_t id, float Pos, float KP, float KW
 }
 
 // 电机速度修改
-void modfiy_speed_cmd(motor_send_t *send,uint8_t id, float Omega)
+void modify_speed_cmd(motor_send_t *send,uint8_t id, float Omega)
 {
 
     send->hex_len = 34;
@@ -83,7 +83,7 @@ void modfiy_speed_cmd(motor_send_t *send,uint8_t id, float Omega)
 }
 
 // 电机力矩修改
-void modfiy_torque_cmd(motor_send_t *send,uint8_t id, float torque)
+void modify_torque_cmd(motor_send_t *send,uint8_t id, float torque)
 {
 
     send->hex_len = 34;
@@ -95,6 +95,21 @@ void modfiy_torque_cmd(motor_send_t *send,uint8_t id, float torque)
     send->W    = 0.0;
     if (torque > 10.0f){torque = 0.0f;} // 限幅
     send->T    = torque / 9.1f;
+    send->K_P  = 0.0;
+    send->K_W  = 0.0;
+}
+
+// 电机停止
+void modify_stop_cmd(motor_send_t *send, uint8_t id)
+{
+    send->hex_len = 34;
+
+    send->mode = 0;
+    send->id   = id;
+
+    send->Pos  = 0.0;
+    send->W    = 0.0;
+    send->T    = 0.0;
     send->K_P  = 0.0;
     send->K_W  = 0.0;
 }
@@ -113,7 +128,7 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart){
 }
 
 // 电机发送接收函数
-void unitreeA1_rxtx(UART_HandleTypeDef send_uart, UART_HandleTypeDef receive_uart)
+void unitreeA1_rxtx(UART_HandleTypeDef uart)
 {
     
         uint8_t A1MotorA1_send[34]; // 发送数据
@@ -145,10 +160,10 @@ void unitreeA1_rxtx(UART_HandleTypeDef send_uart, UART_HandleTypeDef receive_uar
         
         // HAL库 DMA 发送数据 + 接收数据
         HAL_GPIO_WritePin(GPIOC, GPIO_PIN_15, GPIO_PIN_SET); // 485_1 in write mode
-        HAL_UART_Transmit_DMA(&send_uart, A1MotorA1_send, 34);
+        HAL_UART_Transmit_DMA(&uart, A1MotorA1_send, 34);
         // use tx complete interrupt to set 485 to received mode
-        osDelay(10); // wait for send data to go from memory to uart and receive data in uart then to memory, might be able to be shorter
-        HAL_UART_Receive_DMA(&receive_uart, Date, 78);
+        osDelay(1); // wait for send data to go from memory to uart and receive data in uart then to memory, might be able to be shorter
+        HAL_UART_Receive_DMA(&uart, Date, 78);
 
         // 接受数据处理
         // 1.没有处理温度数据 (可能正确，因为是整数?)
@@ -179,7 +194,7 @@ void unitreeA1_rxtx(UART_HandleTypeDef send_uart, UART_HandleTypeDef receive_uar
             MotorA1_recv_id00.MError   = Data.MError;
             MotorA1_recv_id00.T        = Data.T * 9.1f;            // 减速后的扭矩
             MotorA1_recv_id00.W        = Data.W / 9.1f;            // 减速后的角速度
-            MotorA1_recv_id00.Pos      = Data.Pos * (180/PI/9.1f); // 减速后的角度     Date_left.Pos = 减速前的弧度
+            MotorA1_recv_id00.Pos      = Data.Pos / 9.1f;          // 减速后的弧度     Data.Pos = 减速前的弧度
             MotorA1_recv_id00.Acc      = Data.Acc; 
         }
 
@@ -191,7 +206,7 @@ void unitreeA1_rxtx(UART_HandleTypeDef send_uart, UART_HandleTypeDef receive_uar
             MotorA1_recv_id01.MError   = Data.MError;
             MotorA1_recv_id01.T        = Data.T * 9.1f;
             MotorA1_recv_id01.W        = Data.W / 9.1f;   
-            MotorA1_recv_id01.Pos      = Data.Pos*(180/PI/9.1f);
+            MotorA1_recv_id01.Pos      = Data.Pos / 9.1f;
             MotorA1_recv_id01.Acc      = Data.Acc; 
 
         }
@@ -204,7 +219,7 @@ void unitreeA1_rxtx(UART_HandleTypeDef send_uart, UART_HandleTypeDef receive_uar
             MotorA1_recv_id02.MError   = Data.MError;
             MotorA1_recv_id02.T        = Data.T * 9.1f;
             MotorA1_recv_id02.W        = Data.W / 9.1f;  
-            MotorA1_recv_id02.Pos      = Data.Pos*(180/PI/9.1f);
+            MotorA1_recv_id02.Pos      = Data.Pos / 9.1f;
             MotorA1_recv_id02.Acc      = Data.Acc; 
         }
 

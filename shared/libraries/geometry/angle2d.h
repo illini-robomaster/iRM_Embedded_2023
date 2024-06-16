@@ -3,7 +3,6 @@
 #include <string>
 #include <cmath>
 #include "Angle2d.h"
-#define PI 3.14159265358979323846
 
 /**
  * Create an instance that contains an angle. This angle's unit can be taken to degree, radian, or rotation.

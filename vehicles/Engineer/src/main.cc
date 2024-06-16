@@ -126,7 +126,7 @@ void KillAll() {
 #endif
 
 #ifdef ARM_A1
-    kill_arm_A1();
+    kill_arm();
 #endif
 
 }
@@ -134,8 +134,11 @@ void KillAll() {
 
 void RM_RTOS_Default_Task(const void* args) {
     UNUSED(args);
-    while(false){ //if want to print, make sure nothing is print somewhere else
-
+    while(true){ //if want to print, make sure nothing is print somewhere else
+        if(sbus->ch[6]>100){
+            KillAll();
+            print("killed");
+        }
 
 #ifdef REFEREE
         print("ROBOTID: %d",referee->game_robot_status.robot_id);

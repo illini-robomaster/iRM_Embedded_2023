@@ -1,7 +1,6 @@
-#include <cmath>
+#include <math.h>
 #include <string>
 #include "angle2d.h"
-
 
 Angle2d::~Angle2d()
 {
@@ -24,12 +23,12 @@ Angle2d::Angle2d()
 
 Angle2d Angle2d::createFromDegrees( float degrees)
 {
-    return Angle2d(degrees/180.0*PI);
+    return Angle2d(degrees/180.0*M_PI);
 }
 
 Angle2d Angle2d::createFromRotations( float rotations)
 {
-    return Angle2d(rotations*2*PI);
+    return Angle2d(rotations*2*M_PI);
 }
 
 Angle2d::Angle2d( float x,  float y)
@@ -64,7 +63,7 @@ Angle2d Angle2d::minus(Angle2d other)
 
 Angle2d Angle2d::oppositeAngle()
 {
-    return Angle2d( _radians+PI); //current radian + PI
+    return Angle2d( _radians+M_PI); //current radian + PI
 }
 
 Angle2d Angle2d::times( float scalar)
@@ -85,7 +84,7 @@ Angle2d Angle2d::getAngleIn1RotationSymmetricAbout0()
  float Angle2d::getRadians0to2PI()
 {
      float temp_angle = atan2(_sin_value, _cos_value); // [-PI, PI)
-    return temp_angle < 0?temp_angle+2*PI:temp_angle;
+    return temp_angle < 0?temp_angle+2*M_PI:temp_angle;
 }
 
  float Angle2d::getRadiansNegPItoPI()
@@ -95,12 +94,12 @@ Angle2d Angle2d::getAngleIn1RotationSymmetricAbout0()
 
  float Angle2d::getDegrees0to360()
 {
-    return  getRadians0to2PI()/PI*180;
+    return  getRadians0to2PI()/M_PI*180;
 }
 
  float Angle2d::getDegreesN180to180()
 {
-    return getRadiansNegPItoPI()/PI*180;
+    return getRadiansNegPItoPI()/M_PI*180;
 }
 
  float Angle2d::getRadians()
@@ -110,12 +109,12 @@ Angle2d Angle2d::getAngleIn1RotationSymmetricAbout0()
 
  float Angle2d::getDegrees()
 {
-    return  _radians / PI * 180;
+    return  _radians / M_PI * 180;
 }
 
  float Angle2d::getRotations()
 {
-    return  _radians / 2 / PI;
+    return  _radians / 2 / M_PI;
 }
 
  float Angle2d::getCos()

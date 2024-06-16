@@ -39,7 +39,7 @@ class BRTEncoder {
   /* implements data update callback */
   void UpdateData(const uint8_t data[]);
   /* implements data printout */
-  float getData(){
+  float getData() const {
     return invert_ ? -angle_ : angle_;
   }
   void setInvert(bool inv){

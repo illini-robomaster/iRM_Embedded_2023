@@ -51,7 +51,7 @@ void A1Task(void* arg);
 */
 void init_arm_A1();
 
-void kill_arm_A1();
+void kill_arm();
 
 /**
  * @brief main A1 task
@@ -63,12 +63,19 @@ void armTask(void* args);
  * @note software range limitation defined in arm_config.h
  * @return 0 when the command is accepted, 1 otherwise
  */
-int ArmTurnAbsolute(joint_state_t target_joint_state);
+int ArmSetTarget(joint_state_t target_joint_state);
 
 /**
- * @brief Call all TransmitOutput() or equivalent function for each motor
+ * @brief Send commands to motors. Call all TransmitOutput() or equivalent function for each motor
  */
 void ArmTransmitOutput();
+
+/** 
+ * @brief read encoder readings to current_joint_positions
+ * `caution`: this function should be called after A1 cmd is send 
+ * */ 
+void ArmReceiveInput();
+
 
 #ifdef USING_DBUS
 extern remote::DBUS* dbus;
