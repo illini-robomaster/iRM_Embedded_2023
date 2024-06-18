@@ -26,12 +26,12 @@ communication::UserInterface* UI = nullptr;
 
 void UI_task(void* args) {
   UNUSED(args);
-  float current_pitch = 0;
-  float suggested_pitch = 0;
+//  float current_pitch = 0;
+//  float suggested_pitch = 0;
   while (true) {
     // update parameters
-    current_pitch = pitch_curr;
-    suggested_pitch = pitch_target;
+//    current_pitch = pitch_curr;
+//    suggested_pitch = pitch_target;
 
 
   }
@@ -39,5 +39,5 @@ void UI_task(void* args) {
 
 void UI_Init() {
   UI = new communication::UserInterface();
-
+  print_use_uart(&huart1);
 }

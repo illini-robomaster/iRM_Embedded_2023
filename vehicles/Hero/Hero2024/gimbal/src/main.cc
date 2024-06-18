@@ -45,6 +45,8 @@ bsp::CanBridge* send = nullptr;
 
 bsp::Buzzer *buzzer = nullptr;
 
+
+
 // lob mode switch
 BoolEdgeDetector lob_mode_sw=BoolEdgeDetector(false);
 volatile bool lob_mode=false;

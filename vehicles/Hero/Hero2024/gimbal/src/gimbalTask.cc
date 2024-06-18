@@ -21,9 +21,12 @@
 #include "gimbalTask.h"
 
 //==================================================================================================
-// Shooter
+// Gimbal
 //==================================================================================================
 // Params Initialization
+
+float pitch_cmd;
+float yaw_cmd;
 
 static const int KILLALL_DELAY = 100;
 static const int GIMBAL_TASK_DELAY = 1;
@@ -44,6 +47,8 @@ bool exit_flag = false;
 
 float calibrated_theta = 0;
 
+float pitch_curr;
+float pitch_target;
 
 void jam_callback(control::ServoMotor* servo, const control::servo_jam_t data) {
   UNUSED(data);
@@ -64,10 +69,14 @@ void gimbal_task(void* args) {
   UNUSED(args);
   control::MotorCANBase* can1_escalation[] = {esca_motor};
   control::MotorCANBase* can1_pitch[] = {pitch_motor};
+  control::Motor4310* can1_yaw[] = {yaw_motor};
   while (true) {
     if (dbus->keyboard.bit.B || dbus->swr == remote::DOWN) break;
     osDelay(100);
   }
+
+  yaw_motor->SetZeroPos();
+  yaw_motor->MotorEnable();
 
   while (true){
     escalation_servo->SetTarget(escalation_servo->GetTheta() - PI * 2,true);
@@ -90,7 +99,8 @@ void gimbal_task(void* args) {
   pitch_curr = -1.0; // make sure it is initialized.
 
   pitch_cmd = 0.0;
-  pitch_cmd = 0.0;
+
+  yaw_cmd = 0.0;
 
   while (true) {
     // Bool Edge Detector for lob mode switch or osEventFlags wait for a signal from different threads
@@ -114,14 +124,21 @@ void gimbal_task(void* args) {
       // set escalation servo to original position
       escalation_servo->SetTarget(calibrated_theta);
     }
-    pitch_target = dbus->ch3 / 600.0;
 
-    pitch_servo->SetTarget(pitch_servo->GetTheta() + pitch_target);
+    pitch_cmd = dbus->ch3 / 500.0;
+    yaw_cmd = clip<float>(dbus->ch2 / 220.0 * 30.0, -30, 30);
+
+
+
+    pitch_servo->SetTarget(pitch_servo->GetTheta() + pitch_cmd);
     pitch_servo->CalcOutput();
     escalation_servo->CalcOutput();
+    yaw_motor->SetOutput(yaw_cmd);
+
     pitch_curr = pitch_encoder->getData();
     control::MotorCANBase::TransmitOutput(can1_escalation, 1);
     control::MotorCANBase::TransmitOutput(can1_pitch, 1);
+    control::Motor4310::TransmitOutput(can1_yaw, 1);
     osDelay(GIMBAL_TASK_DELAY);
   }
 }
@@ -151,7 +168,7 @@ void init_gimbal() {
   pitch_servo_data.max_iout = 1000;
   pitch_servo_data.max_out = 13000;
   pitch_servo = new control::ServoMotor(pitch_servo_data);
-  yaw_motor = new control::Motor4310(can1, 0x03, 0x02, control::POS_VEL);
+  yaw_motor = new control::Motor4310(can1, 0x03, 0x02, control::VEL);
   pitch_encoder = new control::BRTEncoder(can1,0x01,false);
 }
 

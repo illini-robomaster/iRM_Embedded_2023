@@ -26,6 +26,8 @@
 #include "dbus.h"
 #include "sbus.h"
 #include "utils.h"
+#include <queue>
+#include <vector>
 
 #define SBUS_START_IDX 5
 #define WINDOW_SIZE 50
@@ -96,8 +98,8 @@ void RM_RTOS_Default_Task(const void* args) {
 // float sbus_derivative[6] = {0, 0, 0, 0, 0, 0};
  std::vector<float> filtered_signal;
  std::deque<int> filter_window;
- float filtered_output = 0;
- int window_size = 5;
+// float filtered_output = 0;
+// int window_size = 5;
 
  // initialize previous sbus values to avoid discrete jumps
  for (int i = SBUS_START_IDX; i < SBUS_START_IDX + 6; i++) {
@@ -130,7 +132,7 @@ void RM_RTOS_Default_Task(const void* args) {
 //     MedianFilter(sbus->ch[i], filtered_signal, 5);
 //   }
 
-   updateFilter(sbus->ch[10], filter_window, window_size, filtered_output);
+//   updateFilter(sbus->ch[10], filter_window, window_size, filtered_output);
 
    J4_pos = clip<float>(sbus_avg[3] / 660.0 * PI, J4_min, J4_max);
    J5_pos = clip<float>(sbus_avg[4] / 660.0 * PI, J5_min, J5_max);

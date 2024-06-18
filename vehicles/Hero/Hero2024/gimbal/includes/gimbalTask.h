@@ -59,11 +59,10 @@ extern bsp::CanBridge* send;
 extern BoolEdgeDetector lob_mode_sw;
 extern volatile bool lob_mode;
 
-float pitch_curr;
-float pitch_target;
 
-float pitch_cmd;
-float yaw_cmd;
+
+
+
 
 void gimbal_task(void *arg);
 void init_gimbal();
