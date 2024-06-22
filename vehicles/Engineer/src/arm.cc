@@ -207,8 +207,8 @@ void armTask(void* args) {
   // for joint 2, mechanical angle is the reading of encoder0
   // for joint 3, mechanical angle is the reading of encoder1-encoder0
   // mechanical angle range
-  joint_state_t MECHANICAL_MAX_POS = {0, PI/2, 0, 0, PI/2, PI/2, PI/2};
-  joint_state_t MECHANICAL_MIN_POS = {0, -PI/2, 0, 0, -PI/2, -PI/2, -PI/2};
+  joint_state_t MECHANICAL_MAX_POS = {0, PI/2, 0, 0, PI/2, PI/2, PI};
+  joint_state_t MECHANICAL_MIN_POS = {0, -PI/2, 0, 0, -PI/2, -PI/2, -PI};
 
   // modify if encoders remounted
   MECHANICAL_MAX_POS.base_pitch_rotate_2 = -2.76;
@@ -246,6 +246,10 @@ void armTask(void* args) {
 
   // uncomment SetZeroPos() if remounted 4310
 
+  // forearm_rotate_motor_4->SetZeroPos();
+  // wrist_rotate_motor_5->SetZeroPos();
+  // hand_rotate_motor_6->SetZeroPos();
+
   forearm_rotate_motor_4->MotorEnable();
   wrist_rotate_motor_5->MotorEnable();
   hand_rotate_motor_6->MotorEnable();
@@ -259,16 +263,14 @@ void armTask(void* args) {
 
   // set 4310 initial position
   print("j4: %f, j5: %f, j6: %f\r\n", current_motor_angles.forearm_roll_4, current_motor_angles.wrist_5, current_motor_angles.end_6);
-  // forearm_rotate_motor_4->SetZeroPos();
   forearm_rotate_motor_4->SetOutput(current_motor_angles.forearm_roll_4, 0, 10, 0.5, 0);
-  // wrist_rotate_motor_5->SetZeroPos();
   wrist_rotate_motor_5->SetOutput(current_motor_angles.wrist_5, 0, 10, 0.5, 0);
-  // hand_rotate_motor_6->SetZeroPos();
   hand_rotate_motor_6->SetOutput(current_motor_angles.end_6, 0, 10, 0.5, 0);
 
   control::Motor4310* forearm_motors[3] = {forearm_rotate_motor_4, wrist_rotate_motor_5, hand_rotate_motor_6};
   control::Motor4310::TransmitOutput(forearm_motors, 3);
-  // control::Motor4310::TransmitOutput(&hand_rotate_motor_6,1);
+  // control::Motor4310::TransmitOutput(&hand_rotate_motor_6, 1);
+ 
 
   print("4310 motors enabled, but should not move\r\n");
 
@@ -294,8 +296,8 @@ void armTask(void* args) {
   TrapezoidProfile joint_2_profile(0.5, 0.2);
   TrapezoidProfile joint_3_profile(0.5, 0.2);
   TrapezoidProfile joint_4_profile(0.5, 1.5);
-  TrapezoidProfile joint_5_profile(0.5, 2.0);
-  TrapezoidProfile joint_6_profile(0.5, 2.0);
+  TrapezoidProfile joint_5_profile(2.0, 2.0);
+  TrapezoidProfile joint_6_profile(2.0, 2.0);
 
   int loop_cnt = 0;
   float last_loop_time = HAL_GetTick();
@@ -351,12 +353,11 @@ void armTask(void* args) {
 
     // TODO: 4310 joints
     if(!areJointTargetsLegal(mechanical_angle)){
-      // don't change joint_targets if mechanical angle is illegal
+      // don't change joint targets if mechanical angle is illegal
       if(loop_cnt % 100 == 0){
         print("mechanical angle illegal\r\n");
       }
     }else{
-      
       // Convert mechanical angle to motor command angle.
       joint_targets.base_yaw_rotate_1 = mechanical_angle.base_yaw_rotate_1 - A1_id0_offset; // no abs encoder
       joint_targets.base_pitch_rotate_2 = mechanical_angle.base_pitch_rotate_2 - A1_id1_offset; // has abs encoder
@@ -364,33 +365,34 @@ void armTask(void* args) {
       joint_targets.forearm_roll_4 = mechanical_angle.forearm_roll_4;
       joint_targets.wrist_5 = mechanical_angle.wrist_5;
       joint_targets.end_6 = mechanical_angle.end_6;
+
+      // apply kinematics constraints    
+      kinematics_state joint_1_state = joint_1_profile.calculate(joint_targets.base_yaw_rotate_1,   5, {last_targets.base_yaw_rotate_1,   last_velocities.base_yaw_rotate_1});
+      kinematics_state joint_2_state = joint_2_profile.calculate(joint_targets.base_pitch_rotate_2, 5, {last_targets.base_pitch_rotate_2, last_velocities.base_pitch_rotate_2});
+      kinematics_state joint_3_state = joint_3_profile.calculate(joint_targets.forearm_pitch_3,     5, {last_targets.forearm_pitch_3,     last_velocities.forearm_pitch_3});
+      kinematics_state joint_4_state = joint_4_profile.calculate(joint_targets.forearm_roll_4,      5, {last_targets.forearm_roll_4,      last_velocities.forearm_roll_4});
+      kinematics_state joint_5_state = joint_5_profile.calculate(joint_targets.wrist_5,             5, {last_targets.wrist_5,             last_velocities.wrist_5});
+      kinematics_state joint_6_state = joint_6_profile.calculate(joint_targets.end_6,               5, {last_targets.end_6,               last_velocities.end_6});
+
+      // modify target angles
+      last_targets =    {0, joint_1_state.position, joint_2_state.position, joint_3_state.position, joint_4_state.position, joint_5_state.position, joint_6_state.position};
+      last_velocities = {0, joint_1_state.velocity, joint_2_state.velocity, joint_3_state.velocity, joint_4_state.velocity, joint_5_state.velocity, joint_6_state.velocity};
     }
-
-    // apply kinematics constraints    
-    kinematics_state joint_1_state = joint_1_profile.calculate(joint_targets.base_yaw_rotate_1,   5, {last_targets.base_yaw_rotate_1,   last_velocities.base_yaw_rotate_1});
-    kinematics_state joint_2_state = joint_2_profile.calculate(joint_targets.base_pitch_rotate_2, 5, {last_targets.base_pitch_rotate_2, last_velocities.base_pitch_rotate_2});
-    kinematics_state joint_3_state = joint_3_profile.calculate(joint_targets.forearm_pitch_3,     5, {last_targets.forearm_pitch_3,     last_velocities.forearm_pitch_3});
-    kinematics_state joint_4_state = joint_4_profile.calculate(joint_targets.forearm_roll_4,      5, {last_targets.forearm_roll_4,      last_velocities.forearm_roll_4});
-    kinematics_state joint_5_state = joint_5_profile.calculate(joint_targets.wrist_5,             5, {last_targets.wrist_5,             last_velocities.wrist_5});
-    kinematics_state joint_6_state = joint_6_profile.calculate(joint_targets.end_6,               5, {last_targets.end_6,               last_velocities.end_6});
-
-
-    last_targets =    {0, joint_1_state.position, joint_2_state.position, joint_3_state.position, joint_4_state.position, joint_5_state.position, joint_6_state.position};
-    last_velocities = {0, joint_1_state.velocity, joint_2_state.velocity, joint_3_state.velocity, joint_4_state.velocity, joint_5_state.velocity, joint_6_state.velocity};
 
     ArmSetTarget(last_targets);
 
 
     // print every 100 loops
-    if(loop_cnt % 100 == 0){
-      print("encoder0 %f, encoder1 %f\n", encoder0->getData(), encoder1->getData());
+    if(loop_cnt % 10 == 0){
+      // print("encoder0 %f, encoder1 %f\n", encoder0->getData(), encoder1->getData());
       // print("A1_offset %f, %f\n", A1_id1_offset, A1_id2_offset);
       // print("A1 current: %f. %f \n", MotorA1_recv_id00.current);
       // print("mechanical: %f, %f, %f, %f, %f, %f \n", mechanical_angle.base_yaw_rotate_1, mechanical_angle.base_pitch_rotate_2, mechanical_angle.forearm_pitch_3, mechanical_angle.forearm_roll_4, mechanical_angle.wrist_5, mechanical_angle.end_6);
-      // print("current: %f, %f, %f, %f, %f, %f \n", current_joint_positions.base_yaw_rotate_1, current_joint_positions.base_pitch_rotate_2, current_joint_positions.forearm_pitch_3, current_joint_positions.forearm_roll_4, current_joint_positions.wrist_5, current_joint_positions.end_6);
+      // print("current: %f, %f, %f, %f, %f, %f \n", current_motor_angles.base_yaw_rotate_1, current_motor_angles.base_pitch_rotate_2, current_motor_angles.forearm_pitch_3, current_motor_angles.forearm_roll_4, current_motor_angles.wrist_5, current_motor_angles.end_6);
       // print("smoothed: %f, %f, %f, %f, %f, %f \n", last_targets.base_yaw_rotate_1, last_targets.base_pitch_rotate_2, last_targets.forearm_pitch_3, last_targets.forearm_roll_4, last_targets.wrist_5, last_targets.end_6);
       // print("targets: %f, %f, %f, %f, %f, %f \n",joint_targets.base_yaw_rotate_1, joint_targets.base_pitch_rotate_2, joint_targets.forearm_pitch_3, joint_targets.forearm_roll_4, joint_targets.wrist_5, joint_targets.end_6);
       // print("loop time %fms \r\n", (HAL_GetTick()-last_loop_time)/100.0);
+      print("d: %f, %f \r\n", hand_rotate_motor_6->GetTheta(), last_targets.end_6);
       last_loop_time = HAL_GetTick();
 
     }
@@ -401,12 +403,15 @@ void armTask(void* args) {
       while(dbus->swr != remote::DOWN){
         osDelay(100);
         print("waiting for dbus swr to be down\r\n");
+        last_loop_time = HAL_GetTick();
   }
   #else
       print("waiting for sbus channel 5 to be smaller than -100\r\n");
       while(sbus->ch[9] > -100){
         osDelay(100);
+        print("j456: %f %f %f\r\n", forearm_rotate_motor_4->GetTheta(), wrist_rotate_motor_5->GetTheta(), hand_rotate_motor_6->GetTheta());
       }
+      last_loop_time = HAL_GetTick();
   #endif
     }
 

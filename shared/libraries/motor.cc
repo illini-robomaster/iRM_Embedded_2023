@@ -926,7 +926,7 @@ void Motor4310::UpdateData(const uint8_t data[]) {
   raw_mosTemp_ = data[6];
   raw_motorTemp_ = data[7];
 
-  theta_ = uint_to_float(raw_pos_, P_MIN, P_MAX, 16);
+  theta_ = wrap<float>(uint_to_float(raw_pos_, P_MIN, P_MAX, 16), P_MIN, P_MAX);
   omega_ = uint_to_float(raw_vel_, V_MIN, V_MAX, 12);
   torque_ = uint_to_float(raw_torque_, T_MIN, T_MAX, 12);
 

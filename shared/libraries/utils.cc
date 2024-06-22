@@ -65,7 +65,9 @@ uint16_t float_to_uint(float x, float x_min, float x_max, int bits) {
   float offset = x_min;
   return (uint16_t) ((x-offset) * ((float)((1<<bits)-1))/span);
 }
-
+// BUG: this does not produce the correct result
+// e.g. x_min = -PI and x_max = PI, the result is from -2PI to 0 instead if bits = 16
+// probably has to do with int is 16bit and when the bits param is 16
 float uint_to_float(int x_int, float x_min, float x_max, int bits) {
   float span = x_max - x_min;
   float offset = x_min;
