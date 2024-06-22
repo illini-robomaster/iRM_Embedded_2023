@@ -23,6 +23,11 @@ class TrapezoidProfile
         int direction;
 
     public:
+        /**
+         * @brief Construct a new Trapezoid Profile object, with acceleration and cruise velocity. 
+         * @param acceleration the designed acceleration of the system. Unit is velocity unit per second.
+         * @param cruise_velocity the maximum/cruise velocity of the system. Unit is arbitrary. But should be consistent with acceleration
+        */
         TrapezoidProfile(float acceleration, float cruise_velocity) : acc(acceleration), cruise_vel(abs(cruise_velocity)){}
         
         /**
