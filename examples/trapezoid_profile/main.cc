@@ -22,29 +22,46 @@
 
 #include "bsp_print.h"
 #include "cmsis_os.h"
-#include "encoder.h"
+#include "trapezoid_profile.h"
 
-static bsp::CAN* can = nullptr;
-static control::BRTEncoder* encoder = nullptr;
-static control::BRTEncoder* encoder2 = nullptr;
+#define USE_SBUS 
+
+#ifdef USE_SBUS
+#include "sbus.h"
+static remote::SBUS* sbus;
+#endif
 
 void RM_RTOS_Init(void) {
   print_use_uart(&UART_HANDLE);
-  can = new bsp::CAN(&hcan1);
-  encoder = new control::BRTEncoder(can, 0x01, true);
-  encoder2 = new control::BRTEncoder(can, 0x0A, false);
+
+#ifdef USE_SBUS
+  sbus = new remote::SBUS(&huart3);
+#endif
+ 
 }
 
 void RM_RTOS_Default_Task(const void* args) {
-  UNUSED(args);
+    UNUSED(args);
 
-  while (true) {
-    // set_cursor(0, 0);
-    // clear_screen();
-    print("1:");
-    encoder->PrintData();
-    print("2:");
-    encoder2->PrintData();
-    osDelay(100);
-  }
+    TrapezoidProfile profile(2, 2); // acceleration, cruise velocity, initial position
+    kinematics_state current_state = {0,0};
+    auto last_loop_time = HAL_GetTick();
+    while (true) {
+        // get current time
+        auto current_time = HAL_GetTick();
+        auto delta_t = current_time - last_loop_time; // or use a fixed typical delta t time
+
+        // calculate the new target
+#ifdef USE_SBUS
+        // get the target from the remote controller
+        kinematics_state new_state = profile.calculate(sbus->ch[0]/660.0*5, delta_t, current_state); // target pos, delta_t, current state
+#else 
+        kinematics_state new_state = profile.calculate(5, delta_t, current_state); // target pos, delta_t, current state
+#endif
+        last_loop_time = current_time;
+        print("t p v: %d %f %f\n", current_time, new_state.position, new_state.velocity);
+        current_state = new_state;
+        
+        osDelay(10);
+    }
 }

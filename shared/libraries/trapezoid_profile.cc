@@ -56,23 +56,17 @@ kinematics_state TrapezoidProfile::calculate(float new_target, int delta_t_ms, k
     if (t < end_acc_time) { // if t is in acceleration phase
       result.velocity += t * acc;  // v = v0 + at
       result.position += (m_current_state.velocity + t * acc / 2.0) * t; // v0 * t + 0.5 * a * t^2
-      std::cout << "acceleration" << std:: endl;
     } else if (t < end_cruise_time) { // if t is in cruise phase
       result.velocity = cruise_vel; // constant velocity
       result.position +=
           (m_current_state.velocity + end_acc_time * acc / 2.0) * end_acc_time // distance if acceleration not finished yet
               + cruise_vel * (t - end_acc_time); // cruise phase distance
-        std::cout << "cruise" << std:: endl;
-
     } else if (t <= end_decc_time) { // decceleration phase
       result.velocity = goal_state.velocity + (end_decc_time - t) * acc;
       float timeLeft = end_decc_time - t;
       result.position =
           goal_state.position
               - (goal_state.velocity + timeLeft * acc / 2.0) * timeLeft;
-
-        std::cout << "deccelerating" << std:: endl;
-
     } else { // near finished
       result = goal_state;
     }
