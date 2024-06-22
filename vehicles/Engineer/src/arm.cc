@@ -218,6 +218,7 @@ void armTask(void* args) {
 
   const float SBUS_CHANNEL_MAX = 660;
 
+  joint_state_t current_motor_angles = {0,0,0,0,0,0,0};
 
   //Add 1s Time for 4310 start up.
   print("START\r\n");
@@ -239,11 +240,40 @@ void armTask(void* args) {
    }
   #endif
 
-  // check if all motors connected 
+
+
+  // enable 4310
+
+  // uncomment SetZeroPos() if remounted 4310
+
+  forearm_rotate_motor_4->MotorEnable();
+  wrist_rotate_motor_5->MotorEnable();
+  hand_rotate_motor_6->MotorEnable();
+
+  // check if all motors connected, this has to be after 4310 motors enabled
   print("checking all motors connected\r\n");
   checkAllMotorsConnected();
 
-  // read A1 offsets
+  // load current motor angles, need to be after checkAllMotorsConnected, or else A1 will not return data
+  ArmLoadInput(current_motor_angles);
+
+  // set 4310 initial position
+  print("j4: %f, j5: %f, j6: %f\r\n", current_motor_angles.forearm_roll_4, current_motor_angles.wrist_5, current_motor_angles.end_6);
+  // forearm_rotate_motor_4->SetZeroPos();
+  forearm_rotate_motor_4->SetOutput(current_motor_angles.forearm_roll_4, 0, 10, 0.5, 0);
+  // wrist_rotate_motor_5->SetZeroPos();
+  wrist_rotate_motor_5->SetOutput(current_motor_angles.wrist_5, 0, 10, 0.5, 0);
+  // hand_rotate_motor_6->SetZeroPos();
+  hand_rotate_motor_6->SetOutput(current_motor_angles.end_6, 0, 10, 0.5, 0);
+
+  control::Motor4310* forearm_motors[3] = {forearm_rotate_motor_4, wrist_rotate_motor_5, hand_rotate_motor_6};
+  control::Motor4310::TransmitOutput(forearm_motors, 3);
+  // control::Motor4310::TransmitOutput(&hand_rotate_motor_6,1);
+
+  print("4310 motors enabled, but should not move\r\n");
+
+  
+  // read A1 offsets, this has to be after checkAllMotorsConnected
   // encoder1 - encoder0 = A1_id2 angle
   // encoder0 = A1_id1 angle
   A1_id2_offset = encoder1->getData() + encoder0->getData() - MotorA1_recv_id02.Pos;
@@ -251,32 +281,7 @@ void armTask(void* args) {
   A1_id0_offset = -MotorA1_recv_id00.Pos;
   print("A1 offsets read\r\n");
 
-  // load current motor angles
-  joint_state_t current_motor_angles = {0,0,0,0,0,0,0};
-  ArmLoadInput(current_motor_angles);
 
-  // enable 4310
-
-  // uncomment SetZeroPos() if remounted 4310
-
-  // forearm_rotate_motor_4->SetZeroPos();
-  forearm_rotate_motor_4->MotorEnable();
-  forearm_rotate_motor_4->SetOutput(current_motor_angles.forearm_roll_4, 0, 10, 0.5, 0);
-
-  // wrist_rotate_motor_5->SetZeroPos();
-  wrist_rotate_motor_5->MotorEnable();
-  wrist_rotate_motor_5->SetOutput(current_motor_angles.wrist_5, 0, 10, 0.5, 0);
-
-  // hand_rotate_motor_6->SetZeroPos();
-  hand_rotate_motor_6->MotorEnable();
-  hand_rotate_motor_6->SetOutput(current_motor_angles.end_6, 0, 10, 0.5, 0);
-
-  control::Motor4310* forearm_motors[3] = {forearm_rotate_motor_4, wrist_rotate_motor_5, hand_rotate_motor_6};
-  control::Motor4310::TransmitOutput(forearm_motors, 3);
-
-  print("4310 motors enabled, but should not move\r\n");
-
-  // control::Motor4310::TransmitOutput(&hand_rotate_motor_6,1);
 
   // initialize target angles
   joint_state_t last_velocities = {0,0,0,0,0,0,0};  
@@ -378,12 +383,12 @@ void armTask(void* args) {
 
     // print every 100 loops
     if(loop_cnt % 100 == 0){
-      // print("encoder0 %f, encoder1 %f\n", encoder0->getData(), encoder1->getData());
+      print("encoder0 %f, encoder1 %f\n", encoder0->getData(), encoder1->getData());
       // print("A1_offset %f, %f\n", A1_id1_offset, A1_id2_offset);
       // print("A1 current: %f. %f \n", MotorA1_recv_id00.current);
       // print("mechanical: %f, %f, %f, %f, %f, %f \n", mechanical_angle.base_yaw_rotate_1, mechanical_angle.base_pitch_rotate_2, mechanical_angle.forearm_pitch_3, mechanical_angle.forearm_roll_4, mechanical_angle.wrist_5, mechanical_angle.end_6);
       // print("current: %f, %f, %f, %f, %f, %f \n", current_joint_positions.base_yaw_rotate_1, current_joint_positions.base_pitch_rotate_2, current_joint_positions.forearm_pitch_3, current_joint_positions.forearm_roll_4, current_joint_positions.wrist_5, current_joint_positions.end_6);
-      print("smoothed: %f, %f, %f, %f, %f, %f \n", last_targets.base_yaw_rotate_1, last_targets.base_pitch_rotate_2, last_targets.forearm_pitch_3, last_targets.forearm_roll_4, last_targets.wrist_5, last_targets.end_6);
+      // print("smoothed: %f, %f, %f, %f, %f, %f \n", last_targets.base_yaw_rotate_1, last_targets.base_pitch_rotate_2, last_targets.forearm_pitch_3, last_targets.forearm_roll_4, last_targets.wrist_5, last_targets.end_6);
       // print("targets: %f, %f, %f, %f, %f, %f \n",joint_targets.base_yaw_rotate_1, joint_targets.base_pitch_rotate_2, joint_targets.forearm_pitch_3, joint_targets.forearm_roll_4, joint_targets.wrist_5, joint_targets.end_6);
       // print("loop time %fms \r\n", (HAL_GetTick()-last_loop_time)/100.0);
       last_loop_time = HAL_GetTick();
@@ -447,8 +452,8 @@ int ArmSetTarget(joint_state_t target) {
 
 
 void ArmTransmitOutput() {  
-  // control::Motor4310* forearm_motors[3] = {forearm_rotate_motor_4, wrist_rotate_motor_5, hand_rotate_motor_6};
-  // control::Motor4310::TransmitOutput(forearm_motors, 3);
+  control::Motor4310* forearm_motors[3] = {forearm_rotate_motor_4, wrist_rotate_motor_5, hand_rotate_motor_6};
+  control::Motor4310::TransmitOutput(forearm_motors, 3);
   // control::Motor4310::TransmitOutput(&hand_rotate_motor_6,1);
 }
 
@@ -460,7 +465,6 @@ void ArmLoadInput(joint_state_t &current_joint_positions) {
   current_joint_positions.forearm_roll_4 = forearm_rotate_motor_4->GetTheta(); 
   current_joint_positions.wrist_5 = wrist_rotate_motor_5->GetTheta();
   current_joint_positions.end_6 = hand_rotate_motor_6->GetTheta();
-
 }
 
 void kill_arm() {
