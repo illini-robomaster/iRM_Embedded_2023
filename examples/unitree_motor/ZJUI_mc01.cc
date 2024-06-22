@@ -25,7 +25,7 @@
 #include "cmsis_os.h"
 #include "sbus.h"
 #include "bsp_gpio.h"
-#include "A1_motor_drive.h"
+#include "A1/A1_motor_drive.h"
 
 static remote::SBUS* dbus;
 bsp::GPIO* user_key = nullptr;

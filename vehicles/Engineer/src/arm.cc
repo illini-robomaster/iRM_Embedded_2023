@@ -18,6 +18,12 @@
  *                                                                          *
  ****************************************************************************/
 
+// TODO: mechanical angle definition
+// TODO: inverse kinematics
+// TODO: 4310 absolute position
+// TODO: trapeozid profile
+
+
 #include "bsp_gpio.h"
 #include "bsp_os.h"
 #include "bsp_print.h"
@@ -36,7 +42,8 @@
 #include "encoder.h"
 #include "bsp_relay.h"
 
-#include "A1_motor_drive.h"
+#include "A1/A1_motor_drive.h"
+#include "trapezoid_profile.h"
 
 // static bsp::CAN* can1 = nullptr;
 // static remote::DBUS* sbus = nullptr;
@@ -65,6 +72,8 @@ static const float encoder0_val_when_arm_upright = -2.43;
 static const float encoder1_val_when_arm_upright = 3.23;
 
 static bool killed = false;
+
+
 
 /*
 upright position:
@@ -113,6 +122,7 @@ void init_arm_A1() {
 
 }
 
+// CAUTION: these values needs to be updated if J4 4310 motor\elbow lever is reinstalled, especially encoder1
 /** A legal arm position satisfies all of the following constraints:
  * encoder1 (elbow pitch) 2.9 to 3.9
  * encoder0 (base pitch) -2.1 to -3.5
@@ -126,7 +136,7 @@ bool areJointTargetsLegal(joint_state_t &mechanical_angle) {
   if (mechanical_angle.forearm_pitch_3 < 0.1 || mechanical_angle.forearm_pitch_3 > 1.8) {
     return false;
   }
-  if (mechanical_angle.forearm_pitch_3-mechanical_angle.base_pitch_rotate_2 < 2.9 || mechanical_angle.forearm_pitch_3-mechanical_angle.base_pitch_rotate_2 > 4.0) {
+  if (mechanical_angle.forearm_pitch_3-mechanical_angle.base_pitch_rotate_2 < 2.9 || mechanical_angle.forearm_pitch_3-mechanical_angle.base_pitch_rotate_2 > 3.9) {
     return false;
   }
   return true;
@@ -226,16 +236,28 @@ void armTask(void* args) {
   // enable 4310
   // forearm_rotate_motor_4->SetZeroPos();
   forearm_rotate_motor_4->MotorEnable();
+  float j4_current_angle = forearm_rotate_motor_4->GetTheta();
+  forearm_rotate_motor_4->SetOutput(j4_current_angle, 0, 10, 0.5, 0);
+
   // wrist_rotate_motor_5->SetZeroPos();
   wrist_rotate_motor_5->MotorEnable();
+  float j5_current_angle = wrist_rotate_motor_5->GetTheta();
+  wrist_rotate_motor_5->SetOutput(j5_current_angle, 0, 10, 0.5, 0);
+
   // hand_rotate_motor_6->SetZeroPos();
   hand_rotate_motor_6->MotorEnable();
+
 
   print("now checking all motors connected\r\n");
   // check all motors connected 
   checkAllMotorsConnected();
 
-
+  
+  // control::Motor4310* forearm_motors[3] = {forearm_rotate_motor_4, wrist_rotate_motor_5, hand_rotate_motor_6};
+  // control::Motor4310::TransmitOutput(forearm_motors, 3);
+  float j6_current_angle = hand_rotate_motor_6->GetTheta();
+  hand_rotate_motor_6->SetOutput(j6_current_angle, 0, 10, 0.5, 0);
+  control::Motor4310::TransmitOutput(&hand_rotate_motor_6,1);
 
   // read motor offsets
   // encoder1 - encoder0 = A1_id2 angle
@@ -245,7 +267,6 @@ void armTask(void* args) {
   A1_id0_offset = -MotorA1_recv_id00.Pos;
 
 
-  // TODO: mechanical angle definition
 
   // Mechanical Angle refers to the angle reference defined manually for easy kinematics/inverse kinematics and/or other purposes
   // for joint 2, mechanical angle is the reading of encoder0
@@ -349,6 +370,7 @@ void armTask(void* args) {
     if(loop_cnt % 100 == 0){
       print("encoder0 %f, encoder1 %f\n", encoder0->getData(), encoder1->getData());
       // print("A1_offset %f, %f\n", A1_id1_offset, A1_id2_offset);
+      // print("A1 current: %f. %f \n", MotorA1_recv_id00.current);
       print("mechanical: %f, %f, %f, %f, %f, %f \n", mechanical_angle.base_yaw_rotate_1, mechanical_angle.base_pitch_rotate_2, mechanical_angle.forearm_pitch_3, mechanical_angle.forearm_roll_4, mechanical_angle.wrist_5, mechanical_angle.end_6);
       // print("current: %f, %f, %f, %f, %f, %f \n", current_joint_positions.base_yaw_rotate_1, current_joint_positions.base_pitch_rotate_2, current_joint_positions.forearm_pitch_3, current_joint_positions.forearm_roll_4, current_joint_positions.wrist_5, current_joint_positions.end_6);
       // print("smoothed: %f, %f, %f, %f, %f, %f \n", smoothed_targets.base_yaw_rotate_1, smoothed_targets.base_pitch_rotate_2, smoothed_targets.forearm_pitch_3, smoothed_targets.forearm_roll_4, smoothed_targets.wrist_5, smoothed_targets.end_6);
@@ -406,18 +428,18 @@ int ArmSetTarget(joint_state_t target) {
 
 
   // 4310
-  forearm_rotate_motor_4->SetOutput(target.forearm_roll_4, target.forearm_roll_4, 10, 0.5, 0);
-  wrist_rotate_motor_5->SetOutput(target.wrist_5, target.wrist_5, 10, 0.5, 0);
-  hand_rotate_motor_6->SetOutput(target.end_6, target.end_6, 10, 0.5, 0);
+  forearm_rotate_motor_4->SetOutput(target.forearm_roll_4, 0, 10, 0.5, 0);
+  wrist_rotate_motor_5->SetOutput(target.wrist_5, 0, 10, 0.5, 0);
+  hand_rotate_motor_6->SetOutput(target.end_6, 0, 10, 0.5, 0);
 
   return 0;
 }
 
-void ArmTransmitOutput() {
-  // unitreeA1_rxtx(huart1);
-  
-  control::Motor4310* forearm_motors[3] = {forearm_rotate_motor_4, wrist_rotate_motor_5, hand_rotate_motor_6};
-  control::Motor4310::TransmitOutput(forearm_motors, 3);
+
+void ArmTransmitOutput() {  
+  // control::Motor4310* forearm_motors[3] = {forearm_rotate_motor_4, wrist_rotate_motor_5, hand_rotate_motor_6};
+  // control::Motor4310::TransmitOutput(forearm_motors, 3);
+  // control::Motor4310::TransmitOutput(&hand_rotate_motor_6,1);
 }
 
 
