@@ -37,7 +37,7 @@ class TrapezoidProfile
         * @param current_state the current state of the system, which contains position and velocity. Could be the last output of this function.
         * @return kinematics_state which contains position and velocity of the current setpoint at time t.
         */
-        kinematics_state calculate(float new_target, int current_time_ms, kinematics_state current_state);
+        kinematics_state calculate(float new_target, int delta_t_ms, kinematics_state current_state);
 
         /**
          * @brief make sure the direction of the output state matches the 

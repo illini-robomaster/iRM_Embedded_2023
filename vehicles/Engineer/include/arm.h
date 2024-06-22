@@ -74,7 +74,7 @@ void ArmTransmitOutput();
  * @brief read encoder readings to current_joint_positions
  * `caution`: this function should be called after A1 cmd is send 
  * */ 
-void ArmReceiveInput();
+void ArmLoadInput(joint_state_t &current_joint_positions);
 
 
 #ifdef USING_DBUS
