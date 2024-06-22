@@ -23,7 +23,7 @@ class TrapezoidProfile
         int direction;
 
     public:
-        TrapezoidProfile(float acceleration, float cruise_velocity, float init_pos) : acc(acceleration), cruise_vel(abs(cruise_velocity)){}
+        TrapezoidProfile(float acceleration, float cruise_velocity) : acc(acceleration), cruise_vel(abs(cruise_velocity)){}
         
         /**
         * @brief update the internal target and return a new target that satisfy the acceleration and velocity limit.
