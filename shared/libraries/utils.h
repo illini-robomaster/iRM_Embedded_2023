@@ -21,7 +21,7 @@
 #pragma once
 
 #include "stdint.h"
-
+#include <deque>
 /**
  * @brief clip a value to fall into a given range
  *
@@ -239,3 +239,30 @@ uint16_t float_to_uint(float x, float x_min, float x_max, int bits);
  * @return value converted from unsigned int to float
  */
 float uint_to_float(int x_int, float x_min, float x_max, int bits);
+
+/**
+ * @brief A moving average filter
+ * @param window_size the size of sliding window for average filtering
+ * @return the filtered value
+ */
+template <typename T>
+class MovingAverageFilter {
+public:
+    MovingAverageFilter(size_t window_size):window_size_(window_size){}
+
+    T update(T measurement){
+      if (window.size() >= window_size_) {
+        window.pop_front();
+      }
+      window.push_back(measurement);
+      T sum = 0;
+      for (const T& value : window) {
+        sum += value;
+      }
+      return sum / window.size();
+    }
+
+private:
+    size_t window_size_;
+    std::deque<T> window;
+};

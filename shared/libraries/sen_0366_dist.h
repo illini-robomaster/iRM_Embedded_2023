@@ -18,59 +18,58 @@
  *                                                                          *
  ****************************************************************************/
 
+
+#include "bsp_uart.h"
 #include "utils.h"
-
-BoolEdgeDetector::BoolEdgeDetector(bool initial) { prev_ = initial; }
-
-void BoolEdgeDetector::input(bool signal) {
-  posEdge_ = false;
-  negEdge_ = false;
-  if (!prev_ && signal)
-    posEdge_ = true;
-  else if (prev_ && !signal)
-    negEdge_ = true;
-  prev_ = signal;
-}
-
-bool BoolEdgeDetector::edge() { return posEdge_ || negEdge_; }
-
-bool BoolEdgeDetector::posEdge() { return posEdge_; }
-
-bool BoolEdgeDetector::negEdge() { return negEdge_; }
-
-FloatEdgeDetector::FloatEdgeDetector(float initial, float threshold) {
-  prev_ = initial;
-  threshold_ = threshold;
-}
-
-void FloatEdgeDetector::input(float signal) {
-  posEdge_ = false;
-  negEdge_ = false;
-  float diff = signal - prev_;
-  if (diff > threshold_)
-    posEdge_ = true;
-  else if (diff < -threshold_)
-    negEdge_ = true;
-  prev_ = signal;
-}
-
-bool FloatEdgeDetector::edge() { return posEdge_ || negEdge_; }
-
-bool FloatEdgeDetector::posEdge() { return posEdge_; }
-
-bool FloatEdgeDetector::negEdge() { return negEdge_; }
-
-uint16_t float_to_uint(float x, float x_min, float x_max, int bits) {
-  float span = x_max - x_min;
-  float offset = x_min;
-  return (uint16_t) ((x-offset) * ((float)((1<<bits)-1))/span);
-}
-
-float uint_to_float(int x_int, float x_min, float x_max, int bits) {
-  float span = x_max - x_min;
-  float offset = x_min;
-  return ((float)x_int) * span / ((float)((1 << bits) - 1)) + offset;
-}
+#include "usart.h"
 
 
+namespace distance {
 
+    typedef struct{
+        uint8_t command[4];
+    }__packed SendPacket_4_t;
+
+    typedef struct{
+        uint8_t command[5];
+    }__packed SendPacket_5_t;
+
+    typedef struct{
+        uint8_t command[6];
+    }__packed SendPacket_6_t;
+
+    typedef void (*sen_0366_delay_t)(uint32_t milli);
+
+    void sen_0366_config(UART_HandleTypeDef *huart);
+
+    class SEN_0366_DIST : public bsp::UART {
+    public:
+
+
+        SEN_0366_DIST(UART_HandleTypeDef *huart, uint8_t ADDR, MovingAverageFilter<double> maf);
+
+        static SEN_0366_DIST* init(UART_HandleTypeDef *huart, uint8_t ADDR);
+
+        uint8_t address;
+        MovingAverageFilter<double>maf;
+
+        bool begin();
+        bool setMeasureRange(int8_t range);
+        bool laserOn();
+        void readValue();
+        bool setResolution(float resolution);
+        bool shutdown();
+
+        double distance;
+
+    private:
+        sen_0366_delay_t delay_func = [](uint32_t milli) { HAL_Delay(milli); };
+        SendPacket_4_t single_measurement_packet;
+        SendPacket_4_t continuous_measurement_packet;
+        SendPacket_4_t shutdown_packet;
+        SendPacket_5_t laser_on_packet;
+        SendPacket_5_t set_measure_distance_packet;
+        SendPacket_5_t set_frequency_packet;
+        SendPacket_5_t set_resolution_packet;
+    };
+};
