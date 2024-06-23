@@ -25,5 +25,5 @@ irm_add_arm_executable(${PROJECT_NAME}
         TARGET DJI_Board_TypeC
 
         SOURCES
-        laser_dist_meas.cc
+        main.cc
 )
