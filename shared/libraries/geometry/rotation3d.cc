@@ -91,25 +91,25 @@ Rotation3d Rotation3d::normalized() const
     return Rotation3d(_x / length, _y / length, _z / length, _w / length);
 }
 
-void Rotation3d::toEuler(float& roll, float& pitch, float& yaw) const
+void Rotation3d::toEuler()
 {
     float sinr_cosp = 2 * (_w * _x + _y * _z);
     float cosr_cosp = 1 - 2 * (_x * _x + _y * _y);
-    roll = atan2(sinr_cosp, cosr_cosp);
+    _roll = atan2(sinr_cosp, cosr_cosp);
 
     float sinp = 2 * (_w * _y - _z * _x);
     if (fabs(sinp) >= 1)
     {
-        pitch = copysign(PI / 2, sinp);
+        _pitch = copysign(PI / 2, sinp);
     }
     else
     {
-        pitch = asin(sinp);
+        _pitch = asin(sinp);
     }
 
     float siny_cosp = 2 * (_w * _z + _x * _y);
     float cosy_cosp = 1 - 2 * (_y * _y + _z * _z);
-    yaw = atan2(siny_cosp, cosy_cosp);
+    _yaw = atan2(siny_cosp, cosy_cosp);
 }
 
 void Rotation3d::fromEuler(float roll, float pitch, float yaw)

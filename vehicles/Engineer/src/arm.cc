@@ -44,6 +44,7 @@
 
 #include "A1/A1_motor_drive.h"
 #include "trapezoid_profile.h"
+#include "geometry/geometry.h"
 
 // static bsp::CAN* can1 = nullptr;
 // static remote::DBUS* sbus = nullptr;
@@ -186,6 +187,27 @@ void checkAllMotorsConnected(){
     osDelay(100);
   }
 }
+
+const float BASE_OFFSET = 0.1;
+const float b = 0.5; // big arm length
+const float c = 0.4; // forearm length
+joint_state_t inverse_kinematics(Vector3d position, Rotation3d orientation){
+  float l = sqrt(position.x*position.x + position.y*position.y - BASE_OFFSET*BASE_OFFSET);
+  float alpha1 = atan(l/BASE_OFFSET);
+  float theta1 = atan2(position.y, position.x) + alpha1 - PI/2;
+
+  float d = sqrt(l*l+position.z*position.z);
+  float alpha2 = atan2(position.z, l);
+  float beta1 = acos((b*b+d*d-c*c)/(2*b*d));
+  float beta2 = acos((b*b+c*c-d*d)/(2*b*c));
+  float theta2 = PI/2 - alpha2 - beta1;
+  float theta3 = PI - alpha2 - beta1 - beta2;
+  
+
+  // todo last 3 joint inverse kinematics
+  return {0, theta1, theta2, theta3, orientation.getYaw(), orientation.getPitch(), orientation.getRoll()};
+}
+
 
 void checkEncodersConnected(){
   while(!encoder0->is_connected() || !encoder1->is_connected()){

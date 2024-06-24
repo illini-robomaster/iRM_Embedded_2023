@@ -7,6 +7,12 @@ private:
     float _z;
     float _w;
 
+    float _yaw;
+    float _pitch;
+    float _roll;
+    
+    void toEuler();
+
 public:
     Rotation3d();
     Rotation3d(float x, float y, float z, float w);
@@ -23,9 +29,12 @@ public:
     float getZ() const;
     float getW() const;
 
+    float getYaw() const;
+    float getPitch() const;
+    float getRoll() const;
+
     Rotation3d normalized() const;
 
-    void toEuler(float& roll, float& pitch, float& yaw) const;
     void fromEuler(float roll, float pitch, float yaw);
 
     void toAxisAngle(Vector3d& axis, float& angle) const;
