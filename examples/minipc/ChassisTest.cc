@@ -75,7 +75,7 @@ void chassisTask(void* argument) {
   control::MotorCANBase* motors[] = {fl_motor, fr_motor, bl_motor, br_motor};
 
   float vx_keyboard = 0, vy_keyboard = 0, wz_keyboard = 0;
-  float vx_remote, vy_remote;
+  float vx_remote, vy_remote, wz_remote;
   float vx_set, vy_set, wz_set;
 
   while (true) {
@@ -96,23 +96,26 @@ void chassisTask(void* argument) {
 
       vx_remote = dbus->ch0;
       vy_remote = dbus->ch1;
+      wz_remote = dbus->ch2;
 
       vx_set = vx_keyboard + vx_remote;
       vy_set = vy_keyboard + vy_remote;
-      wz_set = wz_keyboard;
+      wz_set = wz_keyboard + wz_remote;
+
+      chassis->SetSpeed(vx_set, vy_set, wz_set);
+      chassis->Update(false, 30, 20, 60);
 
       led->Display(RGB_color[1]);
     } else {
       // if timeout (no packet, stop the motor)
-      vx_set = 0;
-      vy_set = 0;
-      wz_set = 0;
+      fl_motor->SetOutput(0);
+      fr_motor->SetOutput(0);
+      bl_motor->SetOutput(0);
+      br_motor->SetOutput(0);
 
       led->Display(RGB_color[0]);
     }
 
-    chassis->SetSpeed(vx_set, vy_set, wz_set);
-    chassis->Update(false, 30, 20, 60);
     control::MotorCANBase::TransmitOutput(motors, 4);
     osDelay(10);
   }
