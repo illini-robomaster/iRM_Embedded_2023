@@ -2,25 +2,20 @@
 class Rotation3d {
 // use quaternion to represent rotation
 private:
-    float _x;
-    float _y;
-    float _z;
-    float _w;
 
-    float _yaw;
-    float _pitch;
-    float _roll;
+    // quaternion representation
+    float _x; // i
+    float _y; // j 
+    float _z; // k
+    float _w; // real part
     
-    void toEuler();
-
 public:
     Rotation3d();
-    Rotation3d(float x, float y, float z, float w);
-    Rotation3d(const Rotation3d& r);
-    ~Rotation3d();
+    Rotation3d(float x, float y, float z, float w); // quaternion
+    Rotation3d(float yaw, float pitch, float roll); // euler angles (yaw, pitch, roll
+    // TODO: axis-angle and rotation matrix
 
     Rotation3d operator*(const Rotation3d& r) const;
-    Rotation3d& operator*=(const Rotation3d& r);
     bool operator==(const Rotation3d& r) const;
     bool operator!=(const Rotation3d& r) const;
 
@@ -34,12 +29,4 @@ public:
     float getRoll() const;
 
     Rotation3d normalized() const;
-
-    void fromEuler(float roll, float pitch, float yaw);
-
-    void toAxisAngle(Vector3d& axis, float& angle) const;
-    void fromAxisAngle(const Vector3d& axis, float angle);
-
-    void toMatrix(float matrix[3][3]) const;
-    void fromMatrix(const float matrix[3][3]); 
 };
