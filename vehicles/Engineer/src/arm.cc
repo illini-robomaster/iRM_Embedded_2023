@@ -18,11 +18,9 @@
  *                                                                          *
  ****************************************************************************/
 
-// TODO: mechanical angle definition
 // TODO: inverse kinematics
-// TODO: 4310 absolute position
-// TODO: trapeozid profile
 
+// #define INV_KINEMATICS
 
 #include "bsp_gpio.h"
 #include "bsp_os.h"
@@ -69,6 +67,14 @@ static const float encoder1_val_when_arm_upright = 3.23;
 
 static bool killed = false;
 
+static joint_state_t last_angular_velocities = {0,0,0,0,0,0,0};
+static joint_state_t last_targets = {0,0,0,0,0,0,0};
+static joint_state_t mechanical_angle = {0,0,0,0,0,0,0};
+
+#ifdef INV_KINEMATICS
+  static Vector3d last_position(0.3,0,0.36);
+  static Vector3d last_velocities(0,0,0);
+#endif
 
 
 /*
@@ -122,15 +128,26 @@ void init_arm_A1() {
  * encoder1 (elbow pitch) 2.9 to 3.9
  * encoder0 (base pitch) -2.1 to -3.5
  * encoder1+encoder0 0.1 to 1.8
- * @return true if the arm is in a legal position
+ * @return first try to make big arm and fore arm angles legal, if not possible to determine which one is reaching limit, return false;
  */
-bool areJointTargetsLegal(joint_state_t &mechanical_angle) {
-  if (mechanical_angle.base_pitch_rotate_2 > -2.1 || mechanical_angle.base_pitch_rotate_2 < -3.5) {
-    return false;
+bool makeJointTargetsLegal(joint_state_t &mechanical_angle) {
+  if (mechanical_angle.base_pitch_rotate_2 > -2.1){
+    mechanical_angle.base_pitch_rotate_2 = -2.1;
   }
-  if (mechanical_angle.forearm_pitch_3 < 0.1 || mechanical_angle.forearm_pitch_3 > 1.8) {
-    return false;
+
+  if (mechanical_angle.base_pitch_rotate_2 < -3.5){
+    mechanical_angle.base_pitch_rotate_2 = -3.5;
   }
+
+  if (mechanical_angle.forearm_pitch_3 < 0.1){
+    mechanical_angle.forearm_pitch_3 = 0.1; 
+  } 
+  
+  if (mechanical_angle.forearm_pitch_3 > 1.8) {
+    mechanical_angle.forearm_pitch_3 = 1.8;
+  }
+
+  // not possible to determine which one to limit
   if (mechanical_angle.forearm_pitch_3-mechanical_angle.base_pitch_rotate_2 < 2.9 || mechanical_angle.forearm_pitch_3-mechanical_angle.base_pitch_rotate_2 > 3.9) {
     return false;
   }
@@ -188,12 +205,12 @@ void checkAllMotorsConnected(){
   }
 }
 
-const float BASE_OFFSET = 0.1;
-const float b = 0.5; // big arm length
-const float c = 0.4; // forearm length
+const float a = 0.05;
+const float b = 0.36; // big arm length
+const float c = 0.30; // forearm length
 joint_state_t inverse_kinematics(Vector3d position, Rotation3d orientation){
-  float l = sqrt(position.x*position.x + position.y*position.y - BASE_OFFSET*BASE_OFFSET);
-  float alpha1 = atan(l/BASE_OFFSET);
+  float l = sqrt(position.x*position.x + position.y*position.y - a*a);
+  float alpha1 = atan(l/a);
   float theta1 = atan2(position.y, position.x) + alpha1 - PI/2;
 
   float d = sqrt(l*l+position.z*position.z);
@@ -226,17 +243,11 @@ void armTask(void* args) {
   
   
   // Mechanical Angle refers to the angle reference defined manually for easy kinematics/inverse kinematics and/or other purposes
-  // for joint 2, mechanical angle is the reading of encoder0
-  // for joint 3, mechanical angle is the reading of encoder1-encoder0
+  // for joint 2, mechanical angle is the reading of encoder0 - encoder0_angle_when_upright
+  // for joint 3, mechanical angle is the reading of encoder1-encoder0 - encoder1_angle_when_upright - encoder0_angle_when_upright
   // mechanical angle range
-  joint_state_t MECHANICAL_MAX_POS = {0, PI/2, 0, 0, PI/2, PI/2, PI};
-  joint_state_t MECHANICAL_MIN_POS = {0, -PI/2, 0, 0, -PI/2, -PI/2, -PI};
-
-  // modify if encoders remounted
-  MECHANICAL_MAX_POS.base_pitch_rotate_2 = -2.76;
-  MECHANICAL_MIN_POS.base_pitch_rotate_2 = -2.1;
-  MECHANICAL_MAX_POS.forearm_pitch_3 = 1.4;
-  MECHANICAL_MIN_POS.forearm_pitch_3 = 0.1;
+  joint_state_t MECHANICAL_MAX_POS = {0, PI/2, 0.33, 0.65, PI/2, PI/2, PI};
+  joint_state_t MECHANICAL_MIN_POS = {0, -PI/2, -0.33, -0.65, -PI/2, -PI/2, -PI};
 
   const float SBUS_CHANNEL_MAX = 660;
 
@@ -284,7 +295,7 @@ void armTask(void* args) {
   ArmLoadInput(current_motor_angles);
 
   // set 4310 initial position
-  print("j4: %f, j5: %f, j6: %f\r\n", current_motor_angles.forearm_roll_4, current_motor_angles.wrist_5, current_motor_angles.end_6);
+  // print("j4: %f, j5: %f, j6: %f\r\n", current_motor_angles.forearm_roll_4, current_motor_angles.wrist_5, current_motor_angles.end_6);
   forearm_rotate_motor_4->SetOutput(current_motor_angles.forearm_roll_4, 0, 10, 0.5, 0);
   wrist_rotate_motor_5->SetOutput(current_motor_angles.wrist_5, 0, 10, 0.5, 0);
   hand_rotate_motor_6->SetOutput(current_motor_angles.end_6, 0, 10, 0.5, 0);
@@ -306,18 +317,29 @@ void armTask(void* args) {
   print("A1 offsets read\r\n");
 
 
+#ifdef INV_KINEMATICS
+  // using SI units (m, m/s and m/s^2)
+  
+  last_position = {0.3,0,0.36};
+  last_velocities = {0,0,0};
+  TrapezoidProfile x_profile(0.10, 0.10); 
+  TrapezoidProfile y_profile(0.10, 0.10);
+  TrapezoidProfile z_profile(0.10, 0.10);
+
+#endif
+
 
   // initialize target angles
-  joint_state_t last_velocities = {0,0,0,0,0,0,0};  
-  joint_state_t last_targets = current_motor_angles; // target angles initially match current motor angles
+  last_angular_velocities = {0,0,0,0,0,0,0};  
+  last_targets = current_motor_angles; // target angles initially match current motor angles
 
   MovingAverage moving_average[7]; // filter for 7 "joint"s
 
   // Motion Profile for each joint
-  TrapezoidProfile joint_1_profile(0.5, 0.5);
-  TrapezoidProfile joint_2_profile(0.5, 0.2);
-  TrapezoidProfile joint_3_profile(0.5, 0.2);
-  TrapezoidProfile joint_4_profile(0.5, 1.5);
+  TrapezoidProfile joint_1_profile(1.0, 1.0); // acceleration, velocity
+  TrapezoidProfile joint_2_profile(1.0, 0.5);
+  TrapezoidProfile joint_3_profile(1.0, 0.5);
+  TrapezoidProfile joint_4_profile(2.0, 3.5);
   TrapezoidProfile joint_5_profile(2.0, 2.0);
   TrapezoidProfile joint_6_profile(2.0, 2.0);
 
@@ -352,7 +374,7 @@ void armTask(void* args) {
     moving_average[5].AddSample(sbus->ch[4]); // wrist
     moving_average[6].AddSample(sbus->ch[5]); // end
 #endif
-
+    // value range from -1 to 1
     filtered_sbus[1] = clip<float>(moving_average[1].GetAverage(), -SBUS_CHANNEL_MAX, SBUS_CHANNEL_MAX)/SBUS_CHANNEL_MAX;
     filtered_sbus[2] = clip<float>(moving_average[2].GetAverage(), -SBUS_CHANNEL_MAX, SBUS_CHANNEL_MAX)/SBUS_CHANNEL_MAX;
     filtered_sbus[3] = clip<float>(moving_average[3].GetAverage(), -SBUS_CHANNEL_MAX, SBUS_CHANNEL_MAX)/SBUS_CHANNEL_MAX;
@@ -360,45 +382,61 @@ void armTask(void* args) {
     filtered_sbus[5] = clip<float>(moving_average[5].GetAverage(), -SBUS_CHANNEL_MAX, SBUS_CHANNEL_MAX)/SBUS_CHANNEL_MAX;
     filtered_sbus[6] = clip<float>(moving_average[6].GetAverage(), -SBUS_CHANNEL_MAX, SBUS_CHANNEL_MAX)/SBUS_CHANNEL_MAX;
 
+#ifdef INV_KINEMATICS
+    kinematics_state x_state = x_profile.calculate(last_position.x + 0.1*filtered_sbus[1]*0.005, 5, {last_position.x, last_velocities.x});
+    kinematics_state y_state = y_profile.calculate(last_position.y + 0.1*filtered_sbus[2]*0.005, 5, {last_position.y, last_velocities.y});
+    kinematics_state z_state = z_profile.calculate(last_position.z + 0.1*filtered_sbus[3]*0.005, 5, {last_position.z, last_velocities.z});
 
-    joint_state_t mechanical_angle = {0,0,0,0,0,0,0};
+    mechanical_angle = inverse_kinematics(Vector3d(x_state.position, y_state.position, z_state.position), Rotation3d(last_targets.base_yaw_rotate_1, last_targets.base_pitch_rotate_2, last_targets.forearm_pitch_3));
+    mechanical_angle.base_yaw_rotate_1   = clip<float>(mechanical_angle.base_yaw_rotate_1,   MECHANICAL_MIN_POS.base_yaw_rotate_1,   MECHANICAL_MAX_POS.base_yaw_rotate_1);
+    mechanical_angle.base_pitch_rotate_2 = clip<float>(mechanical_angle.base_pitch_rotate_2, MECHANICAL_MIN_POS.base_pitch_rotate_2, MECHANICAL_MAX_POS.base_pitch_rotate_2);
+    mechanical_angle.forearm_pitch_3     = clip<float>(mechanical_angle.forearm_pitch_3,     MECHANICAL_MIN_POS.forearm_pitch_3,     MECHANICAL_MAX_POS.forearm_pitch_3);
+    mechanical_angle.forearm_roll_4      = clip<float>(mechanical_angle.forearm_roll_4,      MECHANICAL_MIN_POS.forearm_roll_4,      MECHANICAL_MAX_POS.forearm_roll_4);
+    mechanical_angle.wrist_5             = clip<float>(mechanical_angle.wrist_5,             MECHANICAL_MIN_POS.wrist_5,             MECHANICAL_MAX_POS.wrist_5);
+    mechanical_angle.end_6               = clip<float>(mechanical_angle.end_6,               MECHANICAL_MIN_POS.end_6,               MECHANICAL_MAX_POS.end_6);
+#else
+
     // map sbus input to mechanical angle range
-    
     mechanical_angle.base_yaw_rotate_1   = map<float>(filtered_sbus[1], MECHANICAL_MIN_POS.base_yaw_rotate_1,   MECHANICAL_MAX_POS.base_yaw_rotate_1);
     mechanical_angle.base_pitch_rotate_2 = map<float>(filtered_sbus[2], MECHANICAL_MIN_POS.base_pitch_rotate_2, MECHANICAL_MAX_POS.base_pitch_rotate_2);
     mechanical_angle.forearm_pitch_3     = map<float>(filtered_sbus[3], MECHANICAL_MIN_POS.forearm_pitch_3,     MECHANICAL_MAX_POS.forearm_pitch_3);
     mechanical_angle.forearm_roll_4      = map<float>(filtered_sbus[4], MECHANICAL_MIN_POS.forearm_roll_4,      MECHANICAL_MAX_POS.forearm_roll_4);
     mechanical_angle.wrist_5             = map<float>(filtered_sbus[5], MECHANICAL_MIN_POS.wrist_5,             MECHANICAL_MAX_POS.wrist_5);
     mechanical_angle.end_6               = map<float>(filtered_sbus[6], MECHANICAL_MIN_POS.end_6,               MECHANICAL_MAX_POS.end_6);
+#endif 
+    joint_state_t encoder_angle = mechanical_angle; 
+
+    encoder_angle.base_pitch_rotate_2 = mechanical_angle.base_pitch_rotate_2 + encoder0_val_when_arm_upright;
+    encoder_angle.forearm_pitch_3 = mechanical_angle.forearm_pitch_3 + encoder0_val_when_arm_upright + encoder1_val_when_arm_upright;
 
     joint_state_t joint_targets = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
     // TODO: 4310 joints
-    if(!areJointTargetsLegal(mechanical_angle)){
+    if(!makeJointTargetsLegal(encoder_angle)){
       // don't change joint targets if mechanical angle is illegal
       if(loop_cnt % 100 == 0){
         print("mechanical angle illegal\r\n");
       }
     }else{
       // Convert mechanical angle to motor command angle.
-      joint_targets.base_yaw_rotate_1 = mechanical_angle.base_yaw_rotate_1 - A1_id0_offset; // no abs encoder
-      joint_targets.base_pitch_rotate_2 = mechanical_angle.base_pitch_rotate_2 - A1_id1_offset; // has abs encoder
-      joint_targets.forearm_pitch_3 = mechanical_angle.forearm_pitch_3 - A1_id2_offset; // has abs encoder
-      joint_targets.forearm_roll_4 = mechanical_angle.forearm_roll_4;
-      joint_targets.wrist_5 = mechanical_angle.wrist_5;
-      joint_targets.end_6 = mechanical_angle.end_6;
+      joint_targets.base_yaw_rotate_1 = encoder_angle.base_yaw_rotate_1 - A1_id0_offset; // no abs encoder
+      joint_targets.base_pitch_rotate_2 = encoder_angle.base_pitch_rotate_2 - A1_id1_offset; // has abs encoder
+      joint_targets.forearm_pitch_3 = encoder_angle.forearm_pitch_3 - A1_id2_offset; // has abs encoder
+      joint_targets.forearm_roll_4 = encoder_angle.forearm_roll_4;
+      joint_targets.wrist_5 = encoder_angle.wrist_5;
+      joint_targets.end_6 = encoder_angle.end_6;
 
       // apply kinematics constraints    
-      kinematics_state joint_1_state = joint_1_profile.calculate(joint_targets.base_yaw_rotate_1,   5, {last_targets.base_yaw_rotate_1,   last_velocities.base_yaw_rotate_1});
-      kinematics_state joint_2_state = joint_2_profile.calculate(joint_targets.base_pitch_rotate_2, 5, {last_targets.base_pitch_rotate_2, last_velocities.base_pitch_rotate_2});
-      kinematics_state joint_3_state = joint_3_profile.calculate(joint_targets.forearm_pitch_3,     5, {last_targets.forearm_pitch_3,     last_velocities.forearm_pitch_3});
-      kinematics_state joint_4_state = joint_4_profile.calculate(joint_targets.forearm_roll_4,      5, {last_targets.forearm_roll_4,      last_velocities.forearm_roll_4});
-      kinematics_state joint_5_state = joint_5_profile.calculate(joint_targets.wrist_5,             5, {last_targets.wrist_5,             last_velocities.wrist_5});
-      kinematics_state joint_6_state = joint_6_profile.calculate(joint_targets.end_6,               5, {last_targets.end_6,               last_velocities.end_6});
+      kinematics_state joint_1_state = joint_1_profile.calculate(joint_targets.base_yaw_rotate_1,   5, {last_targets.base_yaw_rotate_1,   last_angular_velocities.base_yaw_rotate_1});
+      kinematics_state joint_2_state = joint_2_profile.calculate(joint_targets.base_pitch_rotate_2, 5, {last_targets.base_pitch_rotate_2, last_angular_velocities.base_pitch_rotate_2});
+      kinematics_state joint_3_state = joint_3_profile.calculate(joint_targets.forearm_pitch_3,     5, {last_targets.forearm_pitch_3,     last_angular_velocities.forearm_pitch_3});
+      kinematics_state joint_4_state = joint_4_profile.calculate(joint_targets.forearm_roll_4,      5, {last_targets.forearm_roll_4,      last_angular_velocities.forearm_roll_4});
+      kinematics_state joint_5_state = joint_5_profile.calculate(joint_targets.wrist_5,             5, {last_targets.wrist_5,             last_angular_velocities.wrist_5});
+      kinematics_state joint_6_state = joint_6_profile.calculate(joint_targets.end_6,               5, {last_targets.end_6,               last_angular_velocities.end_6});
 
       // modify target angles
       last_targets =    {0, joint_1_state.position, joint_2_state.position, joint_3_state.position, joint_4_state.position, joint_5_state.position, joint_6_state.position};
-      last_velocities = {0, joint_1_state.velocity, joint_2_state.velocity, joint_3_state.velocity, joint_4_state.velocity, joint_5_state.velocity, joint_6_state.velocity};
+      last_angular_velocities = {0, joint_1_state.velocity, joint_2_state.velocity, joint_3_state.velocity, joint_4_state.velocity, joint_5_state.velocity, joint_6_state.velocity};
     }
 
     ArmSetTarget(last_targets);
@@ -409,7 +447,7 @@ void armTask(void* args) {
       // print("encoder0 %f, encoder1 %f\n", encoder0->getData(), encoder1->getData());
       // print("A1_offset %f, %f\n", A1_id1_offset, A1_id2_offset);
       // print("A1 current: %f. %f \n", MotorA1_recv_id00.current);
-      // print("mechanical: %f, %f, %f, %f, %f, %f \n", mechanical_angle.base_yaw_rotate_1, mechanical_angle.base_pitch_rotate_2, mechanical_angle.forearm_pitch_3, mechanical_angle.forearm_roll_4, mechanical_angle.wrist_5, mechanical_angle.end_6);
+      print("mechanical: %f, %f, %f, %f, %f, %f \n", mechanical_angle.base_yaw_rotate_1, mechanical_angle.base_pitch_rotate_2, mechanical_angle.forearm_pitch_3, mechanical_angle.forearm_roll_4, mechanical_angle.wrist_5, mechanical_angle.end_6);
       // print("current: %f, %f, %f, %f, %f, %f \n", current_motor_angles.base_yaw_rotate_1, current_motor_angles.base_pitch_rotate_2, current_motor_angles.forearm_pitch_3, current_motor_angles.forearm_roll_4, current_motor_angles.wrist_5, current_motor_angles.end_6);
       // print("smoothed: %f, %f, %f, %f, %f, %f \n", last_targets.base_yaw_rotate_1, last_targets.base_pitch_rotate_2, last_targets.forearm_pitch_3, last_targets.forearm_roll_4, last_targets.wrist_5, last_targets.end_6);
       // print("targets: %f, %f, %f, %f, %f, %f \n",joint_targets.base_yaw_rotate_1, joint_targets.base_pitch_rotate_2, joint_targets.forearm_pitch_3, joint_targets.forearm_roll_4, joint_targets.wrist_5, joint_targets.end_6);
@@ -431,7 +469,7 @@ void armTask(void* args) {
       print("waiting for sbus channel 5 to be smaller than -100\r\n");
       while(sbus->ch[9] > -100){
         osDelay(100);
-        print("j456: %f %f %f\r\n", forearm_rotate_motor_4->GetTheta(), wrist_rotate_motor_5->GetTheta(), hand_rotate_motor_6->GetTheta());
+        // print("j456: %f %f %f\r\n", forearm_rotate_motor_4->GetTheta(), wrist_rotate_motor_5->GetTheta(), hand_rotate_motor_6->GetTheta());
       }
       last_loop_time = HAL_GetTick();
   #endif
@@ -479,8 +517,8 @@ int ArmSetTarget(joint_state_t target) {
 
 
 void ArmTransmitOutput() {  
-  control::Motor4310* forearm_motors[3] = {forearm_rotate_motor_4, wrist_rotate_motor_5, hand_rotate_motor_6};
-  control::Motor4310::TransmitOutput(forearm_motors, 3);
+  // control::Motor4310* forearm_motors[3] = {forearm_rotate_motor_4, wrist_rotate_motor_5, hand_rotate_motor_6};
+  // control::Motor4310::TransmitOutput(forearm_motors, 3);
   // control::Motor4310::TransmitOutput(&hand_rotate_motor_6,1);
 }
 
@@ -511,3 +549,16 @@ void kill_arm() {
   hand_rotate_motor_6->MotorDisable();
 }
 
+void revive_arm(){
+  killed = false;
+
+  last_angular_velocities = {0,0,0,0,0,0,0};  
+  last_targets = {0,0,0,0,0,0,0}; // target angles initially match current motor angles
+
+  forearm_rotate_motor_4->MotorEnable();
+  wrist_rotate_motor_5->MotorEnable();
+  hand_rotate_motor_6->MotorEnable();
+  ArmLoadInput(last_targets);
+
+  
+}

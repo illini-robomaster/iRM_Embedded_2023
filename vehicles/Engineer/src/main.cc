@@ -53,7 +53,7 @@ osThreadId_t refereeTaskHandle;
 bsp::CAN* can1 = nullptr;
 bsp::CAN* can2 = nullptr;
 control::Motor4310* rotate_motor = nullptr;
-
+static bool engineerIsKilled = false;
 
 #ifdef USING_DBUS
 remote::DBUS* dbus = nullptr;
@@ -131,13 +131,27 @@ void KillAll() {
 
 }
 
+void ReviveAll(){
+#ifdef CHASSIS
+
+#endif
+
+#ifdef ARM_A1
+    revive_arm();
+#endif
+}
+
 
 void RM_RTOS_Default_Task(const void* args) {
     UNUSED(args);
     while(true){ //if want to print, make sure nothing is print somewhere else
         if(sbus->ch[6]>100){
+            engineerIsKilled = true;
             KillAll();
             print("killed");
+        }else if(engineerIsKilled){ // killed to revive
+            ReviveAll();
+            engineerIsKilled = false;
         }
 
 #ifdef REFEREE

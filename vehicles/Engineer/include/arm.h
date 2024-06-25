@@ -76,6 +76,7 @@ void ArmTransmitOutput();
  * */ 
 void ArmLoadInput(joint_state_t &current_joint_positions);
 
+void revive_arm();
 
 #ifdef USING_DBUS
 extern remote::DBUS* dbus;
