@@ -209,12 +209,12 @@ const float a = 0.05;
 const float b = 0.36; // big arm length
 const float c = 0.30; // forearm length
 joint_state_t inverse_kinematics(Vector3d position, Rotation3d orientation){
-  float l = sqrt(position.x*position.x + position.y*position.y - a*a);
+  float l = sqrt(position._x*position._x + position._y*position._y - a*a);
   float alpha1 = atan(l/a);
-  float theta1 = atan2(position.y, position.x) + alpha1 - PI/2;
+  float theta1 = atan2(position._y, position._x) + alpha1 - PI/2;
 
-  float d = sqrt(l*l+position.z*position.z);
-  float alpha2 = atan2(position.z, l);
+  float d = sqrt(l*l+position._z*position._z);
+  float alpha2 = atan2(position._z, l);
   float beta1 = acos((b*b+d*d-c*c)/(2*b*d));
   float beta2 = acos((b*b+c*c-d*d)/(2*b*c));
   float theta2 = PI/2 - alpha2 - beta1;

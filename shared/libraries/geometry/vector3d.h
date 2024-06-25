@@ -8,9 +8,9 @@ public:
     Vector3d(const Vector3d& v);
     ~Vector3d();
 
-    float x;
-    float y;
-    float z;
+    float _x;
+    float _y;
+    float _z;
 
     Vector3d operator+(const Vector3d& v) const;
     Vector3d operator-(const Vector3d& v) const;
