@@ -75,49 +75,50 @@ void chassisTask(void* argument) {
   control::MotorCANBase* motors[] = {fl_motor, fr_motor, bl_motor, br_motor};
 
   float vx_keyboard = 0, vy_keyboard = 0, wz_keyboard = 0;
-  float vx_remote, vy_remote, wz_remote;
-  float vx_set, vy_set, wz_set;
 
   while (true) {
-    // Wait time = 50 ticks, 50ms?
-    flags = 0;
-    flags = osEventFlagsWait(chassis_flag_id, DATA_READY_SIGNAL, osFlagsWaitAny, 50);
-
-    vx_keyboard = vx;
-    vy_keyboard = vy;
-    wz_keyboard = vw;
-
     uint32_t RGB_color[3] = {0xFFFF0000, 0xFF00FF00, 0xFF0000FF};
 
-    // When timeout it returns -2 so we need extra checks here
-    if (flags != osFlagsErrorTimeout && flags & DATA_READY_SIGNAL) {
-      vx_keyboard = clip<float>(vx_keyboard, -1200, 1200);
-      vy_keyboard = clip<float>(vy_keyboard, -1200, 1200);
+    // Keyboard control / Navigation mode
+    if (dbus->swr == remote::UP) {
+      flags = 0;
+      flags = osEventFlagsWait(chassis_flag_id, DATA_READY_SIGNAL, osFlagsWaitAny, 50);
 
-      vx_remote = dbus->ch0;
-      vy_remote = dbus->ch1;
-      wz_remote = dbus->ch2;
+      vx_keyboard = vx;
+      vy_keyboard = vy;
+      wz_keyboard = vw;
 
-      vx_set = vx_keyboard + vx_remote;
-      vy_set = vy_keyboard + vy_remote;
-      wz_set = wz_keyboard + wz_remote;
+      // When timeout it returns -2 so we need extra checks here
+      if (flags != osFlagsErrorTimeout && flags & DATA_READY_SIGNAL) {
+        vx_keyboard = clip<float>(vx_keyboard, -1200, 1200);
+        vy_keyboard = clip<float>(vy_keyboard, -1200, 1200);
 
-      chassis->SetSpeed(vx_set, vy_set, wz_set);
-      chassis->Update(false, 30, 20, 60);
+        chassis->SetSpeed(vx_keyboard, vy_keyboard, wz_keyboard);
+        chassis->Update(false, 30, 20, 60);
 
-      led->Display(RGB_color[1]);
-    } else {
-      // if timeout (no packet, stop the motor)
-      fl_motor->SetOutput(0);
-      fr_motor->SetOutput(0);
-      bl_motor->SetOutput(0);
-      br_motor->SetOutput(0);
+        led->Display(RGB_color[1]);
+      } else {
+        // if timeout (no packet, stop the motor)
+        fl_motor->SetOutput(0);
+        fr_motor->SetOutput(0);
+        bl_motor->SetOutput(0);
+        br_motor->SetOutput(0);
 
-      led->Display(RGB_color[0]);
+        led->Display(RGB_color[0]);
+      }
+      control::MotorCANBase::TransmitOutput(motors, 4);
+      osDelay(10);
     }
 
-    control::MotorCANBase::TransmitOutput(motors, 4);
-    osDelay(10);
+    // Dbus control
+    else {
+      chassis->SetSpeed(dbus->ch0, dbus->ch1, dbus->ch2);
+      chassis->Update(false, 30, 20, 60);
+      control::MotorCANBase::TransmitOutput(motors, 4);
+      osDelay(10);
+
+      led->Display(RGB_color[2]);
+    }
   }
 }
 
@@ -152,7 +153,6 @@ void RM_RTOS_Threads_Init(void) {
 
 void RM_RTOS_Default_Task(const void* argument) {
   UNUSED(argument);
-
   auto uart = std::make_unique<CustomUART>(&huart1);
   uart->SetupRx(50);
   uart->SetupTx(50);
