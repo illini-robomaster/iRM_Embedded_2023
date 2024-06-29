@@ -21,6 +21,10 @@
 #pragma once
 
 #include "stdint.h"
+
+#include <cmath>
+#include <vector>
+#include <algorithm>
 #include <deque>
 /**
  * @brief clip a value to fall into a given range
@@ -256,8 +260,8 @@ public:
       }
       window.push_back(measurement);
       T sum = 0;
-      for (const T& value : window) {
-        sum += value;
+      for (const T &val: window){
+        sum += val;
       }
       return sum / window.size();
     }

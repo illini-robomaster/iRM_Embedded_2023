@@ -73,4 +73,75 @@ float uint_to_float(int x_int, float x_min, float x_max, int bits) {
 }
 
 
+//==================================================================================================
+// Hero 2024 Gimbal pitch angle calculation:
+//==================================================================================================
+
+
+const double g = 9.81;
+const double pi = M_PI;
+const double c = 0.05; // drag coefficient; need update
+const double m = 0.145; // mass of the projectile; need update
+
+
+struct State {
+    double x;
+    double y;
+    double vx;
+    double vy;
+    double h2_minus_h1;
+};
+
+State derivatives(const State& state) {
+  double v = std::sqrt(state.vx * state.vx + state.vy * state.vy);
+  return { state.vx, state.vy, - c / m * v * state.vx, -g - c / m * v * state.vy ,state.h2_minus_h1};
+}
+
+State rk4_step(const State& state, double dt) {
+  State k1 = derivatives(state);
+  State k2 = derivatives({ state.x + k1.x * dt / 2, state.y + k1.y * dt / 2, state.vx + k1.vx * dt / 2, state.vy + k1.vy * dt / 2 ,state.h2_minus_h1});
+  State k3 = derivatives({ state.x + k2.x * dt / 2, state.y + k2.y * dt / 2, state.vx + k2.vx * dt / 2, state.vy + k2.vy * dt / 2 ,state.h2_minus_h1});
+  State k4 = derivatives({ state.x + k3.x * dt, state.y + k3.y * dt, state.vx + k3.vx * dt, state.vy + k3.vy * dt, state.h2_minus_h1});
+
+  return {
+          state.x + dt / 6 * (k1.x + 2 * k2.x + 2 * k3.x + k4.x),
+          state.y + dt / 6 * (k1.y + 2 * k2.y + 2 * k3.y + k4.y),
+          state.vx + dt / 6 * (k1.vx + 2 * k2.vx + 2 * k3.vx + k4.vx),
+          state.vy + dt / 6 * (k1.vy + 2 * k2.vy + 2 * k3.vy + k4.vy),
+          state.h2_minus_h1
+  };
+}
+
+double simulate(double theta0, double V0, double diff) {
+  State state = { 0, 0, V0 * cos(theta0), V0 * sin(theta0) , diff};
+  double dt = 0.01;
+  double x_final = 0;
+
+
+  while (state.y >= state.h2_minus_h1) {
+    state = rk4_step(state, dt);
+    if (state.y <= state.h2_minus_h1) {
+      x_final = state.x;
+      break;
+    }
+  }
+  return x_final;
+}
+
+double find_optimal_angle(double V0, double S, double height_diff) {
+
+  double angle_step = 0.1 * pi / 180; // 0.1 degrees in radians
+  double best_angle = 0;
+  double min_diff = std::numeric_limits<double>::max();
+
+  for (double theta = 10 * pi / 180; theta <= 80 * pi / 180; theta += angle_step) {
+    double distance = simulate(theta, V0, height_diff);
+    double diff = std::abs(distance - S);
+    if (diff < min_diff) {
+      min_diff = diff;
+      best_angle = theta;
+    }
+  }
+  return best_angle * 180 / pi; // Convert radians back to degrees
+}
 

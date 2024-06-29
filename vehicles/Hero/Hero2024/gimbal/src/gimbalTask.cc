@@ -41,6 +41,7 @@ static control::ServoMotor* pitch_servo = nullptr;
 static control::Motor4310* yaw_motor = nullptr;
 
 static control::BRTEncoder *pitch_encoder = nullptr;
+static distance::SEN_0366_DIST *distance_sensor = nullptr;
 
 
 bool exit_flag = false;
@@ -70,6 +71,12 @@ void gimbal_task(void* args) {
   control::MotorCANBase* can1_escalation[] = {esca_motor};
   control::MotorCANBase* can1_pitch[] = {pitch_motor};
   control::Motor4310* can1_yaw[] = {yaw_motor};
+
+  while (!distance_sensor->begin()){
+    print("distance sensor initializing\r\n");
+    osDelay(100);
+  }
+
   while (true) {
     if (dbus->keyboard.bit.B || dbus->swr == remote::DOWN) break;
     osDelay(100);
@@ -128,6 +135,7 @@ void gimbal_task(void* args) {
     pitch_cmd = dbus->ch3 / 500.0;
     yaw_cmd = clip<float>(dbus->ch2 / 220.0 * 30.0, -30, 30);
 
+    distance_sensor->readValue();
 
 
     pitch_servo->SetTarget(pitch_servo->GetTheta() + pitch_cmd);
@@ -170,6 +178,7 @@ void init_gimbal() {
   pitch_servo = new control::ServoMotor(pitch_servo_data);
   yaw_motor = new control::Motor4310(can1, 0x03, 0x02, control::VEL);
   pitch_encoder = new control::BRTEncoder(can1,0x01,false);
+  distance_sensor = distance::SEN_0366_DIST::init(&huart6,0x80);
 }
 
 void kill_gimbal() {
@@ -181,3 +190,4 @@ void kill_gimbal() {
     osDelay(KILLALL_DELAY);
   }
 }
+

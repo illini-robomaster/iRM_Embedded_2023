@@ -39,13 +39,22 @@ void RM_RTOS_Default_Task(const void* arguments) {
   UNUSED(arguments);
 
   print("Begin\r\n");
-  while (!sensor->begin()) osDelay(50);
+  while (!sensor->begin()){
+    print("sensor_initializing\r\n");
+    osDelay(50);
+  }
 
-
+  sensor->continuousMeasure();
   while (true) {
     osDelay(100);
+//    sensor->singleMeasure();
     sensor->readValue();
-      print("distance is: %2f m. \r\n", sensor->distance);
+    print("distance is: %f m. \r\n", sensor->distance_);
+
+//    for (int i = 0; i < 10; i++){
+//      print("%x ",sensor->buff_[i]);
+//    }
+//    print ("\r\n");
   }
 }
 

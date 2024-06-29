@@ -20,17 +20,20 @@
 
 #include "sen_0366_dist.h"
 
+
+
 namespace distance{
 
     void sen_0366_config(UART_HandleTypeDef *huart){
+      // uninitialized the current uart for now
       HAL_UART_DeInit(huart);
+      // update baud rate
       huart->Init.BaudRate = 9600;
-      huart->Init.StopBits = UART_STOPBITS_1;
-      huart->Init.Parity = UART_PARITY_ODD;
+      // reinitialize the uart
       HAL_UART_Init(huart);
     }
-    SEN_0366_DIST::SEN_0366_DIST(UART_HandleTypeDef *huart, uint8_t ADDR, MovingAverageFilter<double> maf)
-            : bsp::UART(huart), maf(maf) {
+    SEN_0366_DIST::SEN_0366_DIST(UART_HandleTypeDef *huart, uint8_t ADDR, MovingAverageFilter<double> filter)
+            : bsp::UART(huart), filter_(std::move(filter)) {
       address = ADDR;
       SetupRx(100);
       SetupTx(100);
@@ -38,8 +41,8 @@ namespace distance{
 
     SEN_0366_DIST*  SEN_0366_DIST::init(UART_HandleTypeDef *huart, uint8_t ADDR) {
         sen_0366_config(huart);
-        size_t window_size = 30;
-        SEN_0366_DIST* ret = new SEN_0366_DIST(huart, ADDR, MovingAverageFilter<double>(window_size));
+        size_t window_size = 15;
+        auto* ret = new SEN_0366_DIST(huart, ADDR, MovingAverageFilter<double>(window_size));
         return ret;
     }
     bool SEN_0366_DIST::begin() {
@@ -68,6 +71,11 @@ namespace distance{
         laser_on_packet.command[3] = 0x01;
         laser_on_packet.command[4] = ~(address +
                 laser_on_packet.command[1] + laser_on_packet.command[2] + laser_on_packet.command[3]) + 1;
+        // read parameter packet
+        parameter_packet.command[0] = 0xFA;
+        parameter_packet.command[1] = 0x06;
+        parameter_packet.command[2] = 0x01;
+        parameter_packet.command[3] = 0xFF;
         // set measure distance
         set_measure_distance_packet.command[0] = 0xFA;
         set_measure_distance_packet.command[1] = 0x04;
@@ -81,11 +89,36 @@ namespace distance{
         set_resolution_packet.command[1] = 0x04;
         set_resolution_packet.command[2] = 0x0C;
 
-        Write((uint8_t*)&continuous_measurement_packet, sizeof(SendPacket_4_t ));
+        //FA 06 01 FF
+        read_version_packet.command[0] = 0xFA;
+        read_version_packet.command[1] = 0x06;
+        read_version_packet.command[2] = 0x01;
+        read_version_packet.command[3] = 0xFF;
 
+        setResolution(RESOLUTION_0_1_MM);
 
+        setMeasureRange(RANGE_80_M);
 
-        return laserOn()&true;
+        return laserOn();
+    }
+
+    bool SEN_0366_DIST::singleMeasure() {
+        delay_func(50);
+        uint8_t *buffer;
+        Write((uint8_t*)&single_measurement_packet, sizeof(SendPacket_4_t));
+        Read(&buffer);
+        distance_ = (buffer[3] - 0x30) * 100 + (buffer[4] - 0x30) * 10
+                  + (buffer[5] - 0x30) + (buffer[7] - 0x30) * 0.1 + (buffer[8] - 0x30) * 0.01;
+
+        return checkReturn(buffer,MEASURE_RET);
+    }
+
+    bool SEN_0366_DIST::continuousMeasure() {
+      delay_func(100);
+      uint8_t *buffer;
+      Write((uint8_t*)&continuous_measurement_packet, sizeof(SendPacket_4_t ));
+      Read(&buffer);
+      return checkReturn(buffer,MEASURE_RET);
     }
 
     bool SEN_0366_DIST::laserOn() {
@@ -93,8 +126,66 @@ namespace distance{
         uint8_t *buffer;
         Write((uint8_t*)&laser_on_packet, sizeof(SendPacket_5_t));
         Read(&buffer);
-        // TODO: ask customer services of how to do CRC check
-        return true;
+        buff_ = buffer;
+        return checkReturn(buffer,LASER_RET);
+    }
+
+    void SEN_0366_DIST::fetchParameter() {
+        delay_func(50);
+        uint8_t *buffer;
+        Write((uint8_t*)&parameter_packet,sizeof(SendPacket_4_t ));
+        Read(&buffer);
+        buff_ = buffer;
+
+    }
+
+    bool SEN_0366_DIST::setMeasureRange(range_t range) {
+        switch (range) {
+            case RANGE_5_M:
+              set_measure_distance_packet.command[3] = 0x05;
+              set_measure_distance_packet.command[4] = 0xF4;
+              break;
+            case RANGE_10_M:
+              set_measure_distance_packet.command[3] = 0x0A;
+              set_measure_distance_packet.command[4] = 0xEF;
+              break;
+            case RANGE_30_M:
+              set_measure_distance_packet.command[3] = 0x1E;
+              set_measure_distance_packet.command[4] = 0xDB;
+              break;
+            case RANGE_50_M:
+              set_measure_distance_packet.command[3] = 0x32;
+              set_measure_distance_packet.command[4] = 0xC7;
+              break;
+            case RANGE_80_M:
+              set_measure_distance_packet.command[3] = 0x50;
+              set_measure_distance_packet.command[4] = 0xA9;
+              break;
+            default:
+              return false;
+          }
+        delay_func(50);
+        uint8_t *buffer;
+        Write((uint8_t*)&set_measure_distance_packet, sizeof(SendPacket_5_t));
+        Read(&buffer);
+        return checkReturn(buffer,SET_MEASURE_RANGE_RET);
+    }
+
+    bool SEN_0366_DIST::setResolution(resolution_t resolution) {
+      if (resolution == RESOLUTION_1_MM){
+        set_resolution_packet.command[3] = 0x01;
+        set_resolution_packet.command[4] = 0xF5;
+      } else if (resolution == RESOLUTION_0_1_MM){
+        set_resolution_packet.command[3] = 0x02;
+        set_resolution_packet.command[4] = 0xF4;
+      } else {
+        return false;
+      }
+      delay_func(50);
+      uint8_t *buffer;
+      Write((uint8_t*)&set_resolution_packet, sizeof(SendPacket_5_t));
+      Read(&buffer);
+      return checkReturn(buffer,SET_RESOLUTION_RET);
     }
 
     bool SEN_0366_DIST::shutdown(){
@@ -102,18 +193,72 @@ namespace distance{
         uint8_t *buffer;
         Write((uint8_t*)&shutdown_packet, sizeof(SendPacket_4_t));
         Read(&buffer);
-        return true;
+        return checkReturn(buffer,SHUTDOWN_RET);
     }
 
     void SEN_0366_DIST::readValue() {
+      delay_func(50);
       uint8_t *buffer;
       Read(&buffer);
-      double prev_distance = distance;
-      distance = (buffer[3] - 0x30) * 100 + (buffer[4] - 0x30) * 10 + (buffer[5] - 0x30) + (buffer[7] - 0x30) * 0.1 + (buffer[8] - 0x30) * 0.01;
-      if (distance < 0 || distance > 70){
-        distance = prev_distance;
-        distance = maf.update(distance);
+      buff_=buffer;
+      double prev_distance = distance_;
+      distance_ = (buffer[3] - 0x30) * 100 + (buffer[4] - 0x30) * 10
+              + (buffer[5] - 0x30) + (buffer[7] - 0x30) * 0.1 + (buffer[8] - 0x30) * 0.01;
+//      distance_ = filter_.update(distance_);
+      if ((distance_ < 0 || distance_ > 70)||(!(checkReturn(buffer,MEASURE_RET)))){
+          distance_ = prev_distance;
+        }
+    }
+
+    bool SEN_0366_DIST::checkReturn(const uint8_t *buffer, command_id_t command_id) const {
+      switch(command_id){
+        case LASER_RET:
+          if (buffer[0] == address && buffer[1] == 0x06 && buffer[2] == 0x85 && buffer[3] == 0x01){
+            uint16_t cs = ~(address + buffer[1] + buffer[2] + buffer[3]) + 1;
+            cs = cs << 8;
+            cs = cs >> 8;
+            if (buffer[4] == cs){
+              return true;
+            }
+          }
+          return false;
+        case MEASURE_RET:
+          if (buffer[3]=='E' && buffer[4] == 'R' && buffer[5] == 'R'){
+            return false;
+          }
+          return true;
+        case SHUTDOWN_RET:
+          if (buffer[0] == address && buffer[1] == 0x04 && buffer[2] == 0x82){
+              uint8_t cs = ~(address + buffer[1] + buffer[2]) + 1;
+              if (buffer[3] == cs){
+                return true;
+              }
+          }
+          return false;
+        case SET_MEASURE_RANGE_RET:
+          if (buffer[0]==0xFA && buffer[1] == 0x04 && buffer[2] == 0x89 && buffer[3] == 0x79){
+            return true;
+          }
+          return false;
+        case SET_FREQUENCY_RET:
+          if (buffer[0]==0xFA && buffer[1] == 0x04 && buffer[2] == 0x8A && buffer[3] == 0x78){
+            return true;
+          }
+          return false;
+        case SET_RESOLUTION_RET:
+          if (buffer[0]==0xFA && buffer[1] == 0x04 && buffer[2] == 0x8C && buffer[3] == 0x76){
+              return true;
+          }
+          return false;
+        case VERSION_RET:
+          if (buffer[0]==0xFA && buffer[1] == 0x06 && buffer[2] == 0x81 && buffer[3] == 0x80){
+            return true;
+          }
+          return false;
+        default:
+          break;
       }
+      return false;
     }
 }
 
