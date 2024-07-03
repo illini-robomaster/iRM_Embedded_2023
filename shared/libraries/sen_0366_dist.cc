@@ -99,7 +99,9 @@ namespace distance{
 
         setMeasureRange(RANGE_80_M);
 
-        return laserOn();
+        connection_flag_ = laserOn();
+
+        return connection_flag_;
     }
 
     bool SEN_0366_DIST::singleMeasure() {
@@ -210,7 +212,7 @@ namespace distance{
         }
     }
 
-    bool SEN_0366_DIST::checkReturn(const uint8_t *buffer, command_id_t command_id) const {
+    bool SEN_0366_DIST::checkReturn(const uint8_t *buffer, command_id_t command_id) {
       switch(command_id){
         case LASER_RET:
           if (buffer[0] == address && buffer[1] == 0x06 && buffer[2] == 0x85 && buffer[3] == 0x01){
@@ -221,11 +223,13 @@ namespace distance{
               return true;
             }
           }
+          connection_flag_ = false;
           return false;
         case MEASURE_RET:
           if (buffer[3]=='E' && buffer[4] == 'R' && buffer[5] == 'R'){
             return false;
           }
+          connection_flag_ = false;
           return true;
         case SHUTDOWN_RET:
           if (buffer[0] == address && buffer[1] == 0x04 && buffer[2] == 0x82){
@@ -234,26 +238,31 @@ namespace distance{
                 return true;
               }
           }
+          connection_flag_ = false;
           return false;
         case SET_MEASURE_RANGE_RET:
           if (buffer[0]==0xFA && buffer[1] == 0x04 && buffer[2] == 0x89 && buffer[3] == 0x79){
             return true;
           }
+          connection_flag_ = false;
           return false;
         case SET_FREQUENCY_RET:
           if (buffer[0]==0xFA && buffer[1] == 0x04 && buffer[2] == 0x8A && buffer[3] == 0x78){
             return true;
           }
+          connection_flag_ = false;
           return false;
         case SET_RESOLUTION_RET:
           if (buffer[0]==0xFA && buffer[1] == 0x04 && buffer[2] == 0x8C && buffer[3] == 0x76){
               return true;
           }
+          connection_flag_ = false;
           return false;
         case VERSION_RET:
           if (buffer[0]==0xFA && buffer[1] == 0x06 && buffer[2] == 0x81 && buffer[3] == 0x80){
             return true;
           }
+          connection_flag_ = false;
           return false;
         default:
           break;

@@ -139,11 +139,13 @@ namespace distance {
         void readValue(); ///< Function to read the value from the sensor.
         bool setResolution(resolution_t resolution); ///< Function to set the resolution.
         bool shutdown(); ///< Function to shutdown the sensor.
-        bool checkReturn(const uint8_t *buffer, command_id_t command_id) const; ///< Function to check the return value of a command.
+        bool checkReturn(const uint8_t *buffer, command_id_t command_id); ///< Function to check the return value of a command.
         void fetchParameter(); ///< Function to fetch parameters from the sensor.
+
 
         double distance_; ///< Measured distance.
         uint8_t *buff_; ///< Buffer for received data.
+        bool connection_flag_;
 
     private:
         sen_0366_delay_t delay_func = [](uint32_t milli) { HAL_Delay(milli); }; ///< Delay function.

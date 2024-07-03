@@ -29,6 +29,7 @@
 #include "gimbalTask.h"
 #include "main.h"
 #include "protocol.h"
+#include "refereeTask.h"
 
 extern osThreadId_t uiTaskHandle;
 const osThreadAttr_t uiTaskAttribute = {.name = "UI_task",

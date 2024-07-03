@@ -33,10 +33,13 @@ static const int GIMBAL_TASK_DELAY = 1;
 
 static control::MotorCANBase* esca_motor = nullptr;
 static control::ServoMotor* escalation_servo = nullptr;
+static control::MotorCANBase *esca_yaw_motor = nullptr;
 
+static control::MotorCANBase* pitch_motor_L = nullptr;
+static control::MotorCANBase* pitch_motor_R = nullptr;
 
-static control::MotorCANBase* pitch_motor = nullptr;
-static control::ServoMotor* pitch_servo = nullptr;
+static control::ServoMotor* pitch_servo_L = nullptr;
+static control::ServoMotor* pitch_servo_R = nullptr;
 
 static control::Motor4310* yaw_motor = nullptr;
 
@@ -44,12 +47,17 @@ static control::BRTEncoder *pitch_encoder = nullptr;
 static distance::SEN_0366_DIST *distance_sensor = nullptr;
 
 
+
 bool exit_flag = false;
 
-float calibrated_theta = 0;
+float calibrated_theta_esca = 0;
+
+
 
 float pitch_curr;
 float pitch_target;
+
+float curr_yaw;
 
 void jam_callback(control::ServoMotor* servo, const control::servo_jam_t data) {
   UNUSED(data);
@@ -58,7 +66,7 @@ void jam_callback(control::ServoMotor* servo, const control::servo_jam_t data) {
   control::MotorCANBase::TransmitOutput(can1_escalation, 1);
   osDelay(100);
   servo->ResetTheta();
-  print("Jam detected, resetting...\r\n");
+//  print("Jam detected, resetting...\r\n");
   exit_flag = true;
 }
 void empty_callback(control::ServoMotor* servo, const control::servo_jam_t data) {
@@ -69,11 +77,11 @@ void empty_callback(control::ServoMotor* servo, const control::servo_jam_t data)
 void gimbal_task(void* args) {
   UNUSED(args);
   control::MotorCANBase* can1_escalation[] = {esca_motor};
-  control::MotorCANBase* can1_pitch[] = {pitch_motor};
+  control::MotorCANBase* can1_pitch[] = {pitch_motor_L, pitch_motor_R};
   control::Motor4310* can1_yaw[] = {yaw_motor};
 
   while (!distance_sensor->begin()){
-    print("distance sensor initializing\r\n");
+//    print("distance sensor initializing\r\n");
     osDelay(100);
   }
 
@@ -82,27 +90,63 @@ void gimbal_task(void* args) {
     osDelay(100);
   }
 
+  distance_sensor->continuousMeasure();
   yaw_motor->SetZeroPos();
   yaw_motor->MotorEnable();
 
+  /*
+   * escalation reset
+   */
   while (true){
     escalation_servo->SetTarget(escalation_servo->GetTheta() - PI * 2,true);
     escalation_servo->CalcOutput();
     control::MotorCANBase::TransmitOutput(can1_escalation, 1);
     osDelay(GIMBAL_TASK_DELAY);
     if (exit_flag){
-      print("Escalation motor jammed, reseting...\r\n");
+//      print("Escalation motor jammed, resting...\r\n");
+      osDelay(50);
+      calibrated_theta_esca = escalation_servo->GetTheta();
+      escalation_servo->SetTarget(calibrated_theta_esca, true);
+      // update jam callback threshold
+      escalation_servo->RegisterJamCallback(empty_callback, 0.205);
+      osDelay(50);
       break;
     }
   }
-  calibrated_theta = escalation_servo->GetTheta();
-  print("gimbal_task entering loop\r\n");
-  print("calibrated_theta: %f\r\n", calibrated_theta);
-  escalation_servo->SetTarget(calibrated_theta,true);
-  // update jam callback threshold
-  escalation_servo->RegisterJamCallback(empty_callback, 0.205);
+
+
+
+//  print("gimbal_task entering loop\r\n");
+//  print("calibrated_theta: %f\r\n", calibrated_theta);
+
+
+  /*
+   * pitch motors reset
+   */
+  exit_flag = false;
+  while (true){
+    pitch_servo_L->SetTarget(pitch_servo_L->GetTheta() - PI * 2,true);
+    pitch_servo_L->CalcOutput();
+    pitch_servo_R->SetTarget(pitch_servo_R->GetTheta() - PI * 2,true);
+    pitch_servo_R->CalcOutput();
+    control::MotorCANBase::TransmitOutput(can1_pitch, 2);
+    osDelay(GIMBAL_TASK_DELAY);
+    if (exit_flag){
+      osDelay(50);
+      pitch_servo_L->SetTarget(pitch_servo_L->GetTheta(),true);
+      pitch_servo_R->SetTarget(pitch_servo_R->GetTheta(),true);
+      pitch_servo_L->CalcOutput();
+      pitch_servo_R->CalcOutput();
+      control::MotorCANBase::TransmitOutput(can1_pitch,2);
+      osDelay(50);
+      break;
+    }
+  }
+
+
 
   pitch_target = 0.0;
+
   pitch_curr = -1.0; // make sure it is initialized.
 
   pitch_cmd = 0.0;
@@ -112,24 +156,24 @@ void gimbal_task(void* args) {
   while (true) {
     // Bool Edge Detector for lob mode switch or osEventFlags wait for a signal from different threads
     lob_mode_sw.input(dbus->keyboard.bit.SHIFT || dbus->swl == remote::UP);
-    if (lob_mode_sw.posEdge()&& dbus->swr == remote::MID){
+    if (lob_mode_sw.posEdge() && dbus->swr == remote::MID){
       lob_mode = !lob_mode;
       // TODO: after implementing chassis, uncomment the lob_mode bsp::CanBridge flag transmission
-      send->cmd.id = bsp::LOB_MODE;
-      send->cmd.data_bool = lob_mode;
-      send->TransmitOutput();
+//      send->cmd.id = bsp::LOB_MODE;
+//      send->cmd.data_bool = lob_mode;
+//      send->TransmitOutput();
       escalation_servo->SetMaxSpeed(4 * PI);
-      print("lob_mode: %d\n", lob_mode);
+//      print("lob_mode: %d\n", lob_mode);
     }
     if(lob_mode){
       // please make sure the calibration is all done
       // lob mode
-      escalation_servo->SetTarget(calibrated_theta + PI * 12.1);
+      escalation_servo->SetTarget(calibrated_theta_esca + PI * 12.1);
       // maximum goes to 38.345 radians
     } else {
       // moving mode
       // set escalation servo to original position
-      escalation_servo->SetTarget(calibrated_theta);
+      escalation_servo->SetTarget(calibrated_theta_esca);
     }
 
     pitch_cmd = dbus->ch3 / 500.0;
@@ -137,15 +181,17 @@ void gimbal_task(void* args) {
 
     distance_sensor->readValue();
 
+    pitch_servo_L->SetTarget(pitch_servo_L->GetTheta() + pitch_cmd);
+    pitch_servo_L->CalcOutput();
+    pitch_servo_R->SetTarget(pitch_servo_R->GetTheta() + pitch_cmd);
+    pitch_servo_R->CalcOutput();
 
-    pitch_servo->SetTarget(pitch_servo->GetTheta() + pitch_cmd);
-    pitch_servo->CalcOutput();
     escalation_servo->CalcOutput();
     yaw_motor->SetOutput(yaw_cmd);
 
     pitch_curr = pitch_encoder->getData();
     control::MotorCANBase::TransmitOutput(can1_escalation, 1);
-    control::MotorCANBase::TransmitOutput(can1_pitch, 1);
+    control::MotorCANBase::TransmitOutput(can1_pitch, 2);
     control::Motor4310::TransmitOutput(can1_yaw, 1);
     osDelay(GIMBAL_TASK_DELAY);
   }
@@ -166,19 +212,28 @@ void init_gimbal() {
   escalation_servo = new control::ServoMotor(esca_servo_data);
   escalation_servo->RegisterJamCallback(jam_callback, 0.205);
 
-  pitch_motor = new control::Motor2006(can1, 0x205);
+  pitch_motor_L = new control::Motor2006(can1, 0x205);
   control::servo_t pitch_servo_data;
-  pitch_servo_data.motor = pitch_motor;
-  pitch_servo_data.max_speed = 100 * PI; // TODO: params need test
+  pitch_servo_data.motor = pitch_motor_L;
+  pitch_servo_data.max_speed = 100 * PI;    // TODO: params need test
   pitch_servo_data.max_acceleration = 100 * PI;
   pitch_servo_data.transmission_ratio = M2006P36_RATIO;
   pitch_servo_data.omega_pid_param = new float [3] {150, 1.2, 5};
   pitch_servo_data.max_iout = 1000;
   pitch_servo_data.max_out = 13000;
-  pitch_servo = new control::ServoMotor(pitch_servo_data);
+  pitch_servo_L = new control::ServoMotor(pitch_servo_data);
+
+  pitch_motor_R = new control::Motor2006(can1,0x206);
+  pitch_servo_data.motor = pitch_motor_R;
+  pitch_servo_R = new control::ServoMotor(pitch_servo_data);
+
   yaw_motor = new control::Motor4310(can1, 0x03, 0x02, control::VEL);
+
   pitch_encoder = new control::BRTEncoder(can1,0x01,false);
-  distance_sensor = distance::SEN_0366_DIST::init(&huart6,0x80);
+
+  distance_sensor = distance::SEN_0366_DIST::init(&huart1,0x80);
+
+  esca_yaw_motor = new control::Motor6020(can1,0x208);
 }
 
 void kill_gimbal() {

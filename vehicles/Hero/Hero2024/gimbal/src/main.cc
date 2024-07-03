@@ -45,7 +45,7 @@ bsp::CanBridge* send = nullptr;
 
 bsp::Buzzer *buzzer = nullptr;
 
-
+bsp::GPIO* key = nullptr;
 
 // lob mode switch
 BoolEdgeDetector lob_mode_sw=BoolEdgeDetector(false);
@@ -60,7 +60,6 @@ osThreadId_t refereeTaskHandle;
 
 // Params Initialization
 void RM_RTOS_Init(){
-  print_use_uart(&huart1);
   // Initialize the CAN bus
   can1 = new bsp::CAN(&hcan1, true);
   can2 = new bsp::CAN(&hcan2, false);
