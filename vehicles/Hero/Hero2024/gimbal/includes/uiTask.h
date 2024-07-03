@@ -31,6 +31,8 @@
 #include "protocol.h"
 #include "refereeTask.h"
 
+#define UI_DELAY 40
+
 extern osThreadId_t uiTaskHandle;
 const osThreadAttr_t uiTaskAttribute = {.name = "UI_task",
         .attr_bits = osThreadDetached,
