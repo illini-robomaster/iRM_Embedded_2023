@@ -127,9 +127,9 @@ void RM_RTOS_Init(void) {
 
   can = new bsp::CAN(&hcan1);
   fl_motor = new control::Motor3508(can, 0x201);
-  fr_motor = new control::Motor3508(can, 0x204);
-  bl_motor = new control::Motor3508(can, 0x202);
-  br_motor = new control::Motor3508(can, 0x203);
+  fr_motor = new control::Motor3508(can, 0x202);
+  bl_motor = new control::Motor3508(can, 0x203);
+  br_motor = new control::Motor3508(can, 0x204);
 
   control::MotorCANBase* motors[control::FourWheel::motor_num];
   motors[control::FourWheel::front_left] = fl_motor;
