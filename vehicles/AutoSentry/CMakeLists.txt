@@ -1,6 +1,6 @@
 # ---------------------------------------------------------------------- #
 #                                                                        #
-#  Copyright (C) 2022                                                    #
+#  Copyright (C) 2024                                                    #
 #  Illini RoboMaster @ University of Illinois at Urbana-Champaign.       #
 #                                                                        #
 #  This program is free software: you can redistribute it and/or modify  #
@@ -18,8 +18,12 @@
 #                                                                        #
 # ---------------------------------------------------------------------- #
 
-add_subdirectory(Fortress)
-add_subdirectory(Sentry)
-add_subdirectory(Steering)
-add_subdirectory(Fortress_DoubleShooter)
-add_subdirectory(AutoSentry)
+project(AutoSentry ASM C CXX)
+
+irm_add_arm_executable(autosentry_chassis
+    TARGET DJI_Board_TypeC
+    SOURCES chassis.cc)
+
+irm_add_arm_executable(autosentry_gimbal
+    TARGET DJI_Board_TypeC
+    SOURCES gimbal.cc)
