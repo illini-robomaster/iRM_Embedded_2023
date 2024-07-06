@@ -27,6 +27,7 @@ namespace bsp {
 typedef enum {
   VX,
   VY,
+  WZ,
   RELATIVE_ANGLE,
   START,
   MODE,
@@ -44,7 +45,7 @@ typedef enum {
   FORTRESS_CALIBRATED,
   RECALIBRATE,
   IS_MY_COLOR_BLUE,
-  SUPERCAP_VOLTAGE
+  SUPERCAP_VOLTAGE,
   SELF_CHECK_FLAG
 } can_bridge_cmd;
 
@@ -67,6 +68,7 @@ class CanBridge {
   bridge_data_t cmd;
   float vx = 0;
   float vy = 0;
+  float wz = 0;
   float relative_angle = 0;
   bool start = false;
   int mode = 0;

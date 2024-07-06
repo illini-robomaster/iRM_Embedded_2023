@@ -45,6 +45,9 @@ void CanBridge::UpdateData(const uint8_t* data) {
     case VY:
       vy = cmd.data_float;
       break;
+    case WZ:
+      wz = cmd.data_float;
+      break;
     case RELATIVE_ANGLE:
       relative_angle = cmd.data_float;
       break;
@@ -91,8 +94,8 @@ void CanBridge::UpdateData(const uint8_t* data) {
       is_my_color_blue = cmd.data_bool;
       break;
     case SELF_CHECK_FLAG:
-        self_check_flag = cmd.data_bool;
-        break;
+      self_check_flag = cmd.data_bool;
+      break;
     default:;
   }
 }

@@ -45,21 +45,18 @@
 
 //#define GEAR_GIMBAL   // comment out this line if the gimbal is using belt
 //#define REFEREE_CONNECTED // comment out this line if the referee system is not connected
-
-#define RX_SIGNAL (1 << 0)
-#define DATA_READY_SIGNAL (1 << 1)
-extern osThreadId_t defaultTaskHandle;
+//#define UART_DEBUG  // comment out this line if uart is connected to Jetson
 
 osEventFlagsId_t chassis_flag_id;
 
-static float vx = 0;
-static float vy = 0;
-static float vw = 0;
+static float vx_jetson = 0;
+static float vy_jetson = 0;
+static float vw_jetson = 0;
 
 static bsp::CAN* can1 = nullptr;
 static bsp::CAN* can2 = nullptr;
 static remote::DBUS* dbus = nullptr;
-static display::RGB* RGB = nullptr;
+static display::RGB* led = nullptr;
 
 static const int GIMBAL_TASK_DELAY = 5;
 static const int CHASSIS_TASK_DELAY = 2;
@@ -67,6 +64,7 @@ static const int SHOOTER_TASK_DELAY = 10;
 static const int SELFTEST_TASK_DELAY = 100;
 static const int KILLALL_DELAY = 100;
 static const int DEFAULT_TASK_DELAY = 100;
+static const int JETSON_TASK_DELAY = 10;
 static const int SOFT_START_CONSTANT = 500;
 static const int SOFT_KILL_CONSTANT = 200;
 static const float START_PITCH_POS = 0.48f;
@@ -86,16 +84,10 @@ static volatile bool SpinMode = false;
 // TODO: Fortress mode
 static BoolEdgeDetector ChangeFortressMode(false);
 static volatile bool FortressMode = false;
-
 static BoolEdgeDetector Antijam(false);
-
 static volatile float relative_angle = 0;
-
 static unsigned int chassis_flag_bitmap = 0;
-
 static volatile float pitch_pos = START_PITCH_POS;
-//static volatile float yaw_pos = 0;
-
 static volatile unsigned int gimbal_alive = 0;
 // TODO: need to measure the specific angle
 // static volatile float yaw_pos = START_YAW_POS;
@@ -127,15 +119,6 @@ static volatile bool pitch_reset = false;
 static volatile bool selftestStart = false;
 
 static volatile bool robot_hp_begin = false;
-
-class CustomUART : public bsp::UART {
- public:
-  using bsp::UART::UART;
-
- protected:
-  /* notify application when rx data is pending read */
-  void RxCompleteCallback() override final { osThreadFlagsSet(defaultTaskHandle, RX_SIGNAL); }
-};
 
 //==================================================================================================
 // IMU
@@ -203,7 +186,6 @@ void gimbalTask(void* arg) {
   control::Motor4310* motors_can1_gimbal[] = {pitch_motor, yaw_motor};
 
   print("Wait for beginning signal...\r\n");
-  RGB->Display(display::color_red);
   laser->On();
 
   while (true) {
@@ -238,7 +220,6 @@ void gimbalTask(void* arg) {
   }
 
   print("Start Calibration.\r\n");
-  RGB->Display(display::color_yellow);
   laser->Off();
   pitch_motor->SetOutput(tmp_pitch_pos, 1, 115, 0.5, 0);
   yaw_motor->SetOutput(0, 0, 0, 0, 0);
@@ -255,7 +236,6 @@ void gimbalTask(void* arg) {
   }
 
   print("Gimbal Begin!\r\n");
-  RGB->Display(display::color_green);
   laser->On();
 
   send->cmd.id = bsp::START;
@@ -301,9 +281,12 @@ void gimbalTask(void* arg) {
     #ifdef GEAR_GIMBAL
       yaw_motor->SetOutput(0, -yaw_theta_out, 0, 1.5, 0);
     #else
-//      yaw_motor->SetOutput(0, yaw_theta_out, 0, 1.5, 0);
-      yaw_motor->SetOutput(0, 0, 0, 0, 0);
+      yaw_motor->SetOutput(0, yaw_theta_out, 0, 1.5, 0);
     #endif
+
+    if (!SpinMode) {
+      yaw_motor->SetOutput(0, 0, 90, 0.5, 0);
+    }
 
     control::Motor4310::TransmitOutput(motors_can1_gimbal, 2);
     osDelay(GIMBAL_TASK_DELAY);
@@ -415,7 +398,7 @@ void shooterTask(void* arg) {
      // for manual antijam
      Antijam.input(dbus->keyboard.bit.G);
      // slow shooting
-     if (dbus->mouse.l || dbus->swr == remote::UP) {
+     if (dbus->mouse.l/* || dbus->swr == remote::UP*/) {
        left_shooter->SlowContinueShoot();
        // fast shooting
      } else if ((dbus->mouse.r || dbus->wheel.wheel > remote::WheelDigitalValue)
@@ -450,7 +433,7 @@ void shooterTask(void* arg) {
      // for manual antijam
      Antijam.input(dbus->keyboard.bit.G);
      // slow shooting
-     if (dbus->mouse.l || dbus->swr == remote::UP) {
+     if (dbus->mouse.l/* || dbus->swr == remote::UP*/) {
        right_shooter->SlowContinueShoot();
        // fast shooting
      } else if ((dbus->mouse.r || dbus->wheel.wheel > remote::WheelDigitalValue)
@@ -481,7 +464,7 @@ void shooterTask(void* arg) {
      right_shooter->SetFlywheelSpeed(0);
    } else {
      // flywheel part for left shooter
-     if (!send->shooter_power || dbus->keyboard.bit.Q || dbus->swr == remote::DOWN) {
+     if (!send->shooter_power || dbus->keyboard.bit.Q ||/*dbus->swr == remote::DOWN*/true) {
        leftflywheelFlag = false;
        left_shooter->SetFlywheelSpeed(0);
      } else {
@@ -500,7 +483,7 @@ void shooterTask(void* arg) {
        }
      }
      // flywheel part for right shooter
-     if (!send->shooter_power || dbus->keyboard.bit.Q || dbus->swr == remote::DOWN) {
+     if (!send->shooter_power || dbus->keyboard.bit.Q || /*dbus->swr == remote::DOWN*/true) {
        rightflywheelFlag = false;
        right_shooter->SetFlywheelSpeed(0);
      } else {
@@ -532,6 +515,7 @@ void shooterTask(void* arg) {
 //==================================================================================================
 // Chassis(TODO:)
 //==================================================================================================
+#define DATA_READY_SIGNAL (1 << 0)  // signal for data ready thread flag
 
 const osThreadAttr_t chassisTaskAttribute = {.name = "chassisTask",
                                              .attr_bits = osThreadDetached,
@@ -546,6 +530,7 @@ osThreadId_t chassisTaskHandle;
 
 void chassisTask(void* arg) {
   UNUSED(arg);
+  uint32_t flags;
 
   while (true) {
     if (dbus->keyboard.bit.B || dbus->swr == remote::DOWN) break;
@@ -554,44 +539,51 @@ void chassisTask(void* arg) {
 
   while (!imu->CaliDone()) osDelay(100);
 
-  float vx_keyboard = 0, vy_keyboard = 0;
-  float vx_remote, vy_remote;
-  float vx_set, vy_set;
+  float vx_set = 0, vy_set = 0, wz_set = 0;
 
   while (true) {
-    ChangeSpinMode.input(dbus->keyboard.bit.SHIFT || dbus->swl == remote::UP);
+//    ChangeSpinMode.input(dbus->keyboard.bit.SHIFT || dbus->swl == remote::UP);
     if (ChangeSpinMode.posEdge()) SpinMode = !SpinMode;
 
     send->cmd.id = bsp::MODE;
     send->cmd.data_int = SpinMode ? 1 : 0;
     send->TransmitOutput();
 
-    if (dbus->keyboard.bit.A) vx_keyboard += 61.5;
-    if (dbus->keyboard.bit.D) vx_keyboard -= 61.5;
-    if (dbus->keyboard.bit.W) vy_keyboard -= 61.5;
-    if (dbus->keyboard.bit.S) vy_keyboard += 61.5;
+    // Keyboard control / Navigation mode
+    if (dbus->swr == remote::UP) {
+      flags = 0;
+      flags = osEventFlagsWait(chassis_flag_id, DATA_READY_SIGNAL, osFlagsWaitAny, 50);
 
-    if (-35 <= vx_keyboard && vx_keyboard <= 35) vx_keyboard = 0;
-    if (-35 <= vy_keyboard && vy_keyboard <= 35) vy_keyboard = 0;
+      vx_set = vx_jetson;
+      vy_set = vy_jetson;
+      wz_set = vw_jetson;
 
-    if (vx_keyboard > 0)
-      vx_keyboard -= 60;
-    else if (vx_keyboard < 0)
-      vx_keyboard += 60;
+      // When timeout it returns -2 so we need extra checks here
+      if (flags != osFlagsErrorTimeout && flags & DATA_READY_SIGNAL) {
+        vx_set = clip<float>(vx_set, -1200, 1200);
+        vy_set = clip<float>(vy_set, -1200, 1200);
+        wz_set = clip<float>(wz_set, -1200, 1200);
 
-    if (vy_keyboard > 0)
-      vy_keyboard -= 60;
-    else if (vy_keyboard < 0)
-      vy_keyboard += 60;
+        led->Display(display::color_green);
+      } else {
+        // if timeout (no packet, stop the motor)
+        // TODO : might cause problem
+        vx_set = 0;
+        vy_set = 0;
+        wz_set = 0;
 
-    vx_keyboard = clip<float>(vx_keyboard, -1200, 1200);
-    vy_keyboard = clip<float>(vy_keyboard, -1200, 1200);
+        led->Display(display::color_red);
+      }
+    }
 
-    vx_remote = -dbus->ch0;
-    vy_remote = -dbus->ch1;
+    // Dbus control mode
+    else {
+      vx_set = -dbus->ch0;
+      vy_set = -dbus->ch1;
+      wz_set = dbus->ch2;
 
-    vx_set = vx_keyboard + vx_remote;
-    vy_set = vy_keyboard + vy_remote;
+      led->Display(display::color_blue);
+    }
 
     send->cmd.id = bsp::VX;
     send->cmd.data_float = Dead ? 0 : vx_set;
@@ -600,6 +592,12 @@ void chassisTask(void* arg) {
     send->cmd.id = bsp::VY;
     send->cmd.data_float = Dead ? 0 : vy_set;
     send->TransmitOutput();
+
+    send->cmd.id = bsp::WZ;
+    send->cmd.data_float = Dead ? 0 : wz_set;
+    send->TransmitOutput();
+
+    print("v: %f, %f,%f\r\n", vx_set, vy_set, wz_set);
 
     // TODO
     // the angle difference between the gimbal and the chassis
@@ -618,41 +616,66 @@ void chassisTask(void* arg) {
 }
 
 //==================================================================================================
-// Fortress(TODO)
+// Jetson Communication
 //==================================================================================================
 
-const osThreadAttr_t fortressTaskAttribute = {.name = "fortressTask",
+#define JETSON_RX_SIGNAL (1 << 2)
+
+const osThreadAttr_t jetsonTaskAttribute = {.name = "jetsonTask",
                                               .attr_bits = osThreadDetached,
                                               .cb_mem = nullptr,
                                               .cb_size = 0,
                                               .stack_mem = nullptr,
                                               .stack_size = 256 * 4,
-                                              .priority = (osPriority_t)osPriorityNormal,
+                                              .priority = (osPriority_t)osPriorityHigh,
                                               .tz_module = 0,
                                               .reserved = 0};
 
-osThreadId_t fortressTaskHandle;
+osThreadId_t jetsonTaskHandle;
 
-void fortressTask(void* arg) {
+class CustomUART : public bsp::UART {
+ public:
+  using bsp::UART::UART;
+
+ protected:
+  /* notify application when rx data is pending read */
+  void RxCompleteCallback() override final { osThreadFlagsSet(jetsonTaskHandle, JETSON_RX_SIGNAL); }
+};
+
+void jetsonTask(void* arg) {
   UNUSED(arg);
 
+  #ifndef UART_DEBUG
+    auto uart = std::make_unique<CustomUART>(&huart1);
+    uart->SetupRx(50);
+    uart->SetupTx(50);
+  #endif
+
+  auto minipc_session = communication::MinipcPort();
+  const communication::status_data_t* status_data;
+
+  #ifndef UART_DEBUG
+    uint8_t *data;
+    int32_t length;
+  #endif
+
   while (true) {
-    if (dbus->keyboard.bit.V || dbus->swr == remote::DOWN) break;
-    osDelay(100);
-  }
+    // Wait until first packet from minipc.
+    uint32_t flags = osThreadFlagsWait(JETSON_RX_SIGNAL, osFlagsWaitAll, osWaitForever);
+    if (flags & JETSON_RX_SIGNAL) {
+      #ifndef UART_DEBUG
+        length = uart->Read(&data);
+        minipc_session.ParseUartBuffer(data, length);
+      #endif
+      status_data = minipc_session.GetStatus();
 
-  while (!imu->CaliDone()) osDelay(100);
+      vx_jetson = status_data->vx;
+      vy_jetson = status_data->vy;
+      vw_jetson = status_data->vw;
 
-  // wait for fortress calibrated
-  while (!send->fortress_calibrated) osDelay(100);
-
-  while (true) {
-    ChangeFortressMode.input(dbus->keyboard.bit.X);
-    if (ChangeFortressMode.posEdge()) FortressMode = !FortressMode;
-
-    send->cmd.id = bsp::FORTRESS_MODE;
-    send->fortress_mode = FortressMode ? 1 : 0;
-    send->TransmitOutput();
+      osEventFlagsSet(chassis_flag_id, DATA_READY_SIGNAL);
+    }
+    osDelay(JETSON_TASK_DELAY);
   }
 }
 
@@ -810,13 +833,16 @@ void selfTestTask(void* arg) {
 //==================================================================================================
 
 void RM_RTOS_Init(void) {
-  print_use_uart(&huart1);
+  #ifdef UART_DEBUG
+    print_use_uart(&huart1);
+  #endif
+
   bsp::SetHighresClockTimer(&htim5);
 
   can1 = new bsp::CAN(&hcan1, true);
   can2 = new bsp::CAN(&hcan2, false);
   dbus = new remote::DBUS(&huart3);
-  RGB = new display::RGB(&htim5, 3, 2, 1, 1000000);
+  led = new display::RGB(&htim5, 3, 2, 1, 1000000);
 
   bsp::IST8310_init_t IST8310_init;
   IST8310_init.hi2c = &hi2c3;
@@ -927,7 +953,7 @@ void RM_RTOS_Threads_Init(void) {
   shooterTaskHandle = osThreadNew(shooterTask, nullptr, &shooterTaskAttribute);
   chassisTaskHandle = osThreadNew(chassisTask, nullptr, &chassisTaskAttribute);
   selfTestTaskHandle = osThreadNew(selfTestTask, nullptr, &selfTestTaskAttribute);
-//  fortressTaskHandle = osThreadNew(fortressTask, nullptr, &fortressTaskAttribute);
+  jetsonTaskHandle = osThreadNew(jetsonTask, nullptr, &jetsonTaskAttribute);
 }
 
 //==================================================================================================
@@ -942,7 +968,6 @@ void KillAll() {
   control::MotorCANBase* motors_can1_shooter_right[] = {right_top_flywheel, right_bottom_flywheel, right_dial};
   control::Motor4310* motor[] = {pitch_motor};
 
-  RGB->Display(display::color_blue);
   laser->Off();
 
   while (true) {
@@ -954,7 +979,6 @@ void KillAll() {
     if (FakeDeath.posEdge()) {
       SpinMode = false;
       Dead = false;
-      RGB->Display(display::color_green);
       laser->On();
       pitch_motor->MotorEnable();
       // TODO: whether the 4310 yaw motor need to enable ???
@@ -1035,15 +1059,6 @@ static bool debug = false;
 
 void RM_RTOS_Default_Task(const void* arg) {
   UNUSED(arg);
-  auto uart = std::make_unique<CustomUART>(&huart1);
-  uart->SetupRx(50);
-  uart->SetupTx(50);
-
-  auto minipc_session = communication::MinipcPort();
-  const communication::status_data_t* status_data;
-
-  uint8_t *data;
-  int32_t length;
 
   while (true) {
     if (send->gimbal_power == 1) robot_hp_begin = true;

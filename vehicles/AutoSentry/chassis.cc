@@ -148,11 +148,14 @@ void chassisTask(void* arg) {
 
   while (true) {
     float relative_angle = receive->relative_angle;
-    float sin_yaw, cos_yaw, vx_set, vy_set;
+    float sin_yaw, cos_yaw, vx_set, vy_set, wz_set;
     float vx, vy, wz;
 
     vx_set = -receive->vx;
     vy_set = -receive->vy;
+    wz_set = receive->wz;
+
+    print("v: %f, %f,%f\r\n", vx_set, vy_set, wz_set);
 
     float supercap_voltage = (float)(supercap->info.voltage / 1000.0);
     float maximum_energy = 0.5 * pow(27.0,2) * 6.0;
@@ -196,8 +199,9 @@ void chassisTask(void* arg) {
       cos_yaw = arm_cos_f32(relative_angle);
       vx = cos_yaw * vx_set + sin_yaw * vy_set;
       vy = -sin_yaw * vx_set + cos_yaw * vy_set;
-      wz = std::min(FOLLOW_SPEED, FOLLOW_SPEED * relative_angle);
-      if (-CHASSIS_DEADZONE < relative_angle && relative_angle < CHASSIS_DEADZONE) wz = 0;
+//      wz = std::min(FOLLOW_SPEED, FOLLOW_SPEED * relative_angle);
+      wz = wz_set;
+//      if (-CHASSIS_DEADZONE < relative_angle && relative_angle < CHASSIS_DEADZONE) wz = 0;
     }
 
     chassis->SetSpeed(vx, vy, wz);
