@@ -199,8 +199,8 @@ void chassisTask(void* arg) {
       cos_yaw = arm_cos_f32(relative_angle);
       vx = cos_yaw * vx_set + sin_yaw * vy_set;
       vy = -sin_yaw * vx_set + cos_yaw * vy_set;
-//      wz = std::min(FOLLOW_SPEED, FOLLOW_SPEED * relative_angle);
       wz = wz_set;
+//      wz = std::min(FOLLOW_SPEED, FOLLOW_SPEED * relative_angle);
 //      if (-CHASSIS_DEADZONE < relative_angle && relative_angle < CHASSIS_DEADZONE) wz = 0;
     }
 

@@ -45,7 +45,7 @@
 
 //#define GEAR_GIMBAL   // comment out this line if the gimbal is using belt
 //#define REFEREE_CONNECTED // comment out this line if the referee system is not connected
-//#define UART_DEBUG  // comment out this line if uart is connected to Jetson
+#define UART_DEBUG  // comment out this line if uart is connected to Jetson
 
 osEventFlagsId_t chassis_flag_id;
 
@@ -203,11 +203,11 @@ void gimbalTask(void* arg) {
 //  yaw_motor->SetZeroPos();
   yaw_motor->MotorEnable();
 
-  float yaw_target = 0;
+  float yaw_target = 0.0;
   float yaw_error;
   float yaw_output_theta;
 
-  float tmp_pitch_pos = 0;
+  float tmp_pitch_pos = 0.0;
   for (int j = 0; j < SOFT_START_CONSTANT; j++) {
     tmp_pitch_pos += START_PITCH_POS / SOFT_START_CONSTANT;  // increase position gradually
     pitch_motor->SetOutput(tmp_pitch_pos, 1, 115, 0.5, 0);
@@ -269,24 +269,27 @@ void gimbalTask(void* arg) {
 
     pitch_motor->SetOutput(pitch_pos, pitch_vel, 115, 0.5, 0);
 
-    float yaw_ratio;
-    yaw_ratio = -dbus->mouse.x / 10000.0;
-    yaw_ratio += -dbus->ch2 / 20000.0;
-    yaw_ratio = clip<float>(yaw_ratio, -PI, PI);
-    yaw_target = wrap<float>(yaw_ratio + yaw_target, -PI, PI);
-    yaw_error = wrap<float>(yaw_target - imu->INS_angle[0], -PI, PI);
+    if (!SpinMode) {
+      yaw_error = wrap<float>(-relative_angle, -PI, PI);
+      yaw_target = imu->INS_angle[0];
+    } else {
+      float yaw_ratio;
+      yaw_ratio = -dbus->mouse.x / 10000.0;
+      yaw_ratio += -dbus->ch2 / 20000.0;
+      yaw_ratio = clip<float>(yaw_ratio, -PI, PI);
+      yaw_target = wrap<float>(yaw_ratio + yaw_target, -PI, PI);
+      yaw_error = wrap<float>(yaw_target - imu->INS_angle[0], -PI, PI);
+    }
     float yaw_theta_out = yaw_theta_pid->ComputeOutput(yaw_error);
+
     yaw_theta_out = clip<float>(yaw_theta_out, -15, 15);
+    print("out: %f, %f\r\n", yaw_theta_out, yaw_error);
 
     #ifdef GEAR_GIMBAL
       yaw_motor->SetOutput(0, -yaw_theta_out, 0, 1.5, 0);
     #else
       yaw_motor->SetOutput(0, yaw_theta_out, 0, 1.5, 0);
     #endif
-
-    if (!SpinMode) {
-      yaw_motor->SetOutput(0, 0, 90, 0.5, 0);
-    }
 
     control::Motor4310::TransmitOutput(motors_can1_gimbal, 2);
     osDelay(GIMBAL_TASK_DELAY);
@@ -542,7 +545,7 @@ void chassisTask(void* arg) {
   float vx_set = 0, vy_set = 0, wz_set = 0;
 
   while (true) {
-//    ChangeSpinMode.input(dbus->keyboard.bit.SHIFT || dbus->swl == remote::UP);
+    ChangeSpinMode.input(dbus->keyboard.bit.SHIFT || dbus->swl == remote::UP);
     if (ChangeSpinMode.posEdge()) SpinMode = !SpinMode;
 
     send->cmd.id = bsp::MODE;
@@ -597,9 +600,6 @@ void chassisTask(void* arg) {
     send->cmd.data_float = Dead ? 0 : wz_set;
     send->TransmitOutput();
 
-    print("v: %f, %f,%f\r\n", vx_set, vy_set, wz_set);
-
-    // TODO
     // the angle difference between the gimbal and the chassis
     relative_angle = wrap<float>(yaw_motor->GetTheta(), -PI, PI);
 
@@ -929,8 +929,8 @@ void RM_RTOS_Init(void) {
 //  float yaw_max_out_position = 30;
 //  yaw_pid_position = new control::ConstrainedPID(yaw_pid_param_position, yaw_max_iout_position, yaw_max_out_position);
 
-  float yaw_pid_param_theta[] = {6.0, 1.0, 0.05};
-  float yaw_max_iout_theta = 0;
+  float yaw_pid_param_theta[] = {6.0, 0.0, 0.05};
+  float yaw_max_iout_theta = 5;
   float yaw_max_out_theta = 15;
   yaw_theta_pid = new control::ConstrainedPID(yaw_pid_param_theta, yaw_max_iout_theta, yaw_max_out_theta);
 
