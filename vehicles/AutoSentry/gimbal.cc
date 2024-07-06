@@ -39,6 +39,22 @@
 #include "rgb.h"
 #include "shooter.h"
 #include "stepper.h"
+#include "tim.h"
+#include "minipc_protocol.h"
+#include <memory>
+
+//#define GEAR_GIMBAL   // comment out this line if the gimbal is using belt
+//#define REFEREE_CONNECTED // comment out this line if the referee system is not connected
+
+#define RX_SIGNAL (1 << 0)
+#define DATA_READY_SIGNAL (1 << 1)
+extern osThreadId_t defaultTaskHandle;
+
+osEventFlagsId_t chassis_flag_id;
+
+static float vx = 0;
+static float vy = 0;
+static float vw = 0;
 
 static bsp::CAN* can1 = nullptr;
 static bsp::CAN* can2 = nullptr;
@@ -112,7 +128,14 @@ static volatile bool selftestStart = false;
 
 static volatile bool robot_hp_begin = false;
 
-//#define GEAR_GIMBAL   // comment this line if the gimbal is using belt
+class CustomUART : public bsp::UART {
+ public:
+  using bsp::UART::UART;
+
+ protected:
+  /* notify application when rx data is pending read */
+  void RxCompleteCallback() override final { osThreadFlagsSet(defaultTaskHandle, RX_SIGNAL); }
+};
 
 //==================================================================================================
 // IMU
@@ -193,9 +216,9 @@ void gimbalTask(void* arg) {
   print("Gimbal Begin!\r\n");
 
   // the start code for motor 4310
-  pitch_motor->SetZeroPos();
+//  pitch_motor->SetZeroPos();
   pitch_motor->MotorEnable();
-  yaw_motor->SetZeroPos();
+//  yaw_motor->SetZeroPos();
   yaw_motor->MotorEnable();
 
   float yaw_target = 0;
@@ -278,7 +301,8 @@ void gimbalTask(void* arg) {
     #ifdef GEAR_GIMBAL
       yaw_motor->SetOutput(0, -yaw_theta_out, 0, 1.5, 0);
     #else
-      yaw_motor->SetOutput(0, yaw_theta_out, 0, 1.5, 0);
+//      yaw_motor->SetOutput(0, yaw_theta_out, 0, 1.5, 0);
+      yaw_motor->SetOutput(0, 0, 0, 0, 0);
     #endif
 
     control::Motor4310::TransmitOutput(motors_can1_gimbal, 2);
@@ -833,10 +857,13 @@ void RM_RTOS_Init(void) {
   //  gimbal = new control::Gimbal(gimbal_data);
   //  gimbal_param = gimbal->GetData();
 
-  referee_uart = new RefereeUART(&huart6);
-  referee_uart->SetupRx(300);
-  referee_uart->SetupTx(300);
-  referee = new communication::Referee;
+  #ifdef REFEREE_CONNECTED
+    referee_uart = new RefereeUART(&huart6);
+    referee_uart->SetupRx(300);
+    referee_uart->SetupTx(300);
+    referee = new communication::Referee;
+  #endif
+
   // left shooter
   left_top_flywheel = new control::Motor3508(can1, 0x201);
   left_bottom_flywheel = new control::Motor3508(can1, 0x202);
@@ -894,7 +921,9 @@ void RM_RTOS_Init(void) {
 void RM_RTOS_Threads_Init(void) {
   imuTaskHandle = osThreadNew(imuTask, nullptr, &imuTaskAttribute);
   gimbalTaskHandle = osThreadNew(gimbalTask, nullptr, &gimbalTaskAttribute);
-  refereeTaskHandle = osThreadNew(refereeTask, nullptr, &refereeTaskAttribute);
+  #ifdef REFEREE_CONNECTED
+    refereeTaskHandle = osThreadNew(refereeTask, nullptr, &refereeTaskAttribute);
+  #endif
   shooterTaskHandle = osThreadNew(shooterTask, nullptr, &shooterTaskAttribute);
   chassisTaskHandle = osThreadNew(chassisTask, nullptr, &chassisTaskAttribute);
   selfTestTaskHandle = osThreadNew(selfTestTask, nullptr, &selfTestTaskAttribute);
@@ -1006,6 +1035,15 @@ static bool debug = false;
 
 void RM_RTOS_Default_Task(const void* arg) {
   UNUSED(arg);
+  auto uart = std::make_unique<CustomUART>(&huart1);
+  uart->SetupRx(50);
+  uart->SetupTx(50);
+
+  auto minipc_session = communication::MinipcPort();
+  const communication::status_data_t* status_data;
+
+  uint8_t *data;
+  int32_t length;
 
   while (true) {
     if (send->gimbal_power == 1) robot_hp_begin = true;
