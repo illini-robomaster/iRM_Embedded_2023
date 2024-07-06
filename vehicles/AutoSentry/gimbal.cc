@@ -554,8 +554,8 @@ void chassisTask(void* arg) {
       flags = 0;
       flags = osEventFlagsWait(chassis_flag_id, DATA_READY_SIGNAL, osFlagsWaitAny, 50);
 
-      vx_set = vx_jetson;
-      vy_set = vy_jetson;
+      vx_set = -vx_jetson;
+      vy_set = -vy_jetson;
       wz_set = vw_jetson;
 
       // When timeout it returns -2 so we need extra checks here
@@ -938,6 +938,8 @@ void RM_RTOS_Init(void) {
   float yaw_max_iout_omega = 0;
   float yaw_max_out_omega = 18;
   yaw_omega_pid = new control::ConstrainedPID(yaw_pid_param_omega, yaw_max_iout_omega, yaw_max_out_omega);
+
+  chassis_flag_id = osEventFlagsNew(nullptr);
 }
 
 //==================================================================================================
