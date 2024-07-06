@@ -40,7 +40,9 @@
 #include "rgb.h"
 #include "shooter.h"
 #include "stepper.h"
-#include "autoaim_protocol.h"
+#include "minipc_protocol.h"
+
+
 
 static bsp::CAN* can1 = nullptr;
 static bsp::CAN* can2 = nullptr;
@@ -375,53 +377,55 @@ class CustomUART : public bsp::UART {
 
 void jetsonCommTask(void* arg) {
   UNUSED(arg);
-
-  uint32_t length;
-  uint8_t* data;
-
-  auto uart = std::make_unique<CustomUART>(&huart1);  // see cmake for which uart
-  uart->SetupRx(50);
-  uart->SetupTx(50);
-
-  auto miniPCreceiver = communication::AutoaimProtocol();
-
-  while (!imu->CaliDone()) {
-    osDelay(10);
-  }
-
-  int total_receive_count = 0;
-
-  while (true) {
-    uint32_t flags = osThreadFlagsGet();
-    if (flags & JETSON_RX_SIGNAL) {
-      /* time the non-blocking rx / tx calls (should be <= 1 osTick) */
-
-      // max length of the UART buffer at 150Hz is ~50 bytes
-      length = uart->Read(&data);
-
-      miniPCreceiver.Receive(data, length);
-
-      if (miniPCreceiver.get_valid_flag()) {
-        // there is at least one unprocessed valid packet
-        abs_yaw_jetson = miniPCreceiver.get_relative_yaw();
-        abs_pitch_jetson = miniPCreceiver.get_relative_pitch();
-        total_receive_count++;
-      }
-    }
-    // send IMU data anyway
-    communication::STMToJetsonData packet_to_send;
-    uint8_t my_color; // 1 for blue; 0 for red
-    if (send->is_my_color_blue) {
-      my_color = 1;
-    } else {
-      my_color = 0;
-    }
-    const float pitch_curr = pitch_pos;
-    const float yaw_curr = imu->INS_angle[0];
-    miniPCreceiver.Send(&packet_to_send, my_color, yaw_curr, pitch_curr, 0);
-    uart->Write((uint8_t*)&packet_to_send, sizeof(communication::STMToJetsonData));
-    osDelay(2);
-  }
+// Comment because of upstream AutoaimProtocol Class rewrite in progress
+// youhy, 2023.10
+//
+//  uint32_t length;
+//  uint8_t* data;
+//
+//  auto uart = std::make_unique<CustomUART>(&huart1);  // see cmake for which uart
+//  uart->SetupRx(50);
+//  uart->SetupTx(50);
+//
+//  auto miniPCreceiver = communication::AutoaimProtocol();
+//
+//  while (!imu->CaliDone()) {
+//    osDelay(10);
+//  }
+//
+//  int total_receive_count = 0;
+//
+//  while (true) {
+//    uint32_t flags = osThreadFlagsGet();
+//    if (flags & JETSON_RX_SIGNAL) {
+//      /* time the non-blocking rx / tx calls (should be <= 1 osTick) */
+//
+//      // max length of the UART buffer at 150Hz is ~50 bytes
+//      length = uart->Read(&data);
+//
+//      miniPCreceiver.Receive(data, length);
+//
+//      if (miniPCreceiver.get_valid_flag()) {
+//        // there is at least one unprocessed valid packet
+//        abs_yaw_jetson = miniPCreceiver.get_relative_yaw();
+//        abs_pitch_jetson = miniPCreceiver.get_relative_pitch();
+//        total_receive_count++;
+//      }
+//    }
+//    // send IMU data anyway
+//    communication::STMToJetsonData packet_to_send;
+//    uint8_t my_color; // 1 for blue; 0 for red
+//    if (send->is_my_color_blue) {
+//      my_color = 1;
+//    } else {
+//      my_color = 0;
+//    }
+//    const float pitch_curr = pitch_pos;
+//    const float yaw_curr = imu->INS_angle[0];
+//    miniPCreceiver.Send(&packet_to_send, my_color, yaw_curr, pitch_curr, 0);
+//    uart->Write((uint8_t*)&packet_to_send, sizeof(communication::STMToJetsonData));
+//    osDelay(2);
+//  }
 }
 
 //==================================================================================================
@@ -482,7 +486,7 @@ void shooterTask(void* arg) {
         // fast shooting
         } else if ((dbus->mouse.r || dbus->wheel.wheel > remote::WheelDigitalValue)
                   && send->cooling_heat1 < send->cooling_limit1 - 24) {
-          shooter->FastContinueShoot(); 
+          shooter->FastContinueShoot();
         // triple shooting
         } else if (dbus->wheel.wheel == remote::WheelDigitalValue
                    && dbus->previous_wheel_value == remote::WheelDigitalValue) {
@@ -514,7 +518,7 @@ void shooterTask(void* arg) {
           shooter->SetFlywheelSpeed(437);  // 445 MAX
         } else if (send->speed_limit1 >= 18) {
           flywheelFlag = true;
-          shooter->SetFlywheelSpeed(482);  // 490 MAX
+          shooter->SetFlywheelSpeed(770);  // 490 MAX
         } else {
           flywheelFlag = false;
           shooter->SetFlywheelSpeed(0);

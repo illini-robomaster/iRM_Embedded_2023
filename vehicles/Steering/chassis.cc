@@ -65,6 +65,7 @@ constexpr float FOLLOW_SPEED = 40;
 //==================================================================================================
 
 #define REFEREE_RX_SIGNAL (1 << 1)
+//#define LIMITED_SAMPLE_MATCH
 
 const osThreadAttr_t refereeTaskAttribute = {.name = "refereeTask",
                                              .attr_bits = osThreadDetached,
@@ -179,14 +180,61 @@ void chassisTask(void* arg) {
   chassis->SteerThetaReset();
   chassis->SetWheelSpeed(0, 0, 0, 0);
 
+#ifndef LIMITED_SAMPLE_MATCH
+  const float V_MAX = 660;
+#else
+  const float V_MAX = 330;
+#endif
+  const float NORMALIZATION_FACTOR = 1;
+  // Prevent vehicle from flipping due to sudden changes in velocity.
+  // Speed at which safety will not kick in
+  // TODO: Find good numbers
+  const float MOMENTUM_SAFE_SPEED = V_MAX * 0.4; // Magic number
+  const float MOMENTUM_SAFE_FACTOR_LINE = 0.3;   // also ^
+  const float MOMENTUM_SAFE_FACTOR_TURN = 0.3;   // also ^
+  const float MOMENTUM_FACTOR = 0.75;            // also ^
+
+  float prev_vx = 0;
+  float prev_vy = 0;
+  float prev_mag = 0;
   while (true) {
     float relative_angle = receive->relative_angle;
-    float sin_yaw, cos_yaw, vx_set, vy_set;
+    float sin_yaw, cos_yaw, vx_set, vy_set, v_mag, v_perp;
     float vx, vy, wz;
 
+    float norm_scale_factor = NORMALIZATION_FACTOR;
     // TODO need to change the channels in gimbal.cc
     vx_set = -receive->vy;
     vy_set = receive->vx;
+    v_mag = std::pow(std::pow(vx_set, 2) + std::pow(vy_set, 2), 0.5);
+    // Normalize vx and vy
+    if (v_mag > V_MAX) {
+        norm_scale_factor *= std::abs(V_MAX / v_mag);
+    }
+    vx_set *= norm_scale_factor;
+    vy_set *= norm_scale_factor;
+    
+    // "Momentum" safety mechanism
+    if (prev_vx != 0 && prev_vy != 0 &&
+            v_mag > MOMENTUM_SAFE_SPEED) {
+        // Compute a cross product
+        v_perp = (vx_set*prev_vy - vy_set*prev_vx) / v_mag;
+        // If perpendicular velocity is too high,
+        // or change in magnitude is too large
+        if (v_perp > v_mag * MOMENTUM_SAFE_FACTOR_TURN ||
+                std::abs(prev_mag - v_mag) >
+                    std::abs(prev_mag) * MOMENTUM_SAFE_FACTOR_LINE) {
+            // Change velocity direction.
+            vx_set = vx_set * MOMENTUM_FACTOR +
+                     prev_vx * (1 - MOMENTUM_FACTOR);
+            vy_set = vy_set * MOMENTUM_FACTOR +
+                     prev_vy * (1 - MOMENTUM_FACTOR);
+        }
+    }
+    prev_vx = vx_set;
+    prev_vy = vy_set;
+    prev_mag = std::pow(std::pow(prev_vx, 2) +
+                        std::pow(prev_vy, 2), 0.5);
 
     ReCali.input(receive->recalibrate);  // detect force recalibration
     Revival.input(receive->dead);        // detect robot revival

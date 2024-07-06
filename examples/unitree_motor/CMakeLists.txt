@@ -20,6 +20,10 @@
 
 project(example_unitree_motor ASM C CXX)
 
-irm_add_arm_executable(${PROJECT_NAME}
+irm_add_arm_executable(${PROJECT_NAME}_typeC
     TARGET DJI_Board_TypeC
-    SOURCES main.cc)
+    SOURCES typeC.cc)
+
+irm_add_arm_executable(${PROJECT_NAME}_mc01
+    TARGET DM_MC_01
+    SOURCES mc01.cc)

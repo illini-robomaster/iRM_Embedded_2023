@@ -22,13 +22,13 @@
 
 #include <memory>
 
-#include "autoaim_protocol.h"
-#include "bsp_gpio.h"
 #include "cmsis_os.h"
 #include "dbus.h"
-#include "filtering.h"
 #include "gimbal.h"
 #include "rgb.h"
+#include "bsp_gpio.h"
+#include "minipc_protocol.h"
+#include "filtering.h"
 #include "i2c.h"
 #include "bsp_imu.h"
 
@@ -59,14 +59,14 @@ extern osThreadId_t defaultTaskHandle;
 #define RX_SIGNAL (1 << 0)
 
 const osThreadAttr_t jetsonCommTaskAttribute = {.name = "jetsonCommTask",
-                                                .attr_bits = osThreadDetached,
-                                                .cb_mem = nullptr,
-                                                .cb_size = 0,
-                                                .stack_mem = nullptr,
-                                                .stack_size = 128 * 4,
-                                                .priority = (osPriority_t)osPriorityHigh,
-                                                .tz_module = 0,
-                                                .reserved = 0};
+                                             .attr_bits = osThreadDetached,
+                                             .cb_mem = nullptr,
+                                             .cb_size = 0,
+                                             .stack_mem = nullptr,
+                                             .stack_size = 128 * 4,
+                                             .priority = (osPriority_t)osPriorityHigh,
+                                             .tz_module = 0,
+                                             .reserved = 0};
 osThreadId_t jetsonCommTaskHandle;
 
 class CustomUART : public bsp::UART {
@@ -232,10 +232,8 @@ void RM_RTOS_Default_Task(const void* args) {
   control::MotorCANBase* motors[2] = {pitch_motor, yaw_motor};
   control::gimbal_data_t* gimbal_data = gimbal->GetData();
 
-  while (!key->Read())
-    ;
-  while (key->Read())
-    ;
+  while(!key->Read());
+  while(key->Read());
 
   UNUSED(gimbal_data);
 
@@ -275,7 +273,7 @@ void RM_RTOS_Default_Task(const void* args) {
     relative_pitch = 0;
     relative_yaw = 0;
 
-    // naive implementation
+  // naive implementation
     // abs_autoaim_pitch = gimbal->ComputePitchRel(rel_pitch_buffer, abs_autoaim_pitch);
     // abs_autoaim_yaw = gimbal->ComputeYawRel(rel_yaw_buffer, abs_autoaim_yaw);
     // gimbal->TargetAbsNoOffset(abs_autoaim_pitch, abs_autoaim_yaw);
@@ -292,6 +290,7 @@ void RM_RTOS_Default_Task(const void* args) {
     float abs_pitch_filtered = pitch_filter.iter_and_get_estimation();
     float abs_yaw_filtered = yaw_filter.iter_and_get_estimation();
     gimbal->TargetAbsNoOffset(abs_pitch_filtered, abs_yaw_filtered);
+
 
     // TODO: add this option to allow user-select autoaim mode
     // if (dbus->swr == remote::MID) {
