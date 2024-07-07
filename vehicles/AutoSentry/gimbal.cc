@@ -45,13 +45,13 @@
 
 //#define GEAR_GIMBAL   // comment out this line if the gimbal is using belt
 //#define REFEREE_CONNECTED // comment out this line if the referee system is not connected
-#define UART_DEBUG  // comment out this line if uart is connected to Jetson
+//#define UART_DEBUG  // comment out this line if uart is connected to Jetson
 
 osEventFlagsId_t chassis_flag_id;
 
 static float vx_jetson = 0;
 static float vy_jetson = 0;
-static float vw_jetson = 0;
+static float wz_jetson = 0;
 
 static bsp::CAN* can1 = nullptr;
 static bsp::CAN* can2 = nullptr;
@@ -274,8 +274,12 @@ void gimbalTask(void* arg) {
       yaw_target = imu->INS_angle[0];
     } else {
       float yaw_ratio;
-      yaw_ratio = -dbus->mouse.x / 10000.0;
-      yaw_ratio += -dbus->ch2 / 20000.0;
+      if (dbus->swr == remote::UP) {
+        yaw_ratio = wz_jetson / 60000.0;
+      } else {
+        yaw_ratio = -dbus->mouse.x / 10000.0;
+        yaw_ratio += -dbus->ch2 / 20000.0;
+      }
       yaw_ratio = clip<float>(yaw_ratio, -PI, PI);
       yaw_target = wrap<float>(yaw_ratio + yaw_target, -PI, PI);
       yaw_error = wrap<float>(yaw_target - imu->INS_angle[0], -PI, PI);
@@ -559,7 +563,7 @@ void chassisTask(void* arg) {
 
       vx_set = -vx_jetson;
       vy_set = -vy_jetson;
-      wz_set = vw_jetson;
+      wz_set = wz_jetson;
 
       // When timeout it returns -2 so we need extra checks here
       if (flags != osFlagsErrorTimeout && flags & DATA_READY_SIGNAL) {
@@ -671,7 +675,7 @@ void jetsonTask(void* arg) {
 
       vx_jetson = status_data->vx;
       vy_jetson = status_data->vy;
-      vw_jetson = status_data->vw;
+      wz_jetson = status_data->vw;
 
       osEventFlagsSet(chassis_flag_id, DATA_READY_SIGNAL);
     }
