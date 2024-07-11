@@ -25,23 +25,20 @@
 #include "bsp_gpio.h"
 #include "bsp_os.h"
 #include "bsp_print.h"
-#include "bsp_relay.h"
-#include "chassis.h"
 #include "cmsis_os.h"
-#include "controller.h"
 #include "dbus.h"
 #include "gimbalTask.h"
 #include "motor.h"
-#include "oled.h"
 #include "protocol.h"
-#include "rgb.h"
 #include "shooterTask.h"
 #include "uiTask.h"
+#include "refereeTask.h"
 
 remote::DBUS* dbus = nullptr;
 bsp::CAN* can1 = nullptr;
 bsp::CAN* can2 = nullptr;
 bsp::CanBridge* send = nullptr;
+communication::Referee* referee = nullptr;
 
 bsp::Buzzer *buzzer = nullptr;
 
@@ -70,20 +67,26 @@ void RM_RTOS_Init(){
 
   buzzer = new bsp::Buzzer(&htim4, 3, 1000000);
   print("initialized\r\n");
-  // Initialize the RGB LED
-//  RGB=new display::RGB(&htim5,3,2,1,1000000);
-  // shooter initialization
+  key = new bsp::GPIO(GPIOB, GPIO_PIN_2);
+
   init_shooter();
+  osDelay(200);
   init_gimbal();
+  osDelay(200);
+  init_referee();
+  osDelay(200);
+  init_ui();
 }
 
 void RM_RTOS_Threads_Init(void){
     shooterTaskHandle = osThreadNew(shooter_task, nullptr, &shooterTaskAttribute);
     gimbalTaskHandle = osThreadNew(gimbal_task, nullptr, &gimbalTaskAttribute);
     uiTaskHandle = osThreadNew(UI_task, nullptr, &uiTaskAttribute);
+    refereeTaskHandle = osThreadNew(referee_task, nullptr, &refereeTaskAttribute);
 }
 
 void KillAll(){
+  RM_EXPECT_TRUE(false, "Operation killed\r\n");
   kill_shooter();
   kill_gimbal();
 }

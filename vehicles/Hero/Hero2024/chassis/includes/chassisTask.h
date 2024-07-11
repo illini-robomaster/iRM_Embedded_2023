@@ -17,38 +17,68 @@
  *  along with this program. If not, see <http://www.gnu.org/licenses/>.    *
  *                                                                          *
  ****************************************************************************/
+
 #pragma once
-#include "bsp_print.h"
-#include "bsp_uart.h"
-#include "cmsis_os2.h"
-#include "dbus.h"
-#include "main.h"
+#include "cmsis_os.h"
+#include "motor.h"
+#include "heroSteering.h"
+#include "steering_6020.h"
+#include "can.h"
+#include "rgb.h"
 #include "protocol.h"
+#include "bsp_can_bridge.h"
 
-#define REFEREE_RX_SIGNAL (1 << 0)
+#define USING_DBUS
+
+#ifdef USING_DBUS
+#include "dbus.h"
+#else
+#include "sbus.h"
+#endif
+
+//MAGIC NUMBERS, Represent motor physical install angle offsets.
+#define FL_MOTOR_OFFSET 4.663
+#define FR_MOTOR_OFFSET 0.771
+#define BL_MOTOR_OFFSET 6.110
+#define BR_MOTOR_OFFSET 6.065
+// #define FL_MOTOR_OFFSET 0
+// #define FR_MOTOR_OFFSET 0
+// #define BL_MOTOR_OFFSET 0
+// #define BR_MOTOR_OFFSET 0
 
 
-extern osThreadId_t refereeTaskHandle;
-const osThreadAttr_t refereeTaskAttribute = {.name = "refereeTask",
+extern osThreadId_t chassisTaskHandle;
+const osThreadAttr_t chassisTaskAttribute = {.name = "chassisTask",
         .attr_bits = osThreadDetached,
         .cb_mem = nullptr,
         .cb_size = 0,
         .stack_mem = nullptr,
-        .stack_size = 1024 * 4,
+        .stack_size = 512 * 4,
         .priority = (osPriority_t)osPriorityAboveNormal,
         .tz_module = 0,
         .reserved = 0};
+void chassisTask(void* arg);
+void init_chassis();
+void kill_chassis();
 
+#ifdef USING_DBUS
+extern remote::DBUS* dbus;
+#else
+extern remote::SBUS* sbus;
+#endif
+
+extern bsp::CAN* can1;
+extern bsp::CAN* can2;
+extern display::RGB* RGB;
 extern communication::Referee* referee;
-class RefereeUART : public bsp::UART {
-public:
-    using bsp::UART::UART;
+extern bsp::CanBridge* receive;
+extern control::Motor4310* rotate_motor;
 
-protected:
-    void RxCompleteCallback() final { osThreadFlagsSet(refereeTaskHandle, REFEREE_RX_SIGNAL); }
-};
-extern RefereeUART* referee_uart;
 
-void referee_task(void* arg);
-
-void init_referee();
+// speed for steering motors (rad/s)
+constexpr float RUN_SPEED = (4 * PI);
+constexpr float ALIGN_SPEED = (PI);
+constexpr float ACCELERATION = (100 * PI);
+// speed for chassis rotation (no unit)
+constexpr float FOLLOW_SPEED = 40;
+constexpr float CHASSIS_DEADZONE = 0.04;

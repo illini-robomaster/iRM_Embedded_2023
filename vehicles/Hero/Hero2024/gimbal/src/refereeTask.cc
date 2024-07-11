@@ -27,7 +27,7 @@
 
 
 RefereeUART* referee_uart = nullptr;
-communication::Referee* referee = nullptr;
+
 
 void init_referee() {
   referee_uart = new RefereeUART(&huart6);
@@ -36,7 +36,7 @@ void init_referee() {
   referee = new communication::Referee;
 }
 
-void refereeTask(void* arg) {
+void referee_task(void* arg) {
   UNUSED(arg);
   uint32_t length;
   uint8_t* data;

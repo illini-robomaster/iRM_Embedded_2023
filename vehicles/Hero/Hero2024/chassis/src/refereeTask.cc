@@ -17,38 +17,26 @@
  *  along with this program. If not, see <http://www.gnu.org/licenses/>.    *
  *                                                                          *
  ****************************************************************************/
-#pragma once
-#include "bsp_print.h"
-#include "bsp_uart.h"
-#include "cmsis_os2.h"
-#include "dbus.h"
-#include "main.h"
-#include "protocol.h"
+#include "refereeTask.h"
 
-#define REFEREE_RX_SIGNAL (1 << 0)
+void refereeTask(void* arg) {
+  UNUSED(arg);
+  uint32_t length;
+  uint8_t* data;
 
+  while (true) {
+    uint32_t flags = osThreadFlagsWait(REFEREE_RX_SIGNAL, osFlagsWaitAll, osWaitForever);
+    if (flags & REFEREE_RX_SIGNAL) {
+      length = referee_uart->Read(&data);
+      referee->Receive(communication::package_t{data, (int)length});
+    }
+  }
+}
 
-extern osThreadId_t refereeTaskHandle;
-const osThreadAttr_t refereeTaskAttribute = {.name = "refereeTask",
-        .attr_bits = osThreadDetached,
-        .cb_mem = nullptr,
-        .cb_size = 0,
-        .stack_mem = nullptr,
-        .stack_size = 1024 * 4,
-        .priority = (osPriority_t)osPriorityAboveNormal,
-        .tz_module = 0,
-        .reserved = 0};
+void init_referee(){
 
-extern communication::Referee* referee;
-class RefereeUART : public bsp::UART {
-public:
-    using bsp::UART::UART;
+}
 
-protected:
-    void RxCompleteCallback() final { osThreadFlagsSet(refereeTaskHandle, REFEREE_RX_SIGNAL); }
-};
-extern RefereeUART* referee_uart;
+void kill_referee(){
 
-void referee_task(void* arg);
-
-void init_referee();
+}

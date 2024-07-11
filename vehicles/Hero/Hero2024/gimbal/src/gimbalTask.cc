@@ -241,6 +241,7 @@ void kill_gimbal() {
   control::MotorCANBase* can1_escalation[] = {esca_motor};
   while (true){
     esca_motor->SetOutput(0);
+
     control::MotorCANBase::TransmitOutput(can1_escalation, 1);
     osDelay(KILLALL_DELAY);
   }

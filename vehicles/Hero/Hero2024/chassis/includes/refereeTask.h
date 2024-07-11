@@ -17,18 +17,25 @@
  *  along with this program. If not, see <http://www.gnu.org/licenses/>.    *
  *                                                                          *
  ****************************************************************************/
+
+
 #pragma once
-#include "bsp_print.h"
+#include "cmsis_os.h"
 #include "bsp_uart.h"
-#include "cmsis_os2.h"
-#include "dbus.h"
-#include "main.h"
 #include "protocol.h"
 
-#define REFEREE_RX_SIGNAL (1 << 0)
-
+#define REFEREE_RX_SIGNAL (1 << 1)
 
 extern osThreadId_t refereeTaskHandle;
+
+class RefereeUART : public bsp::UART {
+public:
+    using bsp::UART::UART;
+
+protected:
+    void RxCompleteCallback() final { osThreadFlagsSet(refereeTaskHandle, REFEREE_RX_SIGNAL); }
+};
+
 const osThreadAttr_t refereeTaskAttribute = {.name = "refereeTask",
         .attr_bits = osThreadDetached,
         .cb_mem = nullptr,
@@ -39,16 +46,8 @@ const osThreadAttr_t refereeTaskAttribute = {.name = "refereeTask",
         .tz_module = 0,
         .reserved = 0};
 
+
+void refereeTask(void* args);
+
 extern communication::Referee* referee;
-class RefereeUART : public bsp::UART {
-public:
-    using bsp::UART::UART;
-
-protected:
-    void RxCompleteCallback() final { osThreadFlagsSet(refereeTaskHandle, REFEREE_RX_SIGNAL); }
-};
 extern RefereeUART* referee_uart;
-
-void referee_task(void* arg);
-
-void init_referee();

@@ -18,11 +18,14 @@
 #                                                                        #
 # ---------------------------------------------------------------------- #
 
-#project(Hero2024 ASM C CXX)
-#
-#irm_add_arm_executable(Hero2024_chassis
-#    TARGET DJI_Board_TypeC
-#    SOURCES
-#
-#    INCLUDES includes
-#)
+project(Hero2024 ASM C CXX)
+
+irm_add_arm_executable(Hero2024_chassis
+    TARGET DJI_Board_TypeC
+    SOURCES
+        src/chassisTask.cc
+        src/heroSteering.cc
+        src/main.cc
+        src/refereeTask.cc
+        src/steering_6020.cc
+    INCLUDES includes)
