@@ -1,7 +1,6 @@
 #include "trapezoid_profile.h"
 #include <math.h>
 #include "utils.h"
-#include <iostream>
 
 kinematics_state TrapezoidProfile::direct(kinematics_state in)
 {
