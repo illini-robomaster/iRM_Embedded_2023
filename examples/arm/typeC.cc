@@ -26,8 +26,8 @@
 #include "dbus.h"
 #include "sbus.h"
 #include "utils.h"
-#include <queue>
 #include <vector>
+#include <deque>
 
 #define SBUS_START_IDX 5
 #define WINDOW_SIZE 50

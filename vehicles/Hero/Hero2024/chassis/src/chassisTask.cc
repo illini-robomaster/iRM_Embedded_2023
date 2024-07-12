@@ -20,7 +20,7 @@
 
 
 #include "chassisTask.h"
-#include "geometry.h"
+#include "geometry/geometry.h"
 //#define SINGLEBOARD
 
 //Constants
