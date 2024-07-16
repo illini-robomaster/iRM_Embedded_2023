@@ -150,15 +150,15 @@ void checkAllMotorsConnected(){
     bool all_connected = true;
 
     // because if A1 send back data, temperature will very unlikely be 0
-    if(!MotorA1_recv_id00.Temp != 0){
+    if(!(MotorA1_recv_id00.Temp != 0)){
       print("A1 0 not connected\r\n");
       all_connected = false;
     }
-    if(!MotorA1_recv_id01.Temp != 0){
+    if(!(MotorA1_recv_id01.Temp != 0)){
       print("A1 1 not connected\r\n");
       all_connected = false;
     }
-    if(!MotorA1_recv_id02.Temp != 0){
+    if(!(MotorA1_recv_id02.Temp != 0)){
       print("A1 2 not connected\r\n");
       all_connected = false;
     }

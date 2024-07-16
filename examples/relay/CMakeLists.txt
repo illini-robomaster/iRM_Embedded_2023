@@ -28,3 +28,6 @@ irm_add_arm_executable(${PROJECT_NAME}_TypeC
     TARGET DJI_Board_TypeC
     SOURCES TypeC.cc)
 
+irm_add_arm_executable(${PROJECT_NAME}_Transistor_TypeC
+    TARGET DJI_Board_TypeC
+    SOURCES Transistor_TypeC.cc)

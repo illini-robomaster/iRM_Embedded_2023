@@ -45,6 +45,8 @@
 
 static bsp::Relay* relay;
 
+
+
 void RM_RTOS_Init(void) {
   print_use_uart(&huart1);
   relay = new bsp::Relay(RELAY_1_GPIO_Port, RELAY_1_Pin); /* USE GPIO_1 (PB14)->PIN 7 in the board*/
