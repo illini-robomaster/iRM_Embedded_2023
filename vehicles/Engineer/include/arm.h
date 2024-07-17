@@ -63,12 +63,8 @@ void armTask(void* args);
  * @note software range limitation defined in arm_config.h
  * @return 0 when the command is accepted, 1 otherwise
  */
-int ArmSetTarget(joint_state_t target_joint_state);
+int ArmSetTargetAngles(joint_state_t target_joint_state);
 
-/**
- * @brief Send commands to motors. Call all TransmitOutput() or equivalent function for each motor
- */
-void ArmTransmitOutput();
 
 /** 
  * @brief read encoder readings to current_joint_positions
