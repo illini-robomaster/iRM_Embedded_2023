@@ -231,10 +231,18 @@ joint_state_t inverse_kinematics(Vector3d position, Rotation3d orientation){
   if(isnan(theta3)){
     theta3 = 0;
   }
-  
+
+  Vector3d wrist_orientation(1,0,0);
+  wrist_orientation = wrist_orientation.rotateBy(orientation);
+  // assumes forearm is pointing forward (camera is on forearm)
+  // TODO: test and test sign
+  float theta4 = atan2(wrist_orientation._y, wrist_orientation._x); // the angle of the wrist pointing direction projected in camera plane
+  float theta5 = wrist_orientation.angleBetween(Vector3d(1,0,0)).getRadians();  // angle between pointing forward and desired orientation as a vector
+  Rotation3d wrist_orientation_rot = Vector3d(1,0,0).getRotation3d(wrist_orientation);
+  float theta6 = wrist_orientation_rot.angleBetween(orientation).getRadians(); // angle between desired orientation and orientation achieved by J4 and J5 only
 
   // todo last 3 joint inverse kinematics
-  return {0, theta1, theta2, theta3, orientation.getYaw(), orientation.getPitch(), orientation.getRoll()};
+  return {0, theta1, theta2, theta3, theta4, theta5, theta6};
 }
 
 

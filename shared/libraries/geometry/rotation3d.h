@@ -1,4 +1,5 @@
 #pragma once
+#include "angle2d.h"
 
 struct Quaternion {
     float w;
@@ -19,9 +20,15 @@ private:
 public:
     Rotation3d();
     // quaternion
+    Rotation3d(Quaternion q);
+
+    // quaternion, but not in struct
     Rotation3d(float x, float y, float z, float w); 
-    // euler angles (yaw, pitch, roll)
-    Rotation3d(float yaw, float pitch, float roll); 
+    /// @brief Represents a 3d rotation using euler angles, an object first rotates around x axis by roll, then around y axis by pitch, and finally around z axis by yaw
+    /// @param roll 
+    /// @param pitch 
+    /// @param yaw 
+    Rotation3d(float roll, float pitch, float yaw); 
     // TODO: axis-angle and rotation matrix
 
     Rotation3d operator*(const Rotation3d& r) const;
@@ -38,4 +45,8 @@ public:
     float getRoll() const;
 
     Rotation3d normalized() const;
+
+    Rotation3d conjugate() const;
+
+    Angle2d angleBetween(const Rotation3d& r) const;
 };

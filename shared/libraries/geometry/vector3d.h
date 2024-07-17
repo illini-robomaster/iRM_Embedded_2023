@@ -32,7 +32,20 @@ public:
     float lengthSquared() const;
     Vector3d normalized() const;
     void normalize();
+
+    /// @brief the angle between this vector and the given vector 
+    /// @param v 
+    /// @return 
     Angle2d angleBetween(const Vector3d& v) const;
 
+    /// @brief the vector rotated by the given rotation
+    /// @param r 
+    /// @return 
     Vector3d rotateBy(const Rotation3d& r) const;
+
+    
+    /// @brief Get the Rotation3d object that represents the rotation that would rotate this vector to the given vector in parameter
+    /// @param v the vector that this vector would be rotated to if applyed the returned rotation
+    /// @return 
+    Rotation3d getRotation3d(const Vector3d& v) const;
 };

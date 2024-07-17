@@ -139,6 +139,46 @@ Vector3d Vector3d::rotateBy(const Rotation3d& r) const
 }
 
 
+Rotation3d Vector3d::getRotation3d(const Vector3d& v) const
+{
+    // rotation axis
+    Vector3d n = this->cross(v).normalized(); 
+
+    // special case when the two vectors are parallel
+    
+    if (this->dot(v) > 0.99999)
+    {
+        // if same direction, return identity rotation3d
+        return Rotation3d(0, 0, 0);
+    }
+    else if(this->dot(v) < -0.99999)
+    {
+        // if opposite direction, return 180 degree rotation around any axis perpendicular to the two vectors
+        // choose x axis
+        return Rotation3d(0, 0, M_PI);
+    }
+    
+
+    // use vector angle algorithm to find quaternion
+
+    float cos_theta = _x * v._x + _y * v._y + _z * v._z;
+    // float half_theta = acos(cos_theta)/2.0;
+    // float sin_half_theta = sin(half_theta);
+    // float cos_half_theta = cos(half_theta);
+    float sin_half_theta = sqrt((1.0f - cos_theta) / 2.0f);
+    float cos_half_theta = sqrt((1.0f + cos_theta) / 2.0f);
+
+
+    Quaternion q;
+    q.w = cos_half_theta;
+    q.x = sin_half_theta * n._x;
+    q.y = sin_half_theta * n._y;
+    q.z = sin_half_theta * n._z;
+
+    return Rotation3d(q);
+}
+
+
 Vector3d Vector3d::cross(const Vector3d& v) const
 {
     return Vector3d(

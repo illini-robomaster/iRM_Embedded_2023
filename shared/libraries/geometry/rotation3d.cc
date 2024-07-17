@@ -23,15 +23,24 @@ Rotation3d::Rotation3d()
  * @param z k part
  * @param w w part
 */
-Rotation3d::Rotation3d(float x, float y, float z, float w)
+Rotation3d::Rotation3d(Quaternion q)
 {
-     _x = x;
-     _y = y;
-     _z = z;
-     _w = w;
+     _x = q.x;
+     _y = q.y;
+     _z = q.z;
+     _w = q.w;
 }
 
-Rotation3d::Rotation3d(float yaw, float pitch, float roll)
+Rotation3d::Rotation3d(float x, float y, float z, float w)
+{
+    _x = x;
+    _y = y;
+    _z = z;
+    _w = w;
+}
+
+
+Rotation3d::Rotation3d(float roll, float pitch, float yaw)
 {
     float cy = cos(yaw * 0.5);
     float sy = sin(yaw * 0.5);
@@ -134,4 +143,15 @@ Rotation3d Rotation3d::normalized() const
 {
     float length = sqrt(_x * _x + _y * _y + _z * _z + _w * _w);
     return Rotation3d(_x / length, _y / length, _z / length, _w / length);
+}
+
+Rotation3d Rotation3d::conjugate() const
+{
+    return Rotation3d(-_x, -_y, -_z, _w);
+}
+
+Angle2d Rotation3d::angleBetween(const Rotation3d& r) const
+{
+    float dot = _x * r._x + _y * r._y + _z * r._z + _w * r._w;
+    return Angle2d(2.0 * acos(dot));
 }
