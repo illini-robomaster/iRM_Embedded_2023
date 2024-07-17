@@ -1,5 +1,7 @@
 #pragma once
 
+#include "angle2d.h"
+#include "rotation3d.h"
 
 class Vector3d{
 public:
@@ -30,4 +32,7 @@ public:
     float lengthSquared() const;
     Vector3d normalized() const;
     void normalize();
+    Angle2d angleBetween(const Vector3d& v) const;
+
+    Vector3d rotateBy(const Rotation3d& r) const;
 };

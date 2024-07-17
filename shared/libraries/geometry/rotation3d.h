@@ -1,4 +1,11 @@
-#include "vector3d.h"
+#pragma once
+
+struct Quaternion {
+    float w;
+    float x;
+    float y;
+    float z;
+};
 class Rotation3d {
 // use quaternion to represent rotation
 private:
@@ -11,8 +18,10 @@ private:
     
 public:
     Rotation3d();
-    Rotation3d(float x, float y, float z, float w); // quaternion
-    Rotation3d(float yaw, float pitch, float roll); // euler angles (yaw, pitch, roll
+    // quaternion
+    Rotation3d(float x, float y, float z, float w); 
+    // euler angles (yaw, pitch, roll)
+    Rotation3d(float yaw, float pitch, float roll); 
     // TODO: axis-angle and rotation matrix
 
     Rotation3d operator*(const Rotation3d& r) const;
