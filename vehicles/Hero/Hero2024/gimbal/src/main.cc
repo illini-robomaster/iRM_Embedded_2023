@@ -44,6 +44,12 @@ bsp::Buzzer *buzzer = nullptr;
 
 bsp::GPIO* key = nullptr;
 
+volatile bool Dead;
+
+
+RefereeUART* referee_uart = nullptr;
+
+
 // lob mode switch
 BoolEdgeDetector lob_mode_sw=BoolEdgeDetector(false);
 volatile bool lob_mode=false;
@@ -67,33 +73,47 @@ void RM_RTOS_Init(){
 
   buzzer = new bsp::Buzzer(&htim4, 3, 1000000);
   print("initialized\r\n");
-  key = new bsp::GPIO(GPIOB, GPIO_PIN_2);
+  key = new bsp::GPIO(KEY_GPIO_Port,KEY_Pin);
 
-  init_shooter();
-  osDelay(200);
-  init_gimbal();
-  osDelay(200);
+  referee_uart = new RefereeUART(&huart6);
+  referee_uart->SetupRx(300);
+  referee_uart->SetupTx(300);
+  referee = new communication::Referee;
+
+//  init_shooter();
+//  osDelay(200);
+//  init_gimbal();
+//  osDelay(200);
   init_referee();
   osDelay(200);
   init_ui();
+  osDelay(200);
 }
 
 void RM_RTOS_Threads_Init(void){
-    shooterTaskHandle = osThreadNew(shooter_task, nullptr, &shooterTaskAttribute);
-    gimbalTaskHandle = osThreadNew(gimbal_task, nullptr, &gimbalTaskAttribute);
-    uiTaskHandle = osThreadNew(UI_task, nullptr, &uiTaskAttribute);
     refereeTaskHandle = osThreadNew(referee_task, nullptr, &refereeTaskAttribute);
+//    shooterTaskHandle = osThreadNew(shooter_task, nullptr, &shooterTaskAttribute);
+//    gimbalTaskHandle = osThreadNew(gimbal_task, nullptr, &gimbalTaskAttribute);
+    uiTaskHandle = osThreadNew(UI_task, nullptr, &uiTaskAttribute);
+
 }
 
 void KillAll(){
   RM_EXPECT_TRUE(false, "Operation killed\r\n");
+
+  send->cmd.id = bsp::DEAD;
+  send->cmd.data_bool = true;
+  send->TransmitOutput();
+
   kill_shooter();
   kill_gimbal();
+
 }
 
 void RM_RTOS_Default_Task(const void* args) {
   UNUSED(args);
   while (true) {
+    // TODO: Need Fake Death for death test and a BoolEdgeDetector for fake death
     osDelay(100);
   }
 }

@@ -58,6 +58,7 @@ extern bsp::CAN* can1;
 extern bsp::CAN* can2;
 extern bsp::CanBridge* send;
 
+extern volatile bool Dead;
 extern BoolEdgeDetector lob_mode_sw;
 extern volatile bool lob_mode;
 

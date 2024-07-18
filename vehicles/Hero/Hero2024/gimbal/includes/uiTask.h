@@ -31,7 +31,8 @@
 #include "protocol.h"
 #include "refereeTask.h"
 
-#define UI_DELAY 40
+#define UI_TASK_DELAY 20
+
 
 extern osThreadId_t uiTaskHandle;
 const osThreadAttr_t uiTaskAttribute = {.name = "UI_task",
@@ -44,7 +45,10 @@ const osThreadAttr_t uiTaskAttribute = {.name = "UI_task",
         .tz_module = 0,
         .reserved = 0};
 
+extern RefereeUART *referee_uart;
 
 void UI_task(void* arg);
 
 void init_ui();
+
+void refresh();

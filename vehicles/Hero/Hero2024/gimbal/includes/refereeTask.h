@@ -25,7 +25,7 @@
 #include "main.h"
 #include "protocol.h"
 
-#define REFEREE_RX_SIGNAL (1 << 0)
+#define REFEREE_RX_SIGNAL (1 << 1)
 
 
 extern osThreadId_t refereeTaskHandle;
@@ -40,6 +40,7 @@ const osThreadAttr_t refereeTaskAttribute = {.name = "refereeTask",
         .reserved = 0};
 
 extern communication::Referee* referee;
+
 class RefereeUART : public bsp::UART {
 public:
     using bsp::UART::UART;
@@ -47,6 +48,8 @@ public:
 protected:
     void RxCompleteCallback() final { osThreadFlagsSet(refereeTaskHandle, REFEREE_RX_SIGNAL); }
 };
+
+
 extern RefereeUART* referee_uart;
 
 void referee_task(void* arg);

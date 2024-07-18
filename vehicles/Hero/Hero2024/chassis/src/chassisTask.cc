@@ -18,10 +18,9 @@
  *                                                                          *
  ****************************************************************************/
 
-
 #include "chassisTask.h"
 #include "geometry/geometry.h"
-//#define SINGLEBOARD
+#include "moving_average.h"
 
 //Constants
 static const int KILLALL_DELAY = 100;
@@ -33,11 +32,11 @@ static const float NORMALIZATION_FACTOR = 1;
 // Speed at which safety will not kick in
 // TODO: Find good numbers
 
-static const float MOMENTUM_SAFE_SPEED = V_MAX * 0.3; // Magic number
-static const float MOMENTUM_SAFE_FACTOR_LINE = 0.3;   // also ^
-static const float MOMENTUM_SAFE_FACTOR_TURN = 0.3;   // also ^
-static const float MOMENTUM_FACTOR_PER_SEC = 0.1;     // the velocity at half a second before only have 10% impact on curr target
-static const float MOMENTUM_FACTOR = 1-pow(MOMENTUM_FACTOR_PER_SEC, 1.0/500/0.5);
+// static const float MOMENTUM_SAFE_SPEED = V_MAX * 0.3; // Magic number
+// static const float MOMENTUM_SAFE_FACTOR_LINE = 0.3;   // also ^
+// static const float MOMENTUM_SAFE_FACTOR_TURN = 0.3;   // also ^
+// static const float MOMENTUM_FACTOR_PER_SEC = 0.1;     // the velocity at half a second before only have 10% impact on curr target
+// static const float MOMENTUM_FACTOR = 1-pow(MOMENTUM_FACTOR_PER_SEC, 1.0/500/0.5);
 
 
 /*Args*/
@@ -77,6 +76,19 @@ void chassisTask(void* arg){
   Vector2d prev_target_vel(0, 0);
 
   int loop_cnt = 0;
+  int last = HAL_GetTick();
+
+  MovingAverage x(10);
+  MovingAverage y(10);
+
+
+
+  while(dbus->swr != remote::DOWN){
+    osDelay(100);
+  }  // flip swr to start
+
+
+
 
   while (true) {
     float relative_angle = 0;
@@ -84,12 +96,10 @@ void chassisTask(void* arg){
 
     Vector2d joystick_vector(0, 0);
 
-#ifndef SINGLEBOARD
-    joystick_vector = Vector2d(receive->vx, receive->vy);
-#else
-    joystick_vector = Vector2d(dbus->ch1/ 660.0, dbus->ch0/660.0)
-#endif
+    x.AddSample(dbus->ch1/660.0);
+    y.AddSample(dbus->ch0/660.0);
 
+    joystick_vector = Vector2d(x.GetAverage(), y.GetAverage());
 
     // The following is for joystick only, not for keyboard
     // Max joy stick max = 660
@@ -128,37 +138,32 @@ void chassisTask(void* arg){
     target_vel = prev_target_vel.plus(delta_v);
     // TODO: Rotational acceleration constraints (which needs to deal with each module's angle)
     prev_target_vel = target_vel;
+    wz = dbus->ch2 / 660.0 * V_ROT_MAX; // in m/s
 
-    if(loop_cnt == 100){
-      loop_cnt = 0;
-      set_cursor(0, 0);
-      clear_screen();
-      print("joy_x: %f, joy_y: %f \r\n", joystick_vector.getX(), joystick_vector.getY());
-      print("vx: %f, vy: %f, wz: %f \r\n", target_vel.getX(), target_vel.getY(), wz);
-    }
-    loop_cnt++;
+    // if(loop_cnt == 100){
+    //     loop_cnt = 0;
+    //     set_cursor(0, 0);
+    //     clear_screen();
+    //     print("joy_x: %f, joy_y: %f \r\n", joystick_vector.getX(), joystick_vector.getY());
+    //     print("vx: %f, vy: %f, wz: %f \r\n", target_vel.getX(), target_vel.getY(), wz);
+    //     print("DELTA T: %d \r\n", HAL_GetTick() - last);
+    // }
+    // last = HAL_GetTick();
+    // loop_cnt++;
+    UNUSED(loop_cnt);
+    UNUSED(last);
+
+
 
     // calculate camera oriented velocity vector
     Vector2d target_vel_cam = target_vel.rotateBy(Angle2d(relative_angle)); // now relative_angle is 0
 
-    // wz = std::min(FOLLOW_SPEED, FOLLOW_SPEED * dbus->ch2);       /* TODO : ASK IF GIMBAL EXIST, HOW CHASSIS MOVE */
-    wz = dbus->ch2 / 660.0 * V_ROT_MAX; // in m/s
-
-
-#ifndef  SINGLEBOARD
-    wz = receive->relative_angle;
-#else
-    wz = 0;
-#endif
-
-
-    // if (-CHASSIS_DEADZONE < relative_angle && relative_angle < CHASSIS_DEADZONE) wz = 0;
     chassis->SteerSetMaxSpeed(RUN_SPEED);
     chassis->SetSpeed(target_vel_cam.getX(), target_vel_cam.getY(), wz);
     chassis->SteerUpdateTarget();
     chassis->WheelUpdateSpeed();
     chassis->SteerCalcOutput();
-
+    // print("chassis_task loop entered 2\r\n");
 
     // if(loop_count == 100){
     // 	clear_screen();
@@ -172,7 +177,7 @@ void chassisTask(void* arg){
     // }
     // loop_count ++;
 
-#ifdef REFEREE
+#ifdef REFEREEsteer_motors
     chassis->Update((float)referee->game_robot_status.chassis_power_limit,
                            referee->power_heat_data.chassis_power,
                            (float)referee->power_heat_data.chassis_power_buffer);
@@ -192,7 +197,9 @@ void chassisTask(void* arg){
     // chassis->PrintData();
     control::MotorCANBase::TransmitOutput(wheel_motors, 4);
     control::MotorCANBase::TransmitOutput(steer_motors, 4);
-
+    UNUSED(steer_motors);
+    UNUSED(wheel_motors);
+    // print("chassis motor output transmitted \r\n");
 
     osDelay(CHASSIS_TASK_DELAY);
   }
@@ -278,3 +285,4 @@ void kill_chassis(){
   }
 
 }
+

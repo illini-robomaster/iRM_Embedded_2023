@@ -34,12 +34,13 @@
 #include "oled.h"
 #include "bsp_buzzer.h"
 
-// parameters: could proved to be useless  (╯‵□′)╯︵┻━┻
+// parameters: could be proved useless  (╯‵□′)╯︵┻━┻
 #define FORCE_0_ANGLE (0)
 #define FORCE_1_ANGLE (2 * PI)
 #define FORCE_2_ANGLE (4 * PI)
 #define FORCE_3_ANGLE (6 * PI)
 extern bsp::Buzzer *buzzer;
+
 
 extern osThreadId_t shooterTaskHandle;
 const osThreadAttr_t shooterTaskAttribute = {.name = "shooter_task",
@@ -59,7 +60,6 @@ extern bsp::CAN* can1;
 extern bsp::CAN* can2;
 extern bsp::GPIO* key;
 
-extern BoolEdgeDetector lob_mode_sw;
 extern volatile bool lob_mode;
 
 extern communication::Referee* referee;

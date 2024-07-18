@@ -17,7 +17,6 @@
  *  along with this program. If not, see <http://www.gnu.org/licenses/>.    *
  *                                                                          *
  ****************************************************************************/
-
 #pragma once
 #include "cmsis_os.h"
 #include "motor.h"
@@ -28,13 +27,7 @@
 #include "protocol.h"
 #include "bsp_can_bridge.h"
 
-#define USING_DBUS
-
-#ifdef USING_DBUS
 #include "dbus.h"
-#else
-#include "sbus.h"
-#endif
 
 //MAGIC NUMBERS, Represent motor physical install angle offsets.
 #define FL_MOTOR_OFFSET 4.663
@@ -61,18 +54,14 @@ void chassisTask(void* arg);
 void init_chassis();
 void kill_chassis();
 
-#ifdef USING_DBUS
 extern remote::DBUS* dbus;
-#else
-extern remote::SBUS* sbus;
-#endif
+
 
 extern bsp::CAN* can1;
 extern bsp::CAN* can2;
 extern display::RGB* RGB;
 extern communication::Referee* referee;
 extern bsp::CanBridge* receive;
-extern control::Motor4310* rotate_motor;
 
 
 // speed for steering motors (rad/s)

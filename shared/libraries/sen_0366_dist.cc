@@ -95,10 +95,6 @@ namespace distance{
         read_version_packet.command[2] = 0x01;
         read_version_packet.command[3] = 0xFF;
 
-        setResolution(RESOLUTION_0_1_MM);
-
-        setMeasureRange(RANGE_80_M);
-
         connection_flag_ = laserOn();
 
         return connection_flag_;

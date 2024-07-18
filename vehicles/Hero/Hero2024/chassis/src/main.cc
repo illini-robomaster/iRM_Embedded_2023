@@ -34,8 +34,6 @@
 //#define SINGLEBOARD
 //
 osThreadId_t chassisTaskHandle;
-osThreadId_t UITaskHandle;
-osThreadId_t testTaskHandle;
 #ifdef REFEREE
 osThreadId_t refereeTaskHandle;
 #endif

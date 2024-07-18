@@ -26,14 +26,9 @@
 //==================================================================================================
 
 
-RefereeUART* referee_uart = nullptr;
-
 
 void init_referee() {
-  referee_uart = new RefereeUART(&huart6);
-  referee_uart->SetupRx(300);
-  referee_uart->SetupTx(300);
-  referee = new communication::Referee;
+
 }
 
 void referee_task(void* arg) {
@@ -43,7 +38,9 @@ void referee_task(void* arg) {
 
   while (true) {
     uint32_t flags = osThreadFlagsWait(REFEREE_RX_SIGNAL, osFlagsWaitAll, osWaitForever);
+//    uint32_t flags = REFEREE_RX_SIGNAL;
     if (flags & REFEREE_RX_SIGNAL) {
+//      print("Referee task REFEREE_RX_SIGNAL satisfied\r\n");
       length = referee_uart->Read(&data);
       referee->Receive(communication::package_t{data, (int)length});
     }

@@ -71,6 +71,9 @@ void shooter_task(void* args) {
     osDelay(100);
   }
 
+  load_motor->SetZeroPos();
+  load_motor->MotorEnable();
+
   while (true) {
 
     if ((dbus->swr == remote::UP || dbus->mouse.l)) {
@@ -110,10 +113,10 @@ void shooter_task(void* args) {
 
 void init_shooter() {
   //Shooter initialization
-  load_motor = new control::Motor4310(can1, 0x02, 0x01, control::POS_VEL);
-  shoot_front_motor = new control::Motor3508(can1, 0x201);
-  shoot_back_motor = new control::Motor3508(can1, 0x202);
-  force_motor = new control::Motor3508(can1, 0x203);
+  load_motor = new control::Motor4310(can1, 0x02, 0x03, control::POS_VEL);
+  shoot_front_motor = new control::Motor3508(can2, 0x201);
+  shoot_back_motor = new control::Motor3508(can2, 0x202);
+  force_motor = new control::Motor3508(can2, 0x203);
   // Servo control for each shooter motor
   control::servo_t servo_data;
   servo_data.motor = force_motor;
@@ -134,6 +137,7 @@ void kill_shooter() {
     shoot_back_motor->SetOutput(0);
     force_motor->SetOutput(0);
     load_motor->SetOutput(0);
+    load_motor->MotorDisable();
     control::MotorCANBase::TransmitOutput(shooter_motors, 3);
     control::Motor4310::TransmitOutput(load_motors, 1);
     osDelay(KILLALL_DELAY);

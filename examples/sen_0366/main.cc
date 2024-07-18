@@ -31,8 +31,8 @@ static distance::SEN_0366_DIST* sensor = nullptr;
 
 
 void RM_RTOS_Init(void) {
-  print_use_uart(&huart1);
-  sensor = distance::SEN_0366_DIST::init(&huart6,0x80);
+  print_use_uart(&huart6);
+  sensor = distance::SEN_0366_DIST::init(&huart1,0x80);
 }
 
 void RM_RTOS_Default_Task(const void* arguments) {
@@ -40,9 +40,12 @@ void RM_RTOS_Default_Task(const void* arguments) {
 
   print("Begin\r\n");
   while (!sensor->begin()){
-    print("sensor_initializing\r\n");
+    print("sensor_initializing: connection_flag_: %d\r\n", sensor->connection_flag_);
     osDelay(50);
   }
+  sensor->setResolution(distance::RESOLUTION_0_1_MM);
+
+  sensor->setMeasureRange(distance::RANGE_80_M);
 
   sensor->continuousMeasure();
   while (true) {

@@ -54,10 +54,19 @@ float calibrated_theta_esca = 0;
 
 
 
-float pitch_curr;
-float pitch_target;
+float pitch_curr = 0;
+float pitch_target = 0;
 
-float curr_yaw;
+float curr_yaw = 0;
+
+float vx_keyboard = 0;
+float vy_keyboard = 0;
+float vx_remote,vy_remote;
+float vx_set,vy_set;
+
+
+
+
 
 void jam_callback(control::ServoMotor* servo, const control::servo_jam_t data) {
   UNUSED(data);
@@ -98,6 +107,10 @@ void gimbal_task(void* args) {
    * escalation reset
    */
   while (true){
+
+
+
+
     escalation_servo->SetTarget(escalation_servo->GetTheta() - PI * 2,true);
     escalation_servo->CalcOutput();
     control::MotorCANBase::TransmitOutput(can1_escalation, 1);
@@ -176,6 +189,42 @@ void gimbal_task(void* args) {
       escalation_servo->SetTarget(calibrated_theta_esca);
     }
 
+    if (dbus->keyboard.bit.A) vx_keyboard -= 61.5;
+    if (dbus->keyboard.bit.D) vx_keyboard += 61.5;
+    if (dbus->keyboard.bit.W) vy_keyboard += 61.5;
+    if (dbus->keyboard.bit.S) vy_keyboard -= 61.5;
+
+
+    if (-35 <= vx_keyboard && vx_keyboard <= 35) vx_keyboard = 0;
+    if (-35 <= vy_keyboard && vy_keyboard <= 35) vy_keyboard = 0;
+
+    if (vx_keyboard > 0)
+      vx_keyboard -= 60;
+    else if (vx_keyboard < 0)
+      vx_keyboard += 60;
+
+    if (vy_keyboard > 0)
+      vy_keyboard -= 60;
+    else if (vy_keyboard < 0)
+      vy_keyboard += 60;
+
+    vx_keyboard = clip<float>(vx_keyboard, -1200, 1200);
+    vy_keyboard = clip<float>(vy_keyboard, -1200, 1200);
+
+    vx_remote = dbus->ch0;
+    vy_remote = dbus->ch1;
+
+    vx_set = vx_keyboard + vx_remote;
+    vy_set = vy_keyboard + vy_remote;
+
+    send->cmd.id = bsp::VX;
+    send->cmd.data_float = Dead ? 0 : vx_set;
+    send->TransmitOutput();
+
+    send->cmd.id = bsp::VY;
+    send->cmd.data_float = Dead ? 0 : vy_set;
+    send->TransmitOutput();
+
     pitch_cmd = dbus->ch3 / 500.0;
     yaw_cmd = clip<float>(dbus->ch2 / 220.0 * 30.0, -30, 30);
 
@@ -227,7 +276,7 @@ void init_gimbal() {
   pitch_servo_data.motor = pitch_motor_R;
   pitch_servo_R = new control::ServoMotor(pitch_servo_data);
 
-  yaw_motor = new control::Motor4310(can1, 0x03, 0x02, control::VEL);
+  yaw_motor = new control::Motor4310(can1, 0x04, 0x05, control::VEL);
 
   pitch_encoder = new control::BRTEncoder(can1,0x01,false);
 
