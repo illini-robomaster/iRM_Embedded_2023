@@ -33,7 +33,7 @@ public:
     Vector3d normalized() const;
     void normalize();
 
-    /// @brief the angle between this vector and the given vector 
+    /// @brief the angle between this vector and the given vector, between 0 and PI
     /// @param v 
     /// @return 
     Angle2d angleBetween(const Vector3d& v) const;

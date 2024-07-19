@@ -54,7 +54,24 @@ Rotation3d::Rotation3d(float roll, float pitch, float yaw)
     _z = sy * cp * cr - cy * sp * sr;
 }
 
-//checked
+Rotation3d::Rotation3d(float axis_x, float axis_y, float axis_z, Angle2d angle) {
+    float norm = sqrt(axis_x*axis_x + axis_y*axis_y + axis_z*axis_z);
+    
+    axis_x /= norm;
+    axis_y /= norm;
+    axis_z /= norm;
+
+    float half_angle = angle.getRadians() / 2.0;
+    float sin_half_angle = sin(half_angle);
+    float cos_half_angle = cos(half_angle);
+
+    _w = cos_half_angle;
+    _x = axis_x * sin_half_angle;
+    _y = axis_y * sin_half_angle;
+    _z = axis_z * sin_half_angle;
+}
+
+// checked
 Rotation3d Rotation3d::operator*(const Rotation3d& r) const
 {   
     // v1 dot v2 (imaginary part)
@@ -150,8 +167,32 @@ Rotation3d Rotation3d::conjugate() const
     return Rotation3d(-_x, -_y, -_z, _w);
 }
 
+AxisAngle Rotation3d::getAxisAngle() const {
+    //return axis as vector3d in axis-angle form
+    float sin_half_angle = sqrt(_x * _x + _y * _y + _z * _z);
+    float cos_half_angle = _w;
+
+    float axis_x = _x / sin_half_angle;
+    float axis_y = _y / sin_half_angle;
+    float axis_z = _z / sin_half_angle;
+    float norm = sqrt(axis_x*axis_x + axis_y*axis_y + axis_z*axis_z);
+    
+    axis_x /= norm;
+    axis_y /= norm;
+    axis_z /= norm;
+
+    float angle = 2.0 * atan2(sin_half_angle, cos_half_angle);
+
+    return {axis_x, axis_y, axis_z, Angle2d(angle)};
+}
+
 Angle2d Rotation3d::angleBetween(const Rotation3d& r) const
 {
     float dot = _x * r._x + _y * r._y + _z * r._z + _w * r._w;
     return Angle2d(2.0 * acos(dot));
 }
+
+Rotation3d Rotation3d::minus(const Rotation3d& r) const {
+    return (*this)*r.conjugate();
+}
+

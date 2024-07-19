@@ -207,8 +207,9 @@ void checkAllMotorsConnected(){
 const float a = 0.05;
 const float b = 0.36; // big arm length
 const float c = 0.30; // forearm length
-joint_state_t inverse_kinematics(Vector3d position, Rotation3d orientation){
+joint_state_t inverse_kinematics(Vector3d position, Rotation3d orientation, joint_state_t joint_angles){
   
+  UNUSED(joint_angles);
   float l = sqrt(position._x*position._x + position._y*position._y - a*a);
   float alpha1 = atan(l/a);
   float theta1 = atan2(position._y, position._x) + alpha1 - PI/2;
@@ -232,17 +233,51 @@ joint_state_t inverse_kinematics(Vector3d position, Rotation3d orientation){
     theta3 = 0;
   }
 
-  Vector3d wrist_orientation(1,0,0);
-  wrist_orientation = wrist_orientation.rotateBy(orientation);
+  Vector3d wrist_facing = Vector3d(1,0,0).rotateBy(orientation);
   // assumes forearm is pointing forward (camera is on forearm)
   // TODO: test and test sign
-  float theta4 = atan2(wrist_orientation._y, wrist_orientation._x); // the angle of the wrist pointing direction projected in camera plane
-  float theta5 = wrist_orientation.angleBetween(Vector3d(1,0,0)).getRadians();  // angle between pointing forward and desired orientation as a vector
-  Rotation3d wrist_orientation_rot = Vector3d(1,0,0).getRotation3d(wrist_orientation);
-  float theta6 = wrist_orientation_rot.angleBetween(orientation).getRadians(); // angle between desired orientation and orientation achieved by J4 and J5 only
+  float theta4 = atan2(wrist_facing._z, wrist_facing._y); // the angle of the wrist pointing direction projected in camera plane
+  float theta5 = wrist_facing.angleBetween(Vector3d(1,0,0)).getRadians();  // angle between pointing forward and desired orientation as a vector
 
-  // todo last 3 joint inverse kinematics
-  return {0, theta1, theta2, theta3, theta4, theta5, theta6};
+  Rotation3d wrist_facing_rot = Vector3d(1,0,0).getRotation3d(wrist_facing);
+  float theta6 = wrist_facing_rot.angleBetween(orientation).getRadians(); // angle between desired orientation and orientation achieved by J4 and J5 only, so the difference is j6 angle
+  // however, there two direction of j6, so we need to do forward kinematics to see if it's this theta6 or its opposite.
+
+  
+  Rotation3d j4_rotation(1,0,0, Angle2d(theta4));
+  Rotation3d j5_rotation(0,0,1, Angle2d(theta5));
+  Rotation3d j6_rotation(1,0,0, Angle2d(theta6));
+
+  // optimize 4310 angles
+  // J4 angle should not turn over 90 degrees, and should reverse theta5
+  Angle2d j4_delta(theta4-joint_angles.forearm_roll_4);
+  if(abs(j4_delta.getRadiansNegPItoPI())>M_PI/2){
+      theta4 -= M_PI;
+      theta5 *= -1.0;
+  }
+  theta4 = wrap<float>(theta4, -M_PI, M_PI);
+
+
+  Rotation3d j4j5j6_rotation = j4_rotation*j5_rotation*j6_rotation; // rotation by joint 6 then joint 5 then joint 4
+
+  // std::cout << "j4j5j6 rotation" << j4j5j6_rotation.getRoll() << " " << j4j5j6_rotation.getPitch() << " " << j4j5j6_rotation.getYaw() << std::endl;
+  // compare j4j5j6_rotation to orientation, if difference is orientation is big, then reverse j6 angle;
+  float diff = j4j5j6_rotation.minus(orientation).getAxisAngle().angle.getRadians();
+  // std::cout << "diff" << diff << std::endl;
+
+
+  if(abs(diff) > 0.01){
+      theta6 -= diff;
+  }
+
+  j6_rotation = Rotation3d(1,0,0, Angle2d(theta6));
+  j4j5j6_rotation = j4_rotation*j5_rotation*j6_rotation; // rotation by joint 6 then joint 5 then joint 4
+  Vector3d j4j5j6_facing = Vector3d(1,0,0).rotateBy(j4j5j6_rotation);
+  // std::cout << "j4j5j6 facing" << j4j5j6_facing._x << " " << j4j5j6_facing._y << " " << j4j5j6_facing._z << std::endl;
+  // std::cout << "j4j5j6 rotation corrected: " << j4j5j6_rotation.getRoll() << " " << j4j5j6_rotation.getPitch() << " " << j4j5j6_rotation.getYaw() << std::endl;
+  diff = j4j5j6_rotation.minus(orientation).getAxisAngle().angle.getRadians();
+
+  return {0,theta1, theta2, theta3, theta4, theta5, theta6};
 }
 
 
@@ -266,8 +301,8 @@ void armTask(void* args) {
   // for joint 2, mechanical angle is the reading of encoder0 - encoder0_angle_when_upright
   // for joint 3, mechanical angle is the reading of encoder1-encoder0 - encoder1_angle_when_upright - encoder0_angle_when_upright
   // mechanical angle range
-  joint_state_t MECHANICAL_MAX_POS = {0, PI/2, 0.33, 0.65, PI/2, PI/2, PI};
-  joint_state_t MECHANICAL_MIN_POS = {0, -PI/2, -0.33, -0.65, -PI/2, -PI/2, -PI};
+  joint_state_t MECHANICAL_MAX_POS = {0, PI/2, 0.33, 0.65, PI, PI/2, PI};
+  joint_state_t MECHANICAL_MIN_POS = {0, -PI/2, -0.33, -0.65, -PI, -PI/2, -PI};
 
   const float SBUS_CHANNEL_MAX = 660;
 
@@ -299,9 +334,14 @@ void armTask(void* args) {
 
   // uncomment SetZeroPos() if remounted 4310
 
-  // forearm_rotate_motor_4->SetZeroPos();
-  // wrist_rotate_motor_5->SetZeroPos();
-  // hand_rotate_motor_6->SetZeroPos();
+  forearm_rotate_motor_4->SetZeroPos();
+  osDelay(10);
+  wrist_rotate_motor_5->SetZeroPos();
+  osDelay(10);
+  hand_rotate_motor_6->SetZeroPos();  
+  osDelay(10);
+
+
 
   forearm_rotate_motor_4->MotorEnable();
   wrist_rotate_motor_5->MotorEnable();
@@ -353,9 +393,9 @@ void armTask(void* args) {
   TrapezoidProfile joint_1_profile(1.0, 1.0); // acceleration, velocity
   TrapezoidProfile joint_2_profile(1.0, 0.5);
   TrapezoidProfile joint_3_profile(1.0, 0.5);
-  TrapezoidProfile joint_4_profile(2.0, 3.5);
-  TrapezoidProfile joint_5_profile(2.0, 2.0);
-  TrapezoidProfile joint_6_profile(2.0, 2.0);
+  TrapezoidProfile joint_4_profile(4.0, 3.5);
+  TrapezoidProfile joint_5_profile(4.0, 5.0);
+  TrapezoidProfile joint_6_profile(4.0, 5.0);
 
   int loop_cnt = 0;
   float last_100loop_time = HAL_GetTick();
@@ -411,7 +451,7 @@ void armTask(void* args) {
     current_position._x = clip<float>(current_position._x, 0.1, 0.65);
     current_position._y = clip<float>(current_position._y, -0.65, 0.65);
 
-    joint_state_t desired_mechanical_angle = inverse_kinematics(Vector3d(current_position._x, current_position._y , current_position._z), Rotation3d(last_targets.base_yaw_rotate_1, last_targets.base_pitch_rotate_2, last_targets.forearm_pitch_3));
+    joint_state_t desired_mechanical_angle = inverse_kinematics(Vector3d(current_position._x, current_position._y , current_position._z), Rotation3d(filtered_sbus[4]*M_PI/2, filtered_sbus[5]*M_PI/2, filtered_sbus[6]*M_PI/2), current_motor_angles);
 
     if(isJointTargetsLegal(desired_mechanical_angle)){
       mechanical_angle = desired_mechanical_angle;
@@ -420,11 +460,12 @@ void armTask(void* args) {
     }
     // otherwise, A1 targets don't change
 
+   
 
     //TODO: 4310 Motors use field roll=pitch-yaw to control 
-    mechanical_angle.forearm_roll_4      = map<float>(filtered_sbus[4], MECHANICAL_MIN_POS.forearm_roll_4,      MECHANICAL_MAX_POS.forearm_roll_4);
-    mechanical_angle.wrist_5             = map<float>(filtered_sbus[5], MECHANICAL_MIN_POS.wrist_5,             MECHANICAL_MAX_POS.wrist_5);
-    mechanical_angle.end_6               = map<float>(filtered_sbus[6], MECHANICAL_MIN_POS.end_6,               MECHANICAL_MAX_POS.end_6); 
+    mechanical_angle.forearm_roll_4      = wrap<float>(mechanical_angle.forearm_roll_4, MECHANICAL_MIN_POS.forearm_roll_4,      MECHANICAL_MAX_POS.forearm_roll_4);
+    mechanical_angle.wrist_5             = wrap<float>(mechanical_angle.wrist_5, MECHANICAL_MIN_POS.wrist_5,             MECHANICAL_MAX_POS.wrist_5);
+    mechanical_angle.end_6               = wrap<float>(mechanical_angle.end_6, MECHANICAL_MIN_POS.end_6,               MECHANICAL_MAX_POS.end_6); 
 
 #else
     // map sbus input to mechanical angle range
@@ -435,6 +476,7 @@ void armTask(void* args) {
     mechanical_angle.wrist_5             = map<float>(filtered_sbus[5], MECHANICAL_MIN_POS.wrist_5,             MECHANICAL_MAX_POS.wrist_5);
     mechanical_angle.end_6               = map<float>(filtered_sbus[6], MECHANICAL_MIN_POS.end_6,               MECHANICAL_MAX_POS.end_6);
 #endif 
+
 
 
     // check if joint targets are legal
@@ -485,10 +527,11 @@ void armTask(void* args) {
       // print("A1_offset %f, %f\n", A1_id1_offset, A1_id2_offset);
       // print("A1 current: %f. %f \n", MotorA1_recv_id00.current);
       print("position: %f, %f, %f \n", last_position._x, last_position._y, last_position._z);
+      print("orientation: %f, %f, %f \n", filtered_sbus[4]*PI, filtered_sbus[5]*PI, filtered_sbus[6]*PI);
       // print("mechanical: %f, %f, %f, %f, %f, %f \n", mechanical_angle.base_yaw_rotate_1, mechanical_angle.base_pitch_rotate_2, mechanical_angle.forearm_pitch_3, mechanical_angle.forearm_roll_4, mechanical_angle.wrist_5, mechanical_angle.end_6);
       print("current: %f, %f, %f, %f, %f, %f \n", current_motor_angles.base_yaw_rotate_1, current_motor_angles.base_pitch_rotate_2, current_motor_angles.forearm_pitch_3, current_motor_angles.forearm_roll_4, current_motor_angles.wrist_5, current_motor_angles.end_6);
       // print("smoothed: %f, %f, %f, %f, %f, %f \n", last_targets.base_yaw_rotate_1, last_targets.base_pitch_rotate_2, last_targets.forearm_pitch_3, last_targets.forearm_roll_4, last_targets.wrist_5, last_targets.end_6);
-      // print("targets: %f, %f, %f, %f, %f, %f \n",joint_targets.base_yaw_rotate_1, joint_targets.base_pitch_rotate_2, joint_targets.forearm_pitch_3, joint_targets.forearm_roll_4, joint_targets.wrist_5, joint_targets.end_6);
+      print("targets: %f, %f, %f, %f, %f, %f \n",last_targets.base_yaw_rotate_1, last_targets.base_pitch_rotate_2, last_targets.forearm_pitch_3, last_targets.forearm_roll_4, last_targets.wrist_5, last_targets.end_6);
       print("loop time %fms \r\n", (HAL_GetTick()-last_100loop_time)/100.0);
       // print("d: %f, %f \r\n", hand_rotate_motor_6->GetTheta(), last_targets.end_6);
       last_100loop_time = HAL_GetTick();

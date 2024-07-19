@@ -7,6 +7,14 @@ struct Quaternion {
     float y;
     float z;
 };
+
+struct AxisAngle {
+    float axis_x;
+    float axis_y;
+    float axis_z;
+    Angle2d angle;
+};
+
 class Rotation3d {
 // use quaternion to represent rotation
 private:
@@ -29,6 +37,11 @@ public:
     /// @param pitch 
     /// @param yaw 
     Rotation3d(float roll, float pitch, float yaw); 
+
+    /// @brief Angle-axis representation
+    /// @param axis 
+    /// @param  
+    Rotation3d(float axis_x, float axis_y, float axis_z, Angle2d angle);
     // TODO: axis-angle and rotation matrix
 
     Rotation3d operator*(const Rotation3d& r) const;
@@ -48,5 +61,9 @@ public:
 
     Rotation3d conjugate() const;
 
+    AxisAngle getAxisAngle() const;
+
     Angle2d angleBetween(const Rotation3d& r) const;
+
+    Rotation3d minus(const Rotation3d& r) const;
 };
