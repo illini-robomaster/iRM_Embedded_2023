@@ -233,50 +233,54 @@ joint_state_t inverse_kinematics(Vector3d position, Rotation3d orientation, join
     theta3 = 0;
   }
 
-  Vector3d wrist_facing = Vector3d(1,0,0).rotateBy(orientation);
-  // assumes forearm is pointing forward (camera is on forearm)
-  // TODO: test and test sign
-  float theta4 = atan2(wrist_facing._z, wrist_facing._y); // the angle of the wrist pointing direction projected in camera plane
-  float theta5 = wrist_facing.angleBetween(Vector3d(1,0,0)).getRadians();  // angle between pointing forward and desired orientation as a vector
+    Vector3d wrist_facing = Vector3d(1,0,0).rotateBy(orientation);
+    // assumes forearm is pointing forward (camera is on forearm)
+    // TODO: test and test sign
+    float theta4 = atan2(wrist_facing._z, wrist_facing._y); // the angle of the wrist pointing direction projected in camera plane
+    float theta5 = wrist_facing.angleBetween(Vector3d(1,0,0)).getRadians();  // angle between pointing forward and desired orientation as a vector
+   
+    // optimize 4310 angles
+    // J4 angle should not turn over 90 degrees, and should reverse theta5
+    
+    Angle2d j4_delta(theta4-joint_angles.forearm_roll_4);
 
-  Rotation3d wrist_facing_rot = Vector3d(1,0,0).getRotation3d(wrist_facing);
-  float theta6 = wrist_facing_rot.angleBetween(orientation).getRadians(); // angle between desired orientation and orientation achieved by J4 and J5 only, so the difference is j6 angle
-  // however, there two direction of j6, so we need to do forward kinematics to see if it's this theta6 or its opposite.
+    float magical_multipler = 1.0;
+    if(abs(j4_delta.getRadiansNegPItoPI())>M_PI/2){
+        theta4 = Angle2d(theta4-M_PI).getRadians();
+        theta5 *= -1.0;
+        magical_multipler = -1.0;
+    }
 
-  
-  Rotation3d j4_rotation(1,0,0, Angle2d(theta4));
-  Rotation3d j5_rotation(0,0,1, Angle2d(theta5));
-  Rotation3d j6_rotation(1,0,0, Angle2d(theta6));
+    Rotation3d j4_rotation(1,0,0, Angle2d(theta4));
+    Rotation3d j5_rotation(0,0,1, Angle2d(theta5));
 
-  // optimize 4310 angles
-  // J4 angle should not turn over 90 degrees, and should reverse theta5
-  Angle2d j4_delta(theta4-joint_angles.forearm_roll_4);
-  if(abs(j4_delta.getRadiansNegPItoPI())>M_PI/2){
-      theta4 -= M_PI;
-      theta5 *= -1.0;
-  }
-  theta4 = wrap<float>(theta4, -M_PI, M_PI);
+    Rotation3d j4j5_rotation = j4_rotation * j5_rotation;
+    
+    // Rotation3d wrist_facing_rot = Vector3d(1,0,0).getRotation3d(wrist_facing);
+    float theta6 = j4j5_rotation.minus(orientation).getAxisAngle().angle.getRadians(); // angle between desired orientation and orientation achieved by J4 and J5 only, so the difference is j6 angle
+    // however, there two direction of j6, so we need to do forward kinematics to see if it's this theta6 or its opposite.
+    
+    Rotation3d j6_rotation(1,0,0, Angle2d(theta6));
 
+    Rotation3d j4j5j6_rotation = j4_rotation*j5_rotation*j6_rotation; // rotation by joint 6 then joint 5 then joint 4
 
-  Rotation3d j4j5j6_rotation = j4_rotation*j5_rotation*j6_rotation; // rotation by joint 6 then joint 5 then joint 4
+    // std::cout << "j4j5j6 rotation" << j4j5j6_rotation.getRoll() << " " << j4j5j6_rotation.getPitch() << " " << j4j5j6_rotation.getYaw() << std::endl;
+    // compare j4j5j6_rotation to orientation, if difference is orientation is big, then reverse j6 angle;
+    float diff = j4j5j6_rotation.minus(orientation).getAxisAngle().angle.getRadians();
+    // std::cout << "diff" << diff << std::endl;
 
-  // std::cout << "j4j5j6 rotation" << j4j5j6_rotation.getRoll() << " " << j4j5j6_rotation.getPitch() << " " << j4j5j6_rotation.getYaw() << std::endl;
-  // compare j4j5j6_rotation to orientation, if difference is orientation is big, then reverse j6 angle;
-  float diff = j4j5j6_rotation.minus(orientation).getAxisAngle().angle.getRadians();
-  // std::cout << "diff" << diff << std::endl;
+    if(abs(diff) > 0.01){
+        theta6 -= diff * magical_multipler;
+    }
 
-
-  if(abs(diff) > 0.01){
-      theta6 -= diff;
-  }
-
-  j6_rotation = Rotation3d(1,0,0, Angle2d(theta6));
-  j4j5j6_rotation = j4_rotation*j5_rotation*j6_rotation; // rotation by joint 6 then joint 5 then joint 4
-  Vector3d j4j5j6_facing = Vector3d(1,0,0).rotateBy(j4j5j6_rotation);
-  // std::cout << "j4j5j6 facing" << j4j5j6_facing._x << " " << j4j5j6_facing._y << " " << j4j5j6_facing._z << std::endl;
-  // std::cout << "j4j5j6 rotation corrected: " << j4j5j6_rotation.getRoll() << " " << j4j5j6_rotation.getPitch() << " " << j4j5j6_rotation.getYaw() << std::endl;
-  diff = j4j5j6_rotation.minus(orientation).getAxisAngle().angle.getRadians();
-
+    j6_rotation = Rotation3d(1,0,0, Angle2d(theta6));
+    j4j5j6_rotation = j4_rotation*j5_rotation*j6_rotation; // rotation by joint 6 then joint 5 then joint 4
+    Vector3d j4j5j6_facing = Vector3d(1,0,0).rotateBy(j4j5j6_rotation);
+    // std::cout << "j4j5j6 facing" << j4j5j6_facing._x << " " << j4j5j6_facing._y << " " << j4j5j6_facing._z << std::endl;
+    // std::cout << "j4j5j6 rotation corrected: " << j4j5j6_rotation.getRoll() << " " << j4j5j6_rotation.getPitch() << " " << j4j5j6_rotation.getYaw() << std::endl;
+    diff = j4j5j6_rotation.minus(orientation).getAxisAngle().angle.getRadians();
+    // std::cout << "diff corrected" << diff << std::endl;
+    // std::cout << theta4 << " " << theta5 << " " << theta6 << std::endl;
   return {0,theta1, theta2, theta3, theta4, theta5, theta6};
 }
 
