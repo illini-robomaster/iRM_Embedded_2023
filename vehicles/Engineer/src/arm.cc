@@ -73,8 +73,8 @@ static joint_state_t target_mechanical_angle = {0,0,0,0,0,0,0};
 static joint_state_t current_mechanical_angle = {0,0,0,0,0,0,0};
 
 #ifdef INV_KINEMATICS
-  // static Vector3d last_position(0.3,0.05,0.36); // 3+3 joint
-  static Vector3d last_position(0.46,0.05,0.36); // 6 joint
+  static Vector3d last_position(0.3,0.05,0.36); // 3+3 joint
+  // static Vector3d last_position(0.46,0.05,0.36); // 6 joint
 
 #endif
 
@@ -265,11 +265,9 @@ joint_state_t inverse_kinematics(Vector3d position, Rotation3d orientation, join
   // optimize 4310 angles
   // J4 angle should not turn over 90 degrees, and should reverse theta5
   Angle2d j4_delta(theta4-joint_angles.forearm_roll_4);
-  // float magical_multipler = 1.0;
   if(abs(j4_delta.getRadiansNegPItoPI())>M_PI/2){
       theta4 = Angle2d(theta4-M_PI).getRadians();
       theta5 *= -1.0;
-      // magical_multipler = -1.0;
   }
 
   Rotation3d j4_rotation(1,0,0, Angle2d(theta4)); // axis-angle representation of a 3d rotation
