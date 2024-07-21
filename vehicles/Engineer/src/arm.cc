@@ -211,7 +211,7 @@ const float a = 0.05;
 const float b = 0.36; // big arm length
 const float c = 0.30; // forearm length
 const float wrist_length = 0.16;
-joint_state_t inverse_kinematics(Vector3d end_position, Rotation3d orientation, joint_state_t joint_angles){
+joint_state_t inverse_kinematics(Vector3d position, Rotation3d orientation, joint_state_t joint_angles){
   
   // Vector3d position = end_position-(Vector3d(wrist_length,0,0).rotateBy(orientation));
 
