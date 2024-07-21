@@ -29,6 +29,13 @@
 #include "dbus.h"
 #include "tim.h"
 
+/* 
+This example receives vx, vy, and vw commands from Jetson and commands 
+the chassis. 
+
+The corresponding example on Jetson is chassis_test.py in robot_driver. 
+*/
+
 #define RX_SIGNAL (1 << 0)
 #define DATA_READY_SIGNAL (1 << 1)
 extern osThreadId_t defaultTaskHandle;
