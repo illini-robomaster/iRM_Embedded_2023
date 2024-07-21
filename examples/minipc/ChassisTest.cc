@@ -30,10 +30,14 @@
 #include "tim.h"
 
 /* 
-This example receives vx, vy, and vw commands from Jetson and commands 
-the chassis. 
+  This example receives vx, vy, and vw commands from the Jetson and commands 
+  the chassis. 
 
-The corresponding example on Jetson is chassis_test.py in robot_driver. 
+  On the Jetson side, the following scripts in robot_driver work with this
+  example: chassis_test.py, cmd_vel_adjuster.py, and keyboard_teleop.py.
+
+  (Note that if you are using cmd_vel_adjuster.py and keyboard_teleop.py, you
+  will need to run robot.py as well. See each script for more information.)
 */
 
 #define RX_SIGNAL (1 << 0)
