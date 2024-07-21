@@ -90,6 +90,11 @@ Rotation3d Rotation3d::operator*(const Rotation3d& r) const
     return Rotation3d(new_x, new_y, new_z, new_w);
 }
 
+Rotation3d Rotation3d::operator/(float scalar) const
+{
+    return Rotation3d(_x / scalar, _y / scalar, _z / scalar, _w / scalar);
+}
+
 bool Rotation3d::operator==(const Rotation3d& r) const
 {
     return _x == r._x && _y == r._y && _z == r._z && _w == r._w;
@@ -167,6 +172,17 @@ Rotation3d Rotation3d::conjugate() const
     return Rotation3d(-_x, -_y, -_z, _w);
 }
 
+Rotation3d Rotation3d::inverse() const 
+{
+    Rotation3d result = this->conjugate();
+    return result.normalized();
+}
+
+float Rotation3d::dot(const Rotation3d &other) const
+{
+    return _x * other._x + _y * other._y + _z * other._z + _w * other._w;
+}
+
 AxisAngle Rotation3d::getAxisAngle() const {
     //return axis as vector3d in axis-angle form
     float sin_half_angle = sqrt(_x * _x + _y * _y + _z * _z);
@@ -193,6 +209,6 @@ Angle2d Rotation3d::angleBetween(const Rotation3d& r) const
 }
 
 Rotation3d Rotation3d::minus(const Rotation3d& r) const {
-    return (*this)*r.conjugate();
+    return (*this)*r.inverse();
 }
 

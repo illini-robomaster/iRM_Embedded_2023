@@ -45,6 +45,7 @@ public:
     // TODO: axis-angle and rotation matrix
 
     Rotation3d operator*(const Rotation3d& r) const;
+    Rotation3d operator/(float scalar) const;
     bool operator==(const Rotation3d& r) const;
     bool operator!=(const Rotation3d& r) const;
 
@@ -61,9 +62,18 @@ public:
 
     Rotation3d conjugate() const;
 
+    Rotation3d inverse() const;
+
+    float dot(const Rotation3d& other) const;
+
     AxisAngle getAxisAngle() const;
 
     Angle2d angleBetween(const Rotation3d& r) const;
 
+    /** @brief this quaternion minus another quaternion, the result satisfies:
+    * `result * this quaternion = other quaternion`
+    * @param r 
+    * @return this quaternion multiples the inverse of the other quaternion
+    */ 
     Rotation3d minus(const Rotation3d& r) const;
 };
