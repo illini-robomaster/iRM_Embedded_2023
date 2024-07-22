@@ -48,4 +48,6 @@ public:
     /// @param v the vector that this vector would be rotated to if applyed the returned rotation
     /// @return 
     Rotation3d getRotation3d(const Vector3d& v) const;
+
+    std::string toString() const;
 };

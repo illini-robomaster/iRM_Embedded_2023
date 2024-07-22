@@ -1,5 +1,6 @@
 #pragma once
 #include "angle2d.h"
+#include <string>
 
 struct Quaternion {
     float w;
@@ -76,4 +77,6 @@ public:
     * @return this quaternion multiples the inverse of the other quaternion
     */ 
     Rotation3d minus(const Rotation3d& r) const;
+
+    std::string toString() const;
 };

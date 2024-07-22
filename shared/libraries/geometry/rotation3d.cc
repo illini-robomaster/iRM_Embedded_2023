@@ -92,6 +92,9 @@ Rotation3d Rotation3d::operator*(const Rotation3d& r) const
 
 Rotation3d Rotation3d::operator/(float scalar) const
 {
+    if(scalar == 0){
+        return (*this); // return identity rotation
+    }
     return Rotation3d(_x / scalar, _y / scalar, _z / scalar, _w / scalar);
 }
 
@@ -164,6 +167,10 @@ float Rotation3d::getRoll() const
 Rotation3d Rotation3d::normalized() const
 {
     float length = sqrt(_x * _x + _y * _y + _z * _z + _w * _w);
+    if(length == 0){
+        // prevent division by 0
+        return Rotation3d(0,0,0); // return identity rotation
+    }
     return Rotation3d(_x / length, _y / length, _z / length, _w / length);
 }
 
@@ -211,4 +218,6 @@ Angle2d Rotation3d::angleBetween(const Rotation3d& r) const
 Rotation3d Rotation3d::minus(const Rotation3d& r) const {
     return (*this)*r.inverse();
 }
-
+std::string Rotation3d::toString() const {
+  return "Rotation3d(roll: " + std::to_string(getRoll()) + " pitch: " + std::to_string(getPitch()) + " yaw: " + std::to_string(getYaw());
+}

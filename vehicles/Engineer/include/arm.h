@@ -34,8 +34,8 @@ const osThreadAttr_t armA1TaskAttribute = {.name = "armTask",
                                              .cb_mem = nullptr,
                                              .cb_size = 0,
                                              .stack_mem = nullptr,
-                                             .stack_size = 512 * 4,
-                                             .priority = (osPriority_t)osPriorityAboveNormal,
+                                             .stack_size = 1024 * 4,
+                                             .priority = (osPriority_t)osPriorityHigh,
                                              .tz_module = 0,
                                              .reserved = 0};
 

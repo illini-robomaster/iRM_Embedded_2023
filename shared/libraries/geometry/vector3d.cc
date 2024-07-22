@@ -178,6 +178,9 @@ Rotation3d Vector3d::getRotation3d(const Vector3d& v) const
     return Rotation3d(q);
 }
 
+std::string Vector3d::toString() const {
+  return "Vector3d(" + std::to_string(_x) + ", " + std::to_string(_y) + ", " + std::to_string(_z) + ")";
+}
 
 Vector3d Vector3d::cross(const Vector3d& v) const
 {
