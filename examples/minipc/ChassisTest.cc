@@ -85,29 +85,26 @@ void chassisTask(void* argument) {
   uint32_t flags;
   control::MotorCANBase* motors[] = {fl_motor, fr_motor, bl_motor, br_motor};
 
-  float vx_keyboard = 0, vy_keyboard = 0, wz_keyboard = 0;
+  float vx_keyboard = 0.0;
+  float vy_keyboard = 0.0;
+  float wz_keyboard = 0.0;
 
   while (true) {
-    uint32_t RGB_color[3] = {0xFFFF0000, 0xFF00FF00, 0xFF0000FF};
-
     // Keyboard control / Navigation mode
     if (dbus->swr == remote::UP) {
       flags = 0;
       flags = osEventFlagsWait(chassis_flag_id, DATA_READY_SIGNAL, osFlagsWaitAny, 50);
 
-      vx_keyboard = vx;
-      vy_keyboard = vy;
-      wz_keyboard = vw;
-
       // When timeout it returns -2 so we need extra checks here
       if (flags != osFlagsErrorTimeout && flags & DATA_READY_SIGNAL) {
-        vx_keyboard = clip<float>(vx_keyboard, -1200, 1200);
-        vy_keyboard = clip<float>(vy_keyboard, -1200, 1200);
+        vx_keyboard = clip<float>(vx, -1200, 1200);
+        vy_keyboard = clip<float>(vy, -1200, 1200);
+        wz_keyboard = vw;
 
         chassis->SetSpeed(vx_keyboard, vy_keyboard, wz_keyboard);
         chassis->Update(false, 30, 20, 60);
 
-        led->Display(RGB_color[1]);
+        led->Display(display::color_green);
       } else {
         // if timeout (no packet, stop the motor)
         fl_motor->SetOutput(0);
@@ -115,20 +112,17 @@ void chassisTask(void* argument) {
         bl_motor->SetOutput(0);
         br_motor->SetOutput(0);
 
-        led->Display(RGB_color[0]);
+        led->Display(display::color_red);
       }
       control::MotorCANBase::TransmitOutput(motors, 4);
       osDelay(10);
-    }
-
-    // Dbus control
-    else {
+    } else { // Dbus control
       chassis->SetSpeed(dbus->ch0, dbus->ch1, dbus->ch2);
       chassis->Update(false, 30, 20, 60);
       control::MotorCANBase::TransmitOutput(motors, 4);
       osDelay(10);
 
-      led->Display(RGB_color[2]);
+      led->Display(display::color_blue);
     }
   }
 }
