@@ -861,6 +861,8 @@ class Motor4310 {
    */
   Motor4310(bsp::CAN* can, uint16_t rx_id, uint16_t tx_id, mode_t mode);
 
+  Motor4310(bsp::CAN* can, uint16_t rx_id, uint16_t tx_id, mode_t mode, float P_MAX);
+
   /* implements data update callback */
   void UpdateData(const uint8_t data[]);
 
@@ -994,8 +996,8 @@ class Motor4310 {
   constexpr static float KD_MIN = 0;
   constexpr static float KD_MAX = 5;
   // position
-  constexpr static float P_MIN = -PI;
-  constexpr static float P_MAX = PI;
+  float P_MIN = -PI;
+  float P_MAX = PI;
   // velocity
   constexpr static float V_MIN = -45;
   constexpr static float V_MAX = 45;

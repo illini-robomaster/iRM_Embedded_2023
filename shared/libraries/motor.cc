@@ -812,6 +812,11 @@ Motor4310::Motor4310(bsp::CAN* can, uint16_t rx_id, uint16_t tx_id, mode_t mode)
   }
 }
 
+Motor4310::Motor4310(bsp::CAN* can, uint16_t rx_id, uint16_t tx_id, mode_t mode, float p_max) : Motor4310(can, rx_id, tx_id, mode) {
+  P_MAX = p_max;
+  P_MIN = -p_max;
+}
+
 void Motor4310::MotorEnable() {
   uint8_t data[8] = {0};
   data[0] = 0xff;
@@ -881,7 +886,7 @@ void Motor4310::TransmitOutput(Motor4310* motors[], uint8_t num_motors) {
       // converting float to unsigned int before transmitting
       kp_tmp = float_to_uint(motors[i]->kp_set_, KP_MIN, KP_MAX, 12);
       kd_tmp = float_to_uint(motors[i]->kd_set_, KD_MIN, KD_MAX, 12);
-      pos_tmp = float_to_uint(motors[i]->pos_set_, P_MIN, P_MAX, 16);
+      pos_tmp = float_to_uint(motors[i]->pos_set_, motors[i]->P_MIN, motors[i]->P_MAX, 16);
       vel_tmp = float_to_uint(motors[i]->vel_set_, V_MIN, V_MAX, 12);
       torque_tmp = float_to_uint(motors[i]->torque_set_, T_MIN, T_MAX, 12);
       data[0] = pos_tmp >> 8;
