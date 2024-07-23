@@ -69,7 +69,7 @@ remote::SBUS* sbus = nullptr;
 
 
 void RM_RTOS_Init() {
-    print_use_uart(&huart1);
+    print_use_uart(&huart4);
     bsp::SetHighresClockTimer(&htim5);
 #ifdef USING_DBUS
     dbus = new remote::DBUS(&huart3);
@@ -141,9 +141,12 @@ void RM_RTOS_Default_Task(const void* args) {
     UNUSED(args);
     while(true){ //if want to print, make sure nothing is print somewhere else
         if(sbus->ch[6]>100){
+            if(!engineerIsKilled){
+                print("killed\n");
+            }
             engineerIsKilled = true;
             KillAll();
-            print("killed");
+            // print("killed");
             osDelay(10);
         }else if(engineerIsKilled && sbus->ch[6]<=100){ // killed to revive
             ReviveAll();

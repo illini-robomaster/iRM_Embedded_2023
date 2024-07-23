@@ -81,7 +81,7 @@ static float base_rotate_offset = 0.0;
 
 
 #ifdef INV_KINEMATICS
-  static Vector3d last_position(0.46,0.05,0.36); // 3+3 joint
+  static Vector3d last_target_position(0.46,0.05,0.36); // 3+3 joint
   // static Vector3d last_position(0.46,0.05,0.36); // 6 joint
 
 #endif
@@ -437,6 +437,15 @@ void armTask(void* args) {
   TrapezoidProfile joint_5_profile(4.0, 5.0);
   TrapezoidProfile joint_6_profile(4.0, 5.0);
 
+#ifdef INV_KINEMATICS
+  // xyz profile for arm
+  TrapezoidProfile x_profile(0.2, 0.1);
+  TrapezoidProfile y_profile(0.2, 0.1);
+  TrapezoidProfile z_profile(0.2, 0.1);
+  Vector3d last_setpoint_velocity(0,0,0);
+  Vector3d last_setpoint_position = last_target_position;
+#endif
+
   int loop_cnt = 0;
   float last_100loop_time = HAL_GetTick();
   UNUSED(last_100loop_time);
@@ -489,29 +498,45 @@ void armTask(void* args) {
 #ifdef INV_KINEMATICS
 
     // x is forward, y is left, z is up
-    Vector3d current_position = last_position;
-    current_position._x += 0.2*-filtered_sbus[3]*0.005;
-    current_position._y += 0.2*filtered_sbus[1]*0.005;
-    current_position._z += 0.2*-filtered_sbus[2]*0.005;
+    Vector3d target_position = last_target_position;
+    target_position._x += 0.2*-filtered_sbus[3]*0.006;
+    target_position._y += 0.2*filtered_sbus[1]*0.006;
+    target_position._z += 0.2*-filtered_sbus[2]*0.006;
 
+    // make sure target position is in range
+    target_position._z = clip<float>(target_position._z, 0.1, 0.65);
+    target_position._x = clip<float>(target_position._x, 0.1, 0.65);
+    target_position._y = clip<float>(target_position._y, -0.65, 0.65);
+
+    kinematics_state x_state = x_profile.calculate(target_position._x, 6, {last_setpoint_position._x, last_setpoint_velocity._x});
+    kinematics_state y_state = y_profile.calculate(target_position._y, 6, {last_setpoint_position._y, last_setpoint_velocity._y});
+    kinematics_state z_state = z_profile.calculate(target_position._z, 6, {last_setpoint_position._z, last_setpoint_velocity._z});
+
+    Vector3d current_setpoint_velocity(x_state.velocity, y_state.velocity, z_state.velocity);
+    Vector3d current_setpoint_position(x_state.position, y_state.position, z_state.position);
+
+
+    // calculate ik based on current_setpoint (position) and orientation
+  
     Rotation3d orientation(filtered_sbus[4]*M_PI, filtered_sbus[5]*M_PI/2, filtered_sbus[6]*M_PI);
     Vector3d wrist_translation = Vector3d(wrist_length,0,0).rotateBy(orientation);
-    Vector3d forearm_position = current_position - wrist_translation;
+    Vector3d forearm_position = current_setpoint_position - wrist_translation;
     // current_position *= -1;
     
-    current_position._z = clip<float>(current_position._z, 0.1, 0.65);
-    current_position._x = clip<float>(current_position._x, 0.1, 0.65);
-    current_position._y = clip<float>(current_position._y, -0.65, 0.65);
-
     joint_state_t desired_mechanical_angle = inverse_kinematics(forearm_position, orientation, current_mechanical_angle);
 
+    last_target_position = target_position; // xyz
     if(isJointTargetsLegal(desired_mechanical_angle)){
       target_mechanical_angle = desired_mechanical_angle;
-      last_position = current_position;
 
-    }else if(loop_cnt % 100 == 0){
-      
-      print("ik result not legal %f %f %f %f %f %f\n", desired_mechanical_angle.base_yaw_rotate_1, desired_mechanical_angle.base_pitch_rotate_2, desired_mechanical_angle.forearm_pitch_3, desired_mechanical_angle.forearm_roll_4, desired_mechanical_angle.wrist_5, desired_mechanical_angle.end_6);
+
+      last_setpoint_position = current_setpoint_position;
+      last_setpoint_velocity = current_setpoint_velocity;
+
+    }else{
+      last_setpoint_velocity = {0,0,0};
+      if(loop_cnt % 100 == 0)
+        print("ik result not legal %f %f %f %f %f %f\n", desired_mechanical_angle.base_yaw_rotate_1, desired_mechanical_angle.base_pitch_rotate_2, desired_mechanical_angle.forearm_pitch_3, desired_mechanical_angle.forearm_roll_4, desired_mechanical_angle.wrist_5, desired_mechanical_angle.end_6);
     }
     // otherwise, A1 targets don't change
 #else
@@ -601,7 +626,7 @@ void armTask(void* args) {
       // print("A1_offset %f, %f\n", A1_id1_offset, A1_id2_offset);
       // print("A1 current: %f. %f \n", MotorA1_recv_id00.current);
 #ifdef INV_KINEMATICS
-      print("position: %f, %f, %f \n", last_position._x, last_position._y, last_position._z);
+      print("position: %f, %f, %f \n", last_target_position._x, last_target_position._y, last_target_position._z);
       print("orientation: %f, %f, %f \n", orientation.getRoll(), orientation.getPitch(), orientation.getYaw());
 #endif
       // print("mechanical: %f, %f, %f, %f, %f, %f \n", mechanical_angle.base_yaw_rotate_1, mechanical_angle.base_pitch_rotate_2, mechanical_angle.forearm_pitch_3, mechanical_angle.forearm_roll_4, mechanical_angle.wrist_5, mechanical_angle.end_6);
