@@ -18,7 +18,6 @@
  *                                                                          *
  ****************************************************************************/
 
-// TODO: inverse kinematics
 
 #define INV_KINEMATICS
 
@@ -27,7 +26,6 @@
 #include "bsp_print.h"
 #include "cmsis_os.h"
 #include "controller.h"
-#include "dbus.h"
 #include "sbus.h"
 #include "main.h"
 #include "motor.h"
@@ -43,9 +41,10 @@
 #include "A1/A1_motor_drive.h"
 #include "trapezoid_profile.h"
 #include "geometry/geometry.h"
+#include <vector>
+#include "arm_commands.h"
 
 // static bsp::CAN* can1 = nullptr;
-// static remote::DBUS* sbus = nullptr;
 static control::BRTEncoder* encoder0= nullptr;
 static control::BRTEncoder* encoder1= nullptr;
 // static bsp::Relay* pump = nullptr;
@@ -90,10 +89,12 @@ const float b = 0.36; // big arm length
 const float c = 0.30; // forearm length
 const float wrist_length = 0.16;
 
+std::vector<Command> commands_to_do;
+
 
 
 /*
-upright position:
+zero position:
 (elbow) -----
         |     
         |      
@@ -104,18 +105,16 @@ upright position:
 */
 
 /**
- * forearm_rotate_motor     RX=0x02 TX=0x01
+ * forearm_rotate_motor     RX=0x08 TX=0x07
  * wrist_rotate_motor       RX=0x04 TX=0x03
  * hand_rotete_motor        RX=0x06 TX=0x05
  * 
- * elbow_rortate_motor      ID=0
+ * elbow_rotate_motor      ID=2
  * upper_arm_motor          ID=1
- * base_motor               ID=2
+ * base_motor               ID=0
 */
 
 // entire arm
-
-// TODO fix transmit output for 4310 multi motors
 
 void init_arm_A1() {
   // print_use_uart(&huart4);
@@ -127,18 +126,16 @@ void init_arm_A1() {
   // motor 4310
   forearm_rotate_motor_4 = new control::Motor4310(can1, 0x08, 0x07, control::MIT, 2*PI);
   wrist_rotate_motor_5 = new control::Motor4310(can1, 0x04, 0x03, control::MIT);
-  hand_rotate_motor_6 = new control::Motor4310(can1, 0x06, 0x05, control::MIT,2*PI);
+  hand_rotate_motor_6 = new control::Motor4310(can1, 0xFF, 0x05, control::MIT,2*PI);
 
   /* rx_id = Master id
    * tx_id = CAN id
    * see example/m4310_mit.cc
    */
 
-  
-
 }
 
-// CAUTION: these values needs to be updated if J4 4310 motor\elbow lever is reinstalled, especially encoder1
+// CAUTION: these values needs to be updated if encoder/J4 4310 motor/elbow lever is reinstalled, especially encoder1
 /** A legal arm position satisfies all of the following constraints:
  * encoder1 (elbow pitch) 2.9 to 3.9
  * encoder0 (base pitch) -2.1 to -3.5
@@ -173,6 +170,13 @@ bool isJointTargetsLegal(joint_state_t &mechanical_angle) {
 
 
   return true;
+}
+
+void waitUntil(bool (*function)()){
+  while(!function()){
+    osDelay(100);
+  }
+  return;
 }
 
 void checkAllMotorsConnected(){
@@ -366,17 +370,10 @@ void armTask(void* args) {
   checkEncodersConnected();
 
   // manually enable motors
-  #ifdef USING_DBUS
-  while(dbus->swr != remote::DOWN){
-    osDelay(100);
-    print("waiting for dbus swr to be down\r\n");
-  }
-  #else
-   print("waiting for sbus channel 10 to be greater than 100, now %d\r\n",sbus->ch[9]);
-   while(sbus->ch[9] < 100){
-    osDelay(100);
-   }
-  #endif
+  
+  print("waiting for sbus channel 10 to be greater than 100, now %d\r\n",sbus->ch[9]);
+
+  waitUntil([]()->bool {return sbus->ch[9]>100;});
 
 
 
@@ -465,11 +462,6 @@ void armTask(void* args) {
     float filtered_sbus[16];
 
     // read and filter sbus
-#ifdef USING_DBUS
-    moving_average[1].AddSample(dbus->ch1); // base_yaw
-    moving_average[2].AddSample(dbus->ch2); // base_pitch
-    moving_average[3].AddSample(dbus->ch3); // elbow_pitch
-#else
 
     // manage input from sbus
     moving_average[1].AddSample(sbus->ch[0]); // base_yaw
@@ -486,7 +478,6 @@ void armTask(void* args) {
       base_rotate_offset = 0;    
     }
 
-#endif
     // value range from -1 to 1
     filtered_sbus[1] = clip<float>(moving_average[1].GetAverage(), -SBUS_CHANNEL_MAX, SBUS_CHANNEL_MAX)/SBUS_CHANNEL_MAX;
     filtered_sbus[2] = clip<float>(moving_average[2].GetAverage(), -SBUS_CHANNEL_MAX, SBUS_CHANNEL_MAX)/SBUS_CHANNEL_MAX;
@@ -520,23 +511,29 @@ void armTask(void* args) {
   
     Rotation3d orientation(filtered_sbus[4]*M_PI, filtered_sbus[5]*M_PI/2, filtered_sbus[6]*M_PI);
     Vector3d wrist_translation = Vector3d(wrist_length,0,0).rotateBy(orientation);
-    Vector3d forearm_position = current_setpoint_position - wrist_translation;
+    Vector3d forearm_setpoint_position = current_setpoint_position - wrist_translation;
+    Vector3d forearm_goal_position = target_position - wrist_translation;
     // current_position *= -1;
     
-    joint_state_t desired_mechanical_angle = inverse_kinematics(forearm_position, orientation, current_mechanical_angle);
-
+    joint_state_t mechanical_angle_setpoint = inverse_kinematics(forearm_setpoint_position, orientation, current_mechanical_angle);
+    joint_state_t goal_mechanical_angle = inverse_kinematics(forearm_goal_position, orientation, current_mechanical_angle);
+    UNUSED(goal_mechanical_angle);
     last_target_position = target_position; // xyz
-    if(isJointTargetsLegal(desired_mechanical_angle)){
-      target_mechanical_angle = desired_mechanical_angle;
+    if(isJointTargetsLegal(mechanical_angle_setpoint)){
+      target_mechanical_angle = mechanical_angle_setpoint;
 
 
       last_setpoint_position = current_setpoint_position;
       last_setpoint_velocity = current_setpoint_velocity;
 
+
+    // TODO: if we have this line, arm rotate motor will calculate to a very large angle
+    // }else if(isJointTargetsLegal(goal_mechanical_angle)){ // if goal is legal but next setpoint is not, fallback to joint movement
+      // target_mechanical_angle = goal_mechanical_angle;
     }else{
       last_setpoint_velocity = {0,0,0};
       if(loop_cnt % 100 == 0)
-        print("ik result not legal %f %f %f %f %f %f\n", desired_mechanical_angle.base_yaw_rotate_1, desired_mechanical_angle.base_pitch_rotate_2, desired_mechanical_angle.forearm_pitch_3, desired_mechanical_angle.forearm_roll_4, desired_mechanical_angle.wrist_5, desired_mechanical_angle.end_6);
+        print("ik result not legal %f %f %f %f %f %f\n", mechanical_angle_setpoint.base_yaw_rotate_1, mechanical_angle_setpoint.base_pitch_rotate_2, mechanical_angle_setpoint.forearm_pitch_3, mechanical_angle_setpoint.forearm_roll_4, mechanical_angle_setpoint.wrist_5, mechanical_angle_setpoint.end_6);
     }
     // otherwise, A1 targets don't change
 #else
@@ -604,12 +601,12 @@ void armTask(void* args) {
       kinematics_state joint_6_state = joint_6_profile.calculate(joint_targets.end_6,               6, {last_targets.end_6,               last_angular_velocities.end_6});
 
       // prevent sudden movement
-      joint_1_state.position = clip<float>(joint_1_state.position, current_motor_angles.base_yaw_rotate_1  -MAX_SPEED_RADIANS.base_yaw_rotate_1/0.006,    current_motor_angles.base_yaw_rotate_1  +MAX_SPEED_RADIANS.base_yaw_rotate_1/0.006);
-      joint_2_state.position = clip<float>(joint_2_state.position, current_motor_angles.base_pitch_rotate_2-MAX_SPEED_RADIANS.base_pitch_rotate_2/0.006,  current_motor_angles.base_pitch_rotate_2+MAX_SPEED_RADIANS.base_pitch_rotate_2/0.006);
-      joint_3_state.position = clip<float>(joint_3_state.position, current_motor_angles.forearm_pitch_3    -MAX_SPEED_RADIANS.forearm_pitch_3/0.006,      current_motor_angles.forearm_pitch_3    +MAX_SPEED_RADIANS.forearm_pitch_3/0.006);
-      joint_4_state.position = clip<float>(joint_4_state.position, current_motor_angles.forearm_roll_4     -MAX_SPEED_RADIANS.forearm_roll_4/0.006,       current_motor_angles.forearm_roll_4     +MAX_SPEED_RADIANS.forearm_roll_4/0.006);
-      joint_5_state.position = clip<float>(joint_5_state.position, current_motor_angles.wrist_5            -MAX_SPEED_RADIANS.wrist_5/0.006,              current_motor_angles.wrist_5            +MAX_SPEED_RADIANS.wrist_5/0.006);
-      joint_6_state.position = clip<float>(joint_6_state.position, current_motor_angles.end_6              -MAX_SPEED_RADIANS.end_6/0.006,                current_motor_angles.end_6              +MAX_SPEED_RADIANS.end_6/0.006);
+      joint_1_state.position = clip<float>(joint_1_state.position, current_motor_angles.base_yaw_rotate_1  -MAX_SPEED_RADIANS.base_yaw_rotate_1*0.006,    current_motor_angles.base_yaw_rotate_1  +MAX_SPEED_RADIANS.base_yaw_rotate_1*0.006);
+      joint_2_state.position = clip<float>(joint_2_state.position, current_motor_angles.base_pitch_rotate_2-MAX_SPEED_RADIANS.base_pitch_rotate_2*0.006,  current_motor_angles.base_pitch_rotate_2+MAX_SPEED_RADIANS.base_pitch_rotate_2*0.006);
+      joint_3_state.position = clip<float>(joint_3_state.position, current_motor_angles.forearm_pitch_3    -MAX_SPEED_RADIANS.forearm_pitch_3*0.006,      current_motor_angles.forearm_pitch_3    +MAX_SPEED_RADIANS.forearm_pitch_3*0.006);
+      joint_4_state.position = clip<float>(joint_4_state.position, current_motor_angles.forearm_roll_4     -MAX_SPEED_RADIANS.forearm_roll_4*0.006,       current_motor_angles.forearm_roll_4     +MAX_SPEED_RADIANS.forearm_roll_4*0.006);
+      joint_5_state.position = clip<float>(joint_5_state.position, current_motor_angles.wrist_5            -MAX_SPEED_RADIANS.wrist_5*0.006,              current_motor_angles.wrist_5            +MAX_SPEED_RADIANS.wrist_5*0.006);
+      joint_6_state.position = clip<float>(joint_6_state.position, current_motor_angles.end_6              -MAX_SPEED_RADIANS.end_6*0.006,                current_motor_angles.end_6              +MAX_SPEED_RADIANS.end_6*0.006);
 
       // modify target angles
       last_targets =    {0, joint_1_state.position, joint_2_state.position, joint_3_state.position, joint_4_state.position, joint_5_state.position, joint_6_state.position};
@@ -641,19 +638,9 @@ void armTask(void* args) {
 
     // manually confirm on the first loop to prevent accidental movement
     if(loop_cnt == 0){
-  #ifdef USING_DBUS
-      while(dbus->swr != remote::DOWN){
-        osDelay(100);
-        print("waiting for dbus swr to be down\r\n");
-        last_loop_time = HAL_GetTick();
-  }
-  #else
       print("waiting for sbus channel 10 to be smaller than -100\r\n");
-      while(sbus->ch[9] > -100){
-        osDelay(100);
-      }
+      waitUntil([]()->bool{return sbus->ch[9] < -100;});
       last_100loop_time = HAL_GetTick();
-  #endif
     }
 
 
