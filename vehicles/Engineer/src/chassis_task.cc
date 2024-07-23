@@ -38,7 +38,6 @@ static control::Steering6020* steering_motor4 = nullptr;
 static control::engineer_steering_chassis_t* chassis_data;
 static control::EngineerSteeringChassis* chassis;
 
-static volatile bool Dead = false;
 static BoolEdgeDetector RotateBarrel(false);
 
 int16_t loop_count = 0;
@@ -63,17 +62,12 @@ void chassisTask(void* arg){
     MovingAverage x(10);
     MovingAverage y(10);
 
-    control::Motor4310* motors[] = {rotate_motor};
 
 #ifdef USING_DBUS
     while(dbus->swr != remote::DOWN){}  // flip swr to start
 #endif
 
-    // rotate_motor->SetZeroPos();
-    rotate_motor->MotorEnable();
-
-    float pos = 0;
-
+    // print("starting loop\n");
     while (true) {
         float relative_angle = 0;
         float wz = 0;
@@ -134,16 +128,16 @@ void chassisTask(void* arg){
         wz = sbus->ch[2] / 660.0 * V_ROT_MAX; // in m/s
 #endif
 
-        // if(loop_cnt == 100){
-        //     loop_cnt = 0;
-        //     set_cursor(0, 0);
-        //     clear_screen();
-        //     print("joy_x: %f, joy_y: %f \r\n", joystick_vector.getX(), joystick_vector.getY());
-        //     print("vx: %f, vy: %f, wz: %f \r\n", target_vel.getX(), target_vel.getY(), wz);
-        //     print("DELTA T: %d \r\n", HAL_GetTick() - last);
-        // }
-        // last = HAL_GetTick();
-        // loop_cnt++;
+        if(loop_cnt == 100){
+            loop_cnt = 0;
+            set_cursor(0, 0);
+            clear_screen();
+            print("joy_x: %f, joy_y: %f \r\n", joystick_vector.getX(), joystick_vector.getY());
+            print("vx: %f, vy: %f, wz: %f \r\n", target_vel.getX(), target_vel.getY(), wz);
+            print("DELTA T: %d \r\n", HAL_GetTick() - last);
+        }
+        last = HAL_GetTick();
+        loop_cnt++;
         UNUSED(loop_cnt);
         UNUSED(last);
 
@@ -152,12 +146,12 @@ void chassisTask(void* arg){
         // calculate camera oriented velocity vector
         Vector2d target_vel_cam = target_vel.rotateBy(Angle2d(relative_angle)); // now relative_angle is 0
 
+
         chassis->SteerSetMaxSpeed(RUN_SPEED);
         chassis->SetSpeed(target_vel_cam.getX(), target_vel_cam.getY(), wz);
         chassis->SteerUpdateTarget();
         chassis->WheelUpdateSpeed();
         chassis->SteerCalcOutput();
-        // print("chassis_task loop entered 2\r\n");
 
 		// if(loop_count == 100){
 		// 	clear_screen();
@@ -180,33 +174,45 @@ void chassisTask(void* arg){
                        50,
                        50);
 
+        // print("chassis_task loop entered 2\r\n");
 
-        if (Dead) {
-        chassis->SetSpeed(0,0,0);
-        motor5->SetOutput(0);
-        motor6->SetOutput(0);
-        motor7->SetOutput(0);
-        motor8->SetOutput(0);
-        }
+
+
         // chassis->PrintData();
         control::MotorCANBase::TransmitOutput(wheel_motors, 4);
         control::MotorCANBase::TransmitOutput(steer_motors, 4);
-        UNUSED(steer_motors);
-        UNUSED(wheel_motors);
-        // print("chassis motor output transmitted \r\n");
+        // control::MotorCANBase::TransmitOutput(&motor1, 1);
+        // print("motor 1 output transmitted \r\n");
+        // osDelay(20);
+        // control::MotorCANBase::TransmitOutput(&motor2, 1);
+        // print("motor 2 output transmitted \r\n");
+        // osDelay(20);
+        // control::MotorCANBase::TransmitOutput(&motor3, 1);
+        // print("motor 3 output transmitted \r\n");
+        // osDelay(20);
+        // control::MotorCANBase::TransmitOutput(&motor4, 1);
+        // print("motor 4 output transmitted \r\n");
+        // osDelay(20);
+        // control::MotorCANBase::TransmitOutput(&motor6, 1);
+        // print("motor 5 output transmitted \r\n");
+        // osDelay(20);
+        // control::MotorCANBase::TransmitOutput(&motor5, 1);
+        // print("motor 6 output transmitted \r\n");
+        // osDelay(20);
+        // control::MotorCANBase::TransmitOutput(&motor7, 1);
+        // print("motor 7 output transmitted \r\n");
+        // osDelay(20);
+        // control::MotorCANBase::TransmitOutput(&motor8, 1);
+        // print("motor 8 output transmitted \r\n");
+        // osDelay(20); 
+
+        // UNUSED(steer_motors);
+        // UNUSED(wheel_motors);
+        print("chassis motor output transmitted \r\n");
 
 #ifdef USING_DBUS
         RotateBarrel.input(dbus->swr == remote::UP);
 #endif
-
-        // flip swr to UP to rotate barrel
-        if (RotateBarrel.posEdge()){
-            pos += 2.0 * PI / 5.0;
-            print("Pos: %f \r\n", pos);
-        }
-
-        rotate_motor->SetOutput(pos, 10);
-        control::Motor4310::TransmitOutput(motors, 1);
 
         osDelay(CHASSIS_TASK_DELAY);
     }
@@ -215,15 +221,16 @@ void chassisTask(void* arg){
 
 
 void init_chassis(){
-    motor1 = new control::Motor6020(can1, 0x205);
-    motor2 = new control::Motor6020(can1, 0x206);
-    motor3 = new control::Motor6020(can1, 0x207);
-    motor4 = new control::Motor6020(can1, 0x208);
+    print("Starting chassis init\n");
+    motor1 = new control::Motor6020(can2, 0x205);
+    motor2 = new control::Motor6020(can2, 0x206);
+    motor3 = new control::Motor6020(can2, 0x207);
+    motor4 = new control::Motor6020(can2, 0x208);
 
-    motor5 = new control::Motor3508(can2, 0x201);
-    motor6 = new control::Motor3508(can2, 0x202);
-    motor7 = new control::Motor3508(can2, 0x203);
-    motor8 = new control::Motor3508(can2, 0x204);
+    motor5 = new control::Motor3508(can1, 0x201);
+    motor6 = new control::Motor3508(can1, 0x202);
+    motor7 = new control::Motor3508(can1, 0x203);
+    motor8 = new control::Motor3508(can1, 0x204);
 
     chassis_data = new control::engineer_steering_chassis_t();
 
@@ -269,18 +276,23 @@ void init_chassis(){
   chassis_data->br_wheel_motor = motor6;
 
   chassis = new control::EngineerSteeringChassis(chassis_data);
-
+    print("chassis init finished\n");
 
 }
 void kill_chassis(){
     RM_EXPECT_TRUE(false, "Operation Killed!\r\n");
 
     control::MotorCANBase* wheel_motors[] = {motor5, motor6, motor7, motor8};
-
-    RGB->Display(display::color_blue);
+    control::MotorCANBase* steer_motors[] = {motor1, motor2, motor3, motor4};
+    // RGB->Display(display::color_blue);
    // set alignment status of each wheel to false
 
     while (true) {
+        motor1->SetOutput(0);
+        motor2->SetOutput(0);
+        motor3->SetOutput(0);
+        motor4->SetOutput(0);
+        control::MotorCANBase::TransmitOutput(steer_motors, 4);
         motor5->SetOutput(0);
         motor6->SetOutput(0);
         motor7->SetOutput(0);

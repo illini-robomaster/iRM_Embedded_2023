@@ -52,7 +52,6 @@ osThreadId_t refereeTaskHandle;
 
 bsp::CAN* can1 = nullptr;
 bsp::CAN* can2 = nullptr;
-control::Motor4310* rotate_motor = nullptr;
 static bool engineerIsKilled = false;
 
 #ifdef USING_DBUS
@@ -60,7 +59,6 @@ remote::DBUS* dbus = nullptr;
 #else
 remote::SBUS* sbus = nullptr;
 #endif
-// display::RGB* RGB = nullptr;
 #ifdef REFEREE
  RefereeUART* referee_uart = nullptr;
  communication::Referee* referee = nullptr;
@@ -71,7 +69,7 @@ remote::SBUS* sbus = nullptr;
 
 
 void RM_RTOS_Init() {
-    print_use_uart(&huart4);
+    print_use_uart(&huart1);
     bsp::SetHighresClockTimer(&htim5);
 #ifdef USING_DBUS
     dbus = new remote::DBUS(&huart3);
@@ -80,7 +78,6 @@ void RM_RTOS_Init() {
 #endif
     can1 = new bsp::CAN(&hcan1, true);
     can2 = new bsp::CAN(&hcan2, false);
-    // RGB = new display::RGB(&htim5, 3, 2, 1, 1000000);
 #ifdef REFEREE
    referee_uart = new RefereeUART(&huart6);
    referee = new communication::Referee();
@@ -90,8 +87,6 @@ void RM_RTOS_Init() {
     init_chassis();
     // init_arm_translate();
 #endif
-
-rotate_motor = new control::Motor4310(can1, 0x30, 0x31, control::POS_VEL);
 
 #ifdef ARM_A1
     init_arm_A1();
@@ -149,7 +144,8 @@ void RM_RTOS_Default_Task(const void* args) {
             engineerIsKilled = true;
             KillAll();
             print("killed");
-        }else if(engineerIsKilled){ // killed to revive
+            osDelay(10);
+        }else if(engineerIsKilled && sbus->ch[6]<=100){ // killed to revive
             ReviveAll();
             engineerIsKilled = false;
         }

@@ -4,7 +4,7 @@ static control::MotorCANBase* motor9 = nullptr;
 static control::ServoMotorWithLG* base_translate_motor = nullptr;
 
 static bsp::GPIO* base_translate_pe_sensor = nullptr;
-static bsp::GPIO* out_5v_enable = nullptr;
+// static bsp::GPIO* out_5v_enable = nullptr;
 
 bool base_translate_align_detect() {
   return base_translate_pe_sensor->Read() == false; // only the white wire for the light gate works, which needs to be reversed
@@ -73,9 +73,9 @@ void init_arm_translate() {
 	motor9 = new control::Motor3508(can1, BASE_TRANSLATE_ID);
 	base_translate_pe_sensor = new bsp::GPIO(IN1_GPIO_Port, IN1_Pin);
 
-	// enable 5v power for the light gate sensor
-	out_5v_enable = new bsp::GPIO(OUT_5V_Port, OUT_5V_Pin);
-	out_5v_enable->High();
+	// enable 5v power for the light gate sensor (on dm board only)
+	// out_5v_enable = new bsp::GPIO(OUT_5V_Port, OUT_5V_Pin);
+	// out_5v_enable->High();
 	control::servoLG_t servoLG_data;
 	servoLG_data.motor = motor9;
 	servoLG_data.max_speed = BASE_TRANSLATE_RUN_SPEED;
