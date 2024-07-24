@@ -117,7 +117,6 @@ zero position:
 // entire arm
 
 void init_arm_A1() {
-  // print_use_uart(&huart4);
   bsp::SetHighresClockTimer(&htim5);
   encoder1 = new control::BRTEncoder(can1,0x0A, false);
   encoder0 = new control::BRTEncoder(can1,0x01, true);
@@ -126,7 +125,7 @@ void init_arm_A1() {
   // motor 4310
   forearm_rotate_motor_4 = new control::Motor4310(can1, 0x08, 0x07, control::MIT, 2*PI);
   wrist_rotate_motor_5 = new control::Motor4310(can1, 0x04, 0x03, control::MIT);
-  hand_rotate_motor_6 = new control::Motor4310(can1, 0xFF, 0x05, control::MIT,2*PI);
+  hand_rotate_motor_6 = new control::Motor4310(can1, 0x06, 0x05, control::MIT,2*PI);
 
   /* rx_id = Master id
    * tx_id = CAN id
