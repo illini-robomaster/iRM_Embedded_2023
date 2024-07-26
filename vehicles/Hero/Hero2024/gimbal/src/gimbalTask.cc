@@ -90,7 +90,7 @@ void gimbal_task(void* args) {
   control::Motor4310* can1_yaw[] = {yaw_motor};
 
   while (!distance_sensor->begin()){
-//    print("distance sensor initializing\r\n");
+    print("distance sensor initializing, please check if it is disconnected!\r\n");
     osDelay(100);
   }
 

@@ -46,6 +46,7 @@ const osThreadAttr_t uiTaskAttribute = {.name = "UI_task",
         .reserved = 0};
 
 extern RefereeUART *referee_uart;
+extern bsp::GPIO *key;
 
 void UI_task(void* arg);
 
