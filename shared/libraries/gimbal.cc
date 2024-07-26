@@ -103,6 +103,26 @@ Gimbal::Gimbal(gimbal_t gimbal)
             new ConstrainedPID(yaw_omega_pid_param_, yaw_omega_max_iout, yaw_omega_max_out);
       }
       break;
+    case GIMBAL_DRONE:  // TODO
+      data_.pitch_offset_ = 5.25f;
+      data_.yaw_offset_ = 4.52;
+      data_.pitch_max_ = 0.5080f;
+      data_.yaw_max_ = PI;
+      {
+        pitch_theta_max_iout = 0;
+        pitch_theta_max_out = 10;
+        pitch_omega_max_iout = 3000;
+        pitch_omega_max_out = 30000;
+        yaw_theta_max_iout = 0;
+        yaw_theta_max_out = 10;
+        yaw_omega_max_iout = 10000;  // 10000
+        yaw_omega_max_out = 30000;
+        pitch_theta_pid_param_ = new float[3]{20, 0, 0};
+        pitch_omega_pid_param_ = new float[3]{2900, 60, 0};
+        yaw_theta_pid_param_ = new float[3]{30, 0, 0.3};
+        yaw_omega_pid_param_ = new float[3]{3600, 20, 0};
+      }
+      break;
     default:
       RM_ASSERT_TRUE(false, "Not Supported Gimbal Mode\r\n");
   }

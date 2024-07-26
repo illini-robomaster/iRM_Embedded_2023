@@ -43,11 +43,8 @@
 #include "utils.h"
 
 static const int GIMBAL_TASK_DELAY = 1;
-static const int CHASSIS_TASK_DELAY = 2;
 static const int SHOOTER_TASK_DELAY = 10;
 static const int SELFTEST_TASK_DELAY = 100;
-static const int UI_TASK_DELAY = 20;
-static const int FORTRESS_TASK_DELAY = 2;
 static const int KILLALL_DELAY = 100;
 static const int DEFAULT_TASK_DELAY = 100;
 
@@ -59,13 +56,7 @@ static display::RGB* RGB = nullptr;
 
 static BoolEdgeDetector FakeDeath(false);
 static volatile bool Dead = false;
-static BoolEdgeDetector ChangeSpinMode(false);
-static volatile bool SpinMode = false;
-static BoolEdgeDetector PeekModeLeft(false);
-static BoolEdgeDetector PeekModeRight(false);
-static volatile bool PeekMode = false;
-static BoolEdgeDetector ChangeFortressMode(false);
-static volatile bool FortressMode = false;
+static BoolEdgeDetector Antijam(false);
 
 static volatile float relative_angle = 0;
 
@@ -300,15 +291,17 @@ void shooterTask(void* arg) {
   while (true) {
     while (Dead) osDelay(100);
 
-    if (send->shooter_power && send->cooling_heat1 >= send->cooling_limit1 - 15) {
+    if (referee->game_robot_status.mains_power_shooter_output &&
+        referee->power_heat_data.shooter_id1_17mm_cooling_heat >=
+          referee->game_robot_status.shooter_id1_17mm_cooling_limit - 15) {
       sl_motor->SetOutput(0);
       sr_motor->SetOutput(0);
       ld_motor->SetOutput(0);
       control::MotorCANBase::TransmitOutput(motors_can1_shooter, 3);
       osDelay(100);
-    } else if (GimbalDead) {
+    } else if (Dead) {
       shooter->DialStop();
-    } else if (send->shooter_power) {
+    } else if (referee->game_robot_status.mains_power_shooter_output) {
       // for manual antijam
       Antijam.input(dbus->keyboard.bit.G);
       // slow shooting
@@ -316,7 +309,8 @@ void shooterTask(void* arg) {
         shooter->SlowContinueShoot();
         // fast shooting
       } else if ((dbus->mouse.r || dbus->wheel.wheel > remote::WheelDigitalValue)
-                 && send->cooling_heat1 < send->cooling_limit1 - 24) {
+                 && referee->power_heat_data.shooter_id1_17mm_cooling_heat <
+                    referee->game_robot_status.shooter_id1_17mm_cooling_limit - 24) {
         shooter->FastContinueShoot();
         // triple shooting
       } else if (dbus->wheel.wheel == remote::WheelDigitalValue
@@ -336,18 +330,19 @@ void shooterTask(void* arg) {
       dbus->previous_wheel_value = dbus->wheel.wheel;
     }
 
-    if (GimbalDead) {
+    if (Dead) {
       flywheelFlag = false;
       shooter->SetFlywheelSpeed(0);
     } else {
-      if (!send->shooter_power || dbus->keyboard.bit.Q || dbus->swr == remote::DOWN) {
+      if (!referee->game_robot_status.mains_power_shooter_output || dbus->keyboard.bit.Q || dbus->swr == remote::DOWN) {
         flywheelFlag = false;
         shooter->SetFlywheelSpeed(0);
       } else {
-        if (14 < send->speed_limit1 && send->speed_limit1 < 16) {
+        if (14 < referee->game_robot_status.shooter_id1_17mm_speed_limit &&
+            referee->game_robot_status.shooter_id1_17mm_speed_limit < 16) {
           flywheelFlag = true;
           shooter->SetFlywheelSpeed(437);  // 445 MAX
-        } else if (send->speed_limit1 >= 18) {
+        } else if (referee->game_robot_status.shooter_id1_17mm_speed_limit >= 18) {
           flywheelFlag = true;
           shooter->SetFlywheelSpeed(770);  // 490 MAX
         } else {
@@ -496,8 +491,8 @@ void RM_RTOS_Init(void) {
  imu = new IMU(imu_init, false);
 
  laser = new bsp::Laser(LASER_GPIO_Port, LASER_Pin);
- pitch_motor = new control::Motor6020(can1, 0x205);
- yaw_motor = new control::Motor6020(can1, 0x206);
+ pitch_motor = new control::Motor3510(can1, 0x205);
+ yaw_motor = new control::Motor3508(can1, 0x206);
  control::gimbal_t gimbal_data;
  gimbal_data.pitch_motor = pitch_motor;
  gimbal_data.yaw_motor = yaw_motor;
@@ -535,8 +530,8 @@ void RM_RTOS_Init(void) {
 void RM_RTOS_Threads_Init(void) {
  imuTaskHandle = osThreadNew(imuTask, nullptr, &imuTaskAttribute);
  gimbalTaskHandle = osThreadNew(gimbalTask, nullptr, &gimbalTaskAttribute);
- refereeTaskHandle = osThreadNew(refereeTask, nullptr, &refereeTaskAttribute);
- shooterTaskHandle = osThreadNew(shooterTask, nullptr, &shooterTaskAttribute);
+// refereeTaskHandle = osThreadNew(refereeTask, nullptr, &refereeTaskAttribute);
+// shooterTaskHandle = osThreadNew(shooterTask, nullptr, &shooterTaskAttribute);
  selfTestTaskHandle = osThreadNew(selfTestTask, nullptr, &selfTestTaskAttribute);
 }
 
@@ -549,10 +544,7 @@ void KillAll() {
 
  control::MotorCANBase* motors_can1_gimbal[] = {pitch_motor};
  control::MotorCANBase* motors_can2_gimbal[] = {yaw_motor};
- control::MotorCANBase* motors_can2_chassis[] = {fl_motor, fr_motor, bl_motor, br_motor};
  control::MotorCANBase* motors_can1_shooter[] = {sl_motor, sr_motor, ld_motor};
- control::MotorCANBase* motors_can2_elevator[] = {elevator_left_motor, elevator_right_motor};
- control::MotorCANBase* motors_can2_fortress[] = {fortress_motor};
 
  RGB->Display(display::color_blue);
  laser->Off();
@@ -560,8 +552,6 @@ void KillAll() {
  while (true) {
    FakeDeath.input(dbus->keyboard.bit.B || dbus->swl == remote::DOWN);
    if (FakeDeath.posEdge()) {
-     SpinMode = false;
-     PeekMode = false;
      Dead = false;
      RGB->Display(display::color_green);
      laser->On();

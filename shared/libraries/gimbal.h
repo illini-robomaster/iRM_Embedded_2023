@@ -30,7 +30,7 @@ namespace control {
 /**
  * @brief gimbal models
  */
-typedef enum { GIMBAL_FORTRESS, GIMBAL_SENTRY, GIMBAL_STEERING, GIMBAL_STEERING_4310 } gimbal_model_t;
+typedef enum { GIMBAL_FORTRESS, GIMBAL_SENTRY, GIMBAL_STEERING, GIMBAL_STEERING_4310, GIMBAL_DRONE} gimbal_model_t;
 
 /**
  * @brief offset, max, and proximity angles of different gimbals
