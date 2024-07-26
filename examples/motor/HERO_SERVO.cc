@@ -4,6 +4,7 @@
 #include "main.h"
 #include "motor.h"
 #include "bsp_pwm.h"
+#include "bsp_buzzer.h"
 /**
  * @brief when installing, please use this example to set angle to 0.0 degree for calibration.
  * The current program is functioning, however, might not be 100% accurate
@@ -23,19 +24,25 @@ bsp::GPIO* key = nullptr;
 BoolEdgeDetector keyEdgeDetector(false);
 control::MotorPWMBase* motor1;
 
+
+//bsp::GPIO* pe = nullptr;
+
 bool nintyDegree = false;
 
 void RM_RTOS_Init(){
   print_use_uart(&huart6);
   key = new bsp::GPIO(KEY_GPIO_Port, KEY_Pin);
+
   motor1 = new control::MotorPWMBase(&htim1, PWM_CHANNEL,TIM_CLOCK_FREQ,MOTOR_OUT_FREQ, PULSE_WIDTH);
 //  motor1->SetOutput(1500);
   osDelay(300);
+//  pe = new bsp::GPIO(IN1_GPIO_Port, IN1_Pin);
   output = 50;
 }
 
 void RM_RTOS_Default_Task(const void* args) {
   UNUSED(args);
+  bsp::Buzzer buzzer(&htim4, 3, 1000000);
   // power is from range 972 to 1947, data on purchasing page is not available, pulse width for central point is 1500
   while(true){
     keyEdgeDetector.input(!(key->Read()));
@@ -43,18 +50,18 @@ void RM_RTOS_Default_Task(const void* args) {
       nintyDegree = !nintyDegree;
     }
     if(nintyDegree) {
-      output = 2500;
+      output = 3;
     } else {
       output = 1500;
     }
     motor1->SetOutput(output);
-
+//    if (pe->Read()==0){
+//      print("pe is 0\r\n");
+//    } else {
+//      print("no read\r\n");
+//    }
 //    power += 10;
     osDelay(2);
-//    angle += 1.0;
-    print("output: %d\r\n", output);
-
-
-
+//    angle += 1.0;m
   }
 }
