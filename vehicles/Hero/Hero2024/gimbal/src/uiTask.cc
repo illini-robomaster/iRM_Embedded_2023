@@ -68,7 +68,7 @@ void UI_task(void* args) {
 
   UI->SetID(referee->game_robot_status.robot_id);
 
-  while(key->Read() != 0 || dbus->swr!=remote::DOWN){
+  while(dbus->swr!=remote::DOWN){
     refresh();
     osDelay(1000);
   }

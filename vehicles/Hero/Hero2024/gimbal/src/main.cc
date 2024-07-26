@@ -1,6 +1,6 @@
 /****************************************************************************
  *                                                                          *
- *  Copyright (C) 2024 RoboMaster.                                          *
+ *  Copyright (C) 2023 RoboMaster.                                          *
  *  Illini RoboMaster @ University of Illinois at Urbana-Champaign          *
  *                                                                          *
  *  This program is free software: you can redistribute it and/or modify    *
@@ -84,12 +84,9 @@ void RM_RTOS_Init(){
 //  osDelay(200);
 //  init_gimbal();
 //  osDelay(200);
-  print("Initialized shooter and gimbal\r\n");
   init_referee();
-  print("Initialized referee\r\n");
   osDelay(200);
   init_ui();
-  print("Initialized UI\r\n");
   osDelay(200);
 }
 
