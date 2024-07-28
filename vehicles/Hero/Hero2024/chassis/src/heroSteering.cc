@@ -81,10 +81,10 @@ namespace control{
       in_position_detector = new BoolEdgeDetector(false);
 
 
-      theta_fl_ = wrap<double>(0,0,2*PI);
-      theta_fr_ = wrap<double>(0,0,2*PI);
-      theta_bl_ = wrap<double>(0,0,2*PI);
-      theta_br_ = wrap<double>(0,0,2*PI);
+      theta_fl_ = wrap<float>(0,0,2*PI);
+      theta_fr_ = wrap<float>(0,0,2*PI);
+      theta_bl_ = wrap<float>(0,0,2*PI);
+      theta_br_ = wrap<float>(0,0,2*PI);
 
 
       // Init private variables ends
@@ -209,10 +209,10 @@ namespace control{
     void EngineerSteeringChassis::SteerUpdateTarget(){
       if (vx != 0 || vy != 0 || vw != 0) {
 
-        double _theta_fl = atan2(vy + vw * cos(PI / 4), vx - vw * sin(PI / 4));
-        double _theta_fr = atan2(vy + vw * cos(PI / 4), vx + vw * sin(PI / 4));
-        double _theta_bl = atan2(vy - vw * cos(PI / 4), vx - vw * sin(PI / 4));
-        double _theta_br = atan2(vy - vw * cos(PI / 4), vx + vw * sin(PI / 4));
+        float _theta_fl = atan2(vy + vw * cos(PI / 4), vx - vw * sin(PI / 4));
+        float _theta_fr = atan2(vy + vw * cos(PI / 4), vx + vw * sin(PI / 4));
+        float _theta_bl = atan2(vy - vw * cos(PI / 4), vx - vw * sin(PI / 4));
+        float _theta_br = atan2(vy - vw * cos(PI / 4), vx + vw * sin(PI / 4));
 
         theta_fl_ = _theta_fl;
         theta_fr_ = _theta_fr;
@@ -220,10 +220,10 @@ namespace control{
         theta_br_ = _theta_br;
 
 
-        double _theta_fl_alt = wrap<double>(_theta_fl + PI, -PI, PI);
-        double _theta_fr_alt = wrap<double>(_theta_fr + PI, -PI, PI);
-        double _theta_bl_alt = wrap<double>(_theta_bl + PI, -PI, PI);
-        double _theta_br_alt = wrap<double>(_theta_br + PI, -PI, PI);
+        float _theta_fl_alt = wrap<float>(_theta_fl + PI, -PI, PI);
+        float _theta_fr_alt = wrap<float>(_theta_fr + PI, -PI, PI);
+        float _theta_bl_alt = wrap<float>(_theta_bl + PI, -PI, PI);
+        float _theta_br_alt = wrap<float>(_theta_br + PI, -PI, PI);
 
         bool ret_fl = false;
         bool ret_fr = false;
@@ -245,46 +245,46 @@ namespace control{
 
 
         // Back Left Motor
-        if (abs(wrap<double>(_theta_bl - _current_theta_bl, -PI, PI)) <
-            abs(wrap<double>(_theta_bl_alt - _current_theta_bl, -PI, PI))) {
+        if (abs(wrap<float>(_theta_bl - _current_theta_bl, -PI, PI)) <
+            abs(wrap<float>(_theta_bl_alt - _current_theta_bl, -PI, PI))) {
           wheel_dir_bl_ = 1.0;
-          steer_target_bl_  = wrap<double>(_theta_bl, -PI, PI);
+          steer_target_bl_  = wrap<float>(_theta_bl, -PI, PI);
         } else {
           wheel_dir_bl_ = -1.0;
-          steer_target_bl_  = wrap<double>(_theta_bl_alt, -PI, PI);
+          steer_target_bl_  = wrap<float>(_theta_bl_alt, -PI, PI);
         }
         ret_bl = bl_steer_motor->SetTarget(steer_target_bl_) == 0 ? false : true;
 
         //Back Right Motor
-        if (abs(wrap<double>(_theta_br - _current_theta_br, -PI, PI)) <
-            abs(wrap<double>(_theta_br_alt - _current_theta_br, -PI, PI))) {
+        if (abs(wrap<float>(_theta_br - _current_theta_br, -PI, PI)) <
+            abs(wrap<float>(_theta_br_alt - _current_theta_br, -PI, PI))) {
           wheel_dir_br_ = 1.0;
-          steer_target_br_  = wrap<double>(_theta_br, -PI, PI);
+          steer_target_br_  = wrap<float>(_theta_br, -PI, PI);
         } else {
           wheel_dir_br_ = -1.0;
-          steer_target_br_  = wrap<double>(_theta_br_alt, -PI, PI);
+          steer_target_br_  = wrap<float>(_theta_br_alt, -PI, PI);
         }
         ret_br = br_steer_motor->SetTarget(steer_target_br_) == 0 ? false : true;
 
         // Front Right Motor
-        if (abs(wrap<double>(_theta_fr - _current_theta_fr , -PI, PI)) <
-            abs(wrap<double>(_theta_fr_alt - _current_theta_fr , -PI, PI))) {
+        if (abs(wrap<float>(_theta_fr - _current_theta_fr , -PI, PI)) <
+            abs(wrap<float>(_theta_fr_alt - _current_theta_fr , -PI, PI))) {
           wheel_dir_fr_ = 1.0;
-          steer_target_fr_  = wrap<double>(_theta_fr, -PI, PI);
+          steer_target_fr_  = wrap<float>(_theta_fr, -PI, PI);
         } else {
           wheel_dir_fr_ = -1.0;
-          steer_target_fr_  = wrap<double>(_theta_fr_alt, -PI, PI);
+          steer_target_fr_  = wrap<float>(_theta_fr_alt, -PI, PI);
         }
         ret_fr = fr_steer_motor->SetTarget(steer_target_fr_) == 0 ? false : true;
 
 
-        if (abs(wrap<double>(_theta_fl - _current_theta_fl, -PI, PI)) <
-            abs(wrap<double>(_theta_fl_alt - _current_theta_fl, -PI, PI))) {
+        if (abs(wrap<float>(_theta_fl - _current_theta_fl, -PI, PI)) <
+            abs(wrap<float>(_theta_fl_alt - _current_theta_fl, -PI, PI))) {
           wheel_dir_fl_ = 1.0;
-          steer_target_fl_ = wrap<double>(_theta_fl, -PI, PI);
+          steer_target_fl_ = wrap<float>(_theta_fl, -PI, PI);
         } else {
           wheel_dir_fl_ = -1.0;
-          steer_target_fl_ = wrap<double>(_theta_fl_alt, -PI, PI);
+          steer_target_fl_ = wrap<float>(_theta_fl_alt, -PI, PI);
         }
         ret_fl = fl_steer_motor->SetTarget(steer_target_fl_) == 0 ? false : true;
 

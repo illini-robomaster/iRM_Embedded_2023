@@ -18,7 +18,7 @@
  *                                                                          *
  ****************************************************************************/
 
-// #define REFEREE
+#define REFEREE
 #include "main.h"
 
 #include "bsp_os.h"
@@ -28,7 +28,7 @@
 #include "chassisTask.h"
 //  #include "ui_task.h"
 #ifdef REFEREE
-#include "referee_task.h"
+#include "refereeTask.h"
 #endif
 #include "bsp_print.h"
 //#define SINGLEBOARD
@@ -67,7 +67,7 @@ void RM_RTOS_Init() {
   // RGB = new display::RGB(&htim5, 3, 2, 1, 1000000);
 #ifdef REFEREE
   referee_uart = new RefereeUART(&huart6);
-   referee = new communication::Referee();
+  referee = new communication::Referee();
 #endif
 
 #ifndef SINGLEBOARD

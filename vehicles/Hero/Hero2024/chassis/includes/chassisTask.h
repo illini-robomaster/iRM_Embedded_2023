@@ -30,10 +30,14 @@
 #include "dbus.h"
 
 //MAGIC NUMBERS, Represent motor physical install angle offsets.
-#define FL_MOTOR_OFFSET 4.663
-#define FR_MOTOR_OFFSET 0.771
-#define BL_MOTOR_OFFSET 6.110
-#define BR_MOTOR_OFFSET 6.065
+// #define FL_MOTOR_OFFSET 4.663
+// #define FR_MOTOR_OFFSET 0.771
+// #define BL_MOTOR_OFFSET 6.110
+// #define BR_MOTOR_OFFSET 6.065
+#define FL_MOTOR_OFFSET 0.2270286536
+#define FR_MOTOR_OFFSET 4.4355056536
+#define BL_MOTOR_OFFSET 3.6232626536
+#define BR_MOTOR_OFFSET 0.5169516536 
 // #define FL_MOTOR_OFFSET 0
 // #define FR_MOTOR_OFFSET 0
 // #define BL_MOTOR_OFFSET 0
