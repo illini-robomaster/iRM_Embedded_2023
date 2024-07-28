@@ -67,6 +67,8 @@ void RM_RTOS_Init() {
   // RGB = new display::RGB(&htim5, 3, 2, 1, 1000000);
 #ifdef REFEREE
   referee_uart = new RefereeUART(&huart6);
+  referee_uart->SetupRx(300);
+  referee_uart->SetupTx(300);
   referee = new communication::Referee();
 #endif
 
@@ -95,6 +97,18 @@ void KillAll() {
 
 void RM_RTOS_Default_Task(const void* args) {
   UNUSED(args);
+  int loop_cnt = 0;
+  while(true){
+    if(loop_cnt == 100){
+      // chassis->PrintData();
+      print("referee power limit: %f \r\n", (float)referee->game_robot_status.chassis_power_limit);
+      print("referee power: %f \r\n", referee->power_heat_data.chassis_power);
+      loop_cnt = 0;
+    }
+    loop_cnt++;
+  }
+
+
   while(false){ //if want to print, make sure nothing is print somewhere else
     set_cursor(0,0);
     clear_screen();

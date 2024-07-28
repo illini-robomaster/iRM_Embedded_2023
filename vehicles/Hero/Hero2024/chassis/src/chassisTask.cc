@@ -179,13 +179,7 @@ void chassisTask(void* arg){
       motor8->SetOutput(0);
     }
 
-    if(loop_cnt == 100){
-      // chassis->PrintData();
-      print("referee power limit: %f \r\n", (float)referee->game_robot_status.chassis_power_limit);
-      print("referee power: %f \r\n", referee->power_heat_data.chassis_power);
-      loop_cnt = 0;
-    }
-    loop_cnt++;
+
 
     control::MotorCANBase::TransmitOutput(wheel_motors, 4);
     control::MotorCANBase::TransmitOutput(steer_motors, 4);
