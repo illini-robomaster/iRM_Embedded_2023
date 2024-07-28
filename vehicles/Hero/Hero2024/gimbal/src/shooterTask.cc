@@ -38,6 +38,8 @@ static control::ServoMotor* force_servo = nullptr;
 
 static BoolEdgeDetector key_sw = BoolEdgeDetector(false);
 
+static BoolEdgeDetector slow_trig(false);
+
 bool shoot_flag = true;
 
 //static int FORCE_VALUE = 0;
@@ -48,7 +50,7 @@ static bsp::BuzzerNoteDelayed levels[] ={{Note::Do1M,80},{Note::Mi3M,80},
 
 
 
-static float shoot_speeds[] = {-200, -400,  -600, -800};
+static float shoot_speeds[] = {-600, -650,-700, -800};
 int level = 0;
 void shooter_task(void* args) {
   UNUSED(args);
@@ -59,11 +61,9 @@ void shooter_task(void* args) {
 //  control::Motor4310* can1_shooter_load[] = {load_motor};
 
   // PID controller initialization
-  float shoot_pid_params[3] = {300, 1.5, 60};
-  control::ConstrainedPID shoot_pid(shoot_pid_params, 8000, 13000);
-  float shoot_front_speed_diff = 0;
+  float shoot_back_pid_params[3] = {400, 1.75,60};
+  control::ConstrainedPID shoot_back_pid(shoot_back_pid_params, 10000,15000);
   float shoot_back_speed_diff = 0;
-  int16_t shoot_front_out = 0;
   int16_t shoot_back_out = 0;
 
   while (true) {
@@ -74,23 +74,24 @@ void shooter_task(void* args) {
   load_motor->SetZeroPos();
   load_motor->MotorEnable();
 
-  while (true) {
 
+  while (true) {
     if ((dbus->swr == remote::UP || dbus->mouse.l)) {
       // TODO: Heat control need to be added in the if statement above
-      shoot_front_speed_diff = shoot_front_motor->GetOmegaDelta(shoot_speeds[level]);
-      shoot_back_speed_diff = shoot_back_motor->GetOmegaDelta(shoot_speeds[level]);
-      shoot_front_out = shoot_pid.ComputeConstrainedOutput(shoot_front_speed_diff);
-      shoot_back_out = shoot_pid.ComputeConstrainedOutput(shoot_back_speed_diff);
-      shoot_front_motor->SetOutput(shoot_front_out);
+      shoot_back_speed_diff = shoot_back_motor->GetOmegaDelta(shoot_speeds[level] - (level+1) * 10);
+      shoot_back_out = shoot_back_pid.ComputeConstrainedOutput(shoot_back_speed_diff);
+      shoot_front_motor->SetOutput(shoot_back_out * 0.98);
       shoot_back_motor->SetOutput(shoot_back_out);
     } else {
-      shoot_front_speed_diff = 0;
-      shoot_back_speed_diff = 0;
-      shoot_front_out = 0;
-      shoot_back_out = 0;
       shoot_front_motor->SetOutput(0);
       shoot_back_motor->SetOutput(0);
+      control::MotorCANBase::TransmitOutput(can1_shooter_shoot, 2);
+      osDelay(SHOOTER_TASK_DELAY);
+
+      shoot_back_speed_diff = shoot_back_motor->GetOmegaDelta(0);
+      shoot_back_out = shoot_back_pid.ComputeConstrainedOutput(shoot_back_speed_diff);
+      shoot_front_motor->SetOutput(shoot_back_out * 0.98);
+      shoot_back_motor->SetOutput(shoot_back_out);
     }
     key_sw.input(dbus->swl == remote::DOWN);
     if(key_sw.posEdge()){
@@ -114,9 +115,9 @@ void shooter_task(void* args) {
 void init_shooter() {
   //Shooter initialization
   load_motor = new control::Motor4310(can1, 0x02, 0x03, control::POS_VEL);
-  shoot_front_motor = new control::Motor3508(can2, 0x201);
-  shoot_back_motor = new control::Motor3508(can2, 0x202);
-  force_motor = new control::Motor3508(can2, 0x203);
+  shoot_front_motor = new control::Motor3508(can1, 0x201);
+  shoot_back_motor = new control::Motor3508(can1, 0x202);
+  force_motor = new control::Motor3508(can1, 0x203);
   // Servo control for each shooter motor
   control::servo_t servo_data;
   servo_data.motor = force_motor;

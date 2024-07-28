@@ -64,6 +64,7 @@ osThreadId_t refereeTaskHandle;
 // Params Initialization
 void RM_RTOS_Init(){
   // Initialize the CAN bus
+  print_use_uart(&huart1);
   can1 = new bsp::CAN(&hcan1, true);
   can2 = new bsp::CAN(&hcan2, false);
   // Initialize the DBUS
@@ -82,19 +83,19 @@ void RM_RTOS_Init(){
 
 //  init_shooter();
 //  osDelay(200);
-//  init_gimbal();
+  init_gimbal();
 //  osDelay(200);
-  init_referee();
-  osDelay(200);
-  init_ui();
-  osDelay(200);
+//  init_referee();
+//  osDelay(200);
+//  init_ui();
+//  osDelay(200);
 }
 
 void RM_RTOS_Threads_Init(void){
-    refereeTaskHandle = osThreadNew(referee_task, nullptr, &refereeTaskAttribute);
+//    refereeTaskHandle = osThreadNew(referee_task, nullptr, &refereeTaskAttribute);
 //    shooterTaskHandle = osThreadNew(shooter_task, nullptr, &shooterTaskAttribute);
-//    gimbalTaskHandle = osThreadNew(gimbal_task, nullptr, &gimbalTaskAttribute);
-    uiTaskHandle = osThreadNew(UI_task, nullptr, &uiTaskAttribute);
+    gimbalTaskHandle = osThreadNew(gimbal_task, nullptr, &gimbalTaskAttribute);
+//    uiTaskHandle = osThreadNew(UI_task, nullptr, &uiTaskAttribute);
 
 }
 
