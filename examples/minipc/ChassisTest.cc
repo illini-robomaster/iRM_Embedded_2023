@@ -92,7 +92,6 @@ void chassisTask(void* argument) {
   while (true) {
     // Keyboard control / Navigation mode
     if (dbus->swr == remote::UP) {
-      flags = 0;
       flags = osEventFlagsWait(chassis_flag_id, DATA_READY_SIGNAL, osFlagsWaitAny, 50);
 
       // When timeout it returns -2 so we need extra checks here
@@ -114,16 +113,14 @@ void chassisTask(void* argument) {
 
         led->Display(display::color_red);
       }
-      control::MotorCANBase::TransmitOutput(motors, 4);
-      osDelay(10);
     } else { // Dbus control
       chassis->SetSpeed(dbus->ch0, dbus->ch1, dbus->ch2);
       chassis->Update(false, 30, 20, 60);
-      control::MotorCANBase::TransmitOutput(motors, 4);
-      osDelay(10);
 
       led->Display(display::color_blue);
     }
+    control::MotorCANBase::TransmitOutput(motors, 4);
+    osDelay(10);
   }
 }
 
