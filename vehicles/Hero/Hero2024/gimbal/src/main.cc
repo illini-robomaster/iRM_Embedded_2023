@@ -44,6 +44,9 @@ bsp::Buzzer *buzzer = nullptr;
 
 bsp::GPIO* key = nullptr;
 
+bsp::GPIO *forward_key = nullptr;
+bsp::GPIO *backward_key = nullptr;
+
 volatile bool Dead;
 
 
@@ -76,13 +79,15 @@ void RM_RTOS_Init(){
   print("initialized\r\n");
   key = new bsp::GPIO(KEY_GPIO_Port,KEY_Pin);
 
+  forward_key = new bsp::GPIO(IN1_GPIO_Port, IN1_Pin);
+  backward_key = new bsp::GPIO(IN2_GPIO_Port, IN2_Pin);
   referee_uart = new RefereeUART(&huart6);
   referee_uart->SetupRx(300);
   referee_uart->SetupTx(300);
   referee = new communication::Referee;
 
-//  init_shooter();
-//  osDelay(200);
+  init_shooter();
+  osDelay(200);
   init_gimbal();
 //  osDelay(200);
 //  init_referee();
@@ -93,7 +98,8 @@ void RM_RTOS_Init(){
 
 void RM_RTOS_Threads_Init(void){
 //    refereeTaskHandle = osThreadNew(referee_task, nullptr, &refereeTaskAttribute);
-//    shooterTaskHandle = osThreadNew(shooter_task, nullptr, &shooterTaskAttribute);
+    shooterTaskHandle = osThreadNew(shooter_task, nullptr, &shooterTaskAttribute);
+    osDelay(200);
     gimbalTaskHandle = osThreadNew(gimbal_task, nullptr, &gimbalTaskAttribute);
 //    uiTaskHandle = osThreadNew(UI_task, nullptr, &uiTaskAttribute);
 
