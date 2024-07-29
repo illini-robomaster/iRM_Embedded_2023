@@ -64,8 +64,8 @@ void shooter_task(void* args) {
 //  control::Motor4310* can1_shooter_load[] = {load_motor};
 
   // PID controller initialization
-  float shoot_back_pid_params[3] = {450, 4.6,20};
-  control::ConstrainedPID shoot_back_pid(shoot_back_pid_params, 10000,15000);
+  float shoot_pid_param[3] = {150, 1.2, 0};
+  control::ConstrainedPID shoot_pid(shoot_pid_param, 10000, 15000);
   float shoot_back_speed_diff = 0;
 
   while (true) {
@@ -84,7 +84,7 @@ void shooter_task(void* args) {
     if ((dbus->swr == remote::UP || dbus->mouse.l)) {
       // TODO: Heat control need to be added in the if statement above
       shoot_back_speed_diff = shoot_back_motor->GetOmegaDelta(shoot_speeds[level] - (level+1) * 10);
-      s_b_out = shoot_back_pid.ComputeConstrainedOutput(shoot_back_speed_diff);
+      s_b_out = shoot_pid.ComputeConstrainedOutput(shoot_back_speed_diff);
       s_f_out = s_b_out * 0.98;
       shoot_front_motor->SetOutput(s_f_out);
       shoot_back_motor->SetOutput(s_b_out);
@@ -107,8 +107,8 @@ void shooter_task(void* args) {
     else {
       osDelay(SHOOTER_TASK_DELAY);
       shoot_back_speed_diff = shoot_back_motor->GetOmegaDelta(0);
-      s_b_out = shoot_back_pid.ComputeConstrainedOutput(shoot_back_speed_diff);
-      s_b_out = shoot_back_pid.ComputeConstrainedOutput(shoot_back_speed_diff);
+      s_b_out = shoot_pid.ComputeConstrainedOutput(shoot_back_speed_diff);
+      s_b_out = shoot_pid.ComputeConstrainedOutput(shoot_back_speed_diff);
       s_f_out = s_b_out * 0.98;
       shoot_front_motor->SetOutput(s_f_out);
       shoot_back_motor->SetOutput(s_b_out);

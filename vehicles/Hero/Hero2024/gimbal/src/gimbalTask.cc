@@ -25,6 +25,8 @@
 //==================================================================================================
 // Params Initialization
 
+//#define calibrate
+
 float pitch_cmd;
 float yaw_cmd;
 
@@ -111,6 +113,7 @@ void gimbal_task(void* args) {
   /*
    * escalation reset
    */
+#ifdef calibrate
   while (true){
     escalation_servo->SetTarget(escalation_servo->GetTheta() - PI * 2000,true);
     escalation_servo->CalcOutput(&esca_out);
@@ -122,60 +125,55 @@ void gimbal_task(void* args) {
       calibrated_theta_esca = escalation_servo->GetTheta();
       escalation_servo->SetTarget(calibrated_theta_esca, true);
       // update jam callback threshold
-      escalation_servo->RegisterJamCallback(empty_callback, 0.205);
+
       osDelay(50);
       break;
     }
   }
 
-
-
-//  print("gimbal_task entering loop\r\n");
-//  print("calibrated_theta: %f\r\n", calibrated_theta);
-
-
   /*
    * pitch motors reset
    */
 
-//  int count = 0;
-//  int prev_angle_l = 0;
-//  int prev_angle_r = 0;
-//  while (true) {
-//
-//    while (pitch_motor_R->connection_flag_ == false || pitch_motor_L->connection_flag_ == false){
-//      print("pitch motor not connected, status: pitch_l: %d, pitch_r: %d\r\n", pitch_motor_L->connection_flag_, pitch_motor_R->connection_flag_);
-//      osDelay(100);
-//    }
-//    pitch_servo_L->SetTarget(pitch_servo_L->GetTheta() - PI * 2000, true);
-//    pitch_servo_R->SetTarget(pitch_servo_R->GetTheta() - PI * 2000, true);
-//    pitch_servo_L->CalcOutput(&p_l_out);
-//    pitch_servo_R->CalcOutput(&p_r_out);
-//
-////    print("angles: %f, %f\r\n", pitch_servo_L->GetTheta(), pitch_servo_R->GetTheta());
-//    if (abs(int (pitch_servo_L->GetTheta())) == abs(prev_angle_l) && abs(int (pitch_servo_R->GetTheta())) ==
-//                                                                     abs(prev_angle_r)){
-//      count++;
-//    } else {
-//      count = 0;
-//    }
-//
-//    prev_angle_l = int (pitch_servo_L->GetTheta());
-//    prev_angle_r = int (pitch_servo_R->GetTheta());
-//    if (count > 100 || dbus->swr == remote::MID){
-//      pitch_motor_L->SetOutput(0);
-//      pitch_motor_R->SetOutput(0);
-//      control::MotorCANBase::TransmitOutput(can1_pitch, 2);
-//      print("pitch motors reset\r\n");
-//      break;
-//    }
-//    control::MotorCANBase::TransmitOutput(can1_pitch, 2);
-//    osDelay(GIMBAL_TASK_DELAY);
-//    print("count: %d\r\n",count);
-//  }
+  int count = 0;
+  int prev_angle_l = 0;
+  int prev_angle_r = 0;
+  while (true) {
+
+    while (pitch_motor_R->connection_flag_ == false || pitch_motor_L->connection_flag_ == false){
+      print("pitch motor not connected, status: pitch_l: %d, pitch_r: %d\r\n", pitch_motor_L->connection_flag_, pitch_motor_R->connection_flag_);
+      osDelay(100);
+    }
+    pitch_servo_L->SetTarget(pitch_servo_L->GetTheta() - PI * 2000, true);
+    pitch_servo_R->SetTarget(pitch_servo_R->GetTheta() - PI * 2000, true);
+    pitch_servo_L->CalcOutput(&p_l_out);
+    pitch_servo_R->CalcOutput(&p_r_out);
+
+//    print("angles: %f, %f\r\n", pitch_servo_L->GetTheta(), pitch_servo_R->GetTheta());
+    if (abs(int (pitch_servo_L->GetTheta())) == abs(prev_angle_l) && abs(int (pitch_servo_R->GetTheta())) ==
+                                                                     abs(prev_angle_r)){
+      count++;
+    } else {
+      count = 0;
+    }
+
+    prev_angle_l = int (pitch_servo_L->GetTheta());
+    prev_angle_r = int (pitch_servo_R->GetTheta());
+    if (count > 100 || dbus->swr == remote::MID){
+      pitch_motor_L->SetOutput(0);
+      pitch_motor_R->SetOutput(0);
+      control::MotorCANBase::TransmitOutput(can1_pitch, 2);
+      print("pitch motors reset\r\n");
+      break;
+    }
+    control::MotorCANBase::TransmitOutput(can1_pitch, 2);
+    osDelay(GIMBAL_TASK_DELAY);
+    print("count: %d\r\n",count);
+  }
+#endif
 
 
-
+  escalation_servo->RegisterJamCallback(empty_callback, 0.205);
   pitch_servo_L->SetMaxCurrent(pitch_servo_data, 2000);
   pitch_servo_R->SetMaxCurrent(pitch_servo_data, 2000);
 
