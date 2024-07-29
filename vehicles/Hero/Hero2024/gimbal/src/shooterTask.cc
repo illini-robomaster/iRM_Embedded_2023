@@ -79,7 +79,7 @@ void shooter_task(void* args) {
 
   while (true) {
 
-    cool_trigger.input(referee->)
+    cool_trigger.input(send->cooling_heat1 >= send->cooling_limit1);
 
     if ((dbus->swr == remote::UP || dbus->mouse.l)) {
       // TODO: Heat control need to be added in the if statement above

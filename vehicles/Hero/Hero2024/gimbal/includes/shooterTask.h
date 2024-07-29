@@ -30,6 +30,7 @@
 #include "dbus.h"
 #include "motor.h"
 #include "protocol.h"
+#include "bsp_can_bridge.h"
 #include "rgb.h"
 #include "oled.h"
 #include "bsp_buzzer.h"
@@ -39,6 +40,10 @@
 #define FORCE_1_ANGLE (2 * PI)
 #define FORCE_2_ANGLE (4 * PI)
 #define FORCE_3_ANGLE (6 * PI)
+
+#define AMMO_HEAT 100
+// TODO: actual value still required
+
 extern bsp::Buzzer *buzzer;
 
 
@@ -59,6 +64,7 @@ extern remote::DBUS* dbus;
 extern bsp::CAN* can1;
 extern bsp::CAN* can2;
 extern bsp::GPIO* key;
+extern bsp::CanBridge* send;
 
 extern volatile bool lob_mode;
 
