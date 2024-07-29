@@ -86,8 +86,8 @@ void RM_RTOS_Init(){
   referee_uart->SetupTx(300);
   referee = new communication::Referee;
 
-  init_shooter();
-  osDelay(200);
+  // init_shooter();
+  // osDelay(200);
   init_gimbal();
 //  osDelay(200);
 //  init_referee();
@@ -98,8 +98,8 @@ void RM_RTOS_Init(){
 
 void RM_RTOS_Threads_Init(void){
 //    refereeTaskHandle = osThreadNew(referee_task, nullptr, &refereeTaskAttribute);
-    shooterTaskHandle = osThreadNew(shooter_task, nullptr, &shooterTaskAttribute);
-    osDelay(200);
+    // shooterTaskHandle = osThreadNew(shooter_task, nullptr, &shooterTaskAttribute);
+    // osDelay(200);
     gimbalTaskHandle = osThreadNew(gimbal_task, nullptr, &gimbalTaskAttribute);
 //    uiTaskHandle = osThreadNew(UI_task, nullptr, &uiTaskAttribute);
 
