@@ -2,7 +2,6 @@
 
 #include <string>
 #include <cmath>
-#include "Angle2d.h"
 
 /**
  * Create an instance that contains an angle. This angle's unit can be taken to degree, radian, or rotation.
@@ -24,7 +23,7 @@ public:
      *
      * @param radians the radian of the angle
      */
-    Angle2d(float  radians);
+    Angle2d(float radians);
 
     /**
      * Default constructor that generate an instance with radian of 0.0

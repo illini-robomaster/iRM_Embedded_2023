@@ -814,21 +814,26 @@ namespace control {
       motor->UpdateData(data);
     }
 
-    Motor4310::Motor4310(bsp::CAN* can, uint16_t rx_id, uint16_t tx_id, mode_t mode)
-            : can_(can), rx_id_(rx_id), tx_id_(tx_id) {
-      can->RegisterRxCallback(rx_id, can_motor_4310_callback, this);
-      /* following the CAN id format from the m4310 V2.1 document */
-      mode_ = mode;
-      if (mode == MIT) {
-        tx_id_actual_ = tx_id;
-      } else if (mode == POS_VEL) {
-        tx_id_actual_ = tx_id + 0x100;
-      } else if (mode == VEL) {
-        tx_id_actual_ = tx_id + 0x200;
-      } else {
-        RM_EXPECT_TRUE(false, "Invalid mode number!");
-      }
-    }
+Motor4310::Motor4310(bsp::CAN* can, uint16_t rx_id, uint16_t tx_id, mode_t mode)
+    : can_(can), rx_id_(rx_id), tx_id_(tx_id) {
+  can->RegisterRxCallback(rx_id, can_motor_4310_callback, this);
+  /* following the CAN id format from the m4310 V2.1 document */
+  mode_ = mode;
+  if (mode == MIT) {
+    tx_id_actual_ = tx_id;
+  } else if (mode == POS_VEL) {
+    tx_id_actual_ = tx_id + 0x100;
+  } else if (mode == VEL) {
+    tx_id_actual_ = tx_id + 0x200;
+  } else {
+    RM_EXPECT_TRUE(false, "Invalid mode number!");
+  }
+}
+
+Motor4310::Motor4310(bsp::CAN* can, uint16_t rx_id, uint16_t tx_id, mode_t mode, float p_max) : Motor4310(can, rx_id, tx_id, mode) {
+  P_MAX = p_max;
+  P_MIN = -p_max;
+}
 
     void Motor4310::MotorEnable() {
       uint8_t data[8] = {0};
@@ -895,47 +900,47 @@ namespace control {
         uint8_t data[8] = {0};
         uint16_t kp_tmp, kd_tmp, pos_tmp, vel_tmp, torque_tmp;
 
-        if (motors[i]->GetMode() == MIT) {
-          // converting float to unsigned int before transmitting
-          kp_tmp = float_to_uint(motors[i]->kp_set_, KP_MIN, KP_MAX, 12);
-          kd_tmp = float_to_uint(motors[i]->kd_set_, KD_MIN, KD_MAX, 12);
-          pos_tmp = float_to_uint(motors[i]->pos_set_, P_MIN, P_MAX, 16);
-          vel_tmp = float_to_uint(motors[i]->vel_set_, V_MIN, V_MAX, 12);
-          torque_tmp = float_to_uint(motors[i]->torque_set_, T_MIN, T_MAX, 12);
-          data[0] = pos_tmp >> 8;
-          data[1] = pos_tmp & 0x00ff;
-          data[2] = (vel_tmp >> 4) & 0x00ff;
-          data[3] = ((vel_tmp & 0x000f) << 4) | ((kp_tmp >> 8) & 0x000f);
-          data[4] = kp_tmp & 0x00ff;
-          data[5] = (kd_tmp >> 4) & 0x00ff;
-          data[6] = ((kd_tmp & 0x000f) << 4) | ((torque_tmp >> 8) & 0x000f);
-          data[7] = torque_tmp & 0x00ff;
-        } else if (motors[i]->GetMode() == POS_VEL) {
-          uint8_t *pbuf, *vbuf;
-          pbuf = (uint8_t*)&motors[i]->pos_set_;
-          vbuf = (uint8_t*)&motors[i]->vel_set_;
-          data[0] = *pbuf;
-          data[1] = *(pbuf + 1);
-          data[2] = *(pbuf + 2);
-          data[3] = *(pbuf + 3);
-          data[4] = *vbuf;
-          data[5] = *(vbuf + 1);
-          data[6] = *(vbuf + 2);
-          data[7] = *(vbuf + 3);
-        } else if (motors[i]->GetMode() == VEL) {
-          uint8_t* vbuf;
-          vbuf = (uint8_t*)&motors[i]->vel_set_;
-          data[0] = *vbuf;
-          data[1] = *(vbuf + 1);
-          data[2] = *(vbuf + 2);
-          data[3] = *(vbuf + 3);
-        } else {
-          RM_EXPECT_TRUE(false, "Invalid mode number!");
-        }
-
-        motors[i]->can_->Transmit(motors[i]->tx_id_actual_, data, 8);
-      }
+    if (motors[i]->GetMode() == MIT) {
+      // converting float to unsigned int before transmitting
+      kp_tmp = float_to_uint(motors[i]->kp_set_, KP_MIN, KP_MAX, 12);
+      kd_tmp = float_to_uint(motors[i]->kd_set_, KD_MIN, KD_MAX, 12);
+      pos_tmp = float_to_uint(motors[i]->pos_set_, motors[i]->P_MIN, motors[i]->P_MAX, 16);
+      vel_tmp = float_to_uint(motors[i]->vel_set_, V_MIN, V_MAX, 12);
+      torque_tmp = float_to_uint(motors[i]->torque_set_, T_MIN, T_MAX, 12);
+      data[0] = pos_tmp >> 8;
+      data[1] = pos_tmp & 0x00ff;
+      data[2] = (vel_tmp >> 4) & 0x00ff;
+      data[3] = ((vel_tmp & 0x000f) << 4) | ((kp_tmp >> 8) & 0x000f);
+      data[4] = kp_tmp & 0x00ff;
+      data[5] = (kd_tmp >> 4) & 0x00ff;
+      data[6] = ((kd_tmp & 0x000f) << 4) | ((torque_tmp >> 8) & 0x000f);
+      data[7] = torque_tmp & 0x00ff;
+    } else if (motors[i]->GetMode() == POS_VEL) {
+      uint8_t *pbuf, *vbuf;
+      pbuf = (uint8_t*)&motors[i]->pos_set_;
+      vbuf = (uint8_t*)&motors[i]->vel_set_;
+      data[0] = *pbuf;
+      data[1] = *(pbuf + 1);
+      data[2] = *(pbuf + 2);
+      data[3] = *(pbuf + 3);
+      data[4] = *vbuf;
+      data[5] = *(vbuf + 1);
+      data[6] = *(vbuf + 2);
+      data[7] = *(vbuf + 3);
+    } else if (motors[i]->GetMode() == VEL) {
+      uint8_t* vbuf;
+      vbuf = (uint8_t*)&motors[i]->vel_set_;
+      data[0] = *vbuf;
+      data[1] = *(vbuf + 1);
+      data[2] = *(vbuf + 2);
+      data[3] = *(vbuf + 3);
+    } else {
+      RM_EXPECT_TRUE(false, "Invalid mode number!");
     }
+    
+    motors[i]->can_->Transmit(motors[i]->tx_id_actual_, data, 8);
+  }
+}
 
     void Motor4310::UpdateData(const uint8_t data[]) {
       raw_pos_ = data[1] << 8 | data[2];

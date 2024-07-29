@@ -1,12 +1,11 @@
-#include <math.h>
-#include <string>
+
 #include "angle2d.h"
 
 Angle2d::~Angle2d()
 {
 }
 
-Angle2d::Angle2d( float radians)
+Angle2d::Angle2d(float radians)
 {
      _radians = radians;
      _cos_value = cos(radians);

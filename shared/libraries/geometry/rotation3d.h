@@ -1,20 +1,52 @@
-#include "vector3d.h"
+#pragma once
+#include "angle2d.h"
+#include <string>
+
+struct Quaternion {
+    float w;
+    float x;
+    float y;
+    float z;
+};
+
+struct AxisAngle {
+    float axis_x;
+    float axis_y;
+    float axis_z;
+    Angle2d angle;
+};
+
 class Rotation3d {
 // use quaternion to represent rotation
 private:
-    float _x;
-    float _y;
-    float _z;
-    float _w;
 
+    // quaternion representation
+    float _x; // i
+    float _y; // j 
+    float _z; // k
+    float _w; // real part
+    
 public:
     Rotation3d();
-    Rotation3d(float x, float y, float z, float w);
-    Rotation3d(const Rotation3d& r);
-    ~Rotation3d();
+    // quaternion
+    Rotation3d(Quaternion q);
+
+    // quaternion, but not in struct
+    Rotation3d(float x, float y, float z, float w); 
+    /// @brief Represents a 3d rotation using euler angles, an object first rotates around x axis by roll, then around y axis by pitch, and finally around z axis by yaw
+    /// @param roll 
+    /// @param pitch 
+    /// @param yaw 
+    Rotation3d(float roll, float pitch, float yaw); 
+
+    /// @brief Angle-axis representation
+    /// @param axis 
+    /// @param  
+    Rotation3d(float axis_x, float axis_y, float axis_z, Angle2d angle);
+    // TODO: axis-angle and rotation matrix
 
     Rotation3d operator*(const Rotation3d& r) const;
-    Rotation3d& operator*=(const Rotation3d& r);
+    Rotation3d operator/(float scalar) const;
     bool operator==(const Rotation3d& r) const;
     bool operator!=(const Rotation3d& r) const;
 
@@ -23,14 +55,28 @@ public:
     float getZ() const;
     float getW() const;
 
+    float getYaw() const;
+    float getPitch() const;
+    float getRoll() const;
+
     Rotation3d normalized() const;
 
-    void toEuler(float& roll, float& pitch, float& yaw) const;
-    void fromEuler(float roll, float pitch, float yaw);
+    Rotation3d conjugate() const;
 
-    void toAxisAngle(Vector3d& axis, float& angle) const;
-    void fromAxisAngle(const Vector3d& axis, float angle);
+    Rotation3d inverse() const;
 
-    void toMatrix(float matrix[3][3]) const;
-    void fromMatrix(const float matrix[3][3]); 
+    float dot(const Rotation3d& other) const;
+
+    AxisAngle getAxisAngle() const;
+
+    Angle2d angleBetween(const Rotation3d& r) const;
+
+    /** @brief this quaternion minus another quaternion, the result satisfies:
+    * `result * this quaternion = other quaternion`
+    * @param r 
+    * @return this quaternion multiples the inverse of the other quaternion
+    */ 
+    Rotation3d minus(const Rotation3d& r) const;
+
+    std::string toString() const;
 };

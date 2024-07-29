@@ -41,9 +41,13 @@ osThreadId_t refereeTaskHandle;
 
 bsp::CAN* can1 = nullptr;
 bsp::CAN* can2 = nullptr;
+static bool engineerIsKilled = false;
 
+#ifdef USING_DBUS
 remote::DBUS* dbus = nullptr;
-// display::RGB* RGB = nullptr;
+#else
+remote::SBUS* sbus = nullptr;
+#endif
 #ifdef REFEREE
 RefereeUART* referee_uart = nullptr;
  communication::Referee* referee = nullptr;
@@ -57,14 +61,15 @@ bsp::CanBridge* receive = nullptr;
 
 
 void RM_RTOS_Init() {
-  print_use_uart(&huart1);
-  bsp::SetHighresClockTimer(&htim5);
-
-  dbus = new remote::DBUS(&huart3);
-
-  can1 = new bsp::CAN(&hcan1, true);
-  can2 = new bsp::CAN(&hcan2, false);
-  // RGB = new display::RGB(&htim5, 3, 2, 1, 1000000);
+    print_use_uart(&huart4);
+    bsp::SetHighresClockTimer(&htim5);
+#ifdef USING_DBUS
+    dbus = new remote::DBUS(&huart3);
+#else
+    sbus = new remote::SBUS(&huart3);
+#endif
+    can1 = new bsp::CAN(&hcan1, true);
+    can2 = new bsp::CAN(&hcan2, false);
 #ifdef REFEREE
   referee_uart = new RefereeUART(&huart6);
   referee_uart->SetupRx(300);
@@ -75,9 +80,12 @@ void RM_RTOS_Init() {
 #ifndef SINGLEBOARD
   receive = new bsp::CanBridge(can2,0x20B,0x20A);
 #endif
-  init_chassis();
-  set_cursor(0,0);
-  clear_screen();
+
+#ifdef ARM_A1
+    init_arm_A1();
+#endif
+    set_cursor(0,0);
+    clear_screen();
 }
 
 
@@ -94,16 +102,37 @@ void KillAll() {
   kill_chassis();
 }
 
+void ReviveAll(){
+#ifdef CHASSIS
+
+#endif
+
+#ifdef ARM_A1
+    revive_arm();
+#endif
+}
+
 
 void RM_RTOS_Default_Task(const void* args) {
-  UNUSED(args);
-  int loop_cnt = 0;
-  while(true){
-    if(loop_cnt == 200){
-      // print("referee power limit: %f \r\n", (float)referee->game_robot_status.chassis_power_limit);
-      print("p: %f \r\n", referee->power_heat_data.chassis_power);
-      // print("chassis power buffer: %f \r\n", (float)(referee->power_heat_data.chassis_power_buffer));
-      loop_cnt = 0;
+    UNUSED(args);
+    while(true){ //if want to print, make sure nothing is print somewhere else
+        if(sbus->ch[6]>100){
+            if(!engineerIsKilled){
+                print("killed\n");
+            }
+            engineerIsKilled = true;
+            KillAll();
+            // print("killed");
+            osDelay(10);
+        }else if(engineerIsKilled && sbus->ch[6]<=100){ // killed to revive
+            ReviveAll();
+            engineerIsKilled = false;
+        }
+
+#ifdef REFEREE
+        print("ROBOTID: %d",referee->game_robot_status.robot_id);
+#endif
+        osDelay(10);
     }
     loop_cnt++;
   }

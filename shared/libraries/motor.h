@@ -856,21 +856,23 @@ namespace control {
 /**
  * @brief m4310 motor class
  */
-    class Motor4310 {
-    public:
-        /** constructor wrapper over MotorCANBase
-         *  CAN frame id for different modes:
-         *      MIT:                  actual CAN id.
-         *      position-velocity:    CAN id + 0x100.
-         *      velocity:             CAN id + 0x200.
-         *  @param can    CAN object
-         *  @param rx_id  Master id
-         *  @param tx_id  CAN id *** NOT the actual CAN id but the id configured in software ***
-         *  @param mode   0: MIT
-         *                1: position-velocity
-         *                2: velocity
-         */
-        Motor4310(bsp::CAN* can, uint16_t rx_id, uint16_t tx_id, mode_t mode);
+class Motor4310 {
+ public:
+  /** constructor wrapper over MotorCANBase
+   *  CAN frame id for different modes:
+   *      MIT:                  actual CAN id.
+   *      position-velocity:    CAN id + 0x100.
+   *      velocity:             CAN id + 0x200.
+   *  @param can    CAN object
+   *  @param rx_id  Master id
+   *  @param tx_id  CAN id *** NOT the actual CAN id but the id configured in software ***
+   *  @param mode   0: MIT
+   *                1: position-velocity
+   *                2: velocity
+   */
+  Motor4310(bsp::CAN* can, uint16_t rx_id, uint16_t tx_id, mode_t mode);
+
+  Motor4310(bsp::CAN* can, uint16_t rx_id, uint16_t tx_id, mode_t mode, float P_MAX);
 
         /* implements data update callback */
         void UpdateData(const uint8_t data[]);
@@ -998,21 +1000,21 @@ namespace control {
         volatile float torque_ = 0;           // actual torque
         float relative_target_ = 0;           // target position
 
-        // P control
-        constexpr static float KP_MIN = 0;
-        constexpr static float KP_MAX = 500;
-        // D control
-        constexpr static float KD_MIN = 0;
-        constexpr static float KD_MAX = 5;
-        // position
-        constexpr static float P_MIN = -PI;
-        constexpr static float P_MAX = PI;
-        // velocity
-        constexpr static float V_MIN = -45;
-        constexpr static float V_MAX = 45;
-        // torque
-        constexpr static float T_MIN = -18;
-        constexpr static float T_MAX = 18;
-    };
+  // P control
+  constexpr static float KP_MIN = 0;
+  constexpr static float KP_MAX = 500;
+  // D control
+  constexpr static float KD_MIN = 0;
+  constexpr static float KD_MAX = 5;
+  // position
+  float P_MIN = -PI;
+  float P_MAX = PI;
+  // velocity
+  constexpr static float V_MIN = -45;
+  constexpr static float V_MAX = 45;
+  // torque
+  constexpr static float T_MIN = -18;
+  constexpr static float T_MAX = 18;
+};
 
 } /* namespace control */

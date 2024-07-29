@@ -24,3 +24,40 @@ irm_add_arm_executable(Hero2023
     TARGET DJI_Board_TypeC
     SOURCES main.cc)
 
+# If using DBUS, don't run arm and chassis at the same time
+# comment one of the definitions in main.cc
+
+# add_compile_definitions(USING_DBUS)
+
+irm_add_arm_executable(Engineer_arm
+    TARGET DM_MC_01
+    SOURCES
+    src/main.cc
+    src/chassis_task.cc
+    src/arm_translate_task.cc
+    src/arm.cc
+    src/engineer_steering.cc
+    src/steering_6020.cc
+    src/referee_task.cc
+    src/selfcheck_task.cc
+#     src/ui_task.cc
+    INCLUDES include
+)
+
+irm_add_arm_executable(Engineer_chassis
+    TARGET DJI_Board_TypeC 
+    SOURCES
+    src/main.cc
+    src/chassis_task.cc
+    src/arm_translate_task.cc
+    src/arm.cc
+    src/engineer_steering.cc
+    src/steering_6020.cc
+    src/referee_task.cc
+    src/selfcheck_task.cc
+#     src/ui_task.cc
+    INCLUDES include
+
+
+)
+
