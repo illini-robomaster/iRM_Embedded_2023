@@ -17,6 +17,9 @@
 #  along with this program. If not, see <http://www.gnu.org/licenses/>.  #
 #                                                                        #
 # ---------------------------------------------------------------------- #
-add_subdirectory(chassis)
-add_subdirectory(arm)
 
+project(Hero ASM C CXX)
+
+irm_add_arm_executable(Hero2023
+    TARGET DJI_Board_TypeC
+    SOURCES main.cc)

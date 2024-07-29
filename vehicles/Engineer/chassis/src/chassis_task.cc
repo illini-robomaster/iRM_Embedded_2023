@@ -2,6 +2,7 @@
 #include "chassis_task.h"
 #include "geometry/geometry.h"
 #include "moving_average.h"
+#include "hrb_supercap.h"
 
 //Constants 
 static const int KILLALL_DELAY = 100;
@@ -39,6 +40,8 @@ static control::engineer_steering_chassis_t* chassis_data;
 static control::EngineerSteeringChassis* chassis;
 
 static BoolEdgeDetector RotateBarrel(false);
+
+static control::HRB_SuperCap *supercap = nullptr;
 
 int16_t loop_count = 0;
 
@@ -218,48 +221,49 @@ void init_chassis(){
 
     chassis_data = new control::engineer_steering_chassis_t();
 
-  control::steering6020_t servo_data;
-  servo_data.motor = motor1;
-  servo_data.max_speed = RUN_SPEED;
-  servo_data.max_acceleration = ACCELERATION;
-  servo_data.transmission_ratio = 1;
-  servo_data.omega_pid_param = new float[3]{80000, 0, 2000};
-//   servo_data.omega_pid_param = new float[3]{0, 0, 0};
-  servo_data.max_iout = 30000;
-  servo_data.max_out = 15000;
+    control::steering6020_t servo_data;
+    servo_data.motor = motor1;
+    servo_data.max_speed = RUN_SPEED;
+    servo_data.max_acceleration = ACCELERATION;
+    servo_data.transmission_ratio = 1;
+    servo_data.omega_pid_param = new float[3]{80000, 0, 2000};
+    //   servo_data.omega_pid_param = new float[3]{0, 0, 0};
+    servo_data.max_iout = 30000;
+    servo_data.max_out = 15000;
 
 
-  /*ALIGNMENT IS NOT APPLICABLE IN THIS VEHICLE*/
-  servo_data.install_offset = FL_MOTOR_OFFSET;
-  steering_motor1 = new control::Steering6020(servo_data);
-  servo_data.motor = motor2;
-  servo_data.install_offset = FR_MOTOR_OFFSET;
-  steering_motor2 = new control::Steering6020(servo_data);
-  servo_data.motor = motor3;
-  servo_data.install_offset = BL_MOTOR_OFFSET;
-  steering_motor3 = new control::Steering6020(servo_data);
-  servo_data.motor = motor4;
-  servo_data.install_offset = BR_MOTOR_OFFSET;
-  steering_motor4 = new control::Steering6020(servo_data);
+    /*ALIGNMENT IS NOT APPLICABLE IN THIS VEHICLE*/
+    servo_data.install_offset = FL_MOTOR_OFFSET;
+    steering_motor1 = new control::Steering6020(servo_data);
+    servo_data.motor = motor2;
+    servo_data.install_offset = FR_MOTOR_OFFSET;
+    steering_motor2 = new control::Steering6020(servo_data);
+    servo_data.motor = motor3;
+    servo_data.install_offset = BL_MOTOR_OFFSET;
+    steering_motor3 = new control::Steering6020(servo_data);
+    servo_data.motor = motor4;
+    servo_data.install_offset = BR_MOTOR_OFFSET;
+    steering_motor4 = new control::Steering6020(servo_data);
 
-  chassis_data = new control::engineer_steering_chassis_t();
+    chassis_data = new control::engineer_steering_chassis_t();
 
-  chassis_data->fl_steer_motor = steering_motor1;
-  chassis_data->fr_steer_motor = steering_motor2;
-  chassis_data->bl_steer_motor = steering_motor3;
-  chassis_data->br_steer_motor = steering_motor4;
+    chassis_data->fl_steer_motor = steering_motor1;
+    chassis_data->fr_steer_motor = steering_motor2;
+    chassis_data->bl_steer_motor = steering_motor3;
+    chassis_data->br_steer_motor = steering_motor4;
 
-  chassis_data->fl_steer_motor_raw = motor1;
-  chassis_data->fr_steer_motor_raw = motor2;
-  chassis_data->bl_steer_motor_raw = motor3;
-  chassis_data->br_steer_motor_raw = motor4;
+    chassis_data->fl_steer_motor_raw = motor1;
+    chassis_data->fr_steer_motor_raw = motor2;
+    chassis_data->bl_steer_motor_raw = motor3;
+    chassis_data->br_steer_motor_raw = motor4;
 
-  chassis_data->fl_wheel_motor = motor5;
-  chassis_data->fr_wheel_motor = motor6;
-  chassis_data->bl_wheel_motor = motor7;
-  chassis_data->br_wheel_motor = motor8;
+    chassis_data->fl_wheel_motor = motor5;
+    chassis_data->fr_wheel_motor = motor6;
+    chassis_data->bl_wheel_motor = motor7;
+    chassis_data->br_wheel_motor = motor8;
 
-  chassis = new control::EngineerSteeringChassis(chassis_data);
+    chassis = new control::EngineerSteeringChassis(chassis_data);
+    supercap = new control::HRB_SuperCap(can1, 0x2C8, 0x2C7);
     print("chassis init finished\n");
 
 }
