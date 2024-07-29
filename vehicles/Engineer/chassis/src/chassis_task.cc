@@ -44,10 +44,12 @@ int16_t loop_count = 0;
 
 void chassisTask(void* arg){
     UNUSED(arg);
+    
+    control::MotorCANBase* wheel_motors_2[] = {motor6, motor8};
+    control::MotorCANBase* wheel_motors_1[] = {motor5, motor7};
 
-    control::MotorCANBase* steer_motors[] = {motor1, motor2, motor3, motor4};
-    control::MotorCANBase* wheel_motors[] = {motor5, motor6, motor7, motor8};
-
+    control::MotorCANBase* steer_motors_1[] = {motor1, motor3};
+    control::MotorCANBase* steer_motors_2[] = {motor2, motor4};
     chassis->SteerSetMaxSpeed(ALIGN_SPEED);
 	chassis->Calibrate();
 
@@ -59,32 +61,15 @@ void chassisTask(void* arg){
     int loop_cnt = 0;
     int last = HAL_GetTick();
 
-    MovingAverage x(10);
-    MovingAverage y(10);
-
-
-#ifdef USING_DBUS
-    while(dbus->swr != remote::DOWN){}  // flip swr to start
-#endif
 
     // print("starting loop\n");
     while (true) {
         float relative_angle = 0;
         float wz = 0;
 
-        Vector2d joystick_vector(0, 0);
+        Vector2d joystick_vector(sbus->ch[0]/ 660.0, sbus->ch[1]/660.0);
 
-#ifdef USING_DBUS
-        x.AddSample(dbus->ch1/660.0);
-        y.AddSample(dbus->ch0/660.0);
-#else
-        x.AddSample(sbus->ch[0]/660.0);
-        y.AddSample(sbus->ch[1]/660.0);
-        // joystick_vector = Vector2d(sbus->ch[0]/ 660.0, sbus->ch[1]/660.0);
-#endif
-        
-        joystick_vector = Vector2d(x.GetAverage(), y.GetAverage());
-
+        wz = sbus->ch[2] / 660.0 * V_ROT_MAX; // in m/s
         // The following is for joystick only, not for keyboard
         // Max joy stick max = 660
 
@@ -122,11 +107,6 @@ void chassisTask(void* arg){
         target_vel = prev_target_vel.plus(delta_v);
         // TODO: Rotational acceleration constraints (which needs to deal with each module's angle)
         prev_target_vel = target_vel;
-#ifdef USING_DBUS
-        wz = dbus->ch2 / 660.0 * V_ROT_MAX; // in m/s
-#else
-        wz = sbus->ch[2] / 660.0 * V_ROT_MAX; // in m/s
-#endif
 
         if(loop_cnt == 100){
             loop_cnt = 0;
@@ -177,10 +157,16 @@ void chassisTask(void* arg){
         // print("chassis_task loop entered 2\r\n");
 
 
-
         // chassis->PrintData();
-        control::MotorCANBase::TransmitOutput(wheel_motors, 4);
-        control::MotorCANBase::TransmitOutput(steer_motors, 4);
+        // osDelay(100);
+
+        control::MotorCANBase::TransmitOutput(steer_motors_1, 2);
+        control::MotorCANBase::TransmitOutput(steer_motors_2, 2);
+
+        control::MotorCANBase::TransmitOutput(wheel_motors_1, 2);
+        control::MotorCANBase::TransmitOutput(wheel_motors_2, 2);
+        // control::MotorCANBase::TransmitOutput(wheel_motors, 4);
+        // control::MotorCANBase::TransmitOutput(steer_motors, 4);
         // control::MotorCANBase::TransmitOutput(&motor1, 1);
         // print("motor 1 output transmitted \r\n");
         // osDelay(20);
@@ -206,13 +192,11 @@ void chassisTask(void* arg){
         // print("motor 8 output transmitted \r\n");
         // osDelay(20); 
 
-        // UNUSED(steer_motors);
-        // UNUSED(wheel_motors);
-        print("chassis motor output transmitted \r\n");
+        UNUSED(steer_motors_1); 
+        UNUSED(steer_motors_2);
+        UNUSED(wheel_motors_1);
+        UNUSED(wheel_motors_2);
 
-#ifdef USING_DBUS
-        RotateBarrel.input(dbus->swr == remote::UP);
-#endif
 
         osDelay(CHASSIS_TASK_DELAY);
     }
@@ -222,15 +206,15 @@ void chassisTask(void* arg){
 
 void init_chassis(){
     print("Starting chassis init\n");
-    motor1 = new control::Motor6020(can2, 0x205);
+    motor1 = new control::Motor6020(can1, 0x205);
     motor2 = new control::Motor6020(can2, 0x206);
-    motor3 = new control::Motor6020(can2, 0x207);
+    motor3 = new control::Motor6020(can1, 0x207);
     motor4 = new control::Motor6020(can2, 0x208);
 
     motor5 = new control::Motor3508(can1, 0x201);
-    motor6 = new control::Motor3508(can1, 0x202);
+    motor6 = new control::Motor3508(can2, 0x202);
     motor7 = new control::Motor3508(can1, 0x203);
-    motor8 = new control::Motor3508(can1, 0x204);
+    motor8 = new control::Motor3508(can2, 0x204);
 
     chassis_data = new control::engineer_steering_chassis_t();
 
@@ -242,38 +226,38 @@ void init_chassis(){
   servo_data.omega_pid_param = new float[3]{80000, 0, 2000};
 //   servo_data.omega_pid_param = new float[3]{0, 0, 0};
   servo_data.max_iout = 30000;
-  servo_data.max_out = 20000;
+  servo_data.max_out = 15000;
 
 
   /*ALIGNMENT IS NOT APPLICABLE IN THIS VEHICLE*/
-  servo_data.install_offset = BL_MOTOR_OFFSET;
+  servo_data.install_offset = FL_MOTOR_OFFSET;
   steering_motor1 = new control::Steering6020(servo_data);
   servo_data.motor = motor2;
-  servo_data.install_offset = BR_MOTOR_OFFSET;
+  servo_data.install_offset = FR_MOTOR_OFFSET;
   steering_motor2 = new control::Steering6020(servo_data);
   servo_data.motor = motor3;
-  servo_data.install_offset = FR_MOTOR_OFFSET;
+  servo_data.install_offset = BL_MOTOR_OFFSET;
   steering_motor3 = new control::Steering6020(servo_data);
   servo_data.motor = motor4;
-  servo_data.install_offset = FL_MOTOR_OFFSET;
+  servo_data.install_offset = BR_MOTOR_OFFSET;
   steering_motor4 = new control::Steering6020(servo_data);
 
   chassis_data = new control::engineer_steering_chassis_t();
 
-  chassis_data->fl_steer_motor = steering_motor4;
-  chassis_data->fr_steer_motor = steering_motor3;
-  chassis_data->bl_steer_motor = steering_motor1;
-  chassis_data->br_steer_motor = steering_motor2;
+  chassis_data->fl_steer_motor = steering_motor1;
+  chassis_data->fr_steer_motor = steering_motor2;
+  chassis_data->bl_steer_motor = steering_motor3;
+  chassis_data->br_steer_motor = steering_motor4;
 
-  chassis_data->fl_steer_motor_raw = motor4;
-  chassis_data->fr_steer_motor_raw = motor3;
-  chassis_data->bl_steer_motor_raw = motor1;
-  chassis_data->br_steer_motor_raw = motor2;
+  chassis_data->fl_steer_motor_raw = motor1;
+  chassis_data->fr_steer_motor_raw = motor2;
+  chassis_data->bl_steer_motor_raw = motor3;
+  chassis_data->br_steer_motor_raw = motor4;
 
-  chassis_data->fl_wheel_motor = motor8;
-  chassis_data->fr_wheel_motor = motor7;
-  chassis_data->bl_wheel_motor = motor5;
-  chassis_data->br_wheel_motor = motor6;
+  chassis_data->fl_wheel_motor = motor5;
+  chassis_data->fr_wheel_motor = motor6;
+  chassis_data->bl_wheel_motor = motor7;
+  chassis_data->br_wheel_motor = motor8;
 
   chassis = new control::EngineerSteeringChassis(chassis_data);
     print("chassis init finished\n");
@@ -282,26 +266,19 @@ void init_chassis(){
 void kill_chassis(){
     RM_EXPECT_TRUE(false, "Operation Killed!\r\n");
 
-    control::MotorCANBase* wheel_motors[] = {motor5, motor6, motor7, motor8};
-    control::MotorCANBase* steer_motors[] = {motor1, motor2, motor3, motor4};
+    control::MotorCANBase* wheel_motors_2[] = {motor6, motor8};
+    control::MotorCANBase* wheel_motors_1[] = {motor5, motor7};
+
     // RGB->Display(display::color_blue);
    // set alignment status of each wheel to false
+    motor5->SetOutput(0);
+    motor6->SetOutput(0);
+    motor7->SetOutput(0);
+    motor8->SetOutput(0);
+    control::MotorCANBase::TransmitOutput(wheel_motors_1, 2);
+    control::MotorCANBase::TransmitOutput(wheel_motors_2, 2);
 
-    while (true) {
-        motor1->SetOutput(0);
-        motor2->SetOutput(0);
-        motor3->SetOutput(0);
-        motor4->SetOutput(0);
-        control::MotorCANBase::TransmitOutput(steer_motors, 4);
-        motor5->SetOutput(0);
-        motor6->SetOutput(0);
-        motor7->SetOutput(0);
-        motor8->SetOutput(0);
-
-        control::MotorCANBase::TransmitOutput(wheel_motors, 4);
-
-        osDelay(KILLALL_DELAY);
-    }
+    osDelay(KILLALL_DELAY);
 
 }
 

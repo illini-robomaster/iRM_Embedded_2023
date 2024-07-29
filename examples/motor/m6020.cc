@@ -38,7 +38,7 @@ void RM_RTOS_Init() {
   can2 = new bsp::CAN(&hcan2, true);
   motor1 = new control::Motor6020(can2, 0x206);
   // motor2 = new control::Motor6020(can1, 0x207);
-  key = new bsp::GPIO(KEY_GPIO_GROUP, KEY_GPIO_PIN);
+  // key = new bsp::GPIO(KEY_GPIO_GROUP, KEY_GPIO_PIN);
 }
 
 void RM_RTOS_Default_Task(const void* args) {

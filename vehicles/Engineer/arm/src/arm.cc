@@ -19,7 +19,7 @@
  ****************************************************************************/
 
 
-#define INV_KINEMATICS
+// #define INV_KINEMATICS
 
 #include "bsp_gpio.h"
 #include "bsp_os.h"
@@ -42,7 +42,6 @@
 #include "trapezoid_profile.h"
 #include "geometry/geometry.h"
 #include <vector>
-#include "arm_commands.h"
 
 // static bsp::CAN* can1 = nullptr;
 static control::BRTEncoder* encoder0= nullptr;
@@ -88,9 +87,6 @@ const float a = 0.05;
 const float b = 0.36; // big arm length
 const float c = 0.30; // forearm length
 const float wrist_length = 0.16;
-
-std::vector<Command> commands_to_do;
-
 
 
 /*
