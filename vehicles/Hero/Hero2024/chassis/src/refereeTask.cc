@@ -28,7 +28,7 @@ void refereeTask(void* arg) {
   while (true) {
     uint32_t flags = osThreadFlagsWait(REFEREE_RX_SIGNAL, osFlagsWaitAll, osWaitForever);
     if (flags & REFEREE_RX_SIGNAL) {
-      print("refereeTask: Received data from referee\r\n");
+      // print("refereeTask: Received data from referee\r\n");
       length = referee_uart->Read(&data);
       referee->Receive(communication::package_t{data, (int)length});
     }

@@ -125,6 +125,7 @@ namespace control{
     int loop_count = 0;
 
     void EngineerSteeringChassis::Update(float _power_limit, float _chassis_power, float _chassis_power_buffer){
+      UNUSED(_chassis_power_buffer);
       // Update Wheels
       float PID_output[MOTOR_NUM];
       float output[MOTOR_NUM];
@@ -140,18 +141,20 @@ namespace control{
 
       // compute power limit
       power_limit_info.power_limit = _power_limit;
-      power_limit_info.WARNING_power = _power_limit * 0.9;
+      power_limit_info.WARNING_power = _power_limit * 0.8;
       power_limit_info.WARNING_power_buff = 50;
-      power_limit_info.buffer_total_current_limit = 3500 * MOTOR_NUM;
-      power_limit_info.power_total_current_limit = 5000 * MOTOR_NUM / 80.0 * _power_limit;
+      // 12288 units = 20 A = 480W -> 34.13 units = 1 W
+      // suppose we want to use up buffer in 1 second, then total current = 60J / 1s / 24V = 2.5A = 85.75 units
+      power_limit_info.buffer_total_current_limit = 5000 * MOTOR_NUM * _power_limit / 100.0;
+      power_limit_info.power_total_current_limit = _power_limit * 16384.0f/20/24 ; // this is currently too small
       power_limit->Output(true, power_limit_info, _chassis_power, _chassis_power_buffer, PID_output,
                           output);
 
       // set final output
-      fl_wheel_motor->SetOutput(PID_output[0]);
-      fr_wheel_motor->SetOutput(PID_output[1]);
-      bl_wheel_motor->SetOutput(PID_output[2]);
-      br_wheel_motor->SetOutput(PID_output[3]);
+      fl_wheel_motor->SetOutput(output[0]);
+      fr_wheel_motor->SetOutput(output[1]);
+      bl_wheel_motor->SetOutput(output[2]);
+      br_wheel_motor->SetOutput(output[3]);
 
       // if(loop_count == 100){
       //   set_cursor(0, 0);

@@ -130,6 +130,7 @@ void chassisTask(void* arg){
     //     loop_cnt = 0;
     //     set_cursor(0, 0);
     //     clear_screen();
+    //     chassis->PrintData();
     //     print("joy_x: %f, joy_y: %f \r\n", joystick_vector.getX(), joystick_vector.getY());
     //     print("vx: %f, vy: %f, wz: %f \r\n", target_vel.getX(), target_vel.getY(), wz);
     //     print("DELTA T: %d \r\n", HAL_GetTick() - last);

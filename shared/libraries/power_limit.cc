@@ -31,36 +31,28 @@ void PowerLimit::Output(bool turn_on, power_limit_t power_limit_info, float chas
     return;
   }
   float total_current_limit;
-  if (chassis_power_buffer < power_limit_info.WARNING_power_buff) {
-    float power_scale;
-    if (chassis_power_buffer > 5.0f) {
-      // scale down WARNING_POWER_BUFF
-      power_scale = chassis_power_buffer / power_limit_info.WARNING_power_buff;
-    } else {
-      // only left 10% of WARNING_POWER_BUFF
-      power_scale = 5.0f / power_limit_info.WARNING_power_buff;
-    }
+
+  // if there are still buffer energy left, use buffer energy
+  if (chassis_power_buffer > power_limit_info.WARNING_power_buff * 0.1f) {
+    float power_scale = chassis_power_buffer / power_limit_info.WARNING_power_buff;
     // scale down
-    total_current_limit = power_limit_info.buffer_total_current_limit * power_scale;
-  } else {
-    // power > WARNING_POWER
-    if (chassis_power > power_limit_info.WARNING_power) {
+    total_current_limit = power_limit_info.buffer_total_current_limit * power_scale + power_limit_info.power_total_current_limit;
+  } else { // if no buffer energy left, don't use buffer energy
+    if (chassis_power > power_limit_info.WARNING_power) {  // power > WARNING_POWER
       float power_scale;
-      // power < 80w
+      // power < smaller than power limit
       if (chassis_power < power_limit_info.power_limit) {
         // scale down
         power_scale = (power_limit_info.power_limit - chassis_power) /
                       (power_limit_info.power_limit - power_limit_info.WARNING_power);
       } else {
-        // power > 80w
+        // power > power limit : stop
         power_scale = 0.0f;
       }
-      total_current_limit = power_limit_info.buffer_total_current_limit +
-                            power_limit_info.power_total_current_limit * power_scale;
+      total_current_limit = power_limit_info.power_total_current_limit * power_scale;
     } else {
-      // power < WARNING_POWER
-      total_current_limit =
-          power_limit_info.buffer_total_current_limit + power_limit_info.power_total_current_limit;
+      // power < WARNING_POWER but no buffer energy left
+      total_current_limit = power_limit_info.power_total_current_limit;
     }
   }
   float total_current = 0;
