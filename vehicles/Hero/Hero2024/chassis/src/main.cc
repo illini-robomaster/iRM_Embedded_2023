@@ -18,7 +18,7 @@
  *                                                                          *
  ****************************************************************************/
 
-// #define REFEREE
+#define REFEREE
 #include "main.h"
 
 #include "bsp_os.h"
@@ -28,7 +28,7 @@
 #include "chassisTask.h"
 //  #include "ui_task.h"
 #ifdef REFEREE
-#include "referee_task.h"
+#include "refereeTask.h"
 #endif
 #include "bsp_print.h"
 //#define SINGLEBOARD
@@ -67,7 +67,9 @@ void RM_RTOS_Init() {
   // RGB = new display::RGB(&htim5, 3, 2, 1, 1000000);
 #ifdef REFEREE
   referee_uart = new RefereeUART(&huart6);
-   referee = new communication::Referee();
+  referee_uart->SetupRx(300);
+  referee_uart->SetupTx(300);
+  referee = new communication::Referee();
 #endif
 
 #ifndef SINGLEBOARD
@@ -95,6 +97,18 @@ void KillAll() {
 
 void RM_RTOS_Default_Task(const void* args) {
   UNUSED(args);
+  int loop_cnt = 0;
+  while(true){
+    if(loop_cnt == 200){
+      // print("referee power limit: %f \r\n", (float)referee->game_robot_status.chassis_power_limit);
+      print("p: %f \r\n", referee->power_heat_data.chassis_power);
+      // print("chassis power buffer: %f \r\n", (float)(referee->power_heat_data.chassis_power_buffer));
+      loop_cnt = 0;
+    }
+    loop_cnt++;
+  }
+
+
   while(false){ //if want to print, make sure nothing is print somewhere else
     set_cursor(0,0);
     clear_screen();
