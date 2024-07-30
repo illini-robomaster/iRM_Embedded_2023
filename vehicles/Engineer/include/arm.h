@@ -85,3 +85,5 @@ extern remote::SBUS* sbus;
 
 extern bsp::CAN* can1;
 extern bsp::CAN* can2;
+
+extern joint_state_t current_motor_angles;

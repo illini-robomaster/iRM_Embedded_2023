@@ -28,7 +28,7 @@
 #include "chassis_task.h"
 #include "arm_translate_task.h"
 #include "arm.h"
-//  #include "ui_task.h"
+#include "ui_task.h"
 #ifdef REFEREE
 #include "referee_task.h"
 #endif
@@ -54,6 +54,7 @@ bsp::CAN* can1 = nullptr;
 bsp::CAN* can2 = nullptr;
 control::Motor4310* rotate_motor = nullptr;
 
+joint_state_t current_motor_angles;
 
 #ifdef USING_DBUS
 remote::DBUS* dbus = nullptr;
@@ -108,13 +109,13 @@ void RM_RTOS_Threads_Init(void) {
 #endif
 
 #ifdef ARM_A1
-    armA1TaskHandle = osThreadNew(armTask, nullptr, &armA1TaskAttribute);
+    // armA1TaskHandle = osThreadNew(armTask, nullptr, &armA1TaskAttribute);
 #endif
 
 #ifdef REFEREE
     refereeTaskHandle = osThreadNew(refereeTask,nullptr,&refereeTaskAttribute);
 #endif
-//     UITaskHandle = osThreadNew(UITask,nullptr,&UITaskAttribute);
+    UITaskHandle = osThreadNew(UITask,nullptr,&UITaskAttribute);
 }
 
 

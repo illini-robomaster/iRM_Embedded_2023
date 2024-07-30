@@ -218,7 +218,7 @@ void armTask(void* args) {
 
   const float SBUS_CHANNEL_MAX = 660;
 
-  joint_state_t current_motor_angles = {0,0,0,0,0,0,0};
+  current_motor_angles = {0,0,0,0,0,0,0};
 
   //Add 1s Time for 4310 start up.
   print("START\r\n");
