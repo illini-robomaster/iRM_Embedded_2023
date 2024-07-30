@@ -27,6 +27,7 @@ namespace bsp {
 typedef enum {
   VX,
   VY,
+  WZ,
   RELATIVE_ANGLE,
   START,
   MODE,
@@ -65,6 +66,7 @@ class CanBridge {
   bridge_data_t cmd;
   float vx = 0;
   float vy = 0;
+  float wz = 0;
   float relative_angle = 0;
   bool start = false;
   int mode = 0;

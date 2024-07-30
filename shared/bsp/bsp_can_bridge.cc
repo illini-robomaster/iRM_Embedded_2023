@@ -45,6 +45,9 @@ void CanBridge::UpdateData(const uint8_t* data) {
     case VY:
       vy = cmd.data_float;
       break;
+    case WZ:
+      wz = cmd.data_float;
+      break;
     case RELATIVE_ANGLE:
       relative_angle = cmd.data_float;
       break;

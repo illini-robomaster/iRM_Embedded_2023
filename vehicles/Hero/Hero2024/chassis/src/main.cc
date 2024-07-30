@@ -101,7 +101,7 @@ void RM_RTOS_Default_Task(const void* args) {
   while(true){
     if(loop_cnt == 200){
       // print("referee power limit: %f \r\n", (float)referee->game_robot_status.chassis_power_limit);
-      print("p: %f \r\n", referee->power_heat_data.chassis_power);
+      // print("p: %f \r\n", referee->power_heat_data.chassis_power);
       // print("chassis power buffer: %f \r\n", (float)(referee->power_heat_data.chassis_power_buffer));
       loop_cnt = 0;
     }

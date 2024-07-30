@@ -75,17 +75,23 @@ void chassisTask(void* arg){
   int loop_cnt = 0;
   int last = HAL_GetTick();
 
-  while(dbus->swr != remote::DOWN){
+  // while(dbus->swr != remote::DOWN){
+  //   osDelay(100);
+  // }  // flip swr to start
+
+  while (!receive->start) {
+    print("Waiting for start signal...\r\n");
     osDelay(100);
-  }  // flip swr to start
+  }
+  print("Start signal received!\r\n");
+
+  float wz = 0;
+  float relative_angle = 0;
 
   while (true) {
-    float relative_angle = 0;
-    float wz = 0;
-
     Vector2d joystick_vector(0, 0);
 
-    joystick_vector = Vector2d(dbus->ch1/660.0, dbus->ch0/660.0);
+    joystick_vector = Vector2d(receive->vy/660.0, receive->vx/660.0);
 
     // The following is for joystick only, not for keyboard
     // Max joy stick max = 660
@@ -124,7 +130,7 @@ void chassisTask(void* arg){
     target_vel = prev_target_vel.plus(delta_v);
     // TODO: Rotational acceleration constraints (which needs to deal with each module's angle)
     prev_target_vel = target_vel;
-    wz = dbus->ch2 / 660.0 * V_ROT_MAX; // in m/s
+    wz = -receive->wz / 660.0 * V_ROT_MAX; // in m/s
 
     // if(loop_cnt == 100){
     //     loop_cnt = 0;

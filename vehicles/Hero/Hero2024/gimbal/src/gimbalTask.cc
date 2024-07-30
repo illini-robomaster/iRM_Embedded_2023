@@ -66,7 +66,7 @@ float curr_yaw = 0;
 float vx_keyboard = 0;
 float vy_keyboard = 0;
 float vx_remote,vy_remote;
-float vx_set,vy_set;
+float vx_set,vy_set,wz_set;
 
 int p_l_out;
 int p_r_out;
@@ -101,14 +101,15 @@ void gimbal_task(void* args) {
 //  }
   osDelay(5000);
 
-  osDelay(5000);
-
   while (true) {
     if (dbus->keyboard.bit.B || dbus->swr == remote::DOWN || !key->Read()) break;
     print("preparing gimbal \r\n");
     osDelay(100);
-
   }
+
+  send->cmd.id = bsp::START;
+  send->cmd.data_bool = true;
+  send->TransmitOutput();
 
 //  distance_sensor->continuousMeasure();
   // yaw_motor->SetZeroPos();
@@ -377,14 +378,22 @@ void gimbal_task(void* args) {
 
     vx_set = vx_keyboard + vx_remote;
     vy_set = vy_keyboard + vy_remote;
+    wz_set = dbus->ch2;
 
-//    send->cmd.id = bsp::VX;
-//    send->cmd.data_float = Dead ? 0 : vx_set;
-//    send->TransmitOutput();
-//
-//    send->cmd.id = bsp::VY;
-//    send->cmd.data_float = Dead ? 0 : vy_set;
-//    send->TransmitOutput();
+    send->cmd.id = bsp::VX;
+    // send->cmd.data_float = Dead ? 0 : vx_set;  // TODO
+    send->cmd.data_float = vx_set;
+    send->TransmitOutput();
+
+    send->cmd.id = bsp::VY;
+    // send->cmd.data_float = Dead ? 0 : vy_set; // TODO
+    send->cmd.data_float = vy_set;
+    send->TransmitOutput();
+
+    send->cmd.id = bsp::WZ;
+    // send->cmd.data_float = Dead ? 0 : vy_set; // TODO
+    send->cmd.data_float = wz_set;
+    send->TransmitOutput();
 
     pitch_cmd = dbus->ch3 / 500.0;
 
@@ -466,10 +475,6 @@ void init_gimbal() {
   pitch_servo_R = new control::ServoMotor(pitch_servo_data);
 
   scope_motor = new control::MotorPWMBase(&htim1, TIM_CHANNEL_1, 1000000, 50, 1500);
-
-  barrel_motor = new control::Motor4310(can1, 0x02, 0x03, control::POS_VEL);
-  yaw_motor = new control::Motor4310(can1, 0x04, 0x05, control::MIT);
-  vtx_pitch_motor = new control::Motor4310(can1, 0x06, 0x07, control::MIT);
 
   barrel_motor = new control::Motor4310(can1, 0x02, 0x03, control::POS_VEL);
   yaw_motor = new control::Motor4310(can1, 0x04, 0x05, control::MIT);
