@@ -54,6 +54,7 @@ static control::BRTEncoder *pitch_encoder = nullptr;
 
 
 static BoolEdgeDetector rotate_barrel(false);
+static BoolEdgeDetector toggle_auxilary_mode(false);
 
 float calibrated_theta_esca = 0;
 
@@ -76,6 +77,8 @@ control::servo_t pitch_servo_data;
 
 BoolEdgeDetector scope_sw(false);
 volatile bool scope_on = false;
+
+volatile bool aux_mode = false;
 
 void jam_callback(control::ServoMotor* servo, const control::servo_jam_t data) {
   UNUSED(data);
@@ -169,42 +172,6 @@ void gimbal_task(void* args) {
     
     osDelay(10);
   }
-
-  // float yaw_min = -1.3053;    
-  // float yaw_max = 1.6151;
-  // float pitch_min = -0.3327;
-  // float pitch_max = 0.2514;
-
-  // float yaw_pos = 0.0, pitch_pos = 0.0, barrel_pos = 0.0;
-  // while (true) {
-  //   print("gimbal task running\r\n");
-  //   float yaw_vel;
-  //   yaw_vel = clip<float>(dbus->ch2 / 660.0 * 15.0, -15, 15);
-  //   yaw_pos += yaw_vel / 3000.0;
-  //   yaw_pos = clip<float>(yaw_pos, yaw_min, yaw_max);
-  //   yaw_motor->SetOutput(yaw_pos, yaw_vel, 30, 0.5, 0);
-
-  //   float pitch_vel;
-  //   pitch_vel = clip<float>(dbus->ch3 / 660.0 * 15.0, -15, 15);
-  //   pitch_pos += pitch_vel / 3000.0;
-  //   pitch_pos = clip<float>(pitch_pos, pitch_min, pitch_max);
-  //   vtx_pitch_motor->SetOutput(pitch_pos, pitch_vel, 30, 0.5, 0);
-
-  //   rotate_barrel.input(dbus->swl == remote::UP);
-  //   if (rotate_barrel.posEdge()) barrel_pos += 2.0 * PI / 5.0;
-  //   barrel_motor->SetOutput(barrel_pos, 1);
-    
-  //   control::Motor4310::TransmitOutput(m4310_motors, 3);
-
-  //   osDelay(GIMBAL_TASK_DELAY);
-  // }
-
-
-  // yaw_motor->SetOutput(0, 1, 15, 0.5, 0);
-  // vtx_pitch_motor->SetOutput(0, 1, 15, 0.5, 0);
-  // barrel_motor->SetOutput(0, 1, 15, 0.5, 0);
-
-  // control::Motor4310::TransmitOutput(m4310_motors, 3);
 
   /*
    * escalation reset
@@ -308,27 +275,35 @@ void gimbal_task(void* args) {
   float pitch_max = 0.2514;
 
   float yaw_pos = 0.0, pitch_pos = 0.0, barrel_pos = 0.0;
-
+  
   while (true) {
-    float yaw_vel;
-    yaw_vel = clip<float>(dbus->ch2 / 660.0 * 15.0, -15, 15);
-    yaw_pos += yaw_vel / 3000.0;
-    yaw_pos = clip<float>(yaw_pos, yaw_min, yaw_max);
-    yaw_motor->SetOutput(yaw_pos, yaw_vel, 30, 0.5, 0);
+    toggle_auxilary_mode.input(dbus->swr == remote::DOWN);
+    if (toggle_auxilary_mode.posEdge()) {
+      aux_mode = !aux_mode;
+    }
 
-    float pitch_vel;
-    pitch_vel = clip<float>(dbus->ch3 / 660.0 * 15.0, -15, 15);
-    pitch_pos += pitch_vel / 3000.0;
-    pitch_pos = clip<float>(pitch_pos, pitch_min, pitch_max);
-    vtx_pitch_motor->SetOutput(pitch_pos, pitch_vel, 30, 0.5, 0);
+    float yaw_vel = 0.0, pitch_vel = 0.0;
+    if (aux_mode) {
+      yaw_vel = clip<float>(dbus->ch2 / 660.0 * 15.0, -15, 15);
+      yaw_pos += yaw_vel / 2000.0;
+      yaw_pos = clip<float>(yaw_pos, yaw_min, yaw_max);
+      yaw_motor->SetOutput(yaw_pos, yaw_vel, 30, 0.5, 0);
 
-    rotate_barrel.input(dbus->swl == remote::UP);
-    if (rotate_barrel.posEdge()) barrel_pos += 2.0 * PI / 5.0;
-    barrel_motor->SetOutput(barrel_pos, 10);
+      pitch_vel = clip<float>(dbus->ch3 / 660.0 * 15.0, -15, 15);
+      pitch_pos += pitch_vel / 2000.0;
+      pitch_pos = clip<float>(pitch_pos, pitch_min, pitch_max);
+      vtx_pitch_motor->SetOutput(pitch_pos, pitch_vel, 30, 0.5, 0);
+
+      rotate_barrel.input(dbus->ch0 > 630.0);
+      if (rotate_barrel.posEdge()) {
+        barrel_pos += 2.0 * PI / 5.0;
+      } 
+      barrel_motor->SetOutput(barrel_pos, 10);
+    } 
 
     // Bool Edge Detector for lob mode switch or osEventFlags wait for a signal from different threads
 
-    lob_mode_sw.input(dbus->keyboard.bit.SHIFT /* || dbus->swl == remote::UP  */|| !key->Read());
+    lob_mode_sw.input(dbus->keyboard.bit.SHIFT || dbus->swl == remote::UP || !key->Read());
     if (lob_mode_sw.posEdge() /*&& dbus->swr == remote::MID*/){
       lob_mode = !lob_mode;
       // TODO: after implementing chassis, uncomment the lob_mode bsp::CanBridge flag transmission
@@ -373,12 +348,18 @@ void gimbal_task(void* args) {
     vx_keyboard = clip<float>(vx_keyboard, -1200, 1200);
     vy_keyboard = clip<float>(vy_keyboard, -1200, 1200);
 
-    vx_remote = dbus->ch0;
-    vy_remote = dbus->ch1;
+    if (aux_mode) {
+      vx_remote = 0;
+      vy_remote = 0;
+      wz_set = 0;
+    } else {
+      vx_remote = dbus->ch0;
+      vy_remote = dbus->ch1;
+      wz_set = dbus->ch2;
+    }
 
     vx_set = vx_keyboard + vx_remote;
     vy_set = vy_keyboard + vy_remote;
-    wz_set = dbus->ch2;
 
     send->cmd.id = bsp::VX;
     // send->cmd.data_float = Dead ? 0 : vx_set;  // TODO
@@ -406,13 +387,13 @@ void gimbal_task(void* args) {
     } else {
       scope_motor->SetOutput(3);
     }
-    if (!forward_key->Read()){
+    if (!forward_key->Read() || (!aux_mode && dbus->ch3 > 630.0)){
       pitch_servo_L->SetTarget(pitch_servo_L->GetTheta() + PI * 100, true);
       pitch_servo_R->SetTarget(pitch_servo_R->GetTheta() + PI * 100, true);
       osDelay(GIMBAL_TASK_DELAY);
       pitch_servo_L->CalcOutput(&p_l_out);
       pitch_servo_R->CalcOutput(&p_r_out);
-    } else if (!backward_key->Read()) {
+    } else if (!backward_key->Read() || (!aux_mode && dbus->ch3 < -630.0)) {
       pitch_servo_L->SetTarget(pitch_servo_L->GetTheta() - PI * 100,true);
       pitch_servo_R->SetTarget(pitch_servo_R->GetTheta() - PI * 100,true);
       osDelay(GIMBAL_TASK_DELAY);

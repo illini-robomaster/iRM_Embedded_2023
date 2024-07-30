@@ -90,6 +90,7 @@ void chassisTask(void* arg){
 
   while (true) {
     Vector2d joystick_vector(0, 0);
+    print("vx: %f, vy: %f, wz: %f \r\n", receive->vx, receive->vy, receive->wz);
 
     joystick_vector = Vector2d(receive->vy/660.0, receive->vx/660.0);
 

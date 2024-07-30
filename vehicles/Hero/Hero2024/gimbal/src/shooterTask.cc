@@ -97,13 +97,13 @@ void shooter_task(void* args) {
       shoot_back_motor->SetOutput(s_b_out);
       control::MotorCANBase::TransmitOutput(can1_shooter_shoot, 2);
       osDelay(1000);
-    } else if (dbus->swr==remote::DOWN) {
+    } /* else if (dbus->swr==remote::DOWN) {
       s_f_out = 0;
       s_b_out = 0;
       shoot_front_motor->SetOutput(s_f_out);
       shoot_back_motor->SetOutput(s_b_out);
       control::MotorCANBase::TransmitOutput(can1_shooter_shoot, 2);
-    }
+    } */
     else {
       osDelay(SHOOTER_TASK_DELAY);
       shoot_back_speed_diff = shoot_back_motor->GetOmegaDelta(0);
