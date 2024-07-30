@@ -7,10 +7,12 @@ project(Engineer ASM C CXX)
 # add_compile_definitions(USING_DBUS)
 
 irm_add_arm_executable(Engineer_arm
-    TARGET DM_MC_01
-    SOURCES
-    src/main.cc
-    src/arm.cc
-    src/selfcheck_task.cc
-    INCLUDES include
+        TARGET DM_MC_01
+        SOURCES
+        src/main.cc
+        src/arm.cc
+        src/selfcheck_task.cc
+        src/ui_task.cc
+        src/referee_task.cc
+        INCLUDES include
 )

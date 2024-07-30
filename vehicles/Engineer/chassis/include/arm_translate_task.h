@@ -7,6 +7,7 @@
 #include "bsp_gpio.h"
 #include "bsp_print.h"
 #include "controller.h"
+#include "bsp_can_bridge.h"
 // #include "utils.h"
 #ifdef USING_DBUS
 #include "dbus.h"
@@ -24,6 +25,7 @@ const osThreadAttr_t armTranslateAttribute = {.name = "armTranslateTask",
                                              .priority = (osPriority_t)osPriorityAboveNormal,
                                              .tz_module = 0,
                                              .reserved = 0};
+
 
 
 void armTranslateTask(void* arg);
@@ -53,3 +55,4 @@ extern remote::SBUS* sbus;
 
 extern bsp::CAN* can1;
 extern bsp::CAN* can2;
+extern bsp::CanBridge* receive;

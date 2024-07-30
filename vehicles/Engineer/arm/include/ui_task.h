@@ -18,40 +18,39 @@
  *                                                                          *
  ****************************************************************************/
 #pragma once
-#include "bsp_print.h"
-#include "bsp_uart.h"
-#include "cmsis_os2.h"
-#include "dbus.h"
+
 #include "main.h"
+#include "user_interface.h"
+#include "referee_task.h"
+#include "cmsis_os.h"
 #include "protocol.h"
+#include "arm.h"
+#include "bsp_gpio.h"
+#include <cstring>
+#include <cstdio>
 
-#define REFEREE_RX_SIGNAL (1 << 1)
+#define UI_TASK_DELAY 20
 
-
-extern osThreadId_t refereeTaskHandle;
-const osThreadAttr_t refereeTaskAttribute = {.name = "refereeTask",
+extern osThreadId_t UITaskHandle;
+const osThreadAttr_t UITaskAttribute = {.name = "UITask",
         .attr_bits = osThreadDetached,
         .cb_mem = nullptr,
         .cb_size = 0,
         .stack_mem = nullptr,
         .stack_size = 1024 * 4,
-        .priority = (osPriority_t)osPriorityAboveNormal,
+        .priority = (osPriority_t)osPriorityBelowNormal,
         .tz_module = 0,
         .reserved = 0};
 
+
+
 extern communication::Referee* referee;
-
-class RefereeUART : public bsp::UART {
-public:
-    using bsp::UART::UART;
-
-protected:
-    void RxCompleteCallback() final { osThreadFlagsSet(refereeTaskHandle, REFEREE_RX_SIGNAL); }
-};
-
-
 extern RefereeUART* referee_uart;
+extern joint_state_t current_motor_angles;
 
-void referee_task(void* arg);
+extern bsp::GPIO* key;
 
-void init_referee();
+void UITask(void* arg);
+void refresh();
+void init_ui();
+void kill_ui();

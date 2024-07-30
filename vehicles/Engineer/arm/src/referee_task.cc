@@ -17,54 +17,27 @@
  *  along with this program. If not, see <http://www.gnu.org/licenses/>.    *
  *                                                                          *
  ****************************************************************************/
-#pragma once
-
-#include "chassis.h"
-
-#include "bsp_gpio.h"
-#include "bsp_os.h"
-#include "bsp_print.h"
-#include "bsp_relay.h"
-#include "cmsis_os.h"
-#include "controller.h"
-#include "dbus.h"
-#include "motor.h"
-#include "protocol.h"
-#include "rgb.h"
-#include "oled.h"
-#include "bsp_buzzer.h"
-
-// parameters: could be proved useless  (╯‵□′)╯︵┻━┻
-#define FORCE_0_ANGLE (0)
-#define FORCE_1_ANGLE (2 * PI)
-#define FORCE_2_ANGLE (4 * PI)
-#define FORCE_3_ANGLE (6 * PI)
-extern bsp::Buzzer *buzzer;
+#include "referee_task.h"
 
 
-extern osThreadId_t shooterTaskHandle;
-const osThreadAttr_t shooterTaskAttribute = {.name = "shooter_task",
-        .attr_bits = osThreadDetached,
-        .cb_mem = nullptr,
-        .cb_size = 0,
-        .stack_mem = nullptr,
-        .stack_size = 256 * 4,
-        .priority = (osPriority_t)osPriorityNormal,
-        .tz_module = 0,
-        .reserved = 0};
+void refereeTask(void* arg) {
+  UNUSED(arg);
+  uint32_t length;
+  uint8_t* data;
 
+  while (true) {
+    uint32_t flags = osThreadFlagsWait(REFEREE_RX_SIGNAL, osFlagsWaitAll, osWaitForever);
+    if (flags & REFEREE_RX_SIGNAL) {
+      length = referee_uart->Read(&data);
+      referee->Receive(communication::package_t{data, (int)length});
+    }
+  }
+}
 
+void init_referee(){
 
-extern remote::DBUS* dbus;
-extern bsp::CAN* can1;
-extern bsp::CAN* can2;
-extern bsp::GPIO* key;
+}
 
-extern volatile bool lob_mode;
+void kill_referee(){
 
-extern communication::Referee* referee;
-
-
-void shooter_task(void* arg);
-void init_shooter();
-void kill_shooter();
+}

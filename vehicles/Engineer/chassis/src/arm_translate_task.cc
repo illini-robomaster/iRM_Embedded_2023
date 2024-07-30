@@ -9,7 +9,7 @@ static int last_motor_pos = 0;
 static bool killed = false;
 // static bsp::GPIO* out_5v_enable = nullptr;
 
-extern bsp::CanBridge* receive = nullptr;
+
 
 bool base_translate_align_detect() {
 	if(!motor9->connection_flag_){ // if motor is not enabled, then it must not be aligned
