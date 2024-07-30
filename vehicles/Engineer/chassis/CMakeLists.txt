@@ -6,6 +6,7 @@ irm_add_arm_executable(Engineer_chassis
     SOURCES
     src/main.cc
     src/chassis_task.cc
+    src/arm_translate_task.cc
     src/engineer_steering.cc
     src/steering_6020.cc
     src/referee_task.cc

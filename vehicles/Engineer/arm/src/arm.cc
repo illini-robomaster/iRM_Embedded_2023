@@ -70,8 +70,8 @@ static joint_state_t last_targets = {0,0,0,0,0,0,0};
 static joint_state_t target_mechanical_angle = {0,0,0,0,0,0,0};
 static joint_state_t current_mechanical_angle = {0,0,0,0,0,0,0};
 
-static joint_state_t MECHANICAL_MAX_POS = {0, PI/2, 0.3, 1.0, PI, PI/2, PI};
-static joint_state_t MECHANICAL_MIN_POS = {0, -PI/2, -0.7, -1.627, -PI, -PI/2, -PI};
+static joint_state_t MECHANICAL_MAX_POS = {0, PI, 0.3, 1.0, PI, 2*PI/3, 2*PI/3};
+static joint_state_t MECHANICAL_MIN_POS = {0, -PI, -0.7, -1.627, -PI, -2*PI/3, -2*PI/3};
 
 static joint_state_t MAX_SPEED_RADIANS = {0, 1.0, 0.5, 0.5, 10.0, 10.0, 10.0};
 

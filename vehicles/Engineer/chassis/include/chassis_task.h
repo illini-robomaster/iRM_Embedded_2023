@@ -39,6 +39,7 @@ const osThreadAttr_t chassisTaskAttribute = {.name = "chassisTask",
 void chassisTask(void* arg);
 void init_chassis();
 void kill_chassis();
+void revive_chassis();
 
 extern remote::SBUS* sbus;
 

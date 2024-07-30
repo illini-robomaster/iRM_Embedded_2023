@@ -48,13 +48,14 @@ int16_t loop_count = 0;
 static control::cap_send_message_t cap_send_data;
 static control::cap_recv_message_t cap_recv_data;
 
+static bool killed;
+
 void chassisTask(void* arg){
     UNUSED(arg);
     
     control::MotorCANBase* wheel_motors_2[] = {motor6, motor8};
     control::MotorCANBase* wheel_motors_1[] = {motor5, motor7};
 
-    control::MotorCANBase* steer_motors_1[] = {motor1, motor3};
     control::MotorCANBase* steer_motors_2[] = {motor2, motor4};
     chassis->SteerSetMaxSpeed(ALIGN_SPEED);
 	chassis->Calibrate();
@@ -71,6 +72,10 @@ void chassisTask(void* arg){
 
     // print("starting loop\n");
     while (true) {
+        if(killed){ // if killed do nothing
+            osDelay(100);
+            continue;
+        }
         float relative_angle = 0;
         float wz = 0;
 
@@ -115,14 +120,14 @@ void chassisTask(void* arg){
         // TODO: Rotational acceleration constraints (which needs to deal with each module's angle)
         prev_target_vel = target_vel;
 
-        if(loop_cnt == 100){
-            loop_cnt = 0;
-            set_cursor(0, 0);
-            clear_screen();
-            print("joy_x: %f, joy_y: %f \r\n", joystick_vector.getX(), joystick_vector.getY());
-            print("vx: %f, vy: %f, wz: %f \r\n", target_vel.getX(), target_vel.getY(), wz);
-            print("DELTA T: %d \r\n", HAL_GetTick() - last);
-        }
+        // if(loop_cnt == 100){
+        //     loop_cnt = 0;
+        //     set_cursor(0, 0);
+        //     clear_screen();
+        //     print("joy_x: %f, joy_y: %f \r\n", joystick_vector.getX(), joystick_vector.getY());
+        //     print("vx: %f, vy: %f, wz: %f \r\n", target_vel.getX(), target_vel.getY(), wz);
+        //     print("DELTA T: %d \r\n", HAL_GetTick() - last);
+        // }
         last = HAL_GetTick();
         loop_cnt++;
         UNUSED(loop_cnt);
@@ -162,13 +167,14 @@ void chassisTask(void* arg){
                        50);
 
 
-        control::MotorCANBase::TransmitOutput(steer_motors_1, 2);
         control::MotorCANBase::TransmitOutput(steer_motors_2, 2);
+        control::MotorCANBase::TransmitOutput(&motor3, 1);
+        control::MotorCANBase::TransmitOutput(&motor1, 1);
+ 
 
         control::MotorCANBase::TransmitOutput(wheel_motors_1, 2);
         control::MotorCANBase::TransmitOutput(wheel_motors_2, 2);
 
-        UNUSED(steer_motors_1); 
         UNUSED(steer_motors_2);
         UNUSED(wheel_motors_1);
         UNUSED(wheel_motors_2);
@@ -181,13 +187,13 @@ void chassisTask(void* arg){
         }
 
         cap_recv_data = supercap->info;
-        if(loop_cnt == 100){
-            loop_cnt = 0;
-            print("cap_recv_data.max_power: %f \r\n", cap_recv_data.max_power / 100.0);
-            print("cap_recv_data.chassis_power: %f \r\n", cap_recv_data.chassis_power / 100.0);
-            print("cap_recv_data.energy_percentage: %f \r\n", cap_recv_data.energy_percentage);
-            print("cap_recv_data.cap_state: %d \r\n", cap_recv_data.cap_state);
-        }
+        // if(loop_cnt == 1000){
+        //     loop_cnt = 0;
+        //     print("cap_recv_data.max_power: %f \r\n", cap_recv_data.max_power / 100.0);
+        //     print("cap_recv_data.chassis_power: %f \r\n", cap_recv_data.chassis_power / 100.0);
+        //     print("cap_recv_data.energy_percentage: %f \r\n", cap_recv_data.energy_percentage);
+        //     print("cap_recv_data.cap_state: %d \r\n", cap_recv_data.cap_state);
+        // }
 
 
         osDelay(CHASSIS_TASK_DELAY);
@@ -198,7 +204,7 @@ void chassisTask(void* arg){
 
 void init_chassis(){
     print("Starting chassis init\n");
-    motor1 = new control::Motor6020(can1, 0x205);
+    motor1 = new control::Motor6020(can1, 0x209);
     motor2 = new control::Motor6020(can2, 0x206);
     motor3 = new control::Motor6020(can1, 0x207);
     motor4 = new control::Motor6020(can2, 0x208);
@@ -257,6 +263,8 @@ void init_chassis(){
 
 }
 void kill_chassis(){
+
+    killed = true;
     RM_EXPECT_TRUE(false, "Operation Killed!\r\n");
 
     control::MotorCANBase* wheel_motors_2[] = {motor6, motor8};
@@ -270,8 +278,8 @@ void kill_chassis(){
     motor8->SetOutput(0);
     control::MotorCANBase::TransmitOutput(wheel_motors_1, 2);
     control::MotorCANBase::TransmitOutput(wheel_motors_2, 2);
-
-    osDelay(KILLALL_DELAY);
-
 }
 
+void revive_chassis(){
+    killed = false;
+}

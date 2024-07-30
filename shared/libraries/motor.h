@@ -742,6 +742,7 @@ namespace control {
         float calibrate_offset;           /* angle from calibration sensor to starting location */
         float reverse_soft_limit;
         float forward_soft_limit;
+        bool align_dir_invert;
     } servoLG_t;
 
 // mode that can turn relative angles in [rad]
@@ -833,7 +834,9 @@ namespace control {
          */
         bool CheckAlignment();
 
-    private:
+        ServoMotor* GetServo();
+
+       private:
         ServoMotor* servo_;
 
         align_detect_t align_detect_func_;/* function pointer for the calibration sensor, see comments for align_detect_t typedef */
@@ -844,6 +847,7 @@ namespace control {
 
         float align_angle_;               /* angle relative to motor start position                                                              */
         bool align_complete_;             /* if calibration is previously done, use the align_angle_                              */
+        bool align_dir_invert_;
     };
 
 

@@ -2,12 +2,29 @@
 
 static control::MotorCANBase* motor9 = nullptr;
 static control::ServoMotorWithLG* base_translate_motor = nullptr;
+static int last_check_time_ms = 0;
+static int last_motor_pos = 0;
 
-static bsp::GPIO* base_translate_pe_sensor = nullptr;
+static bool killed = false;
 // static bsp::GPIO* out_5v_enable = nullptr;
 
 bool base_translate_align_detect() {
-  return base_translate_pe_sensor->Read() == false; // only the white wire for the light gate works, which needs to be reversed
+	if(!motor9->connection_flag_){ // if motor is not enabled, then it must not be aligned
+		return false;
+	}
+
+	// if in the past 500ms, the motor does not move, then it is aligned
+	if(HAL_GetTick()-last_check_time_ms > 500){
+		float diff =  abs(motor9->GetTheta() - last_motor_pos);
+		print("diff: %f\r\n", diff);
+		if(diff<0.6){
+			return true;
+		}
+		// only update every 500ms
+		last_motor_pos = motor9->GetTheta();
+		last_check_time_ms = HAL_GetTick();
+	}
+	return false;
 }
 
 
@@ -17,7 +34,8 @@ void armTranslateTask(void* arg){
 
 	// Calibration / Align
 	bool aligned = false;
-        print("Starting Calib\r\n");
+	print("Starting Calib\r\n");
+	osDelay(1000);
 	base_translate_motor->SetMaxSpeed(BASE_TRANSLATE_ALIGN_SPEED);
 	while(!aligned){
 		base_translate_motor->CalcOutput();
@@ -26,43 +44,52 @@ void armTranslateTask(void* arg){
 
 		// print data
 		loop_cnt++;
-		if(loop_cnt == 100) {
-                  loop_cnt = 0;
+		if(loop_cnt >= 100) {
+			loop_cnt = 0;
                 //   set_cursor(0, 0);
                 //   clear_screen();
 //                print("aligned: %d .. \r\n", base_translate_motor->Calibrate());
-                  print("HAL tick: %d \r\n", HAL_GetTick());
-                //   base_translate_motor->PrintData();
-                //   motor9->PrintData();
-                }
+			print("HAL tick: %d \r\n", HAL_GetTick());
+			// base_translate_motor->PrintData();
+			motor9->PrintData();
+		}
 		osDelay(2);
 	}
 	base_translate_motor->ReAlign();
 	base_translate_motor->TurnRelative(0);
 	base_translate_motor->SetMaxSpeed(BASE_TRANSLATE_RUN_SPEED);
 	control::MotorCANBase::TransmitOutput(&motor9, 1);
+	print("Calib Done\r\n");	
 
 	// Start normal operation
 	while(1) {
-		// loop_cnt++;
-		// if(loop_cnt >= 100) {
+		if(killed)	{ // if killed do nothing
+			osDelay(100);
+			continue;
+		}
+		loop_cnt++;
+		if(loop_cnt >= 100) {
 		// set_cursor(0, 0);
 		// clear_screen();
 		// base_translate_motor->PrintData();
-		// motor9->PrintData();
-		// loop_cnt = 0;
-		// print("dbus ch2: %f \r\n", dbus->ch3/660.0/200);
 
-		// }
+			// motor9->PrintData();
+			base_translate_motor->PrintData();
+
+			loop_cnt = 0;
+			// print("sbus ch4: %f \r\n", sbus->ch[3]/660.0/50);
+
+		}
 #ifdef USING_DBUS
 		base_translate_motor->TurnRelative(dbus->ch3 / 660.0 / 50);
 #else
-		base_translate_motor->TurnRelative(sbus->ch[3] / 660.0 / 50);
+		base_translate_motor->TurnRelative(sbus->ch[12] / 660.0 /80);
 #endif
 		base_translate_motor->CalcOutput();
 		control::MotorCANBase::TransmitOutput(&motor9, 1);
 		osDelay(2);
 	}
+	
 }
 
 
@@ -71,7 +98,6 @@ int TRANSLATE_RATIO = 4; // full translation range is this many rotation
 void init_arm_translate() {
 	// Init m3508 * 1
 	motor9 = new control::Motor3508(can1, BASE_TRANSLATE_ID);
-	base_translate_pe_sensor = new bsp::GPIO(IN1_GPIO_Port, IN1_Pin);
 
 	// enable 5v power for the light gate sensor (on dm board only)
 	// out_5v_enable = new bsp::GPIO(OUT_5V_Port, OUT_5V_Pin);
@@ -88,19 +114,22 @@ void init_arm_translate() {
 	servoLG_data.max_out = 13000;
 	// TODO measure the calibrate offset for base translate motor
 	servoLG_data.calibrate_offset = 0;
-	servoLG_data.forward_soft_limit = 0;
-	servoLG_data.reverse_soft_limit = -25.5;
+	servoLG_data.forward_soft_limit = 25.5; //25.5
+	servoLG_data.reverse_soft_limit = 1;
 	servoLG_data.align_detect_func = base_translate_align_detect;
+	servoLG_data.align_dir_invert = true;
 
 	base_translate_motor = new control::ServoMotorWithLG(servoLG_data);
 }
 
 void kill_arm_translate(){
+	killed = true;
 	RM_EXPECT_TRUE(false, "Operation Killed!\r\n");
 
-	while(true){
-		motor9->SetOutput(0);
-		control::MotorCANBase::TransmitOutput(&motor9, 1);
-		osDelay(100);
-	}
+	motor9->SetOutput(0);
+	control::MotorCANBase::TransmitOutput(&motor9, 1);
+}
+
+void revive_arm_translate(){
+	killed = false;
 }

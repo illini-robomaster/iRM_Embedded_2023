@@ -29,10 +29,11 @@ const osThreadAttr_t armTranslateAttribute = {.name = "armTranslateTask",
 void armTranslateTask(void* arg);
 void init_arm_translate();
 void kill_arm_translate();
+void revive_arm_translate();
 
 
 /* M3508 params start */
-const int BASE_TRANSLATE_ID = 0x201;
+const int BASE_TRANSLATE_ID = 0x205;
 //const GPIO_TypeDef* BASE_TRANS_INIT_GPIO_PORT = GPIOI;
 //const uint16_t BASE_TRANS_INIT_GPIO_PIN = GPIO_PIN_7;  // PWM pin 1 on C board
 

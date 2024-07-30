@@ -692,6 +692,7 @@ namespace control {
       align_angle_ = 0;
       align_complete_ = false;
       current_target_ = 0;
+      align_dir_invert_ = data.align_dir_invert;
     }
 
     float ServoMotorWithLG::GetTheta(GetThetaMode mode) const {
@@ -774,7 +775,8 @@ namespace control {
         return true;
       } else {
         // rotate slowly with TEST_SPEED, try to hit the calibration sensor
-        TurnRelative(2 * PI);
+        TurnRelative(align_dir_invert_? -2 * PI : 2 * PI);
+
       }
       return false;
     }
@@ -797,6 +799,10 @@ namespace control {
 
     bool ServoMotorWithLG::CheckAlignment() {
       return align_complete_;
+    }
+
+    ServoMotor* ServoMotorWithLG::GetServo() {
+      return servo_;
     }
 
 //==================================================================================================

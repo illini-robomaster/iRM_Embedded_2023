@@ -145,8 +145,8 @@ namespace control{
       power_limit_info.WARNING_power_buff = 50;
       // 12288 units = 20 A = 480W -> 34.13 units = 1 W
       // suppose we want to use up buffer in 1 second, then total current = 60J / 1s / 24V = 2.5A = 85.75 units
-      power_limit_info.buffer_total_current_limit = 5000 * MOTOR_NUM * _power_limit / 100.0;
-      power_limit_info.power_total_current_limit = _power_limit * 16384.0f/20/24 ; // this is currently too small
+      power_limit_info.buffer_total_current_limit = 0;
+      power_limit_info.power_total_current_limit = _power_limit * 16384.0f/20/24; // this is currently too small
       power_limit->Output(true, power_limit_info, _chassis_power, _chassis_power_buffer, PID_output,
                           output);
 

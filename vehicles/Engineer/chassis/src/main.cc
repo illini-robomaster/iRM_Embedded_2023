@@ -17,7 +17,7 @@
  *  along with this program. If not, see <http://www.gnu.org/licenses/>.    *
  *                                                                          *
  ****************************************************************************/
-// #define REFEREE
+#define REFEREE
 #define CHASSIS
 
 #include "main.h"
@@ -25,6 +25,7 @@
 #include "can.h"
 #include "rgb.h"
 #include "chassis_task.h"
+#include "arm_translate_task.h"
 //  #include "ui_task.h"
 #ifdef REFEREE
 #include "referee_task.h"
@@ -68,7 +69,7 @@ void RM_RTOS_Init() {
 #endif
 
     init_chassis();
-    // init_arm_translate();
+    init_arm_translate();
 
     set_cursor(0,0);
     clear_screen();
@@ -77,7 +78,7 @@ void RM_RTOS_Init() {
 
 void RM_RTOS_Threads_Init(void) {
     chassisTaskHandle = osThreadNew(chassisTask,nullptr,&chassisTaskAttribute);
-
+    armTranslateTaskHandle = osThreadNew(armTranslateTask,nullptr,&armTranslateAttribute);
 #ifdef REFEREE
     refereeTaskHandle = osThreadNew(refereeTask,nullptr,&refereeTaskAttribute);
 #endif
@@ -88,11 +89,12 @@ void RM_RTOS_Threads_Init(void) {
 void KillAll() {
 
     kill_chassis();
-
+    kill_arm_translate();
 }
 
 void ReviveAll(){
-
+    revive_chassis();
+    revive_arm_translate();
 }
 
 
@@ -105,14 +107,14 @@ void RM_RTOS_Default_Task(const void* args) {
             }
             engineerIsKilled = true;
             KillAll();
-            osDelay(10);
+            osDelay(100);
         }else if(engineerIsKilled && sbus->ch[6]<=100){ // killed to revive
             ReviveAll();
             engineerIsKilled = false;
         }
 
 #ifdef REFEREE
-        print("ROBOTID: %d",referee->game_robot_status.robot_id);
+        // print("ROBOTID: %d",referee->game_robot_status.robot_id);
 #endif
         osDelay(10);
     }

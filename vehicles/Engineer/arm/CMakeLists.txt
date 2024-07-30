@@ -10,7 +10,6 @@ irm_add_arm_executable(Engineer_arm
     TARGET DM_MC_01
     SOURCES
     src/main.cc
-    src/arm_translate_task.cc
     src/arm.cc
     src/selfcheck_task.cc
     INCLUDES include
