@@ -132,7 +132,7 @@ void RM_RTOS_Default_Task(const void* args) {
         }
 
 #ifdef REFEREE
-        print("ROBOTID: %d",referee->game_robot_status.robot_id);
+        // print("ROBOTID: %d",referee->game_robot_status.robot_id);
 #endif
         osDelay(10);
     }

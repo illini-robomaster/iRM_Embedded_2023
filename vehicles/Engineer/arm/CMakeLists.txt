@@ -11,6 +11,6 @@ irm_add_arm_executable(Engineer_arm
     SOURCES
     src/main.cc
     src/arm.cc
-    src/selfcheck_task.cc
+    src/referee_task.cc
     INCLUDES include
 )

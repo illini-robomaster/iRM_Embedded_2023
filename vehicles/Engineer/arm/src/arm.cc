@@ -540,7 +540,7 @@ void armTask(void* args) {
       send->cmd.id = bsp::CHASSIS_POWER_LIMIT;
       send->cmd.data_float = referee->game_robot_status.chassis_power_limit;
       send->TransmitOutput();
-
+      print("can bridge sent\r\n");
     }
 
 #ifdef INV_KINEMATICS

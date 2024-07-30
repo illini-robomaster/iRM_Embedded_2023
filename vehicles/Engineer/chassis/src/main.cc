@@ -111,7 +111,7 @@ void RM_RTOS_Default_Task(const void* args) {
             engineerIsKilled = true;
             KillAll();
             osDelay(100);
-        }else if(engineerIsKilled && receive->dead<=100){ // killed to revive
+        }else if(engineerIsKilled && receive->dead){ // killed to revive
             ReviveAll();
             engineerIsKilled = false;
         }
