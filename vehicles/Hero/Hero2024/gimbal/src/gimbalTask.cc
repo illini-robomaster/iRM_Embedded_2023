@@ -400,9 +400,11 @@ void gimbal_task(void* args) {
       pitch_servo_L->CalcOutput(&p_l_out);
       pitch_servo_R->CalcOutput(&p_r_out);
     }  else {
-      p_l_out = 0;
-      p_r_out = 0;
-
+      pitch_servo_L->SetTarget(pitch_servo_L->GetTheta(), true);
+      pitch_servo_R->SetTarget(pitch_servo_R->GetTheta(), true);
+      osDelay(GIMBAL_TASK_DELAY);
+      pitch_servo_L->CalcOutput(&p_l_out);
+      pitch_servo_R->CalcOutput(&p_r_out);
     }
 //    print("pitch_L: %f, pitch_R: %f\r\n", pitch_servo_L->GetTheta(), pitch_servo_R->GetTheta());
     // TODO: considering change pitch motors to velocity loop
@@ -446,7 +448,7 @@ void init_gimbal() {
   pitch_servo_data.max_speed = PI * 4 ;    // TODO: params need test
   pitch_servo_data.max_acceleration = PI * 100;
   pitch_servo_data.transmission_ratio = M2006P36_RATIO;
-  pitch_servo_data.omega_pid_param = new float [3] {450, 3.6, 0};
+  pitch_servo_data.omega_pid_param = new float [3] {150, 1.2, 5};
   pitch_servo_data.max_iout = 500;
   pitch_servo_data.max_out = 10000;
   pitch_servo_L = new control::ServoMotor(pitch_servo_data);

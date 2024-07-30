@@ -50,9 +50,9 @@ void RM_RTOS_Default_Task(const void* args) {
       nintyDegree = !nintyDegree;
     }
     if(nintyDegree) {
-      output = 3;
+      output = 100;
     } else {
-      output = 1500;
+      output = 1600;
     }
     motor1->SetOutput(output);
 //    if (pe->Read()==0){
