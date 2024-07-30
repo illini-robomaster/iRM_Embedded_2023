@@ -25,13 +25,16 @@
 //==================================================================================================
 // Params Initialization
 
+//#define calibrate
+
 float pitch_cmd;
 float yaw_cmd;
 
 static const int KILLALL_DELAY = 100;
-static const int GIMBAL_TASK_DELAY = 1;
+static const int GIMBAL_TASK_DELAY = 3;
 
 static control::MotorCANBase* esca_motor = nullptr;
+static control::MotorPWMBase* scope_motor = nullptr;
 static control::ServoMotor* escalation_servo = nullptr;
 
 
@@ -41,12 +44,12 @@ static control::MotorCANBase* pitch_motor_R = nullptr;
 static control::ServoMotor* pitch_servo_L = nullptr;
 static control::ServoMotor* pitch_servo_R = nullptr;
 
-
 static control::Motor4310* yaw_motor = nullptr;
 static control::Motor4310* vtx_pitch_motor = nullptr;
 static control::Motor4310* barrel_motor = nullptr;
 
-// static control::BRTEncoder *pitch_encoder = nullptr;
+static control::BRTEncoder *pitch_encoder = nullptr;
+
 //static distance::SEN_0366_DIST *distance_sensor = nullptr;
 
 
@@ -56,7 +59,6 @@ float calibrated_theta_esca = 0;
 
 
 
-float pitch_curr = 0;
 float pitch_target = 0;
 
 float curr_yaw = 0;
@@ -68,10 +70,12 @@ float vx_set,vy_set;
 
 int p_l_out;
 int p_r_out;
+int esca_out;
 
 control::servo_t pitch_servo_data;
 
-BoolEdgeDetector drive_sw(false);
+BoolEdgeDetector scope_sw(false);
+volatile bool scope_on = false;
 
 void jam_callback(control::ServoMotor* servo, const control::servo_jam_t data) {
   UNUSED(data);
@@ -89,14 +93,14 @@ void gimbal_task(void* args) {
   UNUSED(args);
   control::MotorCANBase* can1_escalation[] = {esca_motor};
   control::MotorCANBase* can1_pitch[] = {pitch_motor_L, pitch_motor_R};
-  UNUSED(can1_escalation);
-  UNUSED(can1_pitch);
   control::Motor4310* m4310_motors[] = {yaw_motor, vtx_pitch_motor, barrel_motor};
 
 //  while (!distance_sensor->begin()){
 ////    print("distance sensor initializing\r\n");
 //    osDelay(100);
 //  }
+  osDelay(5000);
+
   osDelay(5000);
 
   while (true) {
@@ -150,7 +154,6 @@ void gimbal_task(void* args) {
   float pitch_delta = vtx_pitch_motor->GetTheta() / 100.0;
   float barrel_curr = barrel_motor->GetTheta();
   float barrel_delta = barrel_motor->GetTheta() / 100.0;
-  
   // 4310 soft start
   for (int i = 0; i < 100; i++) {
     yaw_motor->SetOutput(yaw_curr, 1, 30, 0.5, 0);
@@ -166,34 +169,34 @@ void gimbal_task(void* args) {
     osDelay(10);
   }
 
-  float yaw_min = -1.3053;    
-  float yaw_max = 1.6151;
-  float pitch_min = -0.3327;
-  float pitch_max = 0.2514;
+  // float yaw_min = -1.3053;    
+  // float yaw_max = 1.6151;
+  // float pitch_min = -0.3327;
+  // float pitch_max = 0.2514;
 
-  float yaw_pos = 0.0, pitch_pos = 0.0, barrel_pos = 0.0;
-  while (true) {
-    print("gimbal task running\r\n");
-    float yaw_vel;
-    yaw_vel = clip<float>(dbus->ch2 / 660.0 * 15.0, -15, 15);
-    yaw_pos += yaw_vel / 3000.0;
-    yaw_pos = clip<float>(yaw_pos, yaw_min, yaw_max);
-    yaw_motor->SetOutput(yaw_pos, yaw_vel, 30, 0.5, 0);
+  // float yaw_pos = 0.0, pitch_pos = 0.0, barrel_pos = 0.0;
+  // while (true) {
+  //   print("gimbal task running\r\n");
+  //   float yaw_vel;
+  //   yaw_vel = clip<float>(dbus->ch2 / 660.0 * 15.0, -15, 15);
+  //   yaw_pos += yaw_vel / 3000.0;
+  //   yaw_pos = clip<float>(yaw_pos, yaw_min, yaw_max);
+  //   yaw_motor->SetOutput(yaw_pos, yaw_vel, 30, 0.5, 0);
 
-    float pitch_vel;
-    pitch_vel = clip<float>(dbus->ch3 / 660.0 * 15.0, -15, 15);
-    pitch_pos += pitch_vel / 3000.0;
-    pitch_pos = clip<float>(pitch_pos, pitch_min, pitch_max);
-    vtx_pitch_motor->SetOutput(pitch_pos, pitch_vel, 30, 0.5, 0);
+  //   float pitch_vel;
+  //   pitch_vel = clip<float>(dbus->ch3 / 660.0 * 15.0, -15, 15);
+  //   pitch_pos += pitch_vel / 3000.0;
+  //   pitch_pos = clip<float>(pitch_pos, pitch_min, pitch_max);
+  //   vtx_pitch_motor->SetOutput(pitch_pos, pitch_vel, 30, 0.5, 0);
 
-    rotate_barrel.input(dbus->swl == remote::UP);
-    if (rotate_barrel.posEdge()) barrel_pos += 2.0 * PI / 5.0;
-    barrel_motor->SetOutput(barrel_pos, 1);
+  //   rotate_barrel.input(dbus->swl == remote::UP);
+  //   if (rotate_barrel.posEdge()) barrel_pos += 2.0 * PI / 5.0;
+  //   barrel_motor->SetOutput(barrel_pos, 1);
     
-    control::Motor4310::TransmitOutput(m4310_motors, 3);
+  //   control::Motor4310::TransmitOutput(m4310_motors, 3);
 
-    osDelay(GIMBAL_TASK_DELAY);
-  }
+  //   osDelay(GIMBAL_TASK_DELAY);
+  // }
 
 
   // yaw_motor->SetOutput(0, 1, 15, 0.5, 0);
@@ -205,22 +208,23 @@ void gimbal_task(void* args) {
   /*
    * escalation reset
    */
-//  while (true){
-//    escalation_servo->SetTarget(escalation_servo->GetTheta() - PI * 2,true);
-//    escalation_servo->CalcOutput();
-//    control::MotorCANBase::TransmitOutput(can1_escalation, 1);
-//    osDelay(GIMBAL_TASK_DELAY);
-//    if (escalation_servo->ZeroingExit()){
-////      print("Escalation motor jammed, resting...\r\n");
-//      osDelay(50);
-//      calibrated_theta_esca = escalation_servo->GetTheta();
-//      escalation_servo->SetTarget(calibrated_theta_esca, true);
-//      // update jam callback threshold
-//      escalation_servo->RegisterJamCallback(empty_callback, 0.205);
-//      osDelay(50);
-//      break;
-//    }
-//  }
+#ifdef calibrate
+  while (true){
+    escalation_servo->SetTarget(escalation_servo->GetTheta() - PI * 2000,true);
+    escalation_servo->CalcOutput(&esca_out);
+    control::MotorCANBase::TransmitOutput(can1_escalation, 1);
+    osDelay(GIMBAL_TASK_DELAY);
+    if (escalation_servo->ZeroingExit()){
+//      print("Escalation motor jammed, resting...\r\n");
+      osDelay(50);
+      calibrated_theta_esca = escalation_servo->GetTheta();
+      escalation_servo->SetTarget(calibrated_theta_esca, true);
+      // update jam callback threshold
+
+      osDelay(50);
+      break;
+    }
+  }
 
 
 
@@ -232,29 +236,23 @@ void gimbal_task(void* args) {
    * pitch motors reset
    */
 
-/*
-  osDelay(1000);
-  bool servo_boot_up = true;
   int count = 0;
   int prev_angle_l = 0;
   int prev_angle_r = 0;
   while (true) {
 
     while (pitch_motor_R->connection_flag_ == false || pitch_motor_L->connection_flag_ == false){
-      print("pitch motor not connected, waiting...\r\n");
+      print("pitch motor not connected, status: pitch_l: %d, pitch_r: %d\r\n", pitch_motor_L->connection_flag_, pitch_motor_R->connection_flag_);
       osDelay(100);
     }
-    pitch_servo_L->SetTarget(pitch_servo_L->GetTheta() - PI * 2000);
+    pitch_servo_L->SetTarget(pitch_servo_L->GetTheta() - PI * 2000, true);
+    pitch_servo_R->SetTarget(pitch_servo_R->GetTheta() - PI * 2000, true);
     pitch_servo_L->CalcOutput(&p_l_out);
-    pitch_servo_R->SetTarget(pitch_servo_R->GetTheta() - PI * 2000);
     pitch_servo_R->CalcOutput(&p_r_out);
-    if (servo_boot_up){
-      osDelay(3000);
-      servo_boot_up = false;
-    }
+
 //    print("angles: %f, %f\r\n", pitch_servo_L->GetTheta(), pitch_servo_R->GetTheta());
     if (abs(int (pitch_servo_L->GetTheta())) == abs(prev_angle_l) && abs(int (pitch_servo_R->GetTheta())) ==
-    abs(prev_angle_r)){
+                                                                     abs(prev_angle_r)){
       count++;
     } else {
       count = 0;
@@ -262,25 +260,29 @@ void gimbal_task(void* args) {
 
     prev_angle_l = int (pitch_servo_L->GetTheta());
     prev_angle_r = int (pitch_servo_R->GetTheta());
-    if (count > 130){
+    if (count > 100 || dbus->swr == remote::MID){
+      pitch_motor_L->SetOutput(0);
+      pitch_motor_R->SetOutput(0);
+      control::MotorCANBase::TransmitOutput(can1_pitch, 2);
+      print("pitch motors reset\r\n");
       break;
     }
     control::MotorCANBase::TransmitOutput(can1_pitch, 2);
-//    if (pitch_servo_L->ZeroingExit() && pitch_servo_R->ZeroingExit()) {
-//      osDelay(50);
-//      break;
-//    }
     osDelay(GIMBAL_TASK_DELAY);
     print("count: %d\r\n",count);
   }
+#endif
 
-  print("pitch motors reset\r\n");
+
+  escalation_servo->RegisterJamCallback(empty_callback, 0.205);
   pitch_servo_L->SetMaxCurrent(pitch_servo_data, 2000);
   pitch_servo_R->SetMaxCurrent(pitch_servo_data, 2000);
 
-  pitch_motor_L->SetOutput(0);
-  pitch_motor_R->SetOutput(0);
-  control::MotorCANBase::TransmitOutput(can1_pitch, 2);
+  pitch_servo_L->SetMaxSpeed(7*PI);
+  pitch_servo_R->SetMaxSpeed(7*PI);
+
+
+
 
 //  float pitch_L_val = pitch_servo_L->GetTheta();
 //  float pitch_R_val = pitch_servo_R->GetTheta();
@@ -297,12 +299,36 @@ void gimbal_task(void* args) {
 
   yaw_cmd = 0.0;
 
-  bool drive_flag = false;
+//  bool drive_flag = false;
+
+  float yaw_min = -1.3053;
+  float yaw_max = 1.6151;
+  float pitch_min = -0.3327;
+  float pitch_max = 0.2514;
+
+  float yaw_pos = 0.0, pitch_pos = 0.0, barrel_pos = 0.0;
+
   while (true) {
+    float yaw_vel;
+    yaw_vel = clip<float>(dbus->ch2 / 660.0 * 15.0, -15, 15);
+    yaw_pos += yaw_vel / 3000.0;
+    yaw_pos = clip<float>(yaw_pos, yaw_min, yaw_max);
+    yaw_motor->SetOutput(yaw_pos, yaw_vel, 30, 0.5, 0);
+
+    float pitch_vel;
+    pitch_vel = clip<float>(dbus->ch3 / 660.0 * 15.0, -15, 15);
+    pitch_pos += pitch_vel / 3000.0;
+    pitch_pos = clip<float>(pitch_pos, pitch_min, pitch_max);
+    vtx_pitch_motor->SetOutput(pitch_pos, pitch_vel, 30, 0.5, 0);
+
+    rotate_barrel.input(dbus->swl == remote::UP);
+    if (rotate_barrel.posEdge()) barrel_pos += 2.0 * PI / 5.0;
+    barrel_motor->SetOutput(barrel_pos, 10);
+
     // Bool Edge Detector for lob mode switch or osEventFlags wait for a signal from different threads
-    print("main loop\r\n");
-    lob_mode_sw.input(dbus->keyboard.bit.SHIFT || dbus->swl == remote::UP);
-    if (lob_mode_sw.posEdge() && dbus->swr == remote::MID){
+
+    lob_mode_sw.input(dbus->keyboard.bit.SHIFT /* || dbus->swl == remote::UP  */|| !key->Read());
+    if (lob_mode_sw.posEdge() /*&& dbus->swr == remote::MID*/){
       lob_mode = !lob_mode;
       // TODO: after implementing chassis, uncomment the lob_mode bsp::CanBridge flag transmission
 //      send->cmd.id = bsp::LOB_MODE;
@@ -315,10 +341,12 @@ void gimbal_task(void* args) {
       // please make sure the calibration is all done
       // lob mode
       escalation_servo->SetTarget(calibrated_theta_esca + PI * 12.1);
+      print("lob\r\n");
       // maximum goes to 38.345 radians
     } else {
       // moving mode
       // set escalation servo to original position
+      print("regular\r\n");
       escalation_servo->SetTarget(calibrated_theta_esca);
     }
 
@@ -359,45 +387,51 @@ void gimbal_task(void* args) {
 //    send->TransmitOutput();
 
     pitch_cmd = dbus->ch3 / 500.0;
-    yaw_cmd = clip<float>(dbus->ch2 / 220.0 * 30.0, -30, 30);
 
-//    distance_sensor->readValue();
-
-//    pitch_servo_L->SetTarget(pitch_servo_L->GetTheta() + pitch_cmd);
-//    pitch_servo_L->CalcOutput();
-//    pitch_servo_R->SetTarget(pitch_servo_R->GetTheta() + pitch_cmd);
-//    pitch_servo_R->CalcOutput();
-
-    drive_sw.input(!key->Read());
-    if (drive_sw.posEdge()){
-      drive_flag = !drive_flag;
+    scope_sw.input(dbus->keyboard.bit.C);
+    if (scope_sw.posEdge()){
+      scope_on = !scope_on;
     }
-    if (drive_flag){
-      pitch_servo_L->SetTarget(pitch_servo_L->GetTheta() + 2000 * PI);
-      pitch_servo_L->CalcOutput();
-      pitch_servo_R->SetTarget(pitch_servo_R->GetTheta() + 2000 * PI);
-      pitch_servo_R->CalcOutput();
-      print("driving\r\n");
+    if (scope_on){
+      scope_motor->SetOutput(1500);
     } else {
-//      pitch_servo_L->SetTarget(pitch_servo_L->GetTheta());
-//      pitch_servo_L->CalcOutput();
-//      pitch_servo_R->SetTarget(pitch_servo_R->GetTheta());
-//      pitch_servo_R->CalcOutput();
-      pitch_motor_L->SetOutput(0);
-      pitch_motor_R->SetOutput(0);
-      print("disabled\r\n");
+      scope_motor->SetOutput(3);
     }
+    if (!forward_key->Read()){
+      pitch_servo_L->SetTarget(pitch_servo_L->GetTheta() + PI * 100, true);
+      pitch_servo_R->SetTarget(pitch_servo_R->GetTheta() + PI * 100, true);
+      osDelay(GIMBAL_TASK_DELAY);
+      pitch_servo_L->CalcOutput(&p_l_out);
+      pitch_servo_R->CalcOutput(&p_r_out);
+    } else if (!backward_key->Read()) {
+      pitch_servo_L->SetTarget(pitch_servo_L->GetTheta() - PI * 100,true);
+      pitch_servo_R->SetTarget(pitch_servo_R->GetTheta() - PI * 100,true);
+      osDelay(GIMBAL_TASK_DELAY);
+      pitch_servo_L->CalcOutput(&p_l_out);
+      pitch_servo_R->CalcOutput(&p_r_out);
+    }  else {
+      p_l_out = 0;
+      p_r_out = 0;
 
-    escalation_servo->CalcOutput();
+    }
+//    print("pitch_L: %f, pitch_R: %f\r\n", pitch_servo_L->GetTheta(), pitch_servo_R->GetTheta());
+    // TODO: considering change pitch motors to velocity loop
+
+    escalation_servo->CalcOutput(&esca_out);
     yaw_motor->SetOutput(yaw_cmd);
 
+    pitch_motor_L->SetOutput(p_l_out);
+    pitch_motor_R->SetOutput(p_r_out);
+
     pitch_curr = pitch_encoder->getData();
+
     control::MotorCANBase::TransmitOutput(can1_escalation, 1);
     control::MotorCANBase::TransmitOutput(can1_pitch, 2);
-    control::Motor4310::TransmitOutput(can1_yaw, 1);
+    control::Motor4310::TransmitOutput(m4310_motors, 3);
+
     osDelay(GIMBAL_TASK_DELAY);
+
   }
-  */
 }
 
 void init_gimbal() {
@@ -409,12 +443,12 @@ void init_gimbal() {
   esca_servo_data.max_speed = 2 * PI; // TODO: params need test
   esca_servo_data.max_acceleration = 100 * PI;
   esca_servo_data.transmission_ratio = M3508P19_RATIO;
-  esca_servo_data.omega_pid_param = new float [3] {450, 3.6, 20};
+  esca_servo_data.omega_pid_param = new float [3] {150, 1.2, 5};
 //  esca_servo_data.omega_pid_param = new float [3] {150, 1.2, 5};
   esca_servo_data.max_iout = 2000;
   esca_servo_data.max_out = 10000;
   escalation_servo = new control::ServoMotor(esca_servo_data);
-  escalation_servo->RegisterJamCallback(jam_callback, 0.205);
+  escalation_servo->RegisterJamCallback(jam_callback, 0.105);
 
   pitch_motor_L = new control::Motor2006(can1, 0x206);
 
@@ -422,18 +456,20 @@ void init_gimbal() {
   pitch_servo_data.max_speed = PI * 4 ;    // TODO: params need test
   pitch_servo_data.max_acceleration = PI * 100;
   pitch_servo_data.transmission_ratio = M2006P36_RATIO;
-  pitch_servo_data.omega_pid_param = new float [3] {150, 2.75, 0};
+  pitch_servo_data.omega_pid_param = new float [3] {450, 3.6, 0};
   pitch_servo_data.max_iout = 500;
   pitch_servo_data.max_out = 10000;
   pitch_servo_L = new control::ServoMotor(pitch_servo_data);
-  pitch_servo_L->RegisterJamCallback(empty_callback,0.305);
   pitch_motor_R = new control::Motor2006(can1,0x207);
+  // DO NOT USE RX_ID: 0x205!!!!!!!!!
   pitch_servo_data.motor = pitch_motor_R;
   pitch_servo_R = new control::ServoMotor(pitch_servo_data);
-  pitch_servo_R->RegisterJamCallback(empty_callback,0.305);
 
-  // pitch_encoder = new control::BRTEncoder(can1,0x01,false);
- 
+  scope_motor = new control::MotorPWMBase(&htim1, TIM_CHANNEL_1, 1000000, 50, 1500);
+
+  barrel_motor = new control::Motor4310(can1, 0x02, 0x03, control::POS_VEL);
+  yaw_motor = new control::Motor4310(can1, 0x04, 0x05, control::MIT);
+  vtx_pitch_motor = new control::Motor4310(can1, 0x06, 0x07, control::MIT);
 
   barrel_motor = new control::Motor4310(can1, 0x02, 0x03, control::POS_VEL);
   yaw_motor = new control::Motor4310(can1, 0x04, 0x05, control::MIT);

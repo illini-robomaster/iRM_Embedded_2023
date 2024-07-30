@@ -38,9 +38,12 @@ static control::ServoMotor* force_servo = nullptr;
 
 static BoolEdgeDetector key_sw = BoolEdgeDetector(false);
 
-static BoolEdgeDetector slow_trig(false);
+static BoolEdgeDetector slow_trigger(false);
+static BoolEdgeDetector cool_trigger(false);
 
-bool shoot_flag = true;
+int s_f_out;
+int s_b_out;
+
 
 //static int FORCE_VALUE = 0;
 using Note = bsp::BuzzerNote;
@@ -61,10 +64,9 @@ void shooter_task(void* args) {
 //  control::Motor4310* can1_shooter_load[] = {load_motor};
 
   // PID controller initialization
-  float shoot_back_pid_params[3] = {400, 1.75,60};
-  control::ConstrainedPID shoot_back_pid(shoot_back_pid_params, 10000,15000);
+  float shoot_pid_param[3] = {150, 1.2, 0};
+  control::ConstrainedPID shoot_pid(shoot_pid_param, 10000, 15000);
   float shoot_back_speed_diff = 0;
-  int16_t shoot_back_out = 0;
 
   while (true) {
     if (dbus->keyboard.bit.B || dbus->swr == remote::DOWN) break;
@@ -76,22 +78,40 @@ void shooter_task(void* args) {
 
 
   while (true) {
+
+    cool_trigger.input(send->cooling_heat1 >= send->cooling_limit1);
+
     if ((dbus->swr == remote::UP || dbus->mouse.l)) {
       // TODO: Heat control need to be added in the if statement above
       shoot_back_speed_diff = shoot_back_motor->GetOmegaDelta(shoot_speeds[level] - (level+1) * 10);
-      shoot_back_out = shoot_back_pid.ComputeConstrainedOutput(shoot_back_speed_diff);
-      shoot_front_motor->SetOutput(shoot_back_out * 0.98);
-      shoot_back_motor->SetOutput(shoot_back_out);
-    } else {
-      shoot_front_motor->SetOutput(0);
-      shoot_back_motor->SetOutput(0);
+      s_b_out = shoot_pid.ComputeConstrainedOutput(shoot_back_speed_diff);
+      s_f_out = s_b_out * 0.98;
+      shoot_front_motor->SetOutput(s_f_out);
+      shoot_back_motor->SetOutput(s_b_out);
+      slow_trigger.input(true);
+    } else if (slow_trigger.posEdge()){
+      print("slow down triggered\r\n");
+      s_f_out = 0;
+      s_b_out = 0;
+      shoot_front_motor->SetOutput(s_f_out);
+      shoot_back_motor->SetOutput(s_b_out);
       control::MotorCANBase::TransmitOutput(can1_shooter_shoot, 2);
+      osDelay(1000);
+    } else if (dbus->swr==remote::DOWN) {
+      s_f_out = 0;
+      s_b_out = 0;
+      shoot_front_motor->SetOutput(s_f_out);
+      shoot_back_motor->SetOutput(s_b_out);
+      control::MotorCANBase::TransmitOutput(can1_shooter_shoot, 2);
+    }
+    else {
       osDelay(SHOOTER_TASK_DELAY);
-
       shoot_back_speed_diff = shoot_back_motor->GetOmegaDelta(0);
-      shoot_back_out = shoot_back_pid.ComputeConstrainedOutput(shoot_back_speed_diff);
-      shoot_front_motor->SetOutput(shoot_back_out * 0.98);
-      shoot_back_motor->SetOutput(shoot_back_out);
+      s_b_out = shoot_pid.ComputeConstrainedOutput(shoot_back_speed_diff);
+      s_b_out = shoot_pid.ComputeConstrainedOutput(shoot_back_speed_diff);
+      s_f_out = s_b_out * 0.98;
+      shoot_front_motor->SetOutput(s_f_out);
+      shoot_back_motor->SetOutput(s_b_out);
     }
     key_sw.input(dbus->swl == remote::DOWN);
     if(key_sw.posEdge()){

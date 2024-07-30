@@ -24,9 +24,11 @@ void refereeTask(void* arg) {
   uint32_t length;
   uint8_t* data;
 
+  print("refereeTask: Starting referee task\r\n");
   while (true) {
     uint32_t flags = osThreadFlagsWait(REFEREE_RX_SIGNAL, osFlagsWaitAll, osWaitForever);
     if (flags & REFEREE_RX_SIGNAL) {
+      // print("refereeTask: Received data from referee\r\n");
       length = referee_uart->Read(&data);
       referee->Receive(communication::package_t{data, (int)length});
     }
