@@ -41,13 +41,16 @@ static control::MotorCANBase* pitch_motor_R = nullptr;
 static control::ServoMotor* pitch_servo_L = nullptr;
 static control::ServoMotor* pitch_servo_R = nullptr;
 
-static control::Motor4310* yaw_motor = nullptr;
 
-static control::BRTEncoder *pitch_encoder = nullptr;
+static control::Motor4310* yaw_motor = nullptr;
+static control::Motor4310* vtx_pitch_motor = nullptr;
+static control::Motor4310* barrel_motor = nullptr;
+
+// static control::BRTEncoder *pitch_encoder = nullptr;
 //static distance::SEN_0366_DIST *distance_sensor = nullptr;
 
 
-
+static BoolEdgeDetector rotate_barrel(false);
 
 float calibrated_theta_esca = 0;
 
@@ -86,12 +89,15 @@ void gimbal_task(void* args) {
   UNUSED(args);
   control::MotorCANBase* can1_escalation[] = {esca_motor};
   control::MotorCANBase* can1_pitch[] = {pitch_motor_L, pitch_motor_R};
-  control::Motor4310* can1_yaw[] = {yaw_motor};
+  UNUSED(can1_escalation);
+  UNUSED(can1_pitch);
+  control::Motor4310* m4310_motors[] = {yaw_motor, vtx_pitch_motor, barrel_motor};
 
 //  while (!distance_sensor->begin()){
 ////    print("distance sensor initializing\r\n");
 //    osDelay(100);
 //  }
+  osDelay(5000);
 
   while (true) {
     if (dbus->keyboard.bit.B || dbus->swr == remote::DOWN || !key->Read()) break;
@@ -101,8 +107,100 @@ void gimbal_task(void* args) {
   }
 
 //  distance_sensor->continuousMeasure();
-  yaw_motor->SetZeroPos();
+  // yaw_motor->SetZeroPos();
+  // osDelay(100);
+  // vtx_pitch_motor->SetZeroPos();
+  // osDelay(100);
+  // barrel_motor->SetZeroPos();
+  // osDelay(100);
+
   yaw_motor->MotorEnable();
+  print("yaw motor enabled\r\n");
+  // osDelay(5000);
+  vtx_pitch_motor->MotorEnable();
+  print("vtx pitch motor enabled\r\n");
+  // osDelay(5000);
+  barrel_motor->MotorEnable();
+  print("barrel motor enabled\r\n");
+  // osDelay(5000);
+
+  // while (yaw_motor->GetTheta() == 0.0 || 
+  //         vtx_pitch_motor->GetTheta() == 0.0 || 
+  //         barrel_motor->GetTheta() == 0.0) {
+  //   print("Waiting for 4310 motors to initialize...\r\n");
+  // }
+
+  while (yaw_motor->GetOmega() == 0.0) {
+    print("Waiting for yaw_motor to initialize...\r\n");
+  }
+
+  while (vtx_pitch_motor->GetOmega() == 0.0) {
+    print("Waiting for vtx_pitch_motor to initialize...\r\n");
+  }
+
+  while (barrel_motor->GetOmega() == 0.0) {
+    print("Waiting for barrel_motor to initialize...\r\n");
+  }
+
+  print("4310 motors initalized\r\n" );
+
+  float yaw_curr = yaw_motor->GetTheta();
+  float yaw_delta = yaw_motor->GetTheta() / 100.0;
+  float pitch_curr = vtx_pitch_motor->GetTheta();
+  float pitch_delta = vtx_pitch_motor->GetTheta() / 100.0;
+  float barrel_curr = barrel_motor->GetTheta();
+  float barrel_delta = barrel_motor->GetTheta() / 100.0;
+  
+  // 4310 soft start
+  for (int i = 0; i < 100; i++) {
+    yaw_motor->SetOutput(yaw_curr, 1, 30, 0.5, 0);
+    vtx_pitch_motor->SetOutput(pitch_curr, 1, 30, 0.5, 0);
+    barrel_motor->SetOutput(barrel_curr, 1, 30, 0.5, 0);
+
+    control::Motor4310::TransmitOutput(m4310_motors, 3);
+
+    yaw_curr -= yaw_delta;
+    pitch_curr -= pitch_delta;
+    barrel_curr -= barrel_delta;
+    
+    osDelay(10);
+  }
+
+  float yaw_min = -1.3053;    
+  float yaw_max = 1.6151;
+  float pitch_min = -0.3327;
+  float pitch_max = 0.2514;
+
+  float yaw_pos = 0.0, pitch_pos = 0.0, barrel_pos = 0.0;
+  while (true) {
+    print("gimbal task running\r\n");
+    float yaw_vel;
+    yaw_vel = clip<float>(dbus->ch2 / 660.0 * 15.0, -15, 15);
+    yaw_pos += yaw_vel / 3000.0;
+    yaw_pos = clip<float>(yaw_pos, yaw_min, yaw_max);
+    yaw_motor->SetOutput(yaw_pos, yaw_vel, 30, 0.5, 0);
+
+    float pitch_vel;
+    pitch_vel = clip<float>(dbus->ch3 / 660.0 * 15.0, -15, 15);
+    pitch_pos += pitch_vel / 3000.0;
+    pitch_pos = clip<float>(pitch_pos, pitch_min, pitch_max);
+    vtx_pitch_motor->SetOutput(pitch_pos, pitch_vel, 30, 0.5, 0);
+
+    rotate_barrel.input(dbus->swl == remote::UP);
+    if (rotate_barrel.posEdge()) barrel_pos += 2.0 * PI / 5.0;
+    barrel_motor->SetOutput(barrel_pos, 1);
+    
+    control::Motor4310::TransmitOutput(m4310_motors, 3);
+
+    osDelay(GIMBAL_TASK_DELAY);
+  }
+
+
+  // yaw_motor->SetOutput(0, 1, 15, 0.5, 0);
+  // vtx_pitch_motor->SetOutput(0, 1, 15, 0.5, 0);
+  // barrel_motor->SetOutput(0, 1, 15, 0.5, 0);
+
+  // control::Motor4310::TransmitOutput(m4310_motors, 3);
 
   /*
    * escalation reset
@@ -134,7 +232,7 @@ void gimbal_task(void* args) {
    * pitch motors reset
    */
 
-
+/*
   osDelay(1000);
   bool servo_boot_up = true;
   int count = 0;
@@ -299,9 +397,11 @@ void gimbal_task(void* args) {
     control::Motor4310::TransmitOutput(can1_yaw, 1);
     osDelay(GIMBAL_TASK_DELAY);
   }
+  */
 }
 
 void init_gimbal() {
+  
   esca_motor = new control::Motor3508(can1, 0x204);
   // ESCALATION motors initialization
   control::servo_t esca_servo_data;
@@ -316,7 +416,7 @@ void init_gimbal() {
   escalation_servo = new control::ServoMotor(esca_servo_data);
   escalation_servo->RegisterJamCallback(jam_callback, 0.205);
 
-  pitch_motor_L = new control::Motor2006(can1, 0x205);
+  pitch_motor_L = new control::Motor2006(can1, 0x206);
 
   pitch_servo_data.motor = pitch_motor_L;
   pitch_servo_data.max_speed = PI * 4 ;    // TODO: params need test
@@ -327,14 +427,17 @@ void init_gimbal() {
   pitch_servo_data.max_out = 10000;
   pitch_servo_L = new control::ServoMotor(pitch_servo_data);
   pitch_servo_L->RegisterJamCallback(empty_callback,0.305);
-  pitch_motor_R = new control::Motor2006(can1,0x206);
+  pitch_motor_R = new control::Motor2006(can1,0x207);
   pitch_servo_data.motor = pitch_motor_R;
   pitch_servo_R = new control::ServoMotor(pitch_servo_data);
   pitch_servo_R->RegisterJamCallback(empty_callback,0.305);
 
-  yaw_motor = new control::Motor4310(can1, 0x04, 0x05, control::VEL);
+  // pitch_encoder = new control::BRTEncoder(can1,0x01,false);
+ 
 
-  pitch_encoder = new control::BRTEncoder(can1,0x01,false);
+  barrel_motor = new control::Motor4310(can1, 0x02, 0x03, control::POS_VEL);
+  yaw_motor = new control::Motor4310(can1, 0x04, 0x05, control::MIT);
+  vtx_pitch_motor = new control::Motor4310(can1, 0x06, 0x07, control::MIT);
 
   // distance sensor initialization, remove if not connected, will stop the initialization process
 //  distance_sensor = distance::SEN_0366_DIST::init(&huart1,0x80);
@@ -343,12 +446,13 @@ void init_gimbal() {
 
 void kill_gimbal() {
   RM_EXPECT_TRUE(false, "Operation Killed!\r\n");
-  control::MotorCANBase* can1_escalation[] = {esca_motor};
+  /*control::MotorCANBase* can1_escalation[] = {esca_motor};
   while (true){
     esca_motor->SetOutput(0);
 
     control::MotorCANBase::TransmitOutput(can1_escalation, 1);
     osDelay(KILLALL_DELAY);
-  }
+  }*/
+
 }
 
