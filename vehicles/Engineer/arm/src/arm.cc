@@ -47,6 +47,7 @@
 static control::BRTEncoder* encoder0= nullptr;
 static control::BRTEncoder* encoder1= nullptr;
 static bsp::Relay* pump = nullptr;
+static bsp::GPIO* power_5v = nullptr;
 
 
 // Motor 4310
@@ -119,6 +120,9 @@ void init_arm_A1() {
   encoder1 = new control::BRTEncoder(can1,0x01, false);
   encoder0 = new control::BRTEncoder(can1,0x0A, true);
   pump = new bsp::Relay(GPIOC,GPIO_PIN_6);
+  power_5v = new bsp::GPIO(GPIOC, GPIO_PIN_14);
+  power_5v->High();
+
 
   // motor 4310
   forearm_rotate_motor_4 = new control::Motor4310(can1, 0x08, 0x07, control::MIT);
