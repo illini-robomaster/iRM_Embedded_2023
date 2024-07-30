@@ -23,12 +23,19 @@
 
 namespace control {
 
+
 typedef struct {
-  float energy;
+  uint16_t max_power; // unit in 0.01W
+  uint16_t chassis_power; // unit in 0.01W
+  uint16_t energy_percentage;
+  uint16_t cap_state;
 } __packed cap_recv_message_t;
 
 typedef struct {
-    float referee_power_limit;
+    uint16_t referee_power_limit; // unit in W
+    uint16_t referee_power; // unit in 0.01W
+    const uint16_t CODE_1 = 0x2012;
+    const uint16_t CODE_2 = 0x0712;
 } __packed cap_send_message_t;
 
 class HRB_SuperCap {

@@ -45,6 +45,9 @@ static control::HRB_SuperCap *supercap = nullptr;
 
 int16_t loop_count = 0;
 
+static control::cap_send_message_t cap_send_data;
+static control::cap_recv_message_t cap_recv_data;
+
 void chassisTask(void* arg){
     UNUSED(arg);
     
@@ -63,6 +66,7 @@ void chassisTask(void* arg){
 
     int loop_cnt = 0;
     int last = HAL_GetTick();
+    int last_cap_send = HAL_GetTick();
 
 
     // print("starting loop\n");
@@ -157,48 +161,33 @@ void chassisTask(void* arg){
                        50,
                        50);
 
-        // print("chassis_task loop entered 2\r\n");
-
-
-        // chassis->PrintData();
-        // osDelay(100);
 
         control::MotorCANBase::TransmitOutput(steer_motors_1, 2);
         control::MotorCANBase::TransmitOutput(steer_motors_2, 2);
 
         control::MotorCANBase::TransmitOutput(wheel_motors_1, 2);
         control::MotorCANBase::TransmitOutput(wheel_motors_2, 2);
-        // control::MotorCANBase::TransmitOutput(wheel_motors, 4);
-        // control::MotorCANBase::TransmitOutput(steer_motors, 4);
-        // control::MotorCANBase::TransmitOutput(&motor1, 1);
-        // print("motor 1 output transmitted \r\n");
-        // osDelay(20);
-        // control::MotorCANBase::TransmitOutput(&motor2, 1);
-        // print("motor 2 output transmitted \r\n");
-        // osDelay(20);
-        // control::MotorCANBase::TransmitOutput(&motor3, 1);
-        // print("motor 3 output transmitted \r\n");
-        // osDelay(20);
-        // control::MotorCANBase::TransmitOutput(&motor4, 1);
-        // print("motor 4 output transmitted \r\n");
-        // osDelay(20);
-        // control::MotorCANBase::TransmitOutput(&motor6, 1);
-        // print("motor 5 output transmitted \r\n");
-        // osDelay(20);
-        // control::MotorCANBase::TransmitOutput(&motor5, 1);
-        // print("motor 6 output transmitted \r\n");
-        // osDelay(20);
-        // control::MotorCANBase::TransmitOutput(&motor7, 1);
-        // print("motor 7 output transmitted \r\n");
-        // osDelay(20);
-        // control::MotorCANBase::TransmitOutput(&motor8, 1);
-        // print("motor 8 output transmitted \r\n");
-        // osDelay(20); 
 
         UNUSED(steer_motors_1); 
         UNUSED(steer_motors_2);
         UNUSED(wheel_motors_1);
         UNUSED(wheel_motors_2);
+
+        if(HAL_GetTick() - last_cap_send > 10){ // 100Hz
+            last_cap_send = HAL_GetTick();
+            cap_send_data.referee_power_limit = referee->game_robot_status.chassis_power_limit;
+            cap_send_data.referee_power = (uint16_t)(referee->power_heat_data.chassis_power * 100);
+            supercap->SendData(cap_send_data);
+        }
+
+        cap_recv_data = supercap->info;
+        if(loop_cnt == 100){
+            loop_cnt = 0;
+            print("cap_recv_data.max_power: %f \r\n", cap_recv_data.max_power / 100.0);
+            print("cap_recv_data.chassis_power: %f \r\n", cap_recv_data.chassis_power / 100.0);
+            print("cap_recv_data.energy_percentage: %f \r\n", cap_recv_data.energy_percentage);
+            print("cap_recv_data.cap_state: %d \r\n", cap_recv_data.cap_state);
+        }
 
 
         osDelay(CHASSIS_TASK_DELAY);
