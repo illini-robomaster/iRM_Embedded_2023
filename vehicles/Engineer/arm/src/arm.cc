@@ -46,7 +46,7 @@
 // static bsp::CAN* can1 = nullptr;
 static control::BRTEncoder* encoder0= nullptr;
 static control::BRTEncoder* encoder1= nullptr;
-// static bsp::Relay* pump = nullptr;
+static bsp::Relay* pump = nullptr;
 
 
 // Motor 4310
@@ -118,7 +118,7 @@ void init_arm_A1() {
   bsp::SetHighresClockTimer(&htim5);
   encoder1 = new control::BRTEncoder(can1,0x01, false);
   encoder0 = new control::BRTEncoder(can1,0x0A, true);
-  // pump = new bsp::Relay(K2_GPIO_Port,K2_Pin);
+  pump = new bsp::Relay(GPIOC,GPIO_PIN_6);
 
   // motor 4310
   forearm_rotate_motor_4 = new control::Motor4310(can1, 0x08, 0x07, control::MIT);
@@ -482,6 +482,14 @@ void armTask(void* args) {
       base_rotate_offset = M_PI/2;
     }else{ // get ore
       base_rotate_offset = 0;    
+    }
+
+    if(sbus->ch[11] > 0){
+      pump->On();
+      print("pump on\r\n");
+    }else{
+      pump->Off();
+      print("pump off\r\n");
     }
 
     // value range from -1 to 1

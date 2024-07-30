@@ -86,7 +86,7 @@ void armTranslateTask(void* arg){
 #ifdef SINGLE_BOARD
 		base_translate_motor->TurnRelative(sbus->ch[12] / 660.0 /80);
 #else
-		base_translate_motor->TurnRelative(receive->ARM_TRANSLATE);
+		base_translate_motor->TurnRelative(receive->vx);
 #endif
 		base_translate_motor->CalcOutput();
 		control::MotorCANBase::TransmitOutput(&motor9, 1);
