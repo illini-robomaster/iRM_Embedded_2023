@@ -40,7 +40,7 @@ void RM_RTOS_Init() {
    *  VEL: velocity mode  */
 
   /* Make sure motor is set to the correct mode (in helper tool). Otherwise, motor won't start */
-  motor = new control::Motor4310(can, 0x02, 0x01, control::POS_VEL);
+  motor = new control::Motor4310(can, 0x02, 0x03, control::POS_VEL);
   dbus = new remote::DBUS(&huart3);
 }
 
