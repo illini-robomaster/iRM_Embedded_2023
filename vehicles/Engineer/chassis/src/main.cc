@@ -17,7 +17,7 @@
  *  along with this program. If not, see <http://www.gnu.org/licenses/>.    *
  *                                                                          *
  ****************************************************************************/
-#define REFEREE
+// #define REFEREE
 #define CHASSIS
 
 #include "main.h"
@@ -104,14 +104,14 @@ void ReviveAll(){
 void RM_RTOS_Default_Task(const void* args) {
     UNUSED(args);
     while(true){ //if want to print, make sure nothing is print somewhere else
-        if(sbus->ch[6]>100){
+        if(receive->dead){
             if(!engineerIsKilled){
                 print("killed\n");
             }
             engineerIsKilled = true;
             KillAll();
             osDelay(100);
-        }else if(engineerIsKilled && sbus->ch[6]<=100){ // killed to revive
+        }else if(engineerIsKilled && receive->dead<=100){ // killed to revive
             ReviveAll();
             engineerIsKilled = false;
         }

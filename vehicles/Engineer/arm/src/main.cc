@@ -17,7 +17,7 @@
  *  along with this program. If not, see <http://www.gnu.org/licenses/>.    *
  *                                                                          *
  ****************************************************************************/
-// #define REFEREE
+#define REFEREE
 #define ARM_A1
 
 #include "main.h"
@@ -79,7 +79,7 @@ void RM_RTOS_Init() {
     can2 = new bsp::CAN(&hcan2, false);
     send = new bsp::CanBridge(can1, 0x20A, 0x20B);
 #ifdef REFEREE
-   referee_uart = new RefereeUART(&huart6);
+   referee_uart = new RefereeUART(&huart5);
    referee = new communication::Referee();
 #endif
 
@@ -118,7 +118,7 @@ void ReviveAll(){
 void RM_RTOS_Default_Task(const void* args) {
     UNUSED(args);
     while(true){ //if want to print, make sure nothing is print somewhere else
-        if(sbus->ch[6]>100){
+        if(sbus->ch[11]>100){
             if(!engineerIsKilled){
                 print("killed\n");
             }
@@ -126,7 +126,7 @@ void RM_RTOS_Default_Task(const void* args) {
             KillAll();
             // print("killed");
             osDelay(10);
-        }else if(engineerIsKilled && sbus->ch[6]<=100){ // killed to revive
+        }else if(engineerIsKilled && sbus->ch[11]<=100){ // killed to revive
             ReviveAll();
             engineerIsKilled = false;
         }
