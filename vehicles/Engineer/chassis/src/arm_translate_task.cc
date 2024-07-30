@@ -9,7 +9,7 @@ static int last_motor_pos = 0;
 static bool killed = false;
 // static bsp::GPIO* out_5v_enable = nullptr;
 
-extern bsp::CanBridge* receive = nullptr;
+extern bsp::CanBridge* receive;
 
 bool base_translate_align_detect() {
 	if(!motor9->connection_flag_){ // if motor is not enabled, then it must not be aligned
@@ -59,9 +59,12 @@ void armTranslateTask(void* arg){
 		osDelay(2);
 	}
 	base_translate_motor->ReAlign();
-	base_translate_motor->TurnRelative(0);
 	base_translate_motor->SetMaxSpeed(BASE_TRANSLATE_RUN_SPEED);
+
+	base_translate_motor->TurnAbsolute(1);
+	base_translate_motor->CalcOutput();
 	control::MotorCANBase::TransmitOutput(&motor9, 1);
+	osDelay(500); // wait to 
 	print("Calib Done\r\n");	
 
 	// Start normal operation
@@ -77,7 +80,7 @@ void armTranslateTask(void* arg){
 		// base_translate_motor->PrintData();
 
 			// motor9->PrintData();
-			base_translate_motor->PrintData();
+			// base_translate_motor->PrintData();
 
 			loop_cnt = 0;
 			// print("sbus ch4: %f \r\n", sbus->ch[3]/660.0/50);
@@ -86,7 +89,9 @@ void armTranslateTask(void* arg){
 #ifdef SINGLE_BOARD
 		base_translate_motor->TurnRelative(sbus->ch[12] / 660.0 /80);
 #else
-		base_translate_motor->TurnRelative(receive->arm_translate/80);
+		// base_translate_motor->TurnRelative(receive->arm_translate/80);
+		base_translate_motor->TurnRelative(0);
+
 #endif
 		base_translate_motor->CalcOutput();
 		control::MotorCANBase::TransmitOutput(&motor9, 1);

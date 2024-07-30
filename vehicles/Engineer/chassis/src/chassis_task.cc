@@ -68,9 +68,10 @@ void chassisTask(void* arg){
     int loop_cnt = 0;
     int last = HAL_GetTick();
     int last_cap_send = HAL_GetTick();
+    UNUSED(last_cap_send);
 
+    // print("Entering chassis loop\n");
 
-    // print("starting loop\n");
     while (true) {
         if(killed){ // if killed do nothing
             osDelay(100);
@@ -124,21 +125,19 @@ void chassisTask(void* arg){
         // TODO: Rotational acceleration constraints (which needs to deal with each module's angle)
         prev_target_vel = target_vel;
 
-        // if(loop_cnt == 100){
-        //     loop_cnt = 0;
-        //     set_cursor(0, 0);
-        //     clear_screen();
-        //     print("joy_x: %f, joy_y: %f \r\n", joystick_vector.getX(), joystick_vector.getY());
-        //     print("vx: %f, vy: %f, wz: %f \r\n", target_vel.getX(), target_vel.getY(), wz);
-        //     print("DELTA T: %d \r\n", HAL_GetTick() - last);
-        // }
+        if(loop_cnt == 100){
+            loop_cnt = 0;
+            set_cursor(0, 0);
+            clear_screen();
+            print("joy_x: %f, joy_y: %f \r\n", joystick_vector.getX(), joystick_vector.getY());
+            // print("vx: %f, vy: %f, wz: %f \r\n", target_vel.getX(), target_vel.getY(), wz);
+            print("DELTA T: %d \r\n", HAL_GetTick() - last);
+        }
+
         last = HAL_GetTick();
         loop_cnt++;
         UNUSED(loop_cnt);
         UNUSED(last);
-
-
-
         // calculate camera oriented velocity vector
         Vector2d target_vel_cam = target_vel.rotateBy(Angle2d(relative_angle)); // now relative_angle is 0
 
@@ -182,12 +181,12 @@ void chassisTask(void* arg){
         UNUSED(wheel_motors_1);
         UNUSED(wheel_motors_2);
 
-        if(HAL_GetTick() - last_cap_send > 10){ // 100Hz
-            last_cap_send = HAL_GetTick();
-            cap_send_data.referee_power_limit = receive->chassis_power_limit;
-            cap_send_data.referee_power = (uint16_t)(receive->chassis_power * 100);
-            supercap->SendData(cap_send_data);
-        }
+        // if(HAL_GetTick() - last_cap_send > 10){ // 100Hz
+        //     last_cap_send = HAL_GetTick();
+        //     cap_send_data.referee_power_limit = receive->chassis_power_limit;
+        //     cap_send_data.referee_power = (uint16_t)(receive->chassis_power * 100);
+        //     supercap->SendData(cap_send_data);
+        // }
 
         cap_recv_data = supercap->info;
         // if(loop_cnt == 1000){

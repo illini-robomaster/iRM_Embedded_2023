@@ -64,7 +64,7 @@ void RM_RTOS_Init() {
     sbus = new remote::SBUS(&huart3);
     can1 = new bsp::CAN(&hcan1, true);
     can2 = new bsp::CAN(&hcan2, false);
-    receive = new bsp::CanBridge(can1, 0x20B, 0x20A);
+    receive = new bsp::CanBridge(can2, 0x20B, 0x20A);
     
 #ifdef REFEREE
    referee_uart = new RefereeUART(&huart6);
@@ -111,7 +111,7 @@ void RM_RTOS_Default_Task(const void* args) {
             engineerIsKilled = true;
             KillAll();
             osDelay(100);
-        }else if(engineerIsKilled && receive->dead){ // killed to revive
+        }else if(engineerIsKilled && !receive->dead){ // killed to revive
             ReviveAll();
             engineerIsKilled = false;
         }
