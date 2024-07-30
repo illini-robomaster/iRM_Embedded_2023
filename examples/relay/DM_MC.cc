@@ -18,19 +18,28 @@
  *                                                                          *
  ****************************************************************************/
 
-#include "bsp_can_bridge.h"
-#include "bsp_print.h"
-#include "cmsis_os.h"
+
 #include "main.h"
 
-static bsp::CAN* can = nullptr;
-static bsp::CanBridge* receive = nullptr;
+#include "bsp_print.h"
+#include "bsp_gpio.h"
+#include "bsp_relay.h"
+#include "cmsis_os.h"
+
+static bsp::Relay* relay;
 
 void RM_RTOS_Init(void) {
-  print_use_uart(&huart1);
-  can = new bsp::CAN(&hcan2, false);
-  // can = new bsp::CAN(&hcan1, true);
-  receive = new bsp::CanBridge(can, 0x20B, 0x20A);
+  print_use_uart(&huart4);
+  GPIO_InitTypeDef GPIO_InitStruct;
+  GPIO_InitStruct.Pin = GPIO_PIN_6;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_DeInit(GPIOC,GPIO_PIN_6);
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+  relay = new bsp::Relay(GPIOC, GPIO_PIN_6);
+    
+  relay->Off();
 }
 
 void RM_RTOS_Default_Task(const void* arguments) {
@@ -39,7 +48,13 @@ void RM_RTOS_Default_Task(const void* arguments) {
   while (true) {
     set_cursor(0, 0);
     clear_screen();
-    print("vx: %f, vy: %f\r\n", receive->vx, receive->vy);
-    osDelay(100);
+    relay->On();
+    print("relay on\r\n");
+    osDelay(3000);
+    set_cursor(0, 0);
+    clear_screen();
+    relay->Off();
+    print("relay off\r\n");
+    osDelay(3000);
   }
 }

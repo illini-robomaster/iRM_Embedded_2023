@@ -59,10 +59,13 @@ void armTranslateTask(void* arg){
 		osDelay(2);
 	}
 	base_translate_motor->ReAlign();
-	base_translate_motor->TurnRelative(0);
 	base_translate_motor->SetMaxSpeed(BASE_TRANSLATE_RUN_SPEED);
+
+	base_translate_motor->TurnAbsolute(1);
+	base_translate_motor->CalcOutput();
 	control::MotorCANBase::TransmitOutput(&motor9, 1);
-	print("Calib Done\r\n");	
+	osDelay(500); // wait to
+	print("Calib Done\r\n");
 
 	// Start normal operation
 	while(1) {
@@ -77,7 +80,7 @@ void armTranslateTask(void* arg){
 		// base_translate_motor->PrintData();
 
 			// motor9->PrintData();
-			base_translate_motor->PrintData();
+			// base_translate_motor->PrintData();
 
 			loop_cnt = 0;
 			// print("sbus ch4: %f \r\n", sbus->ch[3]/660.0/50);
@@ -86,7 +89,9 @@ void armTranslateTask(void* arg){
 #ifdef SINGLE_BOARD
 		base_translate_motor->TurnRelative(sbus->ch[12] / 660.0 /80);
 #else
-		base_translate_motor->TurnRelative(receive->vx);
+		// base_translate_motor->TurnRelative(receive->arm_translate/80);
+		base_translate_motor->TurnRelative(0);
+
 #endif
 		base_translate_motor->CalcOutput();
 		control::MotorCANBase::TransmitOutput(&motor9, 1);

@@ -120,24 +120,24 @@ void ReviveAll(){
 
 
 void RM_RTOS_Default_Task(const void* args) {
-  UNUSED(args);
-  while(true){ //if want to print, make sure nothing is print somewhere else
-    if(sbus->ch[6]>100){
-      if(!engineerIsKilled){
-        print("killed\n");
-      }
-      engineerIsKilled = true;
-      KillAll();
-      // print("killed");
-      osDelay(10);
-    }else if(engineerIsKilled && sbus->ch[6]<=100){ // killed to revive
-      ReviveAll();
-      engineerIsKilled = false;
-    }
+    UNUSED(args);
+    while(true){ //if want to print, make sure nothing is print somewhere else
+        if(sbus->ch[11]>100){
+            if(!engineerIsKilled){
+                print("killed\n");
+            }
+            engineerIsKilled = true;
+            KillAll();
+            // print("killed");
+            osDelay(10);
+        }else if(engineerIsKilled && sbus->ch[11]<=100){ // killed to revive
+            ReviveAll();
+            engineerIsKilled = false;
+        }
 
 #ifdef REFEREE
-    print("ROBOTID: %d",referee->game_robot_status.robot_id);
+        // print("ROBOTID: %d",referee->game_robot_status.robot_id);
 #endif
-    osDelay(10);
-  }
+        osDelay(10);
+    }
 }

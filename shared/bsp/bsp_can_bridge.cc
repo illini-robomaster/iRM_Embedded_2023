@@ -96,6 +96,12 @@ void CanBridge::UpdateData(const uint8_t* data) {
     case ARM_TRANSLATE:
       arm_translate = cmd.data_float;
       break;
+    case CHASSIS_POWER:
+      chassis_power = cmd.data_float;
+      break;
+    case CHASSIS_POWER_LIMIT:
+      chassis_power_limit = cmd.data_uint;
+      break;
     default:;
   }
 }

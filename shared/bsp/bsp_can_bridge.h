@@ -44,7 +44,9 @@ typedef enum {
   IS_MY_COLOR_BLUE,
   SELF_CHECK_FLAG,
   LOB_MODE,
-  ARM_TRANSLATE
+  ARM_TRANSLATE,
+  CHASSIS_POWER,
+  CHASSIS_POWER_LIMIT,
 } can_bridge_cmd;
 
 typedef struct {
@@ -84,6 +86,8 @@ class CanBridge {
   bool self_check_flag = false;
   bool lob_mode = false;
   float arm_translate = 0;
+  float chassis_power = 0;
+  unsigned int chassis_power_limit = 0;
   // each bit represents a flag correspond to specific motor e.g.(at index 0, it represents the motor 1's connection flag)
  private:
   bsp::CAN* can_;
