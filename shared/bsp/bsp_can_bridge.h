@@ -43,7 +43,8 @@ typedef enum {
   RECALIBRATE,
   IS_MY_COLOR_BLUE,
   SELF_CHECK_FLAG,
-  LOB_MODE
+  LOB_MODE,
+  ARM_TRANSLATE
 } can_bridge_cmd;
 
 typedef struct {

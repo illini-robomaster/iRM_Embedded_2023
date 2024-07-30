@@ -88,6 +88,8 @@ const float b = 0.36; // big arm length
 const float c = 0.30; // forearm length
 const float wrist_length = 0.16;
 
+extern bsp::CanBridge* send;
+
 
 /*
 zero position:
@@ -489,6 +491,21 @@ void armTask(void* args) {
     filtered_sbus[4] = clip<float>(moving_average[4].GetAverage(), -SBUS_CHANNEL_MAX, SBUS_CHANNEL_MAX)/SBUS_CHANNEL_MAX;
     filtered_sbus[5] = clip<float>(moving_average[5].GetAverage(), -SBUS_CHANNEL_MAX, SBUS_CHANNEL_MAX)/SBUS_CHANNEL_MAX;
     filtered_sbus[6] = clip<float>(moving_average[6].GetAverage(), -SBUS_CHANNEL_MAX, SBUS_CHANNEL_MAX)/SBUS_CHANNEL_MAX;
+
+    if(loop_cnt % 20 == 0){
+      send->cmd.id = bsp::VX;
+      send->cmd.data_float = sbus->ch[1]/660.0;
+      send->TransmitOutput();
+      send->cmd.id = bsp::VY;
+      send->cmd.data_float = sbus->ch[0]/660.0;
+      send->TransmitOutput();
+      send->cmd.id = bsp::RELATIVE_ANGLE;
+      send->cmd.data_float = sbus->ch[2]/660.0;
+      send->TransmitOutput();
+      send->cmd.id = bsp::ARM_TRANSLATE;
+      send->cmd.data_float = sbus->ch[12]/660.0;
+      send->TransmitOutput();
+    }
 
 #ifdef INV_KINEMATICS
 

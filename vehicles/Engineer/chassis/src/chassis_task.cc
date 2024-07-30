@@ -79,9 +79,13 @@ void chassisTask(void* arg){
         float relative_angle = 0;
         float wz = 0;
 
+#ifdef SINGLE_BOARD
         Vector2d joystick_vector(sbus->ch[0]/ 660.0, sbus->ch[1]/660.0);
-
         wz = sbus->ch[2] / 660.0 * V_ROT_MAX; // in m/s
+#else
+        Vector2d joystick_vector(receive->vx, receive->vy);
+        wz = receive->relative_angle * V_ROT_MAX;
+#endif
         // The following is for joystick only, not for keyboard
         // Max joy stick max = 660
 
@@ -258,7 +262,7 @@ void init_chassis(){
     chassis_data->br_wheel_motor = motor8;
 
     chassis = new control::EngineerSteeringChassis(chassis_data);
-    supercap = new control::HRB_SuperCap(can1, 0x2C8, 0x2C7);
+    supercap = new control::HRB_SuperCap(can1, 0x2C7, 0x2C8);
     print("chassis init finished\n");
 
 }

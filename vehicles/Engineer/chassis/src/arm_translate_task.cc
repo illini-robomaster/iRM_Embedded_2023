@@ -1,4 +1,5 @@
 #include "arm_translate_task.h"
+#include "bsp_can_bridge.h"
 
 static control::MotorCANBase* motor9 = nullptr;
 static control::ServoMotorWithLG* base_translate_motor = nullptr;
@@ -7,6 +8,8 @@ static int last_motor_pos = 0;
 
 static bool killed = false;
 // static bsp::GPIO* out_5v_enable = nullptr;
+
+extern bsp::CanBridge* receive = nullptr;
 
 bool base_translate_align_detect() {
 	if(!motor9->connection_flag_){ // if motor is not enabled, then it must not be aligned
@@ -80,10 +83,10 @@ void armTranslateTask(void* arg){
 			// print("sbus ch4: %f \r\n", sbus->ch[3]/660.0/50);
 
 		}
-#ifdef USING_DBUS
-		base_translate_motor->TurnRelative(dbus->ch3 / 660.0 / 50);
-#else
+#ifdef SINGLE_BOARD
 		base_translate_motor->TurnRelative(sbus->ch[12] / 660.0 /80);
+#else
+		base_translate_motor->TurnRelative(receive->ARM_TRANSLATE);
 #endif
 		base_translate_motor->CalcOutput();
 		control::MotorCANBase::TransmitOutput(&motor9, 1);

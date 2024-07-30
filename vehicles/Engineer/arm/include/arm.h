@@ -17,7 +17,8 @@
  *  along with this program. If not, see <http://www.gnu.org/licenses/>.    *
  *                                                                          *
  ****************************************************************************/
-
+#include "cmsis_os.h"
+#include "sbus.h"
 typedef struct {
   float base_translate_0;     /* translate 3508 motor                           */
   float base_yaw_rotate_1;   /* rotate the entire arm around an vertical axis  */

@@ -26,6 +26,7 @@ PowerLimit::PowerLimit(int motor_num) { motor_num_ = motor_num; }
 
 void PowerLimit::Output(bool turn_on, power_limit_t power_limit_info, float chassis_power,
                         float chassis_power_buffer, float* PID_output, float* output) {
+  UNUSED(chassis_power_buffer);
   if (!turn_on) {
     for (int i = 0; i < motor_num_; ++i) output[i] = PID_output[i];
     return;

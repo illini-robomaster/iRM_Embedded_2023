@@ -24,7 +24,7 @@
 #include "bsp_os.h"
 #include "can.h"
 #include "rgb.h"
-#include "arm_translate_task.h"
+#include "bsp_can_bridge.h"
 #include "arm.h"
 //  #include "ui_task.h"
 #ifdef REFEREE
@@ -50,6 +50,7 @@ osThreadId_t refereeTaskHandle;
 
 bsp::CAN* can1 = nullptr;
 bsp::CAN* can2 = nullptr;
+bsp::CanBridge* send = nullptr;
 static bool engineerIsKilled = false;
 
 #ifdef USING_DBUS
@@ -76,33 +77,24 @@ void RM_RTOS_Init() {
 #endif
     can1 = new bsp::CAN(&hcan1, true);
     can2 = new bsp::CAN(&hcan2, false);
+    send = new bsp::CanBridge(can1, 0x20A, 0x20B);
 #ifdef REFEREE
    referee_uart = new RefereeUART(&huart6);
    referee = new communication::Referee();
 #endif
 
-#ifdef CHASSIS
-    init_chassis();
-    // init_arm_translate();
-#endif
 
-#ifdef ARM_A1
     init_arm_A1();
-#endif
     set_cursor(0,0);
     clear_screen();
 }
 
 
 void RM_RTOS_Threads_Init(void) {
-#ifdef CHASSIS
-    chassisTaskHandle = osThreadNew(chassisTask,nullptr,&chassisTaskAttribute);
-    // armTranslateTaskHandle = osThreadNew(armTranslateTask, nullptr, &armTranslateAttribute);
-#endif
 
-#ifdef ARM_A1
+
     armA1TaskHandle = osThreadNew(armTask, nullptr, &armA1TaskAttribute);
-#endif
+
 
 #ifdef REFEREE
     refereeTaskHandle = osThreadNew(refereeTask,nullptr,&refereeTaskAttribute);
@@ -112,26 +104,14 @@ void RM_RTOS_Threads_Init(void) {
 
 
 void KillAll() {
-#ifdef CHASSIS
-    kill_chassis();
-    // kill_arm_translate();
 
-#endif
-
-#ifdef ARM_A1
     kill_arm();
-#endif
 
 }
 
 void ReviveAll(){
-#ifdef CHASSIS
-
-#endif
-
-#ifdef ARM_A1
     revive_arm();
-#endif
+
 }
 
 

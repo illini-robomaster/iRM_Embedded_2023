@@ -45,6 +45,7 @@ osThreadId_t refereeTaskHandle;
 
 bsp::CAN* can1 = nullptr;
 bsp::CAN* can2 = nullptr;
+bsp::CanBridge* receive = nullptr;
 static bool engineerIsKilled = false;
 
 remote::SBUS* sbus = nullptr;
@@ -63,6 +64,8 @@ void RM_RTOS_Init() {
     sbus = new remote::SBUS(&huart3);
     can1 = new bsp::CAN(&hcan1, true);
     can2 = new bsp::CAN(&hcan2, false);
+    receive = new bsp::CanBridge(can1, 0x20B, 0x20A);
+    
 #ifdef REFEREE
    referee_uart = new RefereeUART(&huart6);
    referee = new communication::Referee();
