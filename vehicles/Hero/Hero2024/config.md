@@ -43,6 +43,28 @@
 |        Switch Position        |                           Function                           |
 | :---------------------------: | :----------------------------------------------------------: |
 |           `swl-up`            |                       Toggle lob mode                        |
+|          `swl-down`           |                      Adjust shoot speed                      |
+|           `swr-up`            |                       Spin load motor                        |
 | `swr-down (pre-calibration)`  | Calibration, break dead loop and enter primary loops of most threads |
-| `swl-down (post-calibration)` |                      Adjust shoot speed                      |
+| `swr-down (post-calibration)` |  Toggle between main control mode and auxilary control mode  |
 
+
+## RC Joystick Definition:
+
+### Main control mode:
+
+| Control              | Action                        |
+|----------------------|-------------------------------|
+| `R horizontal (ch0)` | move chassis left/right       |
+| `R vertical (ch1)`   | move chassis forward/backward |
+| `L horizontal (ch2)` | rotate chassis ccw/cw         |
+| `L vertical (ch3)`   | pitch barrel higher/lower     |
+
+### Auxilary control mode:
+
+| Control               | Action                                      |
+|-----------------------|---------------------------------------------|
+| `R horizontal (ch0)`  | rotate barrel by one notch (per max stick position) |
+| `R vertical (ch1)`    | raise/lower scope (per max stick position)  |
+| `L horizontal (ch2)`  | rotate gimbal ccw/cw                        |
+| `L vertical (ch3)`    | pitch camera higher/lower                   |
