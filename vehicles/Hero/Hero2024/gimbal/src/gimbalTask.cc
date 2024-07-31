@@ -145,14 +145,18 @@ void gimbal_task(void* args) {
 
   while (yaw_motor->GetOmega() == 0.0) {
     print("Waiting for yaw_motor to initialize...\r\n");
+    osDelay(100);
   }
 
   while (vtx_pitch_motor->GetOmega() == 0.0) {
     print("Waiting for vtx_pitch_motor to initialize...\r\n");
+    osDelay(100);
+
   }
 
   while (barrel_motor->GetOmega() == 0.0) {
     print("Waiting for barrel_motor to initialize...\r\n");
+    osDelay(100);
   }
 
   print("4310 motors initalized\r\n" );
@@ -163,6 +167,11 @@ void gimbal_task(void* args) {
   float pitch_delta = vtx_pitch_motor->GetTheta() / 100.0;
   float barrel_curr = barrel_motor->GetTheta();
   float barrel_delta = barrel_motor->GetTheta() / 100.0;
+
+  pitch_motor_L->SetOutput(0);
+  pitch_motor_R->SetOutput(0);
+  control::MotorCANBase::TransmitOutput(can1_pitch, 2);
+
   // 4310 soft start
   for (int i = 0; i < 100; i++) {
     yaw_motor->SetOutput(yaw_curr, 1, 30, 0.5, 0);
@@ -383,15 +392,15 @@ void gimbal_task(void* args) {
     with_chassis->TransmitOutput();
 
     with_shooter->cmd.id = bsp::BUS_SWL;
-    with_shooter->cmd.data_bool = dbus->swl;
+    with_shooter->cmd.data_int = dbus->swl;
     with_shooter->TransmitOutput();
 
     with_chassis->cmd.id = bsp::BUS_SWR;
-    with_chassis->cmd.data_bool = dbus->swr;
+    with_chassis->cmd.data_int = dbus->swr;
     with_chassis->TransmitOutput();
 
     with_shooter->cmd.id = bsp::BUS_SWR;
-    with_shooter->cmd.data_bool = dbus->swr;
+    with_shooter->cmd.data_int = dbus->swr;
     with_shooter->TransmitOutput();
 
     /*send->cmd.id = bsp::KEYBOARD_BIT;
@@ -414,18 +423,21 @@ void gimbal_task(void* args) {
     } else {
       scope_motor->SetOutput(1600);
     }
-    if (!forward_key->Read() || (!aux_mode && dbus->ch3 > 630.0)){
+    // print("ch3: %f", dbus->ch3);
+    if (!forward_key->Read() /*|| (!aux_mode && dbus->ch3 > 630.0) */){
       pitch_servo_L->SetTarget(pitch_servo_L->GetTheta() + PI * 100, true);
       pitch_servo_R->SetTarget(pitch_servo_R->GetTheta() + PI * 100, true);
       osDelay(GIMBAL_TASK_DELAY);
       pitch_servo_L->CalcOutput(&p_l_out);
       pitch_servo_R->CalcOutput(&p_r_out);
-    } else if (!backward_key->Read() || (!aux_mode && dbus->ch3 < -630.0)) {
+      print("pitch moving forward\r\n");
+    } else if (!backward_key->Read() /* || (!aux_mode && dbus->ch3 < -630.0) */) {
       pitch_servo_L->SetTarget(pitch_servo_L->GetTheta() - PI * 100,true);
       pitch_servo_R->SetTarget(pitch_servo_R->GetTheta() - PI * 100,true);
       osDelay(GIMBAL_TASK_DELAY);
       pitch_servo_L->CalcOutput(&p_l_out);
       pitch_servo_R->CalcOutput(&p_r_out);
+      print("pitch moving backward\r\n");
     }  else {
       pitch_servo_L->SetTarget(pitch_servo_L->GetTheta(), true);
       pitch_servo_R->SetTarget(pitch_servo_R->GetTheta(), true);
