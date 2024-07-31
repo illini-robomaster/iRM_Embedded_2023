@@ -289,7 +289,7 @@ void gimbal_task(void* args) {
   float pitch_max = 0.2514;
 
   float yaw_pos = 0.0, pitch_pos = 0.0, barrel_pos = 0.0;
-
+  int loop_cnt = 0;
   while (true) {
     toggle_auxilary_mode.input(dbus->swr == remote::DOWN);
     if (toggle_auxilary_mode.posEdge()) {
@@ -303,16 +303,19 @@ void gimbal_task(void* args) {
       yaw_pos = clip<float>(yaw_pos, yaw_min, yaw_max);
       yaw_motor->SetOutput(yaw_pos, yaw_vel, 30, 0.5, 0);
 
-      pitch_vel = clip<float>(dbus->ch3 / 660.0 * 15.0, -15, 15);
-      pitch_pos += pitch_vel / 2000.0;
-      pitch_pos = clip<float>(pitch_pos, pitch_min, pitch_max);
-      vtx_pitch_motor->SetOutput(pitch_pos, pitch_vel, 30, 0.5, 0);
 
       rotate_barrel.input(dbus->ch0 > 630.0);
       if (rotate_barrel.posEdge()) {
         barrel_pos += 2.0 * PI / 5.0;
       }
       barrel_motor->SetOutput(barrel_pos, 10);
+    }
+
+    if (!aux_mode){
+      pitch_vel = clip<float>(dbus->ch3 / 660.0 * 15.0, -15, 15);
+      pitch_pos += pitch_vel / 2000.0;
+      pitch_pos = clip<float>(pitch_pos, pitch_min, pitch_max);
+      vtx_pitch_motor->SetOutput(pitch_pos, pitch_vel, 30, 0.5, 0);
     }
 
     // Bool Edge Detector for lob mode switch or osEventFlags wait for a signal from different threads
@@ -412,7 +415,7 @@ void gimbal_task(void* args) {
     send->TransmitOutput();*/
 
 
-    pitch_cmd = dbus->ch3 / 500.0;
+    // pitch_cmd = dbus->ch3 / 500.0;
 
     scope_sw.input(dbus->keyboard.bit.C);
     if (scope_sw.posEdge()){
@@ -423,15 +426,20 @@ void gimbal_task(void* args) {
     } else {
       scope_motor->SetOutput(1600);
     }
-    // print("ch3: %f", dbus->ch3);
-    if (!forward_key->Read() /*|| (!aux_mode && dbus->ch3 > 630.0) */){
+    // if(loop_cnt == 100){
+    //     print("ch3: %d\r\n", dbus->ch3);
+    //     loop_cnt = 0;
+    // }
+    // loop_cnt++;
+    UNUSED(loop_cnt);
+    if (!forward_key->Read() || (aux_mode && dbus->ch3 > 630)){
       pitch_servo_L->SetTarget(pitch_servo_L->GetTheta() + PI * 100, true);
       pitch_servo_R->SetTarget(pitch_servo_R->GetTheta() + PI * 100, true);
       osDelay(GIMBAL_TASK_DELAY);
       pitch_servo_L->CalcOutput(&p_l_out);
       pitch_servo_R->CalcOutput(&p_r_out);
       print("pitch moving forward\r\n");
-    } else if (!backward_key->Read() /* || (!aux_mode && dbus->ch3 < -630.0) */) {
+    } else if (!backward_key->Read() || (aux_mode && dbus->ch3 < -630)) {
       pitch_servo_L->SetTarget(pitch_servo_L->GetTheta() - PI * 100,true);
       pitch_servo_R->SetTarget(pitch_servo_R->GetTheta() - PI * 100,true);
       osDelay(GIMBAL_TASK_DELAY);

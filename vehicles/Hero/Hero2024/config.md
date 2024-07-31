@@ -11,7 +11,6 @@
 |   Motor4310   |     `barrel_motor`     | `CAN1`  |     `0x03`     | `0x02`  |
 |   Motor4310   |      `yaw_motor`       | `CAN1`  |     `0x05`     | `0x04`  |
 |   Motor4310   |   `vtx_pitch_motor`    | `CAN1`  |     `0x07`     | `0x06`  |
-<!-- |   Motor3508   |   `escalation_motor`   | `CAN1`  |   `DEFAULT`    | `0x204` | -->
 |   Motor2006   |    `pitch_motor_L`     | `CAN1`  |   `DEFAULT`    | `0x206` |
 |   Motor2006   |    `pitch_motor_R`     | `CAN1`  |   `DEFAULT`    | `0x205` |
 |  BRTEncoder   |    `pitch_encoder`     | `CAN1`  |    `NO_TX`     | `0x01`  |
@@ -26,6 +25,8 @@
 |   Motor3508   |   `shoot_back_motor`   | `CAN1`  |   `DEFAULT`    | `0x202` |
 |   Motor3508   |     `force_motor`      | `CAN1`  |   `DEFAULT`    | `0x203` |
 |   Motor6020   |      `rfid_motor`      | `CAN1`  |   `DEFAULT`    | `0x209` |
+|   Motor3508   |   `escalation_motor`   | `CAN1`  |   `DEFAULT`    | `0x204` |
+
 
 
 ### Chassis DJI_Board_TypeC
@@ -41,7 +42,6 @@
 |  Motor3508  | `motor6`     | `CAN1` | `DEFAULT` | `0x202` |
 |  Motor3508  | `motor7`     | `CAN1` | `DEFAULT` | `0x203` |
 |  Motor3508  | `motor8`     | `CAN1` | `DEFAULT` | `0x204` |
-<!-- |   Motor3508   |   `escalation_motor`   | `CAN1`  |   `DEFAULT`    | `0x204` | -->
 
 
 
@@ -65,7 +65,7 @@
 | `R horizontal (ch0)` | move chassis left/right       |
 | `R vertical (ch1)`   | move chassis forward/backward |
 | `L horizontal (ch2)` | rotate chassis ccw/cw         |
-| `L vertical (ch3)`   | pitch barrel higher/lower     |
+| `L vertical (ch3)`   |  pitch camera higher/lower    |
 
 ### Auxilary control mode:
 
@@ -74,18 +74,21 @@
 | `R horizontal (ch0)`  | rotate barrel by one notch (per max stick position) |
 | `R vertical (ch1)`    | raise/lower scope (per max stick position)  |
 | `L horizontal (ch2)`  | rotate gimbal ccw/cw                        |
-| `L vertical (ch3)`    | pitch camera higher/lower                   |
+| `L vertical (ch3)`    | pitch barrel higher/lower                   |
 
 
 ## Can_Bridge
 
-Gimbal (0x20A):
--> chassis
+gimbal id: 0x20A
+chassis id: 0x20B
+shooter id: 0x20C
+
+Gimbal -> chassis:
     VX, VY, VZ, BUS_SWR, START, DEAD
 
--> shooter  (0x20C)
+Gimbal -> shooter:
     START, BUS_SWL, BUS_SWR, DEAD
 
-Chassis: (0x20B)
--> shooter
+<!-- The following is ideal but does not work now -->
+Chassis -> shooter 
     heat, heat_limit
