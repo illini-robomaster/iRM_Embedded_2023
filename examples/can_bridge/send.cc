@@ -24,39 +24,39 @@
 #include "main.h"
 
 static bsp::CAN* can = nullptr;
-static bsp::CanBridge* send1 = nullptr;
-static bsp::CanBridge* send2 = nullptr;
+static bsp::CanBridge* with_chassis = nullptr;
+static bsp::CanBridge* with_shooter = nullptr;
 
 void RM_RTOS_Init(void) {
-  print_use_uart(&huart4);
-  can = new bsp::CAN(&hcan1, true);
-  send1 = new bsp::CanBridge(can, 0x20A, 0x20B);
-  send2 = new bsp::CanBridge(can, 0x20A, 0x20C);
+  print_use_uart(&huart1);
+  can = new bsp::CAN(&hcan2, false);
+  with_chassis = new bsp::CanBridge(can, 0x20A, 0x20B);
+  with_shooter = new bsp::CanBridge(can, 0x20A, 0x20C);
 }
 
 void RM_RTOS_Default_Task(const void* arguments) {
   UNUSED(arguments);
-
+  print("sending\n");
   while (true) {
-    send1->cmd.id = bsp::VX;
-    send1->cmd.data_float = 8980.1;
-    send1->TransmitOutput();
-    send2->cmd.id = bsp::VX;
-    send2->cmd.data_float = 8980.1;
-    send2->TransmitOutput();
+    with_chassis->cmd.id = bsp::VX;
+    with_chassis->cmd.data_float = 8980.1;
+    with_chassis->TransmitOutput();
+    with_shooter->cmd.id = bsp::VX;
+    with_shooter->cmd.data_float = 8980.1;
+    with_shooter->TransmitOutput();
     osDelay(1000);
-    send1->cmd.id = bsp::VY;
-    send1->cmd.data_float = -9.2;
-    send1->TransmitOutput();
-    send2->cmd.id = bsp::VY;
-    send2->cmd.data_float = -9.2;
-    send2->TransmitOutput();
-    send1->cmd.id = bsp::VX;
-    send1->cmd.data_float = 999;
-    send1->TransmitOutput();
-    send2->cmd.id = bsp::VX;
-    send2->cmd.data_float = 999;
-    send2->TransmitOutput();
+    with_chassis->cmd.id = bsp::VY;
+    with_chassis->cmd.data_float = -9.2;
+    with_chassis->TransmitOutput();
+    with_shooter->cmd.id = bsp::VY;
+    with_shooter->cmd.data_float = -9.2;
+    with_shooter->TransmitOutput();
+    with_chassis->cmd.id = bsp::VX;
+    with_chassis->cmd.data_float = 999;
+    with_chassis->TransmitOutput();
+    with_shooter->cmd.id = bsp::VX;
+    with_shooter->cmd.data_float = 999;
+    with_shooter->TransmitOutput();
     osDelay(1000);
     print("running\r\n");
   }

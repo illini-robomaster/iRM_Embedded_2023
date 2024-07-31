@@ -60,7 +60,9 @@ static const int SOFT_KILL_CONSTANT = 200;
 static const float START_PITCH_POS = PI/5;
 static const int INFANTRY_INITIAL_HP = 100;
 
-static bsp::CanBridge* send = nullptr;
+static bsp::CanBridge* with_chassis = nullptr;
+static bsp::CanBridge* with_shooter = nullptr;
+
 
 static BoolEdgeDetector FakeDeath(false);
 static BoolEdgeDetector GimbalDeath(true);

@@ -50,7 +50,8 @@ RefereeUART* referee_uart = nullptr;
 #endif
 
 #ifndef SINGLEBOARD
-bsp::CanBridge* receive = nullptr;
+bsp::CanBridge* with_gimbal = nullptr;
+bsp::CanBridge* with_shooter = nullptr;
 #endif
 
 
@@ -73,7 +74,9 @@ void RM_RTOS_Init() {
 #endif
 
 #ifndef SINGLEBOARD
-  receive = new bsp::CanBridge(can2,0x20B,0x20A);
+  with_gimbal = new bsp::CanBridge(can2,0x20B,0x20A);
+  // with_shooter = new bsp::CanBridge(can2,0x20B,0x20C);
+  // cannot add this line
 #endif
   init_chassis();
   set_cursor(0,0);

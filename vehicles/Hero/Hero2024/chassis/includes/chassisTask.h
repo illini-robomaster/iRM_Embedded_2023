@@ -65,7 +65,8 @@ extern bsp::CAN* can1;
 extern bsp::CAN* can2;
 extern display::RGB* RGB;
 extern communication::Referee* referee;
-extern bsp::CanBridge* receive;
+extern bsp::CanBridge* with_gimbal;
+extern bsp::CanBridge* with_shooter;
 
 
 // speed for steering motors (rad/s)

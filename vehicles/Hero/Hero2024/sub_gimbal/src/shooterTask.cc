@@ -19,6 +19,8 @@
  ****************************************************************************/
 
 #include "shooterTask.h"
+#include <utils.h>
+#include <controller.h>
 
 //==================================================================================================
 // Shooter
@@ -41,6 +43,12 @@ static BoolEdgeDetector key_sw = BoolEdgeDetector(false);
 static BoolEdgeDetector slow_trigger(false);
 static BoolEdgeDetector cool_trigger(false);
 
+static control::MotorCANBase* rfid_motor = nullptr;
+static control::ConstrainedPID* rfid_motor_omega_pid = nullptr;
+
+static BoolEdgeDetector rfid_upper(false);
+static BoolEdgeDetector rfid_lower(false);
+
 int s_f_out;
 int s_b_out;
 
@@ -60,6 +68,8 @@ void shooter_task(void* args) {
   // shooter desired speed
   // motor initialization
   control::MotorCANBase* can1_shooter_shoot[] = {shoot_front_motor, shoot_back_motor};
+  control::MotorCANBase* can2_rfid[] = {rfid_motor};
+
 //  control::MotorCANBase* can1_shooter_force[] = {force_motor};
 
   // PID controller initialization
@@ -67,19 +77,31 @@ void shooter_task(void* args) {
   control::ConstrainedPID shoot_pid(shoot_pid_param, 10000, 15000);
   float shoot_back_speed_diff = 0;
 
+  float rfid_motor_target1 = 5.55;
+  float rfid_motor_target2 = 0.75;
+  float rfid_motor_vel = 1.0;
+
+  print("Shooter ready\r\n");
+
   while (true) {
-    if (/*receive->keyboard.bit.B || */receive->bus_swr == remote::DOWN) break;
+    if (/*receive->keyboard.bit.B || */with_gimbal->bus_swr == remote::DOWN) break;
     osDelay(100);
   }
+
+  bool cw = true;
+
+
+
   print("Shooter begin\r\n");
 
   while (true) {
     print("Shooter running\r\n");
 
-    cool_trigger.input(receive->cooling_heat1 >= receive->cooling_limit1);
-
-    if (receive->bus_swl == remote::UP /*|| receive->mouse_bit.l*/) {
-      // TODO: Heat control need to be added in the if statement above
+    // TODO: heat control
+    float omega_error = 0.0;
+    float omega_pid_out = 0.0;
+    if (with_gimbal->bus_swl == remote::UP /*|| receive->mouse_bit.l*/ && with_chassis->cooling_heat1 <= with_chassis->cooling_limit1-100) {
+      // TODO: Heat control need to be checked
       shoot_back_speed_diff = shoot_back_motor->GetOmegaDelta(shoot_speeds[level] - (level+1) * 10);
       s_b_out = shoot_pid.ComputeConstrainedOutput(shoot_back_speed_diff);
       s_f_out = s_b_out * 0.98;
@@ -110,7 +132,7 @@ void shooter_task(void* args) {
       shoot_front_motor->SetOutput(s_f_out);
       shoot_back_motor->SetOutput(s_b_out);
     }
-    key_sw.input(receive->bus_swl == remote::DOWN);
+    key_sw.input(with_gimbal->bus_swl == remote::DOWN);
     // we use can bus to change the input
     if(key_sw.posEdge()){
       level = (level + 1) % 4;
@@ -124,6 +146,28 @@ void shooter_task(void* args) {
 
     force_servo->CalcOutput();
     control::MotorCANBase::TransmitOutput(can1_shooter_shoot, 2);
+
+    // rfid motor
+    print("theta: %f\r\n", rfid_motor->GetTheta());
+
+    /* rfid motor */
+    rfid_upper.input(rfid_motor->GetTheta() > rfid_motor_target2);
+    rfid_lower.input(rfid_motor->GetTheta() < rfid_motor_target1);
+
+    if (rfid_upper.posEdge()) cw = false;
+    if (rfid_lower.posEdge()) cw = true;
+
+    if (cw) {
+      omega_error = rfid_motor->GetOmegaDelta(rfid_motor_vel);
+      omega_pid_out = rfid_motor_omega_pid->ComputeConstrainedOutput(omega_error);
+      rfid_motor->SetOutput(omega_pid_out);
+    } else {
+      omega_error = rfid_motor->GetOmegaDelta(-rfid_motor_vel);
+      omega_pid_out = rfid_motor_omega_pid->ComputeConstrainedOutput(omega_error);
+      rfid_motor->SetOutput(omega_pid_out);
+    }
+    control::MotorCANBase::TransmitOutput(can2_rfid, 1);
+
 
     osDelay(SHOOTER_TASK_DELAY);
   }
@@ -144,6 +188,13 @@ void init_shooter() {
   servo_data.max_iout = 1000;
   servo_data.max_out = 13000;
   force_servo = new control::ServoMotor(servo_data);
+  rfid_motor = new control::Motor6020(can1, 0x209);
+
+  float rfid_motor_pid_param_omega[] = {550.0, 10.0, 0.0};
+  float rfid_motor_max_iout_omega = 25000;
+  float rfid_motor_max_out_omega = 30000;
+  rfid_motor_omega_pid = new control::ConstrainedPID(rfid_motor_pid_param_omega, rfid_motor_max_iout_omega, rfid_motor_max_out_omega);
+
 }
 
 void kill_shooter() {

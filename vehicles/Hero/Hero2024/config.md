@@ -12,10 +12,9 @@
 |   Motor4310   |      `yaw_motor`       | `CAN1`  |     `0x05`     | `0x04`  |
 |   Motor4310   |   `vtx_pitch_motor`    | `CAN1`  |     `0x07`     | `0x06`  |
 <!-- |   Motor3508   |   `escalation_motor`   | `CAN1`  |   `DEFAULT`    | `0x204` | -->
-|   Motor2006   |    `pitch_motor_L`     | `CAN1`  |   `DEFAULT`    | `0x205` |
-|   Motor2006   |    `pitch_motor_R`     | `CAN1`  |   `DEFAULT`    | `0x206` |
+|   Motor2006   |    `pitch_motor_L`     | `CAN1`  |   `DEFAULT`    | `0x206` |
+|   Motor2006   |    `pitch_motor_R`     | `CAN1`  |   `DEFAULT`    | `0x205` |
 |  BRTEncoder   |    `pitch_encoder`     | `CAN1`  |    `NO_TX`     | `0x01`  |
-|   Motor6020   |      `rfid_motor`      | `CAN2`  |   `DEFAULT`    | `0x209` |
 | SEN_0366_DIST |   `distance_sensor`    | `UART1` | `ADDRESS=0x80` |         |
 |               |                        |         |                |      
 
@@ -25,24 +24,24 @@
 
 |   Motor3508   |  `shoot_front_motor`   | `CAN1`  |   `DEFAULT`    | `0x201` |
 |   Motor3508   |   `shoot_back_motor`   | `CAN1`  |   `DEFAULT`    | `0x202` |
-<!-- |   Motor3508   |     `force_motor`      | `CAN2`  |   `DEFAULT`    | `0x203` | -->
-   |
+|   Motor3508   |     `force_motor`      | `CAN1`  |   `DEFAULT`    | `0x203` |
+|   Motor6020   |      `rfid_motor`      | `CAN1`  |   `DEFAULT`    | `0x209` |
 
 
 ### Chassis DJI_Board_TypeC
 
+<!-- if one more 6020 motor is on can2 then can bridge will not work -->
 | Device Type | Defined Name | COMM   | TX_ID     | RX_ID   |
 | :---------: | ------------ | ------ | --------- | ------- |
-|  Motor6020  | `motor1`     | `CAN1` | `DEFAULT` | `0x205` |
-|  Motor6020  | `motor2`     | `CAN1` | `DEFAULT` | `0x206` |
+|  Motor6020  | `motor1`     | `CAN2` | `DEFAULT` | `0x205` |
+|  Motor6020  | `motor2`     | `CAN2` | `DEFAULT` | `0x206` |
 |  Motor6020  | `motor3`     | `CAN1` | `DEFAULT` | `0x207` |
-|  Motor6020  | `motor4`     | `CAN1` | `DEFAULT` | `0x208` |
-|  Motor3508  | `motor5`     | `CAN2` | `DEFAULT` | `0x201` |
-|  Motor3508  | `motor6`     | `CAN2` | `DEFAULT` | `0x202` |
-|  Motor3508  | `motor7`     | `CAN2` | `DEFAULT` | `0x203` |
-|  Motor3508  | `motor8`     | `CAN2` | `DEFAULT` | `0x204` |
-|   Motor3508   |   `escalation_motor`   | `CAN1`  |   `DEFAULT`    | `0x204` |
-|             |              |        |           |         |
+|  Motor6020  | `motor4`     | `CAN2` | `DEFAULT` | `0x208` | 
+|  Motor3508  | `motor5`     | `CAN1` | `DEFAULT` | `0x201` |
+|  Motor3508  | `motor6`     | `CAN1` | `DEFAULT` | `0x202` |
+|  Motor3508  | `motor7`     | `CAN1` | `DEFAULT` | `0x203` |
+|  Motor3508  | `motor8`     | `CAN1` | `DEFAULT` | `0x204` |
+<!-- |   Motor3508   |   `escalation_motor`   | `CAN1`  |   `DEFAULT`    | `0x204` | -->
 
 
 
@@ -76,3 +75,17 @@
 | `R vertical (ch1)`    | raise/lower scope (per max stick position)  |
 | `L horizontal (ch2)`  | rotate gimbal ccw/cw                        |
 | `L vertical (ch3)`    | pitch camera higher/lower                   |
+
+
+## Can_Bridge
+
+Gimbal (0x20A):
+-> chassis
+    VX, VY, VZ, BUS_SWR, START, DEAD
+
+-> shooter  (0x20C)
+    START, BUS_SWL, BUS_SWR, DEAD
+
+Chassis: (0x20B)
+-> shooter
+    heat, heat_limit

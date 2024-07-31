@@ -70,7 +70,7 @@ static volatile bool Dead = false;
 static BoolEdgeDetector ChangeSpinMode(false);
 static volatile bool SpinMode = false;
 
-static bsp::CanBridge* receive = nullptr;
+static bsp::CanBridge* with_gimbal = nullptr;
 static unsigned int flag_summary = 0;
 static const int KILLALL_DELAY = 100;
 static const int DEFAULT_TASK_DELAY = 100;
@@ -186,9 +186,9 @@ void chassisTask(void* arg) {
   control::MotorCANBase* steer_motors[] = {motor1, motor2, motor3, motor4};
   control::MotorCANBase* wheel_motors[] = {motor5, motor6, motor7, motor8};
 
-  while (!receive->start) osDelay(100);
+  while (!with_gimbal->start) osDelay(100);
 
-  while (receive->start < 0.5) osDelay(100);
+  while (with_gimbal->start < 0.5) osDelay(100);
 
   // Alignment
   chassis->SteerSetMaxSpeed(ALIGN_SPEED);
@@ -225,14 +225,14 @@ void chassisTask(void* arg) {
   float prev_vy = 0;
   float prev_mag = 0;
   while (true) {
-    float relative_angle = receive->relative_angle;
+    float relative_angle = with_gimbal->relative_angle;
     float sin_yaw, cos_yaw, vx_set, vy_set, v_mag, v_perp;
     float vx, vy, wz;
 
     float norm_scale_factor = NORMALIZATION_FACTOR;
     // TODO need to change the channels in gimbal.cc
-    vx_set = -receive->vy;
-    vy_set = receive->vx;
+    vx_set = -with_gimbal->vy;
+    vy_set = with_gimbal->vx;
     v_mag = std::pow(std::pow(vx_set, 2) + std::pow(vy_set, 2), 0.5);
     // Normalize vx and vy
     if (v_mag > V_MAX) {
@@ -263,8 +263,8 @@ void chassisTask(void* arg) {
     prev_mag = std::pow(std::pow(prev_vx, 2) +
                         std::pow(prev_vy, 2), 0.5);
 
-    ReCali.input(receive->recalibrate);   // detect force recalibration
-    Revival.input(receive->dead);         // detect robot revival
+    ReCali.input(with_gimbal->recalibrate);   // detect force recalibration
+    Revival.input(with_gimbal->dead);         // detect robot revival
 
     // realign on revival OR when key 'R' is pressed
     if (Revival.negEdge() || ReCali.posEdge()) {
@@ -286,7 +286,7 @@ void chassisTask(void* arg) {
       chassis->SetWheelSpeed(0,0,0,0);
     }
 
-    if (receive->mode == 1) {  // spin mode
+    if (with_gimbal->mode == 1) {  // spin mode
       // delay compensation
       // based on rule-of-thumb formula SPIN_SPEED = 80 = ~30 degree of error
       relative_angle = relative_angle - PI * 30.0 / 180.0 / 80.0 * SPIN_SPEED;
@@ -328,26 +328,26 @@ void chassisTask(void* arg) {
     control::MotorCANBase::TransmitOutput(wheel_motors, 4);
     control::MotorCANBase::TransmitOutput(steer_motors, 4);
 
-    receive->cmd.id = bsp::SHOOTER_POWER;
-    receive->cmd.data_bool = referee->game_robot_status.mains_power_shooter_output;
-    receive->TransmitOutput();
+    with_gimbal->cmd.id = bsp::SHOOTER_POWER;
+    with_gimbal->cmd.data_bool = referee->game_robot_status.mains_power_shooter_output;
+    with_gimbal->TransmitOutput();
 
-    receive->cmd.id = bsp::COOLING_HEAT1;
-    receive->cmd.data_float = (float)referee->power_heat_data.shooter_id1_17mm_cooling_heat;
-    receive->TransmitOutput();
+    with_gimbal->cmd.id = bsp::COOLING_HEAT1;
+    with_gimbal->cmd.data_float = (float)referee->power_heat_data.shooter_id1_17mm_cooling_heat;
+    with_gimbal->TransmitOutput();
 
-    receive->cmd.id = bsp::COOLING_HEAT2;
-    receive->cmd.data_float = (float)referee->power_heat_data.shooter_id2_17mm_cooling_heat;
-    receive->TransmitOutput();
+    with_gimbal->cmd.id = bsp::COOLING_HEAT2;
+    with_gimbal->cmd.data_float = (float)referee->power_heat_data.shooter_id2_17mm_cooling_heat;
+    with_gimbal->TransmitOutput();
 
-    receive->cmd.id = bsp::COOLING_LIMIT1;
-    receive->cmd.data_float = (float)referee->game_robot_status.shooter_barrel_cooling_value;
-    receive->TransmitOutput();
+    with_gimbal->cmd.id = bsp::COOLING_LIMIT1;
+    with_gimbal->cmd.data_float = (float)referee->game_robot_status.shooter_barrel_cooling_value;
+    with_gimbal->TransmitOutput();
 
 
-    receive->cmd.id = bsp::SPEED_LIMIT1;
-    receive->cmd.data_float = (float)referee->game_robot_status.shooter_barrel_heat_limit;
-    receive->TransmitOutput();
+    with_gimbal->cmd.id = bsp::SPEED_LIMIT1;
+    with_gimbal->cmd.data_float = (float)referee->game_robot_status.shooter_barrel_heat_limit;
+    with_gimbal->TransmitOutput();
 
     osDelay(CHASSIS_TASK_DELAY);
 
@@ -385,9 +385,9 @@ void self_Check_Task(void* arg){
                    fl_wheel_motor_flag<<7;
     osDelay(100);
     if(transmission_flag){
-      receive->cmd.id = bsp::CHASSIS_FLAG;
-      receive->cmd.data_uint = (unsigned int)flag_summary;
-      receive->TransmitOutput();
+      with_gimbal->cmd.id = bsp::CHASSIS_FLAG;
+      with_gimbal->cmd.data_uint = (unsigned int)flag_summary;
+      with_gimbal->TransmitOutput();
     }
     transmission_flag = !transmission_flag;
   }
@@ -460,7 +460,7 @@ void RM_RTOS_Init() {
   referee_uart->SetupRx(300);
   referee_uart->SetupTx(300);
   referee = new communication::Referee;
-  receive = new bsp::CanBridge(can2, 0x20B, 0x20A);
+  with_gimbal = new bsp::CanBridge(can2, 0x20B, 0x20A);
 }
 
 void RM_RTOS_Threads_Init(void) {
@@ -479,7 +479,7 @@ void KillAll() {
   chassis->SteerAlignFalse();   // set alignment status of each wheel to false
 
   while (true) {
-    if (!receive->dead) {
+    if (!with_gimbal->dead) {
       SpinMode = false;
       Dead = false;
       RGB->Display(display::color_green);
@@ -503,26 +503,26 @@ void RM_RTOS_Default_Task(const void* args) {
   UNUSED(args);
 
   while (true) {
-    if (receive->dead) {
+    if (with_gimbal->dead) {
       Dead = true;
       KillAll();
     }
 
-    receive->cmd.id = bsp::GIMBAL_POWER;
-    receive->cmd.data_uint = referee->game_robot_status.mains_power_gimbal_output;
-    receive->TransmitOutput();
+    with_gimbal->cmd.id = bsp::GIMBAL_POWER;
+    with_gimbal->cmd.data_uint = referee->game_robot_status.mains_power_gimbal_output;
+    with_gimbal->TransmitOutput();
 
-    receive->cmd.id = bsp::IS_MY_COLOR_BLUE;
-    receive->cmd.data_bool = (referee->game_robot_status.robot_id >= 100) ? true : false;
-    receive->TransmitOutput();
+    with_gimbal->cmd.id = bsp::IS_MY_COLOR_BLUE;
+    with_gimbal->cmd.data_bool = (referee->game_robot_status.robot_id >= 100) ? true : false;
+    with_gimbal->TransmitOutput();
 
     print("type: %d\r\n", referee->robot_hurt.hurt_type);
 
     if (debug) {
       set_cursor(0, 0);
       clear_screen();
-      print("vx: %f, vy: %f, angle: %f, mode: %f, dead: %f\r\n", receive->vx, receive->vy,
-            receive->relative_angle, receive->mode, receive->dead);
+      print("vx: %f, vy: %f, angle: %f, mode: %f, dead: %f\r\n", with_gimbal->vx, with_gimbal->vy,
+            with_gimbal->relative_angle, with_gimbal->mode, with_gimbal->dead);
     }
     osDelay(DEFAULT_TASK_DELAY);
   }

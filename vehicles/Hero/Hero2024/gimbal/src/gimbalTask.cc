@@ -48,9 +48,6 @@ static control::Motor4310* yaw_motor = nullptr;
 static control::Motor4310* vtx_pitch_motor = nullptr;
 static control::Motor4310* barrel_motor = nullptr;
 
-static control::MotorCANBase* rfid_motor = nullptr;
-static control::ConstrainedPID* rfid_motor_omega_pid = nullptr;
-
 static control::BRTEncoder *pitch_encoder = nullptr;
 
 //static distance::SEN_0366_DIST *distance_sensor = nullptr;
@@ -58,8 +55,7 @@ static control::BRTEncoder *pitch_encoder = nullptr;
 
 static BoolEdgeDetector rotate_barrel(false);
 static BoolEdgeDetector toggle_auxilary_mode(false);
-static BoolEdgeDetector rfid_upper(false);
-static BoolEdgeDetector rfid_lower(false);
+
 
 float calibrated_theta_esca = 0;
 
@@ -101,7 +97,6 @@ void gimbal_task(void* args) {
   UNUSED(args);
   control::MotorCANBase* can1_escalation[] = {esca_motor};  // TODO: change
   control::MotorCANBase* can1_pitch[] = {pitch_motor_L, pitch_motor_R};
-  control::MotorCANBase* can2_rfid[] = {rfid_motor};
   control::Motor4310* m4310_motors[] = {yaw_motor, vtx_pitch_motor, barrel_motor};
 
 //  while (!distance_sensor->begin()){
@@ -116,9 +111,13 @@ void gimbal_task(void* args) {
     osDelay(100);
   }
 
-  send->cmd.id = bsp::START;
-  send->cmd.data_bool = true;
-  send->TransmitOutput();
+  with_chassis->cmd.id = bsp::START;
+  with_chassis->cmd.data_bool = true;
+  with_chassis->TransmitOutput();
+
+  with_shooter->cmd.id = bsp::START;
+  with_shooter->cmd.data_bool = true;
+  with_shooter->TransmitOutput();
 
 //  distance_sensor->continuousMeasure();
   // yaw_motor->SetZeroPos();
@@ -282,13 +281,6 @@ void gimbal_task(void* args) {
 
   float yaw_pos = 0.0, pitch_pos = 0.0, barrel_pos = 0.0;
 
-  float rfid_motor_target1 = 5.55;
-  float rfid_motor_target2 = 0.75;
-  float rfid_motor_vel = 1.0;
-  float omega_error = 0.0;
-  float omega_pid_out = 0.0;
-  bool cw = true;
-
   while (true) {
     toggle_auxilary_mode.input(dbus->swr == remote::DOWN);
     if (toggle_auxilary_mode.posEdge()) {
@@ -375,28 +367,32 @@ void gimbal_task(void* args) {
     vx_set = vx_keyboard + vx_remote;
     vy_set = vy_keyboard + vy_remote;
 
-    send->cmd.id = bsp::VX;
+    with_chassis->cmd.id = bsp::VX;
     // send->cmd.data_float = Dead ? 0 : vx_set;  // TODO
-    send->cmd.data_float = vx_set;
-    send->TransmitOutput();
+    with_chassis->cmd.data_float = vx_set;
+    with_chassis->TransmitOutput();
 
-    send->cmd.id = bsp::VY;
+    with_chassis->cmd.id = bsp::VY;
     // send->cmd.data_float = Dead ? 0 : vy_set; // TODO
-    send->cmd.data_float = vy_set;
-    send->TransmitOutput();
+    with_chassis->cmd.data_float = vy_set;
+    with_chassis->TransmitOutput();
 
-    send->cmd.id = bsp::WZ;
+    with_chassis->cmd.id = bsp::WZ;
     // send->cmd.data_float = Dead ? 0 : vy_set; // TODO
-    send->cmd.data_float = wz_set;
-    send->TransmitOutput();
+    with_chassis->cmd.data_float = wz_set;
+    with_chassis->TransmitOutput();
 
-    send->cmd.id = bsp::BUS_SWL;
-    send->cmd.data_bool = dbus->swl;
-    send->TransmitOutput();
+    with_shooter->cmd.id = bsp::BUS_SWL;
+    with_shooter->cmd.data_bool = dbus->swl;
+    with_shooter->TransmitOutput();
 
-    send->cmd.id = bsp::BUS_SWR;
-    send->cmd.data_bool = dbus->swr;
-    send->TransmitOutput();
+    with_chassis->cmd.id = bsp::BUS_SWR;
+    with_chassis->cmd.data_bool = dbus->swr;
+    with_chassis->TransmitOutput();
+
+    with_shooter->cmd.id = bsp::BUS_SWR;
+    with_shooter->cmd.data_bool = dbus->swr;
+    with_shooter->TransmitOutput();
 
     /*send->cmd.id = bsp::KEYBOARD_BIT;
     send->cmd.data_keyboard = dbus->keyboard;
@@ -448,28 +444,10 @@ void gimbal_task(void* args) {
 
     pitch_curr = pitch_encoder->getData();
 
-    print("theta: %f\r\n", rfid_motor->GetTheta());
-
-    /* rfid motor */
-    rfid_upper.input(rfid_motor->GetTheta() > rfid_motor_target2);
-    rfid_lower.input(rfid_motor->GetTheta() < rfid_motor_target1);
-
-    if (rfid_upper.posEdge()) cw = false;
-    if (rfid_lower.posEdge()) cw = true;
-
-    if (cw) {
-      omega_error = rfid_motor->GetOmegaDelta(rfid_motor_vel);
-      omega_pid_out = rfid_motor_omega_pid->ComputeConstrainedOutput(omega_error);
-      rfid_motor->SetOutput(omega_pid_out);
-    } else {
-      omega_error = rfid_motor->GetOmegaDelta(-rfid_motor_vel);
-      omega_pid_out = rfid_motor_omega_pid->ComputeConstrainedOutput(omega_error);
-      rfid_motor->SetOutput(omega_pid_out);
-    }
+    
 
     control::MotorCANBase::TransmitOutput(can1_escalation, 1);
     control::MotorCANBase::TransmitOutput(can1_pitch, 2);
-    control::MotorCANBase::TransmitOutput(can2_rfid, 1);
     control::Motor4310::TransmitOutput(m4310_motors, 3);
 
     osDelay(GIMBAL_TASK_DELAY);
@@ -503,7 +481,7 @@ void init_gimbal() {
   pitch_servo_data.max_iout = 500;
   pitch_servo_data.max_out = 10000;
   pitch_servo_L = new control::ServoMotor(pitch_servo_data);
-  pitch_motor_R = new control::Motor2006(can1,0x207);
+  pitch_motor_R = new control::Motor2006(can1,0x205);
   // DO NOT USE RX_ID: 0x205!!!!!!!!!
   pitch_servo_data.motor = pitch_motor_R;
   pitch_servo_R = new control::ServoMotor(pitch_servo_data);
@@ -514,12 +492,8 @@ void init_gimbal() {
   yaw_motor = new control::Motor4310(can1, 0x04, 0x05, control::MIT);
   vtx_pitch_motor = new control::Motor4310(can1, 0x06, 0x07, control::MIT);
 
-  rfid_motor = new control::Motor6020(can2, 0x209);
 
-  float rfid_motor_pid_param_omega[] = {550.0, 10.0, 0.0};
-  float rfid_motor_max_iout_omega = 25000;
-  float rfid_motor_max_out_omega = 30000;
-  rfid_motor_omega_pid = new control::ConstrainedPID(rfid_motor_pid_param_omega, rfid_motor_max_iout_omega, rfid_motor_max_out_omega);
+
 
   // distance sensor initialization, remove if not connected, will stop the initialization process
 //  distance_sensor = distance::SEN_0366_DIST::init(&huart1,0x80);

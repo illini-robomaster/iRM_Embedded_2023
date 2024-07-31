@@ -35,8 +35,8 @@
 remote::DBUS* dbus = nullptr;
 bsp::CAN* can1 = nullptr;
 bsp::CAN* can2 = nullptr;
-bsp::CanBridge* send = nullptr;
-bsp::CanBridge* send_shooter = nullptr;
+bsp::CanBridge* with_chassis = nullptr;
+bsp::CanBridge* with_shooter = nullptr;
 communication::Referee* referee = nullptr;
 
 
@@ -72,7 +72,8 @@ void RM_RTOS_Init(){
   // Initialize the DBUS
   dbus = new remote::DBUS(&huart3);
   bsp::SetHighresClockTimer(&htim5);
-  send = new bsp::CanBridge(can2, 0x20A, 0x20B);
+  with_chassis = new bsp::CanBridge(can2, 0x20A, 0x20B);
+  with_shooter = new bsp::CanBridge(can2, 0x20A, 0x20C);
 
 
   print("initialized\r\n");
@@ -106,9 +107,13 @@ void RM_RTOS_Threads_Init(void){
 void KillAll(){
   RM_EXPECT_TRUE(false, "Operation killed\r\n");
 
-  send->cmd.id = bsp::DEAD;
-  send->cmd.data_bool = true;
-  send->TransmitOutput();
+  with_chassis->cmd.id = bsp::DEAD;
+  with_chassis->cmd.data_bool = true;
+  with_chassis->TransmitOutput();
+
+  with_shooter->cmd.id = bsp::DEAD;
+  with_shooter->cmd.data_bool = true;
+  with_shooter->TransmitOutput();
 
   kill_gimbal();
 

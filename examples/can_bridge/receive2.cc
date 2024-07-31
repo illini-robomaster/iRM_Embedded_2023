@@ -28,7 +28,7 @@ static bsp::CanBridge* receive = nullptr;
 
 void RM_RTOS_Init(void) {
   print_use_uart(&huart1);
-  can = new bsp::CAN(&hcan1, true);
+  can = new bsp::CAN(&hcan2, false);
   receive = new bsp::CanBridge(can, 0x20C, 0x20A);
 }
 

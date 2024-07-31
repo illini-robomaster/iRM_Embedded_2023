@@ -24,21 +24,24 @@
 #include "main.h"
 
 static bsp::CAN* can = nullptr;
-static bsp::CanBridge* receive = nullptr;
+static bsp::CanBridge* with_gimbal = nullptr;
 
 void RM_RTOS_Init(void) {
   print_use_uart(&huart1);
-  can = new bsp::CAN(&hcan1, true);
-  receive = new bsp::CanBridge(can, 0x20B, 0x20A);
+  can = new bsp::CAN(&hcan2, false);
+  with_gimbal = new bsp::CanBridge(can, 0x20B, 0x20A);
 }
 
 void RM_RTOS_Default_Task(const void* arguments) {
   UNUSED(arguments);
 
   while (true) {
+    if(with_gimbal->start){
+      print("start\n");
+    }
     set_cursor(0, 0);
     clear_screen();
-    print("vx: %f, vy: %f\r\n", receive->vx, receive->vy);
+    // print("vx: %f, vy: %f\r\n", with_gimbal->vx, with_gimbal->vy);
     osDelay(100);
   }
 }

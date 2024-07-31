@@ -61,7 +61,7 @@ static volatile bool Dead = false;
 void chassisTask(void* arg){
   UNUSED(arg);
 
-  control::MotorCANBase* steer_motors[] = {motor1, motor2, motor3, motor4};
+  control::MotorCANBase* steer_motors[] = {motor1, motor2, motor4};
   control::MotorCANBase* wheel_motors[] = {motor5, motor6, motor7, motor8};
 
   chassis->SteerSetMaxSpeed(ALIGN_SPEED);
@@ -79,7 +79,8 @@ void chassisTask(void* arg){
   //   osDelay(100);
   // }  // flip swr to start
 
-  while (!receive->start) {
+  // this cannot receive input, but using example_receive we can get start signal ?!!!
+  while (!with_gimbal->start) {
     print("Waiting for start signal...\r\n");
     osDelay(100);
   }
@@ -90,9 +91,9 @@ void chassisTask(void* arg){
 
   while (true) {
     Vector2d joystick_vector(0, 0);
-    print("vx: %f, vy: %f, wz: %f \r\n", receive->vx, receive->vy, receive->wz);
 
-    joystick_vector = Vector2d(receive->vy/660.0, receive->vx/660.0);
+    joystick_vector = Vector2d(with_gimbal->vy/660.0, with_gimbal->vx/660.0);
+    // print("vx: %f, vy: %f, wz: %f \r\n", with_gimbal->vx, with_gimbal->vy, with_gimbal->wz);
 
     // The following is for joystick only, not for keyboard
     // Max joy stick max = 660
@@ -131,19 +132,19 @@ void chassisTask(void* arg){
     target_vel = prev_target_vel.plus(delta_v);
     // TODO: Rotational acceleration constraints (which needs to deal with each module's angle)
     prev_target_vel = target_vel;
-    wz = -receive->wz / 660.0 * V_ROT_MAX; // in m/s
+    wz = -with_gimbal->wz / 660.0 * V_ROT_MAX; // in m/s
 
-    // if(loop_cnt == 100){
-    //     loop_cnt = 0;
+    if(loop_cnt == 100){
+        loop_cnt = 0;
     //     set_cursor(0, 0);
     //     clear_screen();
     //     chassis->PrintData();
-    //     print("joy_x: %f, joy_y: %f \r\n", joystick_vector.getX(), joystick_vector.getY());
-    //     print("vx: %f, vy: %f, wz: %f \r\n", target_vel.getX(), target_vel.getY(), wz);
+        print("joy_x: %f, joy_y: %f \r\n", joystick_vector.getX(), joystick_vector.getY());
+        print("vx: %f, vy: %f, wz: %f \r\n", target_vel.getX(), target_vel.getY(), wz);
     //     print("DELTA T: %d \r\n", HAL_GetTick() - last);
-    // }
+    }
     // last = HAL_GetTick();
-    // loop_cnt++;
+    loop_cnt++;
     UNUSED(loop_cnt);
     UNUSED(last);
 
@@ -177,7 +178,7 @@ void chassisTask(void* arg){
     // chassis->Update(50,
     //                 50,
     //                 50);
-
+    
 
     if (Dead) {
       chassis->SetSpeed(0,0,0);
@@ -187,27 +188,31 @@ void chassisTask(void* arg){
       motor8->SetOutput(0);
     }
 
+    // print("ready to transmit output\r\n");
+
     control::MotorCANBase::TransmitOutput(wheel_motors, 4);
-    control::MotorCANBase::TransmitOutput(steer_motors, 4);
+    control::MotorCANBase::TransmitOutput(steer_motors, 3);
+    control::MotorCANBase::TransmitOutput(&motor3, 1);
+ 
     UNUSED(steer_motors);
     UNUSED(wheel_motors);
     // print("chassis motor output transmitted \r\n");
 
-    receive->cmd.id = bsp::COOLING_HEAT1;
-    receive->cmd.data_float = (float)referee->power_heat_data.shooter_id1_17mm_cooling_heat;
-    receive->TransmitOutput();
+    // with_shooter->cmd.id = bsp::COOLING_HEAT1;
+    // with_shooter->cmd.data_float = (float)referee->power_heat_data.shooter_id1_17mm_cooling_heat;
+    // with_shooter->TransmitOutput();
 
-    receive->cmd.id = bsp::COOLING_LIMIT1;
-    receive->cmd.data_float = (float)referee->game_robot_status.shooter_barrel_cooling_value;
-    receive->TransmitOutput();
+    // with_shooter->cmd.id = bsp::COOLING_LIMIT1;
+    // with_shooter->cmd.data_float = (float)referee->game_robot_status.shooter_barrel_cooling_value;
+    // with_shooter->TransmitOutput();
 
-    receive->cmd.id = bsp::GIMBAL_POWER;
-    receive->cmd.data_uint = referee->game_robot_status.mains_power_gimbal_output;
-    receive->TransmitOutput();
+    // with_shooter->cmd.id = bsp::GIMBAL_POWER;
+    // with_shooter->cmd.data_uint = referee->game_robot_status.mains_power_gimbal_output;
+    // with_shooter->TransmitOutput();
 
-    receive->cmd.id = bsp::SHOOTER_POWER;
-    receive->cmd.data_bool = referee->game_robot_status.mains_power_shooter_output;
-    receive->TransmitOutput();
+    // with_shooter->cmd.id = bsp::SHOOTER_POWER;
+    // with_shooter->cmd.data_bool = referee->game_robot_status.mains_power_shooter_output;
+    // with_shooter->TransmitOutput();
 
     osDelay(CHASSIS_TASK_DELAY);
   }
@@ -218,7 +223,7 @@ void chassisTask(void* arg){
 void init_chassis(){
   motor1 = new control::Motor6020(can2, 0x205);
   motor2 = new control::Motor6020(can2, 0x206);
-  motor3 = new control::Motor6020(can2, 0x207);
+  motor3 = new control::Motor6020(can1, 0x207);
   motor4 = new control::Motor6020(can2, 0x208);
 
   motor5 = new control::Motor3508(can1, 0x201);
@@ -280,7 +285,7 @@ void kill_chassis(){
 
   RGB->Display(display::color_blue);
   // set alignment status of each wheel to false
-
+  Dead = true;
   while (true) {
     motor5->SetOutput(0);
     motor6->SetOutput(0);

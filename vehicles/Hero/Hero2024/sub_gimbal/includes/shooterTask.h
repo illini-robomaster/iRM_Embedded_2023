@@ -64,7 +64,8 @@ extern remote::DBUS* dbus;
 extern bsp::CAN* can1;
 extern bsp::CAN* can2;
 extern bsp::GPIO* key;
-extern bsp::CanBridge* receive;
+extern bsp::CanBridge* with_gimbal;
+extern bsp::CanBridge* with_chassis;
 
 extern volatile bool lob_mode;
 

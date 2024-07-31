@@ -55,7 +55,8 @@ const osThreadAttr_t gimbalTaskAttribute = {.name = "gimbal_task",
 extern remote::DBUS* dbus;
 extern bsp::CAN* can1;
 extern bsp::CAN* can2;
-extern bsp::CanBridge* send;
+extern bsp::CanBridge* with_chassis;
+extern bsp::CanBridge* with_shooter;
 extern bsp::GPIO* key;
 extern bsp::GPIO* forward_key;
 extern bsp::GPIO* backward_key;

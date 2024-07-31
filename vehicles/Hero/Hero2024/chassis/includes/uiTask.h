@@ -47,7 +47,7 @@ const osThreadAttr_t uiTaskAttribute = {.name = "UI_task",
 
 extern RefereeUART *referee_uart;
 
-extern bsp::CanBridge *send;
+extern bsp::CanBridge *with_gimbal;
 
 void UI_task(void* arg);
 
