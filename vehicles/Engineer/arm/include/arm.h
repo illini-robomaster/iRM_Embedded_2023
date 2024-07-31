@@ -1,6 +1,6 @@
 /****************************************************************************
  *                                                                          *
- *  Copyright (C) 2023 RoboMaster.                                          *
+ *  Copyright (C) 2024 RoboMaster.                                          *
  *  Illini RoboMaster @ University of Illinois at Urbana-Champaign          *
  *                                                                          *
  *  This program is free software: you can redistribute it and/or modify    *
@@ -17,8 +17,11 @@
  *  along with this program. If not, see <http://www.gnu.org/licenses/>.    *
  *                                                                          *
  ****************************************************************************/
+
+
 #include "cmsis_os.h"
 #include "sbus.h"
+#include "bsp_can.h"
 typedef struct {
   float base_translate_0;     /* translate 3508 motor                           */
   float base_yaw_rotate_1;   /* rotate the entire arm around an vertical axis  */

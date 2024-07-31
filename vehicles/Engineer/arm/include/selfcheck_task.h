@@ -17,57 +17,40 @@
  *  along with this program. If not, see <http://www.gnu.org/licenses/>.    *
  *                                                                          *
  ****************************************************************************/
-
-#pragma once
-
-
-
-#include "chassis.h"
-#include "bsp_gpio.h"
-#include "sen_0366_dist.h"
-#include "bsp_can_bridge.h"
-#include "bsp_os.h"
-#include "bsp_print.h"
-#include "bsp_relay.h"
 #include "cmsis_os.h"
-#include "controller.h"
-#include "dbus.h"
 #include "motor.h"
-#include "protocol.h"
-#include "rgb.h"
-#include "oled.h"
-#include "bsp_buzzer.h"
-#include "shooterTask.h"
-#include "encoder.h"
-
-extern osThreadId_t gimbalTaskHandle;
-
-const osThreadAttr_t gimbalTaskAttribute = {.name = "gimbal_task",
-        .attr_bits = osThreadDetached,
-        .cb_mem = nullptr,
-        .cb_size = 0,
-        .stack_mem = nullptr,
-        .stack_size = 512 * 4,
-        .priority = (osPriority_t)osPriorityHigh,
-        .tz_module = 0,
-        .reserved = 0};
-
-
-extern remote::DBUS* dbus;
-extern bsp::CAN* can1;
-extern bsp::CAN* can2;
-extern bsp::CanBridge* send;
-extern bsp::GPIO* key;
-
-extern volatile bool Dead;
-extern BoolEdgeDetector lob_mode_sw;
-extern volatile bool lob_mode;
 
 
 
+extern osThreadId_t selfTestTaskHandle;
+const osThreadAttr_t selfTestingTask = {.name = "selfTestTask",
+                                             .attr_bits = osThreadDetached,
+                                             .cb_mem = nullptr,
+                                             .cb_size = 0,
+                                             .stack_mem = nullptr,
+                                             .stack_size = 256 * 4,
+                                             .priority = (osPriority_t)osPriorityBelowNormal,
+                                             .tz_module = 0,
+                                             .reserved = 0};
+
+static bool fl_steer_motor_flag = false;
+static bool fr_steer_motor_flag = false;
+static bool bl_steer_motor_flag = false;
+static bool br_steer_motor_flag = false;
+static bool fl_wheel_motor_flag = false;
+static bool fr_wheel_motor_flag = false;
+static bool bl_wheel_motor_flag = false;
+static bool br_wheel_motor_flag = false;
 
 
+extern control::MotorCANBase* motor1;
+extern control::MotorCANBase* motor2;
+extern control::MotorCANBase* motor3;
+extern control::MotorCANBase* motor4;
+extern control::MotorCANBase* motor5;
+extern control::MotorCANBase* motor6;
+extern control::MotorCANBase* motor7;
+extern control::MotorCANBase* motor8;
 
-void gimbal_task(void *arg);
-void init_gimbal();
-void kill_gimbal();
+static unsigned int flag_summary = 0;
+

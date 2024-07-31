@@ -17,41 +17,40 @@
  *  along with this program. If not, see <http://www.gnu.org/licenses/>.    *
  *                                                                          *
  ****************************************************************************/
-#pragma once
-#include "bsp_print.h"
-#include "bsp_uart.h"
-#include "cmsis_os2.h"
-#include "dbus.h"
-#include "main.h"
-#include "protocol.h"
-
-#define REFEREE_RX_SIGNAL (1 << 1)
+#include "selfcheck_task.h"
 
 
-extern osThreadId_t refereeTaskHandle;
-const osThreadAttr_t refereeTaskAttribute = {.name = "refereeTask",
-        .attr_bits = osThreadDetached,
-        .cb_mem = nullptr,
-        .cb_size = 0,
-        .stack_mem = nullptr,
-        .stack_size = 1024 * 4,
-        .priority = (osPriority_t)osPriorityAboveNormal,
-        .tz_module = 0,
-        .reserved = 0};
+void self_Check_Task(void* arg){
+  UNUSED(arg);
 
-extern communication::Referee* referee;
+  while(true){
+    osDelay(100);
+    motor8->connection_flag_ = false;
+    motor7->connection_flag_ = false;
+    motor6->connection_flag_ = false;
+    motor5->connection_flag_ = false;
+    motor4->connection_flag_ = false;
+    motor3->connection_flag_ = false;
+    motor2->connection_flag_ = false;
+    motor1->connection_flag_ = false;
+    osDelay(100);
+    fl_wheel_motor_flag = motor8->connection_flag_;
+    fr_wheel_motor_flag = motor7->connection_flag_;
+    bl_wheel_motor_flag = motor6->connection_flag_;
+    br_wheel_motor_flag = motor5->connection_flag_;
+    fl_steer_motor_flag = motor4->connection_flag_;
+    fr_steer_motor_flag = motor3->connection_flag_;
+    br_steer_motor_flag = motor2->connection_flag_;
+    bl_steer_motor_flag = motor1->connection_flag_;
+    flag_summary = bl_steer_motor_flag|
+                   br_steer_motor_flag<<1|
+                   fr_steer_motor_flag<<2|
+                   fl_steer_motor_flag<<3|
+                   br_wheel_motor_flag<<4|
+                   bl_wheel_motor_flag<<5|
+                   fr_wheel_motor_flag<<6|
+                   fl_wheel_motor_flag<<7;
 
-class RefereeUART : public bsp::UART {
-public:
-    using bsp::UART::UART;
 
-protected:
-    void RxCompleteCallback() final { osThreadFlagsSet(refereeTaskHandle, REFEREE_RX_SIGNAL); }
-};
-
-
-extern RefereeUART* referee_uart;
-
-void referee_task(void* arg);
-
-void init_referee();
+  }
+}

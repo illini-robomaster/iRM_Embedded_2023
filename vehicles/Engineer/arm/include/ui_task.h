@@ -19,52 +19,38 @@
  ****************************************************************************/
 #pragma once
 
-#include "chassis.h"
-
-#include "bsp_gpio.h"
-#include "bsp_os.h"
-#include "bsp_print.h"
-#include "bsp_relay.h"
+#include "main.h"
+#include "user_interface.h"
+#include "referee_task.h"
 #include "cmsis_os.h"
-#include "controller.h"
-#include "dbus.h"
-#include "motor.h"
 #include "protocol.h"
-#include "rgb.h"
-#include "oled.h"
-#include "bsp_buzzer.h"
+#include "arm.h"
+#include "bsp_gpio.h"
+#include <cstring>
+#include <cstdio>
 
-// parameters: could be proved useless  (╯‵□′)╯︵┻━┻
-#define FORCE_0_ANGLE (0)
-#define FORCE_1_ANGLE (2 * PI)
-#define FORCE_2_ANGLE (4 * PI)
-#define FORCE_3_ANGLE (6 * PI)
-extern bsp::Buzzer *buzzer;
+#define UI_TASK_DELAY 20
 
-
-extern osThreadId_t shooterTaskHandle;
-const osThreadAttr_t shooterTaskAttribute = {.name = "shooter_task",
+extern osThreadId_t UITaskHandle;
+const osThreadAttr_t UITaskAttribute = {.name = "UITask",
         .attr_bits = osThreadDetached,
         .cb_mem = nullptr,
         .cb_size = 0,
         .stack_mem = nullptr,
-        .stack_size = 256 * 4,
-        .priority = (osPriority_t)osPriorityNormal,
+        .stack_size = 1024 * 4,
+        .priority = (osPriority_t)osPriorityBelowNormal,
         .tz_module = 0,
         .reserved = 0};
 
 
 
-extern remote::DBUS* dbus;
-extern bsp::CAN* can1;
-extern bsp::CAN* can2;
+extern communication::Referee* referee;
+extern RefereeUART* referee_uart;
+extern joint_state_t current_motor_angles;
+
 extern bsp::GPIO* key;
 
-extern volatile bool lob_mode;
-
-extern communication::Referee* referee;
-
-
-void shooter_task(void* arg);
-void init_shooter();
-void kill_shooter();
+void UITask(void* arg);
+void refresh();
+void init_ui();
+void kill_ui();
