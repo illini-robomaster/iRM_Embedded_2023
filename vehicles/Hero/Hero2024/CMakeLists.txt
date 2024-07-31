@@ -22,3 +22,4 @@
 # TODO: add the subdirectory back when the chassis is ready
 add_subdirectory(chassis)
 add_subdirectory(gimbal)
+add_subdirectory(sub_gimbal)

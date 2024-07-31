@@ -68,7 +68,7 @@ void UI_task(void* args) {
 
   UI->SetID(referee->game_robot_status.robot_id);
 
-  while(dbus->swr!=remote::DOWN){
+  while(send->bus_swr!=remote::DOWN){
     refresh();
     osDelay(1000);
   }
@@ -82,9 +82,7 @@ void UI_task(void* args) {
 
   while (true) {
     // TODO: need to update after calculation of rotated euler angles is done
-    current_pitch = dbus->ch3;
-    target_pitch = dbus->ch0;
-    current_yaw = dbus->ch2;
+
 
     char current_pitch_value[20];
 
@@ -138,9 +136,7 @@ void UI_task(void* args) {
     osDelay(UI_TASK_DELAY);
 
 //    print("UI task running\r\n");
-    if(dbus->keyboard.bit.CTRL){
-      refresh();
-    }
+
   }
 }
 

@@ -1,6 +1,6 @@
 /****************************************************************************
  *                                                                          *
- *  Copyright (C) 2023 RoboMaster.                                          *
+ *  Copyright (C) 2024 RoboMaster.                                          *
  *  Illini RoboMaster @ University of Illinois at Urbana-Champaign          *
  *                                                                          *
  *  This program is free software: you can redistribute it and/or modify    *
@@ -18,27 +18,40 @@
  *                                                                          *
  ****************************************************************************/
 
+#pragma once
+#include <algorithm>
+#include <cmath>
+#include <cstdio>
+#include <cstring>
+
+#include "user_interface.h"
+#include "cmsis_os2.h"
 #include "bsp_can_bridge.h"
-#include "bsp_print.h"
-#include "cmsis_os.h"
 #include "main.h"
+#include "protocol.h"
+#include "refereeTask.h"
 
-static bsp::CAN* can = nullptr;
-static bsp::CanBridge* receive = nullptr;
+#define UI_TASK_DELAY 20
 
-void RM_RTOS_Init(void) {
-  print_use_uart(&huart1);
-  can = new bsp::CAN(&hcan1, true);
-  receive = new bsp::CanBridge(can, 0x20B, 0x20A);
-}
 
-void RM_RTOS_Default_Task(const void* arguments) {
-  UNUSED(arguments);
+extern osThreadId_t uiTaskHandle;
+const osThreadAttr_t uiTaskAttribute = {.name = "UI_task",
+        .attr_bits = osThreadDetached,
+        .cb_mem = nullptr,
+        .cb_size = 0,
+        .stack_mem = nullptr,
+        .stack_size = 1024 * 4,
+        .priority = (osPriority_t)osPriorityBelowNormal,
+        .tz_module = 0,
+        .reserved = 0};
 
-  while (true) {
-    set_cursor(0, 0);
-    clear_screen();
-    print("vx: %f, vy: %f\r\n", receive->vx, receive->vy);
-    osDelay(100);
-  }
-}
+extern RefereeUART *referee_uart;
+
+extern bsp::CanBridge *send;
+
+void UI_task(void* arg);
+
+void init_ui();
+
+void refresh();
+

@@ -18,38 +18,25 @@
  *                                                                          *
  ****************************************************************************/
 
-#pragma once
-#include <algorithm>
-#include <cmath>
-#include <cstdio>
-#include <cstring>
-
-#include "user_interface.h"
-#include "cmsis_os2.h"
-#include "gimbalTask.h"
+#include "shooterTask.h"
+#include "cmsis_os.h"
 #include "main.h"
-#include "protocol.h"
-#include "refereeTask.h"
 
-#define UI_TASK_DELAY 20
+bsp::CAN* can1 = nullptr;
+bsp::CAN* can2 = nullptr;
+bsp::CanBridge* receive = nullptr;
+osThreadId_t shooterTaskHandle;
+bsp::Buzzer *buzzer = nullptr;
+void RM_RTOS_Init(){
+    print_use_uart(&huart1);
+    can1 = new bsp::CAN(&hcan1);
+    can2 = new bsp::CAN(&hcan2);
+    receive = new bsp::CanBridge(can2,0x20B,0x20A);
+    buzzer = new bsp::Buzzer(&htim4, 3, 1000000);
+    init_shooter();
+}
 
-
-extern osThreadId_t uiTaskHandle;
-const osThreadAttr_t uiTaskAttribute = {.name = "UI_task",
-        .attr_bits = osThreadDetached,
-        .cb_mem = nullptr,
-        .cb_size = 0,
-        .stack_mem = nullptr,
-        .stack_size = 1024 * 4,
-        .priority = (osPriority_t)osPriorityBelowNormal,
-        .tz_module = 0,
-        .reserved = 0};
-
-extern RefereeUART *referee_uart;
-
-void UI_task(void* arg);
-
-void init_ui();
-
-void refresh();
-
+void RM_RTOS_Threads_Init(void) {
+  shooterTaskHandle = osThreadNew(shooter_task, nullptr, &shooterTaskAttribute);
+//     UITaskHandle = osThreadNew(UITask,nullptr,&UITaskAttribute);
+}

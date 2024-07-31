@@ -37,7 +37,6 @@
 #include "rgb.h"
 #include "oled.h"
 #include "bsp_buzzer.h"
-#include "shooterTask.h"
 #include "encoder.h"
 
 extern osThreadId_t gimbalTaskHandle;

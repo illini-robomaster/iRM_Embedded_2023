@@ -175,7 +175,7 @@ void gimbal_task(void* args) {
     yaw_curr -= yaw_delta;
     pitch_curr -= pitch_delta;
     barrel_curr -= barrel_delta;
-    
+
     osDelay(10);
   }
 
@@ -288,7 +288,7 @@ void gimbal_task(void* args) {
   float omega_error = 0.0;
   float omega_pid_out = 0.0;
   bool cw = true;
-  
+
   while (true) {
     toggle_auxilary_mode.input(dbus->swr == remote::DOWN);
     if (toggle_auxilary_mode.posEdge()) {
@@ -310,9 +310,9 @@ void gimbal_task(void* args) {
       rotate_barrel.input(dbus->ch0 > 630.0);
       if (rotate_barrel.posEdge()) {
         barrel_pos += 2.0 * PI / 5.0;
-      } 
+      }
       barrel_motor->SetOutput(barrel_pos, 10);
-    } 
+    }
 
     // Bool Edge Detector for lob mode switch or osEventFlags wait for a signal from different threads
 
@@ -371,6 +371,7 @@ void gimbal_task(void* args) {
       wz_set = dbus->ch2;
     }
 
+
     vx_set = vx_keyboard + vx_remote;
     vy_set = vy_keyboard + vy_remote;
 
@@ -388,6 +389,23 @@ void gimbal_task(void* args) {
     // send->cmd.data_float = Dead ? 0 : vy_set; // TODO
     send->cmd.data_float = wz_set;
     send->TransmitOutput();
+
+    send->cmd.id = bsp::BUS_SWL;
+    send->cmd.data_bool = dbus->swl;
+    send->TransmitOutput();
+
+    send->cmd.id = bsp::BUS_SWR;
+    send->cmd.data_bool = dbus->swr;
+    send->TransmitOutput();
+
+    /*send->cmd.id = bsp::KEYBOARD_BIT;
+    send->cmd.data_keyboard = dbus->keyboard;
+    send->TransmitOutput();
+
+    send->cmd.id = bsp::MOUSE_BIT;
+    send->cmd.data_mouse = dbus->mouse;
+    send->TransmitOutput();*/
+
 
     pitch_cmd = dbus->ch3 / 500.0;
 
@@ -460,7 +478,7 @@ void gimbal_task(void* args) {
 }
 
 void init_gimbal() {
-  
+
   esca_motor = new control::Motor3508(can1, 0x204);
   // ESCALATION motors initialization
   control::servo_t esca_servo_data;
