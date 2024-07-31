@@ -51,7 +51,7 @@ osThreadId_t refereeTaskHandle;
 bsp::CAN* can1 = nullptr;
 bsp::CAN* can2 = nullptr;
 bsp::CanBridge* send = nullptr;
-static bool engineerIsKilled = false;
+static bool armIsKilled = false;
 
 #ifdef USING_DBUS
 remote::DBUS* dbus = nullptr;
@@ -118,22 +118,44 @@ void ReviveAll(){
 void RM_RTOS_Default_Task(const void* args) {
     UNUSED(args);
     while(true){ //if want to print, make sure nothing is print somewhere else
-        if(sbus->ch[11]>100){
-            if(!engineerIsKilled){
+        if(sbus->ch[11]>100 || sbus->ch[11]<-100){
+            if(!armIsKilled){
                 print("killed\n");
             }
-            engineerIsKilled = true;
+            armIsKilled = true;
             KillAll();
             // print("killed");
             osDelay(10);
-        }else if(engineerIsKilled && sbus->ch[11]<=100){ // killed to revive
+        }else if(armIsKilled && (sbus->ch[11]<=100 || sbus->ch[11]<-100)){ // killed to revive
             ReviveAll();
-            engineerIsKilled = false;
+            armIsKilled = false;
         }
 
 #ifdef REFEREE
         // print("ROBOTID: %d",referee->game_robot_status.robot_id);
 #endif
+        send->cmd.id = bsp::VX;
+        send->cmd.data_float = -sbus->ch[6]/660.0;
+        send->TransmitOutput();
+        send->cmd.id = bsp::VY;
+        send->cmd.data_float = -sbus->ch[7]/660.0;
+        send->TransmitOutput();
+        send->cmd.id = bsp::RELATIVE_ANGLE;
+        send->cmd.data_float = -sbus->ch[8]/660.0;
+        send->TransmitOutput();
+        send->cmd.id = bsp::ARM_TRANSLATE;
+        send->cmd.data_float = sbus->ch[9]/660.0;
+        send->TransmitOutput();
+        send->cmd.id = bsp::DEAD;
+        send->cmd.data_bool = sbus->ch[11]>100;
+        send->TransmitOutput();
+        send->cmd.id = bsp::CHASSIS_POWER;
+        send->cmd.data_float = referee->power_heat_data.chassis_power;
+        send->TransmitOutput();
+        send->cmd.id = bsp::CHASSIS_POWER_LIMIT;
+        send->cmd.data_float = referee->game_robot_status.chassis_power_limit;
+        send->TransmitOutput();
+        // print("can bridge sent\r\n");
         osDelay(10);
     }
 }

@@ -518,31 +518,6 @@ void armTask(void* args) {
     // ch 12 is confirm start switch
     // ch 13 is pump
 
-    if(loop_cnt % 20 == 0){
-      send->cmd.id = bsp::VX;
-      send->cmd.data_float = sbus->ch[6]/660.0;
-      send->TransmitOutput();
-      send->cmd.id = bsp::VY;
-      send->cmd.data_float = sbus->ch[7]/660.0;
-      send->TransmitOutput();
-      send->cmd.id = bsp::RELATIVE_ANGLE;
-      send->cmd.data_float = sbus->ch[8]/660.0;
-      send->TransmitOutput();
-      send->cmd.id = bsp::ARM_TRANSLATE;
-      send->cmd.data_float = sbus->ch[9]/660.0;
-      send->TransmitOutput();
-      send->cmd.id = bsp::DEAD;
-      send->cmd.data_bool = killed;
-      send->TransmitOutput();
-      send->cmd.id = bsp::CHASSIS_POWER;
-      send->cmd.data_float = referee->power_heat_data.chassis_power;
-      send->TransmitOutput();
-      send->cmd.id = bsp::CHASSIS_POWER_LIMIT;
-      send->cmd.data_float = referee->game_robot_status.chassis_power_limit;
-      send->TransmitOutput();
-      print("can bridge sent\r\n");
-    }
-
 #ifdef INV_KINEMATICS
 
     // x is forward, y is left, z is up

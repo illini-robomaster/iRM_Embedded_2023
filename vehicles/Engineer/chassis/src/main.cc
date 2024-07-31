@@ -46,7 +46,7 @@ osThreadId_t refereeTaskHandle;
 bsp::CAN* can1 = nullptr;
 bsp::CAN* can2 = nullptr;
 bsp::CanBridge* receive = nullptr;
-static bool engineerIsKilled = false;
+static bool armIsKilled = false;
 
 remote::SBUS* sbus = nullptr;
 #ifdef REFEREE
@@ -105,15 +105,15 @@ void RM_RTOS_Default_Task(const void* args) {
     UNUSED(args);
     while(true){ //if want to print, make sure nothing is print somewhere else
         if(receive->dead){
-            if(!engineerIsKilled){
+            if(!armIsKilled){
                 print("killed\n");
             }
-            engineerIsKilled = true;
+            armIsKilled = true;
             KillAll();
             osDelay(100);
-        }else if(engineerIsKilled && !receive->dead){ // killed to revive
+        }else if(armIsKilled && !receive->dead){ // killed to revive
             ReviveAll();
-            engineerIsKilled = false;
+            armIsKilled = false;
         }
 
 #ifdef REFEREE
