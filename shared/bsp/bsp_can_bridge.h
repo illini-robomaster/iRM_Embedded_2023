@@ -21,6 +21,7 @@
 #pragma once
 
 #include "bsp_can.h"
+#include "dbus.h"
 
 namespace bsp {
 
@@ -44,7 +45,11 @@ typedef enum {
   RECALIBRATE,
   IS_MY_COLOR_BLUE,
   SELF_CHECK_FLAG,
-  LOB_MODE
+  LOB_MODE,
+  BUS_SWL,
+  BUS_SWR,
+  KEYBOARD_BIT,
+  MOUSE_BIT
 } can_bridge_cmd;
 
 typedef struct {
@@ -54,6 +59,8 @@ typedef struct {
     int data_int;
     bool data_bool;
     unsigned int data_uint;
+//    remote::keyboard_t data_keyboard;
+//    remote::mouse_t data_mouse;
   };
 } bridge_data_t;
 
@@ -79,12 +86,22 @@ class CanBridge {
   float speed_limit1 = 0;
   float speed_limit2 = 0;
   unsigned int chassis_flag = 0;
+    // each bit represents a flag correspond to specific motor e.g.(at index 0, it represents the motor 1's connection flag)
   unsigned int gimbal_power = 0;
   bool recalibrate = false;
   bool is_my_color_blue = false;
   bool self_check_flag = false;
+
   bool lob_mode = false;
-  // each bit represents a flag correspond to specific motor e.g.(at index 0, it represents the motor 1's connection flag)
+  unsigned int bus_swl = 0;
+  unsigned int bus_swr = 0;
+
+//  remote::keyboard_t keyboard;
+//  remote::mouse_t mouse_bit;
+  // each bit represents a key on the keyboard
+
+
+
  private:
   bsp::CAN* can_;
   uint16_t rx_id_;

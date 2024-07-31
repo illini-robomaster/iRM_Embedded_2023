@@ -68,7 +68,7 @@ void shooter_task(void* args) {
   float shoot_back_speed_diff = 0;
 
   while (true) {
-    if (dbus->keyboard.bit.B || dbus->swr == remote::DOWN) break;
+    if (/*receive->keyboard.bit.B || */receive->bus_swr == remote::DOWN) break;
     osDelay(100);
   }
   print("Shooter begin\r\n");
@@ -76,9 +76,9 @@ void shooter_task(void* args) {
   while (true) {
     print("Shooter running\r\n");
 
-    cool_trigger.input(send->cooling_heat1 >= send->cooling_limit1);
+    cool_trigger.input(receive->cooling_heat1 >= receive->cooling_limit1);
 
-    if ((dbus->swr == remote::UP || dbus->mouse.l)) {
+    if (receive->bus_swl == remote::UP /*|| receive->mouse_bit.l*/) {
       // TODO: Heat control need to be added in the if statement above
       shoot_back_speed_diff = shoot_back_motor->GetOmegaDelta(shoot_speeds[level] - (level+1) * 10);
       s_b_out = shoot_pid.ComputeConstrainedOutput(shoot_back_speed_diff);
@@ -110,7 +110,8 @@ void shooter_task(void* args) {
       shoot_front_motor->SetOutput(s_f_out);
       shoot_back_motor->SetOutput(s_b_out);
     }
-    key_sw.input(dbus->swl == remote::DOWN);
+    key_sw.input(receive->bus_swl == remote::DOWN);
+    // we use can bus to change the input
     if(key_sw.posEdge()){
       level = (level + 1) % 4;
       for (int i = level; i >=0; i--){

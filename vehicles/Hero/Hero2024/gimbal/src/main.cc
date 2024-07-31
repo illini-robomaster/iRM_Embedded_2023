@@ -30,17 +30,16 @@
 #include "gimbalTask.h"
 #include "motor.h"
 #include "protocol.h"
-#include "shooterTask.h"
-#include "uiTask.h"
 #include "refereeTask.h"
 
 remote::DBUS* dbus = nullptr;
 bsp::CAN* can1 = nullptr;
 bsp::CAN* can2 = nullptr;
 bsp::CanBridge* send = nullptr;
+bsp::CanBridge* send_shooter = nullptr;
 communication::Referee* referee = nullptr;
 
-bsp::Buzzer *buzzer = nullptr;
+
 
 bsp::GPIO* key = nullptr;
 
@@ -75,7 +74,7 @@ void RM_RTOS_Init(){
   bsp::SetHighresClockTimer(&htim5);
   send = new bsp::CanBridge(can2, 0x20A, 0x20B);
 
-  buzzer = new bsp::Buzzer(&htim4, 3, 1000000);
+
   print("initialized\r\n");
   key = new bsp::GPIO(KEY_GPIO_Port,KEY_Pin);
 
@@ -86,8 +85,7 @@ void RM_RTOS_Init(){
   referee_uart->SetupTx(300);
   referee = new communication::Referee;
 
-  // init_shooter();
-  // osDelay(200);
+
   init_gimbal();
   // osDelay(200);
 //  init_referee();
@@ -98,10 +96,9 @@ void RM_RTOS_Init(){
 
 void RM_RTOS_Threads_Init(void){
 //    refereeTaskHandle = osThreadNew(referee_task, nullptr, &refereeTaskAttribute);
-    // shooterTaskHandle = osThreadNew(shooter_task, nullptr, &shooterTaskAttribute);
-    // osDelay(200);
-    gimbalTaskHandle = osThreadNew(gimbal_task, nullptr, &gimbalTaskAttribute);
-    // osDelay(200);
+  // osDelay(200);
+  gimbalTaskHandle = osThreadNew(gimbal_task, nullptr, &gimbalTaskAttribute);
+  // osDelay(200);
 //    uiTaskHandle = osThreadNew(UI_task, nullptr, &uiTaskAttribute);
 
 }
@@ -113,7 +110,6 @@ void KillAll(){
   send->cmd.data_bool = true;
   send->TransmitOutput();
 
-  kill_shooter();
   kill_gimbal();
 
 }

@@ -17,13 +17,11 @@
 #  along with this program. If not, see <http://www.gnu.org/licenses/>.  #
 #                                                                        #
 # ---------------------------------------------------------------------- #
-
 project(Hero2024 ASM C CXX)
 
-irm_add_arm_executable(Hero2024_gimbals
+irm_add_arm_executable(Hero2024_sub_gimbal
         TARGET DJI_Board_TypeC
         SOURCES
-        src/main.cc
-        src/gimbalTask.cc
-        src/refereeTask.cc
+            src/main.cc
+            src/shooterTask.cc
         INCLUDES includes)

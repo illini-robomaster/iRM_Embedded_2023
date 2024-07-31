@@ -28,4 +28,5 @@ irm_add_arm_executable(Hero2024_chassis
         src/main.cc
         src/refereeTask.cc
         src/steering_6020.cc
+        src/uiTask.cc
     INCLUDES includes)
