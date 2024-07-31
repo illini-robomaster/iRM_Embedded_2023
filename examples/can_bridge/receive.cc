@@ -29,12 +29,12 @@ static bsp::CanBridge* with_gimbal = nullptr;
 void RM_RTOS_Init(void) {
   print_use_uart(&huart1);
   can = new bsp::CAN(&hcan2, false);
-  with_gimbal = new bsp::CanBridge(can, 0x20B, 0x20A);
+  with_gimbal = new bsp::CanBridge(can, 0x20C, 0x20A);
 }
 
 void RM_RTOS_Default_Task(const void* arguments) {
   UNUSED(arguments);
-
+  print("program start\r\n");
   while (true) {
     if(with_gimbal->start){
       print("start\n");

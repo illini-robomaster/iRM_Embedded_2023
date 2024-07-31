@@ -68,7 +68,7 @@ void shooter_task(void* args) {
   // shooter desired speed
   // motor initialization
   control::MotorCANBase* can1_shooter_shoot[] = {shoot_front_motor, shoot_back_motor};
-  control::MotorCANBase* can2_rfid[] = {rfid_motor};
+  control::MotorCANBase* can1_rfid[] = {rfid_motor};
 
 //  control::MotorCANBase* can1_shooter_force[] = {force_motor};
 
@@ -81,10 +81,11 @@ void shooter_task(void* args) {
   float rfid_motor_target2 = 0.75;
   float rfid_motor_vel = 1.0;
 
-  print("Shooter ready\r\n");
 
   while (true) {
-    if (/*receive->keyboard.bit.B || */with_gimbal->bus_swr == remote::DOWN) break;
+    if (/*receive->keyboard.bit.B || */with_gimbal->start) break;
+    print("Waiting for start signal\r\n");
+
     osDelay(100);
   }
 
@@ -100,7 +101,7 @@ void shooter_task(void* args) {
     // TODO: heat control
     float omega_error = 0.0;
     float omega_pid_out = 0.0;
-    if (with_gimbal->bus_swl == remote::UP /*|| receive->mouse_bit.l*/ && with_chassis->cooling_heat1 <= with_chassis->cooling_limit1-100) {
+    if (with_gimbal->bus_swl == remote::UP /*|| receive->mouse_bit.l && with_chassis->cooling_heat1 <= with_chassis->cooling_limit1-100 */) {
       // TODO: Heat control need to be checked
       shoot_back_speed_diff = shoot_back_motor->GetOmegaDelta(shoot_speeds[level] - (level+1) * 10);
       s_b_out = shoot_pid.ComputeConstrainedOutput(shoot_back_speed_diff);
@@ -145,6 +146,7 @@ void shooter_task(void* args) {
     }
 
     force_servo->CalcOutput();
+
     control::MotorCANBase::TransmitOutput(can1_shooter_shoot, 2);
 
     // rfid motor
@@ -166,7 +168,7 @@ void shooter_task(void* args) {
       omega_pid_out = rfid_motor_omega_pid->ComputeConstrainedOutput(omega_error);
       rfid_motor->SetOutput(omega_pid_out);
     }
-    control::MotorCANBase::TransmitOutput(can2_rfid, 1);
+    control::MotorCANBase::TransmitOutput(can1_rfid, 1);
 
 
     osDelay(SHOOTER_TASK_DELAY);
