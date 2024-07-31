@@ -187,13 +187,27 @@ void chassisTask(void* arg){
       motor8->SetOutput(0);
     }
 
-
-
     control::MotorCANBase::TransmitOutput(wheel_motors, 4);
     control::MotorCANBase::TransmitOutput(steer_motors, 4);
     UNUSED(steer_motors);
     UNUSED(wheel_motors);
     // print("chassis motor output transmitted \r\n");
+
+    receive->cmd.id = bsp::COOLING_HEAT1;
+    receive->cmd.data_float = (float)referee->power_heat_data.shooter_id1_17mm_cooling_heat;
+    receive->TransmitOutput();
+
+    receive->cmd.id = bsp::COOLING_LIMIT1;
+    receive->cmd.data_float = (float)referee->game_robot_status.shooter_barrel_cooling_value;
+    receive->TransmitOutput();
+
+    receive->cmd.id = bsp::GIMBAL_POWER;
+    receive->cmd.data_uint = referee->game_robot_status.mains_power_gimbal_output;
+    receive->TransmitOutput();
+
+    receive->cmd.id = bsp::SHOOTER_POWER;
+    receive->cmd.data_bool = referee->game_robot_status.mains_power_shooter_output;
+    receive->TransmitOutput();
 
     osDelay(CHASSIS_TASK_DELAY);
   }

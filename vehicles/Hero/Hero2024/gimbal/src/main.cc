@@ -89,7 +89,7 @@ void RM_RTOS_Init(){
   // init_shooter();
   // osDelay(200);
   init_gimbal();
-//  osDelay(200);
+  // osDelay(200);
 //  init_referee();
 //  osDelay(200);
 //  init_ui();
@@ -101,6 +101,7 @@ void RM_RTOS_Threads_Init(void){
     // shooterTaskHandle = osThreadNew(shooter_task, nullptr, &shooterTaskAttribute);
     // osDelay(200);
     gimbalTaskHandle = osThreadNew(gimbal_task, nullptr, &gimbalTaskAttribute);
+    // osDelay(200);
 //    uiTaskHandle = osThreadNew(UI_task, nullptr, &uiTaskAttribute);
 
 }

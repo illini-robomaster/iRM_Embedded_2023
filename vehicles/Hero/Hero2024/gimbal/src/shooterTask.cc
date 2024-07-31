@@ -28,7 +28,7 @@
 static const int KILLALL_DELAY = 100;
 static const int SHOOTER_TASK_DELAY = 1;
 
-static control::Motor4310* load_motor = nullptr;
+// static control::Motor4310* load_motor = nullptr;
 
 static control::MotorCANBase* shoot_front_motor = nullptr;
 static control::MotorCANBase* shoot_back_motor = nullptr;
@@ -61,7 +61,6 @@ void shooter_task(void* args) {
   // motor initialization
   control::MotorCANBase* can1_shooter_shoot[] = {shoot_front_motor, shoot_back_motor};
 //  control::MotorCANBase* can1_shooter_force[] = {force_motor};
-//  control::Motor4310* can1_shooter_load[] = {load_motor};
 
   // PID controller initialization
   float shoot_pid_param[3] = {150, 1.2, 0};
@@ -72,12 +71,10 @@ void shooter_task(void* args) {
     if (dbus->keyboard.bit.B || dbus->swr == remote::DOWN) break;
     osDelay(100);
   }
-
-  load_motor->SetZeroPos();
-  load_motor->MotorEnable();
-
+  print("Shooter begin\r\n");
 
   while (true) {
+    print("Shooter running\r\n");
 
     cool_trigger.input(send->cooling_heat1 >= send->cooling_limit1);
 
@@ -125,7 +122,6 @@ void shooter_task(void* args) {
     }
 
     force_servo->CalcOutput();
-//    control::MotorCANBase::TransmitOutput(can1_shooter_force, 1);
     control::MotorCANBase::TransmitOutput(can1_shooter_shoot, 2);
 
     osDelay(SHOOTER_TASK_DELAY);
@@ -134,7 +130,7 @@ void shooter_task(void* args) {
 
 void init_shooter() {
   //Shooter initialization
-  load_motor = new control::Motor4310(can1, 0x02, 0x03, control::POS_VEL);
+  // load_motor = new control::Motor4310(can1, 0x02, 0x03, control::POS_VEL);
   shoot_front_motor = new control::Motor3508(can1, 0x201);
   shoot_back_motor = new control::Motor3508(can1, 0x202);
   force_motor = new control::Motor3508(can1, 0x203);
@@ -152,15 +148,11 @@ void init_shooter() {
 void kill_shooter() {
   RM_EXPECT_TRUE(false, "Operation Killed!\r\n");
   control::MotorCANBase* shooter_motors[] = {shoot_front_motor, shoot_back_motor, force_motor};
-  control::Motor4310* load_motors[] = {load_motor};
   while (true){
     shoot_front_motor->SetOutput(0);
     shoot_back_motor->SetOutput(0);
     force_motor->SetOutput(0);
-    load_motor->SetOutput(0);
-    load_motor->MotorDisable();
     control::MotorCANBase::TransmitOutput(shooter_motors, 3);
-    control::Motor4310::TransmitOutput(load_motors, 1);
     osDelay(KILLALL_DELAY);
   }
 }
