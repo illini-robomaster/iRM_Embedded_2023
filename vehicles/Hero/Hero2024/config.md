@@ -15,12 +15,18 @@
 |   Motor2006   |    `pitch_motor_L`     | `CAN1`  |   `DEFAULT`    | `0x205` |
 |   Motor2006   |    `pitch_motor_R`     | `CAN1`  |   `DEFAULT`    | `0x206` |
 |  BRTEncoder   |    `pitch_encoder`     | `CAN1`  |    `NO_TX`     | `0x01`  |
-|   Motor3508   |  `shoot_front_motor`   | `CAN2`  |   `DEFAULT`    | `0x201` |
-|   Motor3508   |   `shoot_back_motor`   | `CAN2`  |   `DEFAULT`    | `0x202` |
-<!-- |   Motor3508   |     `force_motor`      | `CAN2`  |   `DEFAULT`    | `0x203` | -->
 |   Motor6020   |      `rfid_motor`      | `CAN2`  |   `DEFAULT`    | `0x209` |
 | SEN_0366_DIST |   `distance_sensor`    | `UART1` | `ADDRESS=0x80` |         |
-|               |                        |         |                |         |
+|               |                        |         |                |      
+
+
+### Shooter DJI_Board_TypeC:
+
+
+|   Motor3508   |  `shoot_front_motor`   | `CAN1`  |   `DEFAULT`    | `0x201` |
+|   Motor3508   |   `shoot_back_motor`   | `CAN1`  |   `DEFAULT`    | `0x202` |
+<!-- |   Motor3508   |     `force_motor`      | `CAN2`  |   `DEFAULT`    | `0x203` | -->
+   |
 
 
 ### Chassis DJI_Board_TypeC
