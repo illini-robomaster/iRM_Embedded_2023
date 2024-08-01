@@ -27,6 +27,8 @@
 
 //#define calibrate
 
+#define SOFT_START_RATE 100   // soft start is completed in 10 * SOFT_START_RATE seconds
+
 float pitch_cmd;
 float yaw_cmd;
 
@@ -53,7 +55,8 @@ static control::BRTEncoder *pitch_encoder = nullptr;
 //static distance::SEN_0366_DIST *distance_sensor = nullptr;
 
 
-static BoolEdgeDetector rotate_barrel(false);
+static BoolEdgeDetector rotate_barrel_left(false);
+static BoolEdgeDetector rotate_barrel_right(false);
 static BoolEdgeDetector toggle_auxilary_mode(false);
 
 
@@ -103,13 +106,14 @@ void gimbal_task(void* args) {
 ////    print("distance sensor initializing\r\n");
 //    osDelay(100);
 //  }
-  osDelay(5000);
-
+  
   while (true) {
     if (dbus->keyboard.bit.B || dbus->swr == remote::DOWN || !key->Read()) break;
     print("preparing gimbal \r\n");
     osDelay(100);
   }
+
+  osDelay(1000);  // 4310s need time to initialize
 
   with_chassis->cmd.id = bsp::START;
   with_chassis->cmd.data_bool = true;
@@ -143,40 +147,54 @@ void gimbal_task(void* args) {
   //   print("Waiting for 4310 motors to initialize...\r\n");
   // }
 
-  while (yaw_motor->GetOmega() == 0.0) {
+  while (yaw_motor->GetTheta() == 0.0) {
     print("Waiting for yaw_motor to initialize...\r\n");
     osDelay(100);
   }
 
-  while (vtx_pitch_motor->GetOmega() == 0.0) {
+  while (vtx_pitch_motor->GetTheta() == 0.0) {
     print("Waiting for vtx_pitch_motor to initialize...\r\n");
     osDelay(100);
 
   }
 
-  while (barrel_motor->GetOmega() == 0.0) {
+  while (barrel_motor->GetTheta() == 0.0) {
     print("Waiting for barrel_motor to initialize...\r\n");
     osDelay(100);
   }
 
   print("4310 motors initalized\r\n" );
 
+  pitch_motor_L->SetOutput(0);
+  pitch_motor_R->SetOutput(0);
+  control::MotorCANBase::TransmitOutput(can1_pitch, 2);
+
+  float closest_angle = 2 * PI;
+  float init_barrel_angle = 0.0;
+  print("curr angle: %f\r\n", barrel_motor->GetTheta());
+  float curr_angle = barrel_motor->GetTheta();
+  for (int i = -2; i < 3; i++) {
+    print("angle diff to angle %f: %f\r\n", i * (2*PI/5), abs(curr_angle - (i * (2*PI/5))));
+    
+    if (abs(curr_angle - (i * (2*PI/5))) < abs(closest_angle)) {
+      closest_angle = abs(curr_angle - (i * (2*PI/5)));
+        init_barrel_angle = i * (2*PI/5);
+    }
+  }
+
   float yaw_curr = yaw_motor->GetTheta();
   float yaw_delta = yaw_motor->GetTheta() / 100.0;
   float pitch_curr = vtx_pitch_motor->GetTheta();
   float pitch_delta = vtx_pitch_motor->GetTheta() / 100.0;
   float barrel_curr = barrel_motor->GetTheta();
-  float barrel_delta = barrel_motor->GetTheta() / 100.0;
-
-  pitch_motor_L->SetOutput(0);
-  pitch_motor_R->SetOutput(0);
-  control::MotorCANBase::TransmitOutput(can1_pitch, 2);
+  float barrel_delta = (barrel_motor->GetTheta() - init_barrel_angle) / 100.0;
 
   // 4310 soft start
   for (int i = 0; i < 100; i++) {
     yaw_motor->SetOutput(yaw_curr, 1, 30, 0.5, 0);
     vtx_pitch_motor->SetOutput(pitch_curr, 1, 30, 0.5, 0);
     barrel_motor->SetOutput(barrel_curr, 1, 30, 0.5, 0);
+    // print("barrel_curr: %f barrel actual: %f\r\n", barrel_curr, barrel_motor->GetTheta());
 
     control::Motor4310::TransmitOutput(m4310_motors, 3);
 
@@ -288,7 +306,7 @@ void gimbal_task(void* args) {
   float pitch_min = -0.3327;
   float pitch_max = 0.2514;
 
-  float yaw_pos = 0.0, pitch_pos = 0.0, barrel_pos = 0.0;
+  float yaw_pos = 0.0, vtx_pitch_pos = 0.0, barrel_pos = barrel_curr;
   int loop_cnt = 0;
   while (true) {
     toggle_auxilary_mode.input(dbus->swr == remote::DOWN);
@@ -296,26 +314,31 @@ void gimbal_task(void* args) {
       aux_mode = !aux_mode;
     }
 
-    float yaw_vel = 0.0, pitch_vel = 0.0;
+    float yaw_vel = 0.0, vtx_pitch_vel = 0.0;
     if (aux_mode) {
       yaw_vel = clip<float>(dbus->ch2 / 660.0 * 15.0, -15, 15);
-      yaw_pos += yaw_vel / 2000.0;
+      yaw_pos += yaw_vel / 8000.0;
       yaw_pos = clip<float>(yaw_pos, yaw_min, yaw_max);
       yaw_motor->SetOutput(yaw_pos, yaw_vel, 30, 0.5, 0);
 
-
-      rotate_barrel.input(dbus->ch0 > 630.0);
-      if (rotate_barrel.posEdge()) {
+      rotate_barrel_left.input(dbus->ch0 < -630.0);
+      if (rotate_barrel_left.posEdge()) {
         barrel_pos += 2.0 * PI / 5.0;
       }
+
+      rotate_barrel_right.input(dbus->ch0 > 630.0);
+      if (rotate_barrel_right.posEdge()) {
+        barrel_pos -= 2.0 * PI / 5.0;
+      }
+
       barrel_motor->SetOutput(barrel_pos, 10);
     }
 
     if (!aux_mode){
-      pitch_vel = clip<float>(dbus->ch3 / 660.0 * 15.0, -15, 15);
-      pitch_pos += pitch_vel / 2000.0;
-      pitch_pos = clip<float>(pitch_pos, pitch_min, pitch_max);
-      vtx_pitch_motor->SetOutput(pitch_pos, pitch_vel, 30, 0.5, 0);
+      vtx_pitch_vel = clip<float>(dbus->ch3 / 660.0 * 15.0, -15, 15);
+      vtx_pitch_pos += vtx_pitch_vel / 2000.0;
+      vtx_pitch_pos = clip<float>(vtx_pitch_pos, pitch_min, pitch_max);
+      vtx_pitch_motor->SetOutput(vtx_pitch_pos, vtx_pitch_vel, 30, 0.5, 0);
     }
 
     // Bool Edge Detector for lob mode switch or osEventFlags wait for a signal from different threads
@@ -432,14 +455,14 @@ void gimbal_task(void* args) {
     // }
     // loop_cnt++;
     UNUSED(loop_cnt);
-    if (!forward_key->Read() || (aux_mode && dbus->ch3 > 630)){
+    if (!forward_key->Read() || (aux_mode && dbus->ch3 > 610)){
       pitch_servo_L->SetTarget(pitch_servo_L->GetTheta() + PI * 100, true);
       pitch_servo_R->SetTarget(pitch_servo_R->GetTheta() + PI * 100, true);
       osDelay(GIMBAL_TASK_DELAY);
       pitch_servo_L->CalcOutput(&p_l_out);
       pitch_servo_R->CalcOutput(&p_r_out);
       print("pitch moving forward\r\n");
-    } else if (!backward_key->Read() || (aux_mode && dbus->ch3 < -630)) {
+    } else if (!backward_key->Read() || (aux_mode && dbus->ch3 < -610)) {
       pitch_servo_L->SetTarget(pitch_servo_L->GetTheta() - PI * 100,true);
       pitch_servo_R->SetTarget(pitch_servo_R->GetTheta() - PI * 100,true);
       osDelay(GIMBAL_TASK_DELAY);
