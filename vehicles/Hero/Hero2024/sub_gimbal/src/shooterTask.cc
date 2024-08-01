@@ -158,9 +158,6 @@ void shooter_task(void* args) {
 
     control::MotorCANBase::TransmitOutput(can1_shooter_shoot, 2);
 
-    // rfid motor
-    print("theta: %f\r\n", rfid_motor->GetTheta());
-
     /* rfid motor */
     rfid_upper.input(rfid_motor->GetTheta() > rfid_motor_target2);
     rfid_lower.input(rfid_motor->GetTheta() < rfid_motor_target1);
@@ -179,6 +176,7 @@ void shooter_task(void* args) {
     }
     control::MotorCANBase::TransmitOutput(can1_rfid, 1);
 
+    print("cooling_heat1: %f cooling_limit1: %f gimbal_power: %d shooter_power: %d\r\n", with_chassis->cooling_heat1, with_chassis->cooling_limit1, with_chassis->gimbal_power, with_chassis->shooter_power);
 
     osDelay(SHOOTER_TASK_DELAY);
   }

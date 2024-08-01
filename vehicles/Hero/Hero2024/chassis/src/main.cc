@@ -75,7 +75,7 @@ void RM_RTOS_Init() {
 
 #ifndef SINGLEBOARD
   with_gimbal = new bsp::CanBridge(can2,0x20B,0x20A);
-  // with_shooter = new bsp::CanBridge(can2,0x20B,0x20C);
+  with_shooter = new bsp::CanBridge(can2,0x20D,0x20E);
   // cannot add this line
 #endif
   init_chassis();

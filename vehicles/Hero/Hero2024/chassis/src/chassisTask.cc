@@ -198,21 +198,21 @@ void chassisTask(void* arg){
     UNUSED(wheel_motors);
     // print("chassis motor output transmitted \r\n");
 
-    // with_shooter->cmd.id = bsp::COOLING_HEAT1;
-    // with_shooter->cmd.data_float = (float)referee->power_heat_data.shooter_id1_17mm_cooling_heat;
-    // with_shooter->TransmitOutput();
+    with_shooter->cmd.id = bsp::COOLING_HEAT1;
+    with_shooter->cmd.data_float = (float)referee->power_heat_data.shooter_id1_17mm_cooling_heat;
+    with_shooter->TransmitOutput();
 
-    // with_shooter->cmd.id = bsp::COOLING_LIMIT1;
-    // with_shooter->cmd.data_float = (float)referee->game_robot_status.shooter_barrel_cooling_value;
-    // with_shooter->TransmitOutput();
+    with_shooter->cmd.id = bsp::COOLING_LIMIT1;
+    with_shooter->cmd.data_float = (float)referee->game_robot_status.shooter_barrel_cooling_value;
+    with_shooter->TransmitOutput();
 
-    // with_shooter->cmd.id = bsp::GIMBAL_POWER;
-    // with_shooter->cmd.data_uint = referee->game_robot_status.mains_power_gimbal_output;
-    // with_shooter->TransmitOutput();
+    with_shooter->cmd.id = bsp::GIMBAL_POWER;
+    with_shooter->cmd.data_uint = referee->game_robot_status.mains_power_gimbal_output;
+    with_shooter->TransmitOutput();
 
-    // with_shooter->cmd.id = bsp::SHOOTER_POWER;
-    // with_shooter->cmd.data_bool = referee->game_robot_status.mains_power_shooter_output;
-    // with_shooter->TransmitOutput();
+    with_shooter->cmd.id = bsp::SHOOTER_POWER;
+    with_shooter->cmd.data_bool = referee->game_robot_status.mains_power_shooter_output;
+    with_shooter->TransmitOutput();
 
     osDelay(CHASSIS_TASK_DELAY);
   }

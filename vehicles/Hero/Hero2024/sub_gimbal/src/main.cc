@@ -25,14 +25,16 @@
 bsp::CAN* can1 = nullptr;
 bsp::CAN* can2 = nullptr;
 bsp::CanBridge* with_gimbal = nullptr;
+bsp::CanBridge* with_chassis = nullptr;
 osThreadId_t shooterTaskHandle;
 bsp::Buzzer *buzzer = nullptr;
+
 void RM_RTOS_Init(){
     print_use_uart(&huart1);
     can1 = new bsp::CAN(&hcan1,true);
     can2 = new bsp::CAN(&hcan2,false);
     with_gimbal = new bsp::CanBridge(can2,0x20C,0x20A);
-    // with_chassis = new bsp::CanBridge(can2,0x20C,0x20B);
+    with_chassis = new bsp::CanBridge(can2,0x20E,0x20D);
     buzzer = new bsp::Buzzer(&htim4, 3, 1000000);
     init_shooter();
 }

@@ -49,9 +49,9 @@
 
 |        Switch Position        |                           Function                           |
 | :---------------------------: | :----------------------------------------------------------: |
-|           `swl-up`            |                       Toggle lob mode                        |
+|           `swl-up`            |                      Spin load motor                         |
 |          `swl-down`           |                      Adjust shoot speed                      |
-|           `swr-up`            |                       Spin load motor                        |
+|           `swr-up`            |                       Toggle lob mode                        |
 | `swr-down (pre-calibration)`  | Calibration, break dead loop and enter primary loops of most threads |
 | `swr-down (post-calibration)` |  Toggle between main control mode and auxilary control mode  |
 
@@ -79,9 +79,29 @@
 
 ## Can_Bridge
 
-gimbal id: 0x20A
-chassis id: 0x20B
-shooter id: 0x20C
+Gimbal --> Chassis:
+TX: 0x20A
+RX: 0x20B
+
+Chassis --> Gimbal:
+TX: 0x20B
+RX: 0x20A
+
+Gimbal --> Shooter:
+TX: 0x20A
+RX: 0x20C
+
+Shooter --> Gimbal:
+TX: 0x20C
+RX: 0x20A
+
+Chassis --> Shooter:
+TX: 0x20D
+RX: 0x20E
+
+Shooter --> Chassis:
+TX: 0x20E
+RX: 0x20D
 
 Gimbal -> chassis:
     VX, VY, VZ, BUS_SWR, START, DEAD
@@ -89,6 +109,5 @@ Gimbal -> chassis:
 Gimbal -> shooter:
     START, BUS_SWL, BUS_SWR, DEAD
 
-<!-- The following is ideal but does not work now -->
 Chassis -> shooter 
-    heat, heat_limit
+    COOLING_HEAT1, COOLING_LIMIT1, GIMBAL_POWER, SHOOTER_POWER
