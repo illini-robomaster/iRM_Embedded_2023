@@ -409,14 +409,26 @@ void gimbal_task(void* args) {
     with_shooter->TransmitOutput();
 
     UNUSED(loop_cnt);
-    if (!forward_key->Read() || (aux_mode && dbus->ch3 > 610)){
+    
+    pitch_servo_L->SetMaxSpeed(7*PI);
+    pitch_servo_R->SetMaxSpeed(7*PI);
+
+    if (!forward_key->Read() || (aux_mode && dbus->ch3 > 10)){
+      if (aux_mode && dbus->ch3 > 10){
+        pitch_servo_L->SetMaxSpeed(dbus->ch3 / 660.0 * 5*PI);
+        pitch_servo_R->SetMaxSpeed(dbus->ch3 / 660.0 * 5*PI);
+      }
       pitch_servo_L->SetTarget(pitch_servo_L->GetTheta() + PI * 100, true);
       pitch_servo_R->SetTarget(pitch_servo_R->GetTheta() + PI * 100, true);
       osDelay(GIMBAL_TASK_DELAY);
       pitch_servo_L->CalcOutput(&p_l_out);
       pitch_servo_R->CalcOutput(&p_r_out);
       print("pitch moving forward\r\n");
-    } else if (!backward_key->Read() || (aux_mode && dbus->ch3 < -610)) {
+    } else if (!backward_key->Read() || (aux_mode && dbus->ch3 < -10)) {
+      if (aux_mode && dbus->ch3 < -10){
+        pitch_servo_L->SetMaxSpeed(abs(dbus->ch3) / 660.0 * 5*PI);
+        pitch_servo_R->SetMaxSpeed(abs(dbus->ch3) / 660.0 * 5*PI);
+      }
       pitch_servo_L->SetTarget(pitch_servo_L->GetTheta() - PI * 100,true);
       pitch_servo_R->SetTarget(pitch_servo_R->GetTheta() - PI * 100,true);
       osDelay(GIMBAL_TASK_DELAY);
