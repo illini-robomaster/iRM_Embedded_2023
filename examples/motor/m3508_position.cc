@@ -45,7 +45,7 @@ bsp::CAN* can1 = nullptr;
 control::MotorCANBase* motor = nullptr;
 control::ServoMotor* servo = nullptr;
 bsp::GPIO* key = nullptr;
-
+int escaout = 0;
 #ifdef WITH_CONTROLLER
 remote::DBUS* dbus = nullptr;
 #else
@@ -113,7 +113,9 @@ void RM_RTOS_Default_Task(const void* args) {
   osDelay(500);  // DBUS initialization needs time
 #else
 
+
 #endif
+
    control::MotorCANBase* motors[] = {motor};
 
   BoolEdgeDetector esca_sw(false);
@@ -133,8 +135,8 @@ void RM_RTOS_Default_Task(const void* args) {
       // set escalation servo to original position
       servo->SetTarget(cali);
     }
-    print("theta: %f\r\n",servo->GetTheta()-cali);
-    servo->CalcOutput();
+    servo->CalcOutput(&escaout);
+    print("%d\r\n",escaout);
     control::MotorCANBase::TransmitOutput(motors,1);
     osDelay(2);
   }

@@ -80,7 +80,7 @@ void RM_RTOS_Init() {
   key = new bsp::GPIO(KEY_GPIO_Port,KEY_Pin);
   buzzer.SingSong(Mario);
 #ifdef REFEREE
-  referee_uart = new RefereeUART(&huart6);
+  referee_uart = new RefereeUART(&huart1);
   referee_uart->SetupRx(300);
   referee_uart->SetupTx(300);
   referee = new communication::Referee();

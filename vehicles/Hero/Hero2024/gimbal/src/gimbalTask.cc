@@ -116,8 +116,8 @@ void gimbal_task(void* args) {
   // osDelay(100);
   // vtx_pitch_motor->SetZeroPos();
   // osDelay(100);
-//   barrel_motor->SetZeroPos();
-//   osDelay(100);
+   barrel_motor->SetZeroPos();
+   osDelay(100);
 
   yaw_motor->MotorEnable();
   print("yaw motor enabled\r\n");
@@ -192,6 +192,7 @@ void gimbal_task(void* args) {
 
     osDelay(10);
   }
+  osDelay(3000);
 
   /*
    * escalation reset
@@ -306,8 +307,6 @@ void gimbal_task(void* args) {
         barrel_pos -= 2.0 * PI / 5.0;
         print("reload!!!\r\n");
       }
-
-
       barrel_motor->SetOutput(barrel_pos, 10);
     }
 
@@ -359,6 +358,7 @@ void gimbal_task(void* args) {
       print("ammo abundant \r\n");
 
     }
+
 
     if (dbus->keyboard.bit.A) vx_keyboard -= 61.5;
     if (dbus->keyboard.bit.D) vx_keyboard += 61.5;
@@ -431,6 +431,9 @@ void gimbal_task(void* args) {
     with_chassis->cmd.data_bool = true;
     with_chassis->TransmitOutput();
 
+    with_shooter->cmd.id = bsp::MOUSE;
+    with_shooter->cmd.data_mouse = dbus->mouse;
+    with_shooter->TransmitOutput();
 
 
     UNUSED(loop_cnt);

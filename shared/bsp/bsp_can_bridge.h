@@ -48,7 +48,9 @@ typedef enum {
   BUS_SWL,
   BUS_SWR,
   LOB_MODE,
-  SCOPE_ON
+  SCOPE_ON,
+  BULLET_REMAIN,
+  MOUSE
 } can_bridge_cmd;
 
 typedef struct {
@@ -59,7 +61,7 @@ typedef struct {
     bool data_bool;
     unsigned int data_uint;
 //    remote::keyboard_t data_keyboard;
-//    remote::mouse_t data_mouse;
+    remote::mouse_t data_mouse;
   };
 } bridge_data_t;
 
@@ -96,10 +98,11 @@ class CanBridge {
   unsigned int bus_swr = 0;
 
   bool scope_on = false;
+  unsigned int bullet_remain = 0;
 //  remote::keyboard_t keyboard;
 //  remote::mouse_t mouse_bit;
   // each bit represents a key on the keyboard
-
+  remote::mouse_t mouse;
 
 
  private:

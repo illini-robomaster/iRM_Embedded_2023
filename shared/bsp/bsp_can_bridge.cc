@@ -108,6 +108,12 @@ void CanBridge::UpdateData(const uint8_t* data) {
     case SCOPE_ON:
         scope_on = cmd.data_bool;
         break;
+    case BULLET_REMAIN:
+        bullet_remain = cmd.data_uint;
+        break;
+    case MOUSE:
+        mouse = cmd.data_mouse;
+        break;
     default:;
   }
 }

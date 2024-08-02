@@ -46,7 +46,7 @@ const osThreadAttr_t gimbalTaskAttribute = {.name = "gimbal_task",
         .cb_size = 0,
         .stack_mem = nullptr,
         .stack_size = 512 * 4,
-        .priority = (osPriority_t)osPriorityRealtime,
+        .priority = (osPriority_t)osPriorityHigh,
         .tz_module = 0,
         .reserved = 0};
 

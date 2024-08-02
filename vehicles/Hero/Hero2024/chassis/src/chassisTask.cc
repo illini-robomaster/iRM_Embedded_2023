@@ -66,6 +66,8 @@ bool scope_on = false;
 
 static volatile bool Dead = false;
 
+
+
 void chassisTask(void* arg){
   UNUSED(arg);
 
@@ -172,11 +174,17 @@ void chassisTask(void* arg){
       scope_on = !scope_on;
     }
 
-    if (with_gimbal->scope_on || scope_on){
+
+
+    if (with_gimbal->scope_on){
       scope_motor->SetOutput(100);
+      print("scope motor\r\n");
     } else {
        scope_motor->SetOutput(1600);
+       print("off\r\n");
     }
+
+
 
     // calculate camera oriented velocity vector
     Vector2d target_vel_cam = target_vel.rotateBy(Angle2d(relative_angle)); // now relative_angle is 0
@@ -228,20 +236,22 @@ void chassisTask(void* arg){
     // print("chassis motor output transmitted \r\n");
   #ifdef REFEREE
     with_shooter->cmd.id = bsp::COOLING_HEAT1;
-    with_shooter->cmd.data_float = (float)referee->power_heat_data.shooter_id1_17mm_cooling_heat;
+    with_shooter->cmd.data_float = (float)referee->power_heat_data.shooter_id1_42mm_cooling_heat;
     with_shooter->TransmitOutput();
 
     with_shooter->cmd.id = bsp::COOLING_LIMIT1;
     with_shooter->cmd.data_float = (float)referee->game_robot_status.shooter_barrel_cooling_value;
     with_shooter->TransmitOutput();
 
-    with_shooter->cmd.id = bsp::GIMBAL_POWER;
-    with_shooter->cmd.data_uint = referee->game_robot_status.mains_power_gimbal_output;
+    with_shooter->cmd.id = bsp::BULLET_REMAIN;
+    with_shooter->cmd.data_uint = referee->bullet_remaining.bullet_remaining_num_42mm;
     with_shooter->TransmitOutput();
 
     with_shooter->cmd.id = bsp::SHOOTER_POWER;
     with_shooter->cmd.data_bool = referee->game_robot_status.mains_power_shooter_output;
     with_shooter->TransmitOutput();
+
+
 
   #endif
     osDelay(CHASSIS_TASK_DELAY);
