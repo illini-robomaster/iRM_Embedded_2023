@@ -42,5 +42,5 @@ void RM_RTOS_Init(){
 
 void RM_RTOS_Threads_Init(void) {
   shooterTaskHandle = osThreadNew(shooter_task, nullptr, &shooterTaskAttribute);
-//     UITaskHandle = osThreadNew(UITask,nullptr,&UITaskAttribute);
 }
+

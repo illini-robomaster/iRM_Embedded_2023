@@ -242,6 +242,7 @@ void chassisTask(void* arg){
     with_shooter->cmd.id = bsp::SHOOTER_POWER;
     with_shooter->cmd.data_bool = referee->game_robot_status.mains_power_shooter_output;
     with_shooter->TransmitOutput();
+
   #endif
     osDelay(CHASSIS_TASK_DELAY);
   }

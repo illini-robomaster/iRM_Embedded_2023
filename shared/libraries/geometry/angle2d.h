@@ -2,7 +2,7 @@
 
 #include <string>
 #include <cmath>
-#include "Angle2d.h"
+
 
 /**
  * Create an instance that contains an angle. This angle's unit can be taken to degree, radian, or rotation.

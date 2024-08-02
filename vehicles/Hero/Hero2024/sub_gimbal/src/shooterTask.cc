@@ -176,7 +176,7 @@ void shooter_task(void* args) {
 
 
 
-    if(with_gimbal->lob_mode == remote::UP){
+    if(with_gimbal->bus_swr == remote::UP){
       // please make sure the calibration is all done
       // lob mode
       escalation_servo->SetTarget(calibrated_theta_esca + PI * 12.1);

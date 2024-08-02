@@ -31,7 +31,7 @@ control::MotorPWMBase* motor2;
 bool nintyDegree = false;
 
 void RM_RTOS_Init(){
-  print_use_uart(&huart6);
+  print_use_uart(&huart1);
   key = new bsp::GPIO(KEY_GPIO_Port, KEY_Pin);
 
   motor1 = new control::MotorPWMBase(&htim1, PWM_CHANNEL,TIM_CLOCK_FREQ,MOTOR_OUT_FREQ, PULSE_WIDTH);

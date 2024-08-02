@@ -280,6 +280,9 @@ void gimbal_task(void* args) {
 
   float yaw_pos = 0.0, vtx_pitch_pos = 0.0, barrel_pos = barrel_curr;
   int loop_cnt = 0;
+
+  int16_t pulse_width_ammo;
+
   while (true) {
     toggle_auxilary_mode.input(dbus->swr == remote::DOWN);
     if (toggle_auxilary_mode.posEdge()) {
@@ -298,10 +301,13 @@ void gimbal_task(void* args) {
       barrel_motor->SetOutput(barrel_pos, 10);
     }
     // need to reload whenever there are no ammo
-    rotate_barrel_right.input(/*dbus->ch0 > 630.0*/!reload_sensor->Read());
+    rotate_barrel_right.input(/*dbus->ch0 > 630.0*/reload_sensor->Read());
     if (rotate_barrel_right.posEdge()) {
       barrel_pos -= 2.0 * PI / 5.0;
+      print("reload!!!\r\n");
     }
+
+
     if (!aux_mode){
       vtx_pitch_vel = clip<float>(dbus->ch3 / 660.0 * 15.0, -15, 15);
       vtx_pitch_pos += vtx_pitch_vel / 2000.0;
@@ -313,7 +319,7 @@ void gimbal_task(void* args) {
 
     // Bool Edge Detector for lob mode switch or osEventFlags wait for a signal from different threads
 
-    lob_mode_sw.input(dbus->keyboard.bit.SHIFT || dbus->swl == remote::UP || !key->Read());
+    lob_mode_sw.input(dbus->keyboard.bit.SHIFT || dbus->swr == remote::UP || !key->Read());
     if (lob_mode_sw.posEdge() && dbus->swr == remote::UP){
       lob_mode = !lob_mode;
       // TODO: after implementing chassis, uncomment the lob_mode bsp::CanBridge flag transmission
@@ -336,9 +342,12 @@ void gimbal_task(void* args) {
     // stopping the ammo
 
     if (ammo_sensor->Read()){
-      ammo_motor->SetOutput(50);
+      pulse_width_ammo = 700;
+      print(" no ammo \r\n");
     } else {
-      ammo_motor->SetOutput(700);
+      pulse_width_ammo = 50;
+      print("ammo abundant \r\n");
+
     }
 
     if (dbus->keyboard.bit.A) vx_keyboard -= 61.5;
@@ -408,6 +417,12 @@ void gimbal_task(void* args) {
     with_shooter->cmd.data_bool = true;
     with_shooter->TransmitOutput();
 
+    with_chassis->cmd.id = bsp::START;
+    with_chassis->cmd.data_bool = true;
+    with_chassis->TransmitOutput();
+
+
+
     UNUSED(loop_cnt);
     
     pitch_servo_L->SetMaxSpeed(7*PI);
@@ -450,7 +465,7 @@ void gimbal_task(void* args) {
 
     pitch_motor_L->SetOutput(p_l_out);
     pitch_motor_R->SetOutput(p_r_out);
-
+    ammo_motor->SetOutput(pulse_width_ammo);
 //    pitch_curr = pitch_encoder->getData();
 
 
@@ -481,16 +496,22 @@ void init_gimbal() {
   pitch_servo_R = new control::ServoMotor(pitch_servo_data);
 
 
-  ammo_motor = new control::MotorPWMBase(&htim1, TIM_CHANNEL_2, 1000000, 50, 1500);
+  ammo_motor = new control::MotorPWMBase(&htim1, 1, 1000000, 50, 1500);
 
   barrel_motor = new control::Motor4310(can1, 0x02, 0x03, control::POS_VEL);
   yaw_motor = new control::Motor4310(can1, 0x04, 0x05, control::MIT);
   vtx_pitch_motor = new control::Motor4310(can1, 0x06, 0x07, control::MIT);
-
+  GPIO_InitTypeDef GPIO_InitStruct;
+  HAL_GPIO_DeInit(IN3_GPIO_Port, IN3_Pin);
+  HAL_GPIO_DeInit(IN4_GPIO_Port, IN4_Pin);
+  GPIO_InitStruct.Pin = IN3_Pin | IN4_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(IN3_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(IN4_GPIO_Port, &GPIO_InitStruct);
   ammo_sensor = new bsp::GPIO(IN3_GPIO_Port, IN3_Pin);
   reload_sensor = new bsp::GPIO(IN4_GPIO_Port, IN4_Pin);
-
-
 }
 
 void kill_gimbal() {
