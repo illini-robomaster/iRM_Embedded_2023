@@ -103,15 +103,17 @@ void ReviveAll(){
 
 void RM_RTOS_Default_Task(const void* args) {
     UNUSED(args);
-    while(true){ //if want to print, make sure nothing is print somewhere else
-        if(receive->dead){
-            if(!armIsKilled){
+    while(true){
+        // if want to print, make sure nothing is print somewhere else
+        if (receive->dead) {
+            if (!armIsKilled) {
                 print("killed\n");
             }
             armIsKilled = true;
             KillAll();
             osDelay(100);
-        }else if(armIsKilled && !receive->dead){ // killed to revive
+        } else if (armIsKilled && !receive->dead) {
+            // killed to revive
             ReviveAll();
             armIsKilled = false;
         }

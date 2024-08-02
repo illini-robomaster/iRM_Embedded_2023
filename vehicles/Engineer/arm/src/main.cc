@@ -77,7 +77,7 @@ void RM_RTOS_Init() {
 #endif
   can1 = new bsp::CAN(&hcan1, true);
   can2 = new bsp::CAN(&hcan2, false);
-  send = new bsp::CanBridge(can1, 0x20A, 0x20B);
+  send = new bsp::CanBridge(can2, 0x20A, 0x20B);
 #ifdef REFEREE
   referee_uart = new RefereeUART(&huart5);
   referee_uart->SetupTx(300);

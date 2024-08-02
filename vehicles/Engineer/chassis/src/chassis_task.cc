@@ -4,7 +4,7 @@
 #include "moving_average.h"
 #include "hrb_supercap.h"
 
-//Constants 
+//Constants
 static const int KILLALL_DELAY = 100;
 static const int DEFAULT_TASK_DELAY = 100;
 static const int CHASSIS_TASK_DELAY = 2;
@@ -18,7 +18,7 @@ static const float NORMALIZATION_FACTOR = 1;
 // static const float MOMENTUM_SAFE_FACTOR_LINE = 0.3;   // also ^
 // static const float MOMENTUM_SAFE_FACTOR_TURN = 0.3;   // also ^
 // static const float MOMENTUM_FACTOR_PER_SEC = 0.1;     // the velocity at half a second before only have 10% impact on curr target
-// static const float MOMENTUM_FACTOR = 1-pow(MOMENTUM_FACTOR_PER_SEC, 1.0/500/0.5);  
+// static const float MOMENTUM_FACTOR = 1-pow(MOMENTUM_FACTOR_PER_SEC, 1.0/500/0.5);
 
 
 /*Args*/
@@ -52,7 +52,7 @@ static bool killed;
 
 void chassisTask(void* arg){
     UNUSED(arg);
-    
+
     control::MotorCANBase* wheel_motors_2[] = {motor6, motor8};
     control::MotorCANBase* wheel_motors_1[] = {motor5, motor7};
 
@@ -95,9 +95,9 @@ void chassisTask(void* arg){
         if (joystick_vector.getMagnitude() < DEADZONE){
             joystick_vector = Vector2d(0, 0);
         }
-        else{ 
+        else{
             // make vector continous at the edge of the deadzone
-            // (v - 0.1 / |v| * v) / 0.9 
+            // (v - 0.1 / |v| * v) / 0.9
             joystick_vector = joystick_vector.minus(joystick_vector.normalize().times(0.1)).times(1.0/(1-DEADZONE));
         }
 
@@ -115,7 +115,7 @@ void chassisTask(void* arg){
 
         Vector2d delta_v = target_vel.minus(prev_target_vel);
         // find the maximum delta V that is under the acceleration limit
-        float max_delta_v_mag = ACC_TRANS_MAX * CHASSIS_TASK_DELAY / 1000.0; 
+        float max_delta_v_mag = ACC_TRANS_MAX * CHASSIS_TASK_DELAY / 1000.0;
         // cap delta_v to this magnitude
         if (delta_v.getMagnitude() > max_delta_v_mag){
             delta_v = delta_v.normalize().times(max_delta_v_mag);
@@ -172,7 +172,7 @@ void chassisTask(void* arg){
         control::MotorCANBase::TransmitOutput(steer_motors_2, 2);
         control::MotorCANBase::TransmitOutput(&motor3, 1);
         control::MotorCANBase::TransmitOutput(&motor1, 1);
- 
+
 
         control::MotorCANBase::TransmitOutput(wheel_motors_1, 2);
         control::MotorCANBase::TransmitOutput(wheel_motors_2, 2);
