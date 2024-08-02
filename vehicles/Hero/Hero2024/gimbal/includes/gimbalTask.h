@@ -24,7 +24,6 @@
 
 #include "chassis.h"
 #include "bsp_gpio.h"
-#include "sen_0366_dist.h"
 #include "bsp_can_bridge.h"
 #include "bsp_os.h"
 #include "bsp_print.h"

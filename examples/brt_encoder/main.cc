@@ -30,6 +30,7 @@ static control::BRTEncoder* encoder2 = nullptr;
 
 void RM_RTOS_Init(void) {
   print_use_uart(&UART_HANDLE);
+
   can = new bsp::CAN(&hcan1);
   encoder = new control::BRTEncoder(can, 0x01, true);
   encoder2 = new control::BRTEncoder(can, 0x0A, false);

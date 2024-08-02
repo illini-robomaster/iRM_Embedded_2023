@@ -102,9 +102,12 @@ void CanBridge::UpdateData(const uint8_t* data) {
     case BUS_SWL:
         bus_swl = cmd.data_uint;
         break;
-//    case KEYBOARD_BIT:
-//      keyboard = cmd.data_keyboard;
-//        break;
+    case LOB_MODE:
+        lob_mode = cmd.data_bool;
+        break;
+    case SCOPE_ON:
+        scope_on = cmd.data_bool;
+        break;
     default:;
   }
 }

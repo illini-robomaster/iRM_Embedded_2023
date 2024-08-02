@@ -49,8 +49,19 @@ static control::ConstrainedPID* rfid_motor_omega_pid = nullptr;
 static BoolEdgeDetector rfid_upper(false);
 static BoolEdgeDetector rfid_lower(false);
 
+static control::MotorCANBase* esca_motor = nullptr;
+static control::ServoMotor* escalation_servo = nullptr;
+
+
+
+
 int s_f_out;
 int s_b_out;
+int esca_out;
+
+bool lob_mode = false;
+
+
 
 
 //static int FORCE_VALUE = 0;
@@ -67,6 +78,7 @@ void shooter_task(void* args) {
   UNUSED(args);
   // shooter desired speed
   // motor initialization
+  control::MotorCANBase* can1_escalation[] = {esca_motor};  // TODO: change
   control::MotorCANBase* can1_shooter_shoot[] = {shoot_front_motor, shoot_back_motor};
   control::MotorCANBase* can1_rfid[] = {rfid_motor};
 
@@ -83,6 +95,9 @@ void shooter_task(void* args) {
   float rfid_motor_target2 = 0.75;
   float rfid_motor_vel = 1.0;
 
+  float calibrated_theta_esca = escalation_servo->GetTheta();
+
+
 
   while (true) {
     if (/*receive->keyboard.bit.B || */with_gimbal->start) break;
@@ -97,6 +112,7 @@ void shooter_task(void* args) {
   shoot_back_motor->SetOutput(0);
   force_motor->SetOutput(0);
   control::MotorCANBase::TransmitOutput(can1_shooter_shoot, 2);
+
 
 
 
@@ -133,7 +149,7 @@ void shooter_task(void* args) {
       control::MotorCANBase::TransmitOutput(can1_shooter_shoot, 2);
     } */
     else {
-      print("stopping\r\n");
+//      print("stopping\r\n");
       osDelay(SHOOTER_TASK_DELAY);
       shoot_back_speed_diff = shoot_back_motor->GetOmegaDelta(0);
       s_b_out = shoot_pid.ComputeConstrainedOutput(shoot_back_speed_diff);
@@ -145,6 +161,7 @@ void shooter_task(void* args) {
     key_sw.input(with_gimbal->bus_swl == remote::DOWN);
     // we use can bus to change the input
     if(key_sw.posEdge()){
+      print("level adjusted\r\n");
       level = (level + 1) % 4;
       for (int i = level; i >=0; i--){
         buzzer->SingTone(levels[level].note);
@@ -152,10 +169,27 @@ void shooter_task(void* args) {
         buzzer->SingTone(Note::Silent);
         [](uint32_t milli) { osDelay(milli); }(levels[level].delay);
       }
+
     }
 
     force_servo->CalcOutput();
 
+
+
+    if(with_gimbal->lob_mode == remote::UP){
+      // please make sure the calibration is all done
+      // lob mode
+      escalation_servo->SetTarget(calibrated_theta_esca + PI * 12.1);
+      // maximum goes to 38.345 radians
+      print("lob mode: %d\r\n",with_gimbal->lob_mode);
+    } else {
+      // moving mode
+      // set escalation servo to original position
+      escalation_servo->SetTarget(calibrated_theta_esca);
+      print("regular\r\n");
+    }
+
+    escalation_servo->CalcOutput(&esca_out);
     control::MotorCANBase::TransmitOutput(can1_shooter_shoot, 2);
 
     /* rfid motor */
@@ -175,8 +209,8 @@ void shooter_task(void* args) {
       rfid_motor->SetOutput(omega_pid_out);
     }
     control::MotorCANBase::TransmitOutput(can1_rfid, 1);
-
-    print("cooling_heat1: %f cooling_limit1: %f gimbal_power: %d shooter_power: %d\r\n", with_chassis->cooling_heat1, with_chassis->cooling_limit1, with_chassis->gimbal_power, with_chassis->shooter_power);
+    control::MotorCANBase::TransmitOutput(can1_escalation, 1);
+//    print("cooling_heat1: %f cooling_limit1: %f gimbal_power: %d shooter_power: %d\r\n", with_chassis->cooling_heat1, with_chassis->cooling_limit1, with_chassis->gimbal_power, with_chassis->shooter_power);
 
     osDelay(SHOOTER_TASK_DELAY);
   }
@@ -202,6 +236,20 @@ void init_shooter() {
   float rfid_motor_max_iout_omega = 25000;
   float rfid_motor_max_out_omega = 30000;
   rfid_motor_omega_pid = new control::ConstrainedPID(rfid_motor_pid_param_omega, rfid_motor_max_iout_omega, rfid_motor_max_out_omega);
+
+  // ESCALATION motors initialization
+  esca_motor = new control::Motor3508(can1, 0x204);
+  control::servo_t esca_servo_data;
+  esca_servo_data.motor = esca_motor;
+  esca_servo_data.max_speed = 2 * PI; // TODO: params need test
+  esca_servo_data.max_acceleration = 100 * PI;
+  esca_servo_data.transmission_ratio = M3508P19_RATIO;
+  esca_servo_data.omega_pid_param = new float [3] {150, 1.2, 5};
+  //  esca_servo_data.omega_pid_param = new float [3] {150, 1.2, 5};
+  esca_servo_data.max_iout = 2000;
+  esca_servo_data.max_out = 10000;
+  escalation_servo = new control::ServoMotor(esca_servo_data);
+
 
 }
 

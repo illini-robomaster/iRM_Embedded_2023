@@ -67,7 +67,7 @@ extern bsp::GPIO* key;
 extern bsp::CanBridge* with_gimbal;
 extern bsp::CanBridge* with_chassis;
 
-extern volatile bool lob_mode;
+;
 
 extern communication::Referee* referee;
 

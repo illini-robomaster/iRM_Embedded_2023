@@ -20,10 +20,11 @@ uint32_t MOTOR_OUT_FREQ = 50; /* TODO: could use more calibration if data is ava
 uint32_t PULSE_WIDTH = 1500;
 // PULSE_WIDTH when servo is idle
 int16_t output;
+int16_t output2;
 bsp::GPIO* key = nullptr;
 BoolEdgeDetector keyEdgeDetector(false);
 control::MotorPWMBase* motor1;
-
+control::MotorPWMBase* motor2;
 
 //bsp::GPIO* pe = nullptr;
 
@@ -34,10 +35,10 @@ void RM_RTOS_Init(){
   key = new bsp::GPIO(KEY_GPIO_Port, KEY_Pin);
 
   motor1 = new control::MotorPWMBase(&htim1, PWM_CHANNEL,TIM_CLOCK_FREQ,MOTOR_OUT_FREQ, PULSE_WIDTH);
+  motor2 = new control::MotorPWMBase(&htim1, 2, TIM_CLOCK_FREQ,MOTOR_OUT_FREQ,PULSE_WIDTH);
 //  motor1->SetOutput(1500);
   osDelay(300);
 //  pe = new bsp::GPIO(IN1_GPIO_Port, IN1_Pin);
-  output = 50;
 }
 
 void RM_RTOS_Default_Task(const void* args) {
@@ -54,7 +55,14 @@ void RM_RTOS_Default_Task(const void* args) {
     } else {
       output = 1600;
     }
+    if (nintyDegree){
+      output2 = 50;
+    } else {
+      output2 = 700;
+    }
     motor1->SetOutput(output);
+    motor2->SetOutput(output2);
+    print("motor1: %d, motor2: %d\r\n", output, output2);
 //    if (pe->Read()==0){
 //      print("pe is 0\r\n");
 //    } else {

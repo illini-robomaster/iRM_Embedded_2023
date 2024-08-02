@@ -35,9 +35,7 @@ float yaw_cmd;
 static const int KILLALL_DELAY = 100;
 static const int GIMBAL_TASK_DELAY = 3;
 
-static control::MotorCANBase* esca_motor = nullptr;
-static control::MotorPWMBase* scope_motor = nullptr;
-static control::ServoMotor* escalation_servo = nullptr;
+
 
 
 static control::MotorCANBase* pitch_motor_L = nullptr;
@@ -50,15 +48,20 @@ static control::Motor4310* yaw_motor = nullptr;
 static control::Motor4310* vtx_pitch_motor = nullptr;
 static control::Motor4310* barrel_motor = nullptr;
 
-static control::BRTEncoder *pitch_encoder = nullptr;
+//static control::BRTEncoder *pitch_encoder = nullptr;
 
-//static distance::SEN_0366_DIST *distance_sensor = nullptr;
+
 
 
 static BoolEdgeDetector rotate_barrel_left(false);
 static BoolEdgeDetector rotate_barrel_right(false);
 static BoolEdgeDetector toggle_auxilary_mode(false);
 
+static bsp::GPIO *reload_sensor = nullptr;
+static bsp::GPIO *ammo_sensor = nullptr;
+
+
+static control::MotorPWMBase* ammo_motor = nullptr;
 
 float calibrated_theta_esca = 0;
 
@@ -84,28 +87,14 @@ volatile bool scope_on = false;
 
 volatile bool aux_mode = false;
 
-void jam_callback(control::ServoMotor* servo, const control::servo_jam_t data) {
-  UNUSED(data);
-  control::MotorCANBase* can1_motor[] = {servo->GetMotor()};
-  servo->GetMotor()->SetOutput(0);
-  control::MotorCANBase::TransmitOutput(can1_motor, 1);
-  osDelay(100);
-}
-void empty_callback(control::ServoMotor* servo, const control::servo_jam_t data) {
-  UNUSED(servo);
-  UNUSED(data);
-}
+
 
 void gimbal_task(void* args) {
   UNUSED(args);
-  control::MotorCANBase* can1_escalation[] = {esca_motor};  // TODO: change
   control::MotorCANBase* can1_pitch[] = {pitch_motor_L, pitch_motor_R};
   control::Motor4310* m4310_motors[] = {yaw_motor, vtx_pitch_motor, barrel_motor};
 
-//  while (!distance_sensor->begin()){
-////    print("distance sensor initializing\r\n");
-//    osDelay(100);
-//  }
+
   
   while (true) {
     if (dbus->keyboard.bit.B || dbus->swr == remote::DOWN || !key->Read()) break;
@@ -123,7 +112,6 @@ void gimbal_task(void* args) {
   with_shooter->cmd.data_bool = true;
   with_shooter->TransmitOutput();
 
-//  distance_sensor->continuousMeasure();
   // yaw_motor->SetZeroPos();
   // osDelay(100);
   // vtx_pitch_motor->SetZeroPos();
@@ -209,22 +197,6 @@ void gimbal_task(void* args) {
    * escalation reset
    */
 #ifdef calibrate
-  while (true){
-    escalation_servo->SetTarget(escalation_servo->GetTheta() - PI * 2000,true);
-    escalation_servo->CalcOutput(&esca_out);
-    control::MotorCANBase::TransmitOutput(can1_escalation, 1);
-    osDelay(GIMBAL_TASK_DELAY);
-    if (escalation_servo->ZeroingExit()){
-//      print("Escalation motor jammed, resting...\r\n");
-      osDelay(50);
-      calibrated_theta_esca = escalation_servo->GetTheta();
-      escalation_servo->SetTarget(calibrated_theta_esca, true);
-      // update jam callback threshold
-
-      osDelay(50);
-      break;
-    }
-  }
 
 
 
@@ -274,7 +246,7 @@ void gimbal_task(void* args) {
 #endif
 
 
-  escalation_servo->RegisterJamCallback(empty_callback, 0.205);
+
   pitch_servo_L->SetMaxCurrent(pitch_servo_data, 2000);
   pitch_servo_R->SetMaxCurrent(pitch_servo_data, 2000);
 
@@ -321,19 +293,15 @@ void gimbal_task(void* args) {
       yaw_pos = clip<float>(yaw_pos, yaw_min, yaw_max);
       yaw_motor->SetOutput(yaw_pos, yaw_vel, 30, 0.5, 0);
 
-      rotate_barrel_left.input(dbus->ch0 < -630.0);
-      if (rotate_barrel_left.posEdge()) {
-        barrel_pos += 2.0 * PI / 5.0;
-      }
 
-      rotate_barrel_right.input(dbus->ch0 > 630.0);
-      if (rotate_barrel_right.posEdge()) {
-        barrel_pos -= 2.0 * PI / 5.0;
-      }
 
       barrel_motor->SetOutput(barrel_pos, 10);
     }
-
+    // need to reload whenever there are no ammo
+    rotate_barrel_right.input(/*dbus->ch0 > 630.0*/!reload_sensor->Read());
+    if (rotate_barrel_right.posEdge()) {
+      barrel_pos -= 2.0 * PI / 5.0;
+    }
     if (!aux_mode){
       vtx_pitch_vel = clip<float>(dbus->ch3 / 660.0 * 15.0, -15, 15);
       vtx_pitch_pos += vtx_pitch_vel / 2000.0;
@@ -341,29 +309,36 @@ void gimbal_task(void* args) {
       vtx_pitch_motor->SetOutput(vtx_pitch_pos, vtx_pitch_vel, 30, 0.5, 0);
     }
 
+
+
     // Bool Edge Detector for lob mode switch or osEventFlags wait for a signal from different threads
 
     lob_mode_sw.input(dbus->keyboard.bit.SHIFT || dbus->swl == remote::UP || !key->Read());
-    if (lob_mode_sw.posEdge() /*&& dbus->swr == remote::MID*/){
+    if (lob_mode_sw.posEdge() && dbus->swr == remote::UP){
       lob_mode = !lob_mode;
       // TODO: after implementing chassis, uncomment the lob_mode bsp::CanBridge flag transmission
-//      send->cmd.id = bsp::LOB_MODE;
-//      send->cmd.data_bool = lob_mode;
-//      send->TransmitOutput();
-      escalation_servo->SetMaxSpeed(4 * PI);
+      with_shooter->cmd.id = bsp::LOB_MODE;
+      with_shooter->cmd.data_bool = lob_mode;
+      with_shooter->TransmitOutput();
 //      print("lob_mode: %d\n", lob_mode);
     }
-    if(lob_mode){
-      // please make sure the calibration is all done
-      // lob mode
-      escalation_servo->SetTarget(calibrated_theta_esca + PI * 12.1);
-      print("lob\r\n");
-      // maximum goes to 38.345 radians
+
+
+    scope_sw.input(dbus->keyboard.bit.C);
+    if (scope_sw.posEdge()){
+      scope_on = !scope_on;
+      with_chassis->cmd.id = bsp::SCOPE_ON;
+      with_chassis->cmd.data_bool = scope_on;
+      with_chassis->TransmitOutput();
+    }
+
+
+    // stopping the ammo
+
+    if (ammo_sensor->Read()){
+      ammo_motor->SetOutput(50);
     } else {
-      // moving mode
-      // set escalation servo to original position
-      // print("regular\r\n");
-      escalation_servo->SetTarget(calibrated_theta_esca);
+      ammo_motor->SetOutput(700);
     }
 
     if (dbus->keyboard.bit.A) vx_keyboard -= 61.5;
@@ -429,31 +404,10 @@ void gimbal_task(void* args) {
     with_shooter->cmd.data_int = dbus->swr;
     with_shooter->TransmitOutput();
 
-    /*send->cmd.id = bsp::KEYBOARD_BIT;
-    send->cmd.data_keyboard = dbus->keyboard;
-    send->TransmitOutput();
+    with_shooter->cmd.id = bsp::START;
+    with_shooter->cmd.data_bool = true;
+    with_shooter->TransmitOutput();
 
-    send->cmd.id = bsp::MOUSE_BIT;
-    send->cmd.data_mouse = dbus->mouse;
-    send->TransmitOutput();*/
-
-
-    // pitch_cmd = dbus->ch3 / 500.0;
-
-    scope_sw.input(dbus->keyboard.bit.C);
-    if (scope_sw.posEdge()){
-      scope_on = !scope_on;
-    }
-    if (scope_on){
-      scope_motor->SetOutput(100);
-    } else {
-      scope_motor->SetOutput(1600);
-    }
-    // if(loop_cnt == 100){
-    //     print("ch3: %d\r\n", dbus->ch3);
-    //     loop_cnt = 0;
-    // }
-    // loop_cnt++;
     UNUSED(loop_cnt);
     if (!forward_key->Read() || (aux_mode && dbus->ch3 > 610)){
       pitch_servo_L->SetTarget(pitch_servo_L->GetTheta() + PI * 100, true);
@@ -479,17 +433,15 @@ void gimbal_task(void* args) {
 //    print("pitch_L: %f, pitch_R: %f\r\n", pitch_servo_L->GetTheta(), pitch_servo_R->GetTheta());
     // TODO: considering change pitch motors to velocity loop
 
-    escalation_servo->CalcOutput(&esca_out);
+
     yaw_motor->SetOutput(yaw_cmd);
 
     pitch_motor_L->SetOutput(p_l_out);
     pitch_motor_R->SetOutput(p_r_out);
 
-    pitch_curr = pitch_encoder->getData();
+//    pitch_curr = pitch_encoder->getData();
 
-    
 
-    control::MotorCANBase::TransmitOutput(can1_escalation, 1);
     control::MotorCANBase::TransmitOutput(can1_pitch, 2);
     control::Motor4310::TransmitOutput(m4310_motors, 3);
 
@@ -500,19 +452,6 @@ void gimbal_task(void* args) {
 
 void init_gimbal() {
 
-  esca_motor = new control::Motor3508(can1, 0x204);
-  // ESCALATION motors initialization
-  control::servo_t esca_servo_data;
-  esca_servo_data.motor = esca_motor;
-  esca_servo_data.max_speed = 2 * PI; // TODO: params need test
-  esca_servo_data.max_acceleration = 100 * PI;
-  esca_servo_data.transmission_ratio = M3508P19_RATIO;
-  esca_servo_data.omega_pid_param = new float [3] {150, 1.2, 5};
-//  esca_servo_data.omega_pid_param = new float [3] {150, 1.2, 5};
-  esca_servo_data.max_iout = 2000;
-  esca_servo_data.max_out = 10000;
-  escalation_servo = new control::ServoMotor(esca_servo_data);
-  escalation_servo->RegisterJamCallback(jam_callback, 0.105);
 
   pitch_motor_L = new control::Motor2006(can1, 0x206);
 
@@ -529,17 +468,16 @@ void init_gimbal() {
   pitch_servo_data.motor = pitch_motor_R;
   pitch_servo_R = new control::ServoMotor(pitch_servo_data);
 
-  scope_motor = new control::MotorPWMBase(&htim1, TIM_CHANNEL_1, 1000000, 50, 1500);
+
+  ammo_motor = new control::MotorPWMBase(&htim1, TIM_CHANNEL_2, 1000000, 50, 1500);
 
   barrel_motor = new control::Motor4310(can1, 0x02, 0x03, control::POS_VEL);
   yaw_motor = new control::Motor4310(can1, 0x04, 0x05, control::MIT);
   vtx_pitch_motor = new control::Motor4310(can1, 0x06, 0x07, control::MIT);
 
+  ammo_sensor = new bsp::GPIO(IN3_GPIO_Port, IN3_Pin);
+  reload_sensor = new bsp::GPIO(IN4_GPIO_Port, IN4_Pin);
 
-
-
-  // distance sensor initialization, remove if not connected, will stop the initialization process
-//  distance_sensor = distance::SEN_0366_DIST::init(&huart1,0x80);
 
 }
 

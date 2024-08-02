@@ -28,7 +28,7 @@ target_compile_definitions(${PROJECT_NAME}_typeA.elf PRIVATE UART_HANDLE=huart8)
 irm_add_arm_executable(${PROJECT_NAME}_typeC
     TARGET DJI_Board_TypeC
     SOURCES main.cc)
-target_compile_definitions(${PROJECT_NAME}_typeC.elf PRIVATE UART_HANDLE=huart1)
+target_compile_definitions(${PROJECT_NAME}_typeC.elf PRIVATE UART_HANDLE=huart6)
 
 irm_add_arm_executable(${PROJECT_NAME}_mc01
         TARGET DM_MC_01

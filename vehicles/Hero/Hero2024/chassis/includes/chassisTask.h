@@ -26,6 +26,8 @@
 #include "rgb.h"
 #include "protocol.h"
 #include "bsp_can_bridge.h"
+#include "sen_0366_dist.h"
+#include "bsp_gpio.h"
 
 #include "dbus.h"
 
@@ -67,7 +69,9 @@ extern display::RGB* RGB;
 extern communication::Referee* referee;
 extern bsp::CanBridge* with_gimbal;
 extern bsp::CanBridge* with_shooter;
+extern bsp::GPIO* key;
 
+extern float distance_value;
 
 // speed for steering motors (rad/s)
 constexpr float RUN_SPEED = (4 * PI);

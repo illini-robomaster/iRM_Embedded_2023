@@ -45,11 +45,10 @@ typedef enum {
   RECALIBRATE,
   IS_MY_COLOR_BLUE,
   SELF_CHECK_FLAG,
-  LOB_MODE,
   BUS_SWL,
   BUS_SWR,
-  KEYBOARD_BIT,
-  MOUSE_BIT
+  LOB_MODE,
+  SCOPE_ON
 } can_bridge_cmd;
 
 typedef struct {
@@ -96,6 +95,7 @@ class CanBridge {
   unsigned int bus_swl = 0;
   unsigned int bus_swr = 0;
 
+  bool scope_on = false;
 //  remote::keyboard_t keyboard;
 //  remote::mouse_t mouse_bit;
   // each bit represents a key on the keyboard

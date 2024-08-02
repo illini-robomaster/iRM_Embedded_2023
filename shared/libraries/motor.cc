@@ -469,7 +469,7 @@ namespace control {
         detect_head_ = detect_head_ + 1 < detect_period_ ? detect_head_ + 1 : 0;
         // detect if motor is jammed
         // detect total is used as filter.
-//        print("detect_total_: %d, jam_threshold_: %d \r\n", abs(detect_total_), abs(jam_threshold_));
+        print("detect_total_: %d, jam_threshold_: %d \r\n", abs(detect_total_), abs(jam_threshold_));
         if (abs(detect_total_) >= abs(jam_threshold_)) {
 
           omega_pid_.Reset();

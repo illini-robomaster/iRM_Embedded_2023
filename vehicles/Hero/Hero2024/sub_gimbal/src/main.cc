@@ -29,6 +29,7 @@ bsp::CanBridge* with_chassis = nullptr;
 osThreadId_t shooterTaskHandle;
 bsp::Buzzer *buzzer = nullptr;
 
+
 void RM_RTOS_Init(){
     print_use_uart(&huart1);
     can1 = new bsp::CAN(&hcan1,true);

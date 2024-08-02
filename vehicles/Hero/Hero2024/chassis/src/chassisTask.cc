@@ -20,6 +20,7 @@
 
 #include "chassisTask.h"
 #include "geometry/geometry.h"
+#define REFEREE
 
 //Constants
 static const int KILLALL_DELAY = 100;
@@ -56,6 +57,13 @@ static control::Steering6020* steering_motor4 = nullptr;
 static control::engineer_steering_chassis_t* chassis_data;
 static control::EngineerSteeringChassis* chassis;
 
+static control::MotorPWMBase* scope_motor = nullptr;
+
+static distance::SEN_0366_DIST* distance_sensor = nullptr;
+
+BoolEdgeDetector scope_sw(false);
+bool scope_on = false;
+
 static volatile bool Dead = false;
 
 void chassisTask(void* arg){
@@ -86,10 +94,22 @@ void chassisTask(void* arg){
   }
   print("Start signal received!\r\n");
 
+  while(!distance_sensor->begin()){
+    print("sensor initializing...\r\n");
+    osDelay(100);
+  }
   float wz = 0;
   float relative_angle = 0;
+  distance_sensor->setResolution(distance::RESOLUTION_0_1_MM);
 
+  distance_sensor->setMeasureRange(distance::RANGE_80_M);
+
+  distance_sensor->continuousMeasure();
   while (true) {
+    distance_sensor->readValue();
+    // distance sensor
+    distance_value = distance_sensor->distance_;
+
     Vector2d joystick_vector(0, 0);
 
     joystick_vector = Vector2d(with_gimbal->vy/660.0, with_gimbal->vx/660.0);
@@ -147,8 +167,16 @@ void chassisTask(void* arg){
     loop_cnt++;
     UNUSED(loop_cnt);
     UNUSED(last);
+    scope_sw.input(!key->Read());
+    if (scope_sw.posEdge()){
+      scope_on = !scope_on;
+    }
 
-
+    if (with_gimbal->scope_on || scope_on){
+      scope_motor->SetOutput(100);
+    } else {
+       scope_motor->SetOutput(1600);
+    }
 
     // calculate camera oriented velocity vector
     Vector2d target_vel_cam = target_vel.rotateBy(Angle2d(relative_angle)); // now relative_angle is 0
@@ -171,10 +199,11 @@ void chassisTask(void* arg){
     //     loop_count = 0;
     // }
     // loop_count ++;
-
+#ifdef REFEREE
     chassis->Update((float)referee->game_robot_status.chassis_power_limit,
                            referee->power_heat_data.chassis_power,
                            (float)referee->power_heat_data.chassis_power_buffer);
+#endif
     // chassis->Update(50,
     //                 50,
     //                 50);
@@ -197,7 +226,7 @@ void chassisTask(void* arg){
     UNUSED(steer_motors);
     UNUSED(wheel_motors);
     // print("chassis motor output transmitted \r\n");
-
+  #ifdef REFEREE
     with_shooter->cmd.id = bsp::COOLING_HEAT1;
     with_shooter->cmd.data_float = (float)referee->power_heat_data.shooter_id1_17mm_cooling_heat;
     with_shooter->TransmitOutput();
@@ -213,7 +242,7 @@ void chassisTask(void* arg){
     with_shooter->cmd.id = bsp::SHOOTER_POWER;
     with_shooter->cmd.data_bool = referee->game_robot_status.mains_power_shooter_output;
     with_shooter->TransmitOutput();
-
+  #endif
     osDelay(CHASSIS_TASK_DELAY);
   }
 }
@@ -276,7 +305,9 @@ void init_chassis(){
 
   chassis = new control::EngineerSteeringChassis(chassis_data);
 
+  scope_motor = new control::MotorPWMBase(&htim1, TIM_CHANNEL_1, 1000000, 50, 1500);
 
+  distance_sensor = distance::SEN_0366_DIST::init(&huart1,0x80);
 }
 void kill_chassis(){
   RM_EXPECT_TRUE(false, "Operation Killed!\r\n");

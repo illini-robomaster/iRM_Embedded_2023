@@ -26,8 +26,9 @@
 #include "dbus.h"
 #include "rgb.h"
 #include "chassisTask.h"
-//  #include "ui_task.h"
+#include "bsp_buzzer.h"
 #ifdef REFEREE
+#include "uiTask.h"
 #include "refereeTask.h"
 #endif
 #include "bsp_print.h"
@@ -36,6 +37,7 @@
 osThreadId_t chassisTaskHandle;
 #ifdef REFEREE
 osThreadId_t refereeTaskHandle;
+osThreadId_t UITaskHandle;
 #endif
 
 
@@ -53,19 +55,30 @@ RefereeUART* referee_uart = nullptr;
 bsp::CanBridge* with_gimbal = nullptr;
 bsp::CanBridge* with_shooter = nullptr;
 #endif
+bsp::GPIO *key = nullptr;
 
+using Note = bsp::BuzzerNote;
 
+static bsp::BuzzerNoteDelayed Mario[] = {
+    {Note::Mi3M, 80}, {Note::Silent, 80},  {Note::Mi3M, 80}, {Note::Silent, 240},
+    {Note::Mi3M, 80}, {Note::Silent, 240}, {Note::Do1M, 80}, {Note::Silent, 80},
+    {Note::Mi3M, 80}, {Note::Silent, 240}, {Note::So5M, 80}, {Note::Silent, 560},
+    {Note::So5L, 80}, {Note::Silent, 0},   {Note::Finish, 0}};
+
+float distance_value = 0;
 
 
 void RM_RTOS_Init() {
-  print_use_uart(&huart1);
+  print_use_uart(&huart6);
   bsp::SetHighresClockTimer(&htim5);
-
+  bsp::Buzzer buzzer(&htim4, 3, 1000000);
   dbus = new remote::DBUS(&huart3);
 
   can1 = new bsp::CAN(&hcan1, true);
   can2 = new bsp::CAN(&hcan2, false);
   // RGB = new display::RGB(&htim5, 3, 2, 1, 1000000);
+  key = new bsp::GPIO(KEY_GPIO_Port,KEY_Pin);
+  buzzer.SingSong(Mario);
 #ifdef REFEREE
   referee_uart = new RefereeUART(&huart6);
   referee_uart->SetupRx(300);
@@ -88,8 +101,9 @@ void RM_RTOS_Threads_Init(void) {
   chassisTaskHandle = osThreadNew(chassisTask,nullptr,&chassisTaskAttribute);
 #ifdef REFEREE
   refereeTaskHandle = osThreadNew(refereeTask,nullptr,&refereeTaskAttribute);
+  UITaskHandle = osThreadNew(UI_task,nullptr,&uiTaskAttribute);
 #endif
-//     UITaskHandle = osThreadNew(UITask,nullptr,&UITaskAttribute);
+
 }
 
 
