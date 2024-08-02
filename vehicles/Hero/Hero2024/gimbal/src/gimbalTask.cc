@@ -33,7 +33,7 @@ float pitch_cmd;
 float yaw_cmd;
 
 static const int KILLALL_DELAY = 100;
-static const int GIMBAL_TASK_DELAY = 3;
+static const int GIMBAL_TASK_DELAY = 2;
 
 
 
@@ -116,8 +116,8 @@ void gimbal_task(void* args) {
   // osDelay(100);
   // vtx_pitch_motor->SetZeroPos();
   // osDelay(100);
-  // barrel_motor->SetZeroPos();
-  // osDelay(100);
+//   barrel_motor->SetZeroPos();
+//   osDelay(100);
 
   yaw_motor->MotorEnable();
   print("yaw motor enabled\r\n");
@@ -295,18 +295,28 @@ void gimbal_task(void* args) {
       yaw_pos += yaw_vel / 8000.0;
       yaw_pos = clip<float>(yaw_pos, yaw_min, yaw_max);
       yaw_motor->SetOutput(yaw_pos, yaw_vel, 30, 0.5, 0);
-
+      rotate_barrel_left.input(dbus->ch0 < 630.0);
+      if (rotate_barrel_left.posEdge()) {
+        barrel_pos += 2.0 * PI / 5.0;
+        print("reload!!!\r\n");
+      }
+      // need to reload whenever there are no ammo
+      rotate_barrel_right.input(dbus->ch0 > 630.0/*reload_sensor->Read()*/);
+      if (rotate_barrel_right.posEdge()) {
+        barrel_pos -= 2.0 * PI / 5.0;
+        print("reload!!!\r\n");
+      }
 
 
       barrel_motor->SetOutput(barrel_pos, 10);
     }
+
     // need to reload whenever there are no ammo
-    rotate_barrel_right.input(/*dbus->ch0 > 630.0*/reload_sensor->Read());
+    rotate_barrel_right.input(reload_sensor->Read());
     if (rotate_barrel_right.posEdge()) {
       barrel_pos -= 2.0 * PI / 5.0;
       print("reload!!!\r\n");
     }
-
 
     if (!aux_mode){
       vtx_pitch_vel = clip<float>(dbus->ch3 / 660.0 * 15.0, -15, 15);
@@ -342,10 +352,10 @@ void gimbal_task(void* args) {
     // stopping the ammo
 
     if (ammo_sensor->Read()){
-      pulse_width_ammo = 700;
+      pulse_width_ammo = 550;
       print(" no ammo \r\n");
     } else {
-      pulse_width_ammo = 50;
+      pulse_width_ammo = 450;
       print("ammo abundant \r\n");
 
     }

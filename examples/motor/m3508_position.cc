@@ -44,7 +44,6 @@
 bsp::CAN* can1 = nullptr;
 control::MotorCANBase* motor = nullptr;
 control::ServoMotor* servo = nullptr;
-
 bsp::GPIO* key = nullptr;
 
 #ifdef WITH_CONTROLLER
@@ -62,7 +61,7 @@ void RM_RTOS_Init() {
   bsp::SetHighresClockTimer(&htim5);
 
   can1 = new bsp::CAN(&hcan1, true);
-  key = new bsp::GPIO(IN2_GPIO_Port, IN2_Pin);
+  key = new bsp::GPIO(KEY_GPIO_Port, KEY_Pin);
 
 #ifdef USING_M3508
   motor = new control::Motor3508(can1, 0x201);
@@ -91,15 +90,15 @@ void RM_RTOS_Init() {
 #endif
 
 #ifdef USING_M3508_STEERING
-  motor = new control::Motor3508(can1, 0x201);
+  motor = new control::Motor3508(can1, 0x204);
   control::servo_t servo_data;
   servo_data.motor = motor;
   servo_data.max_speed = SPEED;
   servo_data.max_acceleration = ACCELERATION;
   servo_data.transmission_ratio = 8;
   servo_data.omega_pid_param = new float[3]{140, 1.2, 25};
-  servo_data.max_iout = 1000;
-  servo_data.max_out = 13000;
+  servo_data.max_iout = 25000;
+  servo_data.max_out = 30000;
   servo = new control::ServoMotor(servo_data);
 #endif
 
@@ -115,34 +114,28 @@ void RM_RTOS_Default_Task(const void* args) {
 #else
 
 #endif
-  // control::MotorCANBase* motors[] = {motor};
+   control::MotorCANBase* motors[] = {motor};
 
-  float target = 0;
-
+  BoolEdgeDetector esca_sw(false);
+  bool esca_switch = false;
+  float cali = servo->GetTheta();
   while (true) {
-#ifdef WITH_CONTROLLER
-    target = float(dbus->ch1) / remote::DBUS::ROCKER_MAX * 6 * PI;
-    servo->SetTarget(target, true);
-#else
-    key_detector.input(key->Read());
-    constexpr float desired_target = 0.5 * 2 * PI;
-    if (key_detector.posEdge() && servo->SetTarget(desired_target - target) != 0) {
-      target = desired_target - target;
+    esca_sw.input(!key->Read());
+    if (esca_sw.posEdge()){
+      esca_switch = !esca_switch;
     }
-#endif
-    servo->CalcOutput();
-    // control::MotorCANBase::TransmitOutput(motors, 1);
-
-    static int i = 0;
-    if (i > 10) {
-      // print("%10.2f %10.2f %10.2f %10.2f ", dbus->ch0, dbus->ch0, dbus->ch0, dbus->ch0);
-      print("%d ", !key->Read());
-      servo->PrintData();
-      i = 0;
+    if(esca_switch){
+      // please make sure the calibration is all done
+      // lob mode
+      servo->SetTarget(cali + 22 * PI);
     } else {
-      i++;
+      // moving mode
+      // set escalation servo to original position
+      servo->SetTarget(cali);
     }
-
+    print("theta: %f\r\n",servo->GetTheta()-cali);
+    servo->CalcOutput();
+    control::MotorCANBase::TransmitOutput(motors,1);
     osDelay(2);
   }
 }

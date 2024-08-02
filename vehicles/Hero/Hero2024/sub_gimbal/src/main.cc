@@ -30,6 +30,7 @@ osThreadId_t shooterTaskHandle;
 bsp::Buzzer *buzzer = nullptr;
 
 
+
 void RM_RTOS_Init(){
     print_use_uart(&huart1);
     can1 = new bsp::CAN(&hcan1,true);
@@ -43,4 +44,9 @@ void RM_RTOS_Init(){
 void RM_RTOS_Threads_Init(void) {
   shooterTaskHandle = osThreadNew(shooter_task, nullptr, &shooterTaskAttribute);
 }
+
+void RM_RTOS_Default_Task(const void* args) {
+  UNUSED(args);
+    osDelay(100);
+  }
 

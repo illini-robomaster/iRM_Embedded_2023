@@ -306,7 +306,7 @@ void init_chassis(){
 
   chassis = new control::EngineerSteeringChassis(chassis_data);
 
-  scope_motor = new control::MotorPWMBase(&htim1, TIM_CHANNEL_1, 1000000, 50, 1500);
+  scope_motor = new control::MotorPWMBase(&htim1, 1, 1000000, 50, 1500);
 
   distance_sensor = distance::SEN_0366_DIST::init(&huart1,0x80);
 }
