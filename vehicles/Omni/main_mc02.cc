@@ -73,9 +73,9 @@
  *============================================================================*/
 
 #define ENABLE_CHASSIS   // Comment to disable chassis motors
-#define ENABLE_GIMBAL    // Comment to disable gimbal motors
-#define ENABLE_SHOOTER   // Comment to disable shooter motors
-#define ENABLE_IMU       // Comment to disable IMU (affects FOC and gimbal)
+// #define ENABLE_GIMBAL    // Comment to disable gimbal motors
+// #define ENABLE_SHOOTER   // Comment to disable shooter motors
+// #define ENABLE_IMU       // Comment to disable IMU (affects FOC and gimbal)
 #define ENABLE_CAN       // Comment to disable CAN/FDCAN
 #define ENABLE_DBUS      // Comment to disable DBUS remote
 
@@ -222,8 +222,9 @@ const float PITCH_PHYSICAL_MIN = -24.0f * PI / 180.0f; // -24 degrees in physica
 void RM_RTOS_Init() {
   // Initialize USB - no HAL_Delay here! USB enumeration is interrupt-driven
   // and HAL_Delay before RTOS scheduler starts can interfere with it.
-  print_use_usb();
-  
+  // print_use_usb();
+  print_use_uart(&huart7);
+
 #ifdef ENABLE_CAN
   // MC02 uses FDCAN instead of CAN
   can = new bsp::CAN(&hfdcan1, 0);
@@ -286,10 +287,31 @@ void RM_RTOS_Default_Task(const void* args) {
   /* press reset if no response */
   UNUSED(args);
   print("=== MC02 Omni Robot Control ===\r\n");
-  // ============ MINIMAL USB TEST MODE ============
-  // When all peripherals are disabled, just test USB print
-  #if !defined(ENABLE_CHASSIS) && !defined(ENABLE_GIMBAL) && !defined(ENABLE_SHOOTER) && !defined(ENABLE_CAN) && !defined(ENABLE_DBUS) && !defined(ENABLE_IMU)
-   
+  print("Enabled subsystems: ");
+#ifdef ENABLE_CAN
+  print("CAN ");
+#endif
+#ifdef ENABLE_DBUS
+  print("DBUS ");
+#endif
+#ifdef ENABLE_IMU
+  print("IMU ");
+#endif
+#ifdef ENABLE_CHASSIS
+  print("CHASSIS ");
+#endif
+#ifdef ENABLE_GIMBAL
+  print("GIMBAL ");
+#endif
+#ifdef ENABLE_SHOOTER
+  print("SHOOTER ");
+#endif
+  print("\r\n");
+  osDelay(1000);
+// ============ MINIMAL USB TEST MODE ============
+// When all peripherals are disabled, just test USB print
+#if !defined(ENABLE_CHASSIS) && !defined(ENABLE_GIMBAL) && !defined(ENABLE_SHOOTER) && !defined(ENABLE_CAN) && !defined(ENABLE_DBUS) && !defined(ENABLE_IMU)
+
   uint32_t counter = 0;
   while (true) {
     set_cursor(0, 0);
@@ -299,8 +321,8 @@ void RM_RTOS_Default_Task(const void* args) {
     print("Tick: %lu\r\n", HAL_GetTick());
     osDelay(500);
   }
-  
-  #else
+
+#else
   // ============ NORMAL OPERATION MODE ============
 
 #ifdef ENABLE_CHASSIS
@@ -438,14 +460,32 @@ void RM_RTOS_Default_Task(const void* args) {
     flywheel_motor[0]->SetOutput(left_output);
     flywheel_motor[1]->SetOutput(right_output);
     feeder_motor->SetOutput(feeder_output);
-    print("L: %.2f R: %.2f F: %.2f\r\n", flywheel_motor[0]->GetOmega(), flywheel_motor[1]->GetOmega(), feeder_motor->GetOmega());
 #endif  // ENABLE_SHOOTER
-    print("dial: %d\r\n", dbus->wheel);
+
+    // ============ DEBUG PRINTING ============
+    print("=== OMNI DEBUG [%lu ms] ===\r\n", HAL_GetTick());
+    print("State: %s\r\n", enabled ? "ENABLED" : "DISABLED");
+
+    // DBUS Debug
+    print("-- DBUS --\r\n");
+    print("  CH: [%4d %4d %4d %4d]\r\n", dbus->ch0, dbus->ch1, dbus->ch2, dbus->ch3);
+    print("  SW: L=%d R=%d  Dial=%d\r\n", dbus->swl, dbus->swr, dbus->wheel);
+
+#ifdef ENABLE_IMU
+    // IMU Debug
+    print("-- IMU --\r\n");
+    print("  Gyro: [%7.2f %7.2f %7.2f] deg/s\r\n", gyro[0], gyro[1], gyro[2]);
+    print("  Accel:[%7.2f %7.2f %7.2f] m/s2\r\n", accel[0], accel[1], accel[2]);
+    print("  Euler:[Y=%6.2f P=%6.2f R=%6.2f] deg\r\n",
+          RAD2DEG(INS_angle[0]), RAD2DEG(INS_angle[1]), RAD2DEG(INS_angle[2]));
+    print("  Temp: %.1f C\r\n", temp);
+#endif
 
     // Read DBUS joystick inputs
     float y = -clip<float>(dbus->ch0 / 660.0 * 30.0, -30, 30); // forward
     float x = clip<float>(dbus->ch1 / 660.0 * 30.0, -30, 30); // left
     float yaw_omega = clip<float>(dbus->ch2 / 660.0 * 30.0, -30, 30); // yaw (for both chassis and gimbal)
+    print("  Cmd:  x=%6.2f y=%6.2f yaw_w=%6.2f\r\n", x, y, yaw_omega);
 
 #ifdef ENABLE_GIMBAL
     float pitch_omega = clip<float>(dbus->ch3 / 660.0 * 15.0, -15, 15); // pitch
@@ -463,6 +503,18 @@ void RM_RTOS_Default_Task(const void* args) {
     command = pid_.ComputeOutput(delta_yaw);
 
     float chasis_yaw_measured_in_field_reference = gimbal_yaw_measured_in_field_reference - INS_angle[0];
+
+    // Gimbal Debug
+    print("-- GIMBAL --\r\n");
+    print("  Yaw Motor: theta=%6.2f deg, omega=%6.2f\r\n",
+          RAD2DEG(yaw_motor->GetTheta()), yaw_motor->GetOmega());
+    print("  Yaw: target=%6.2f meas=%6.2f delta=%6.2f cmd=%d\r\n",
+          RAD2DEG(yaw_target), RAD2DEG(gimbal_yaw_measured_in_field_reference),
+          RAD2DEG(delta_yaw), command);
+    print("  Pitch Motor: theta=%6.2f, omega=%6.2f\r\n",
+          RAD2DEG(pitch_motor->GetTheta()), pitch_motor->GetOmegaDeg());
+    print("  Pitch: phys=%6.2f deg, target_w=%6.2f\r\n",
+          RAD2DEG(pitch_physical), pitch_omega);
 #else
     float chasis_yaw_measured_in_field_reference = 0.0f;  // No field-oriented control without gimbal
 #endif  // ENABLE_GIMBAL
@@ -498,7 +550,17 @@ void RM_RTOS_Default_Task(const void* args) {
     motor[1]->SetOutput(vel[1]);
     motor[2]->SetOutput(vel[2]);
     motor[3]->SetOutput(vel[3]);
-    
+
+    // Chassis Debug
+    print("-- CHASSIS --\r\n");
+    print("  FOC angle: %6.2f deg\r\n", RAD2DEG(chasis_yaw_measured_in_field_reference));
+    print("  Alpha=%6.2f Beta=%6.2f Spin=%6.2f\r\n", alpha, beta, chassis_yaw_omega_target);
+    print("  Vel Cmd: [%6.2f %6.2f %6.2f %6.2f]\r\n", vel[0], vel[1], vel[2], vel[3]);
+    print("  M0(FR): theta=%6.2f w=%6.2f\r\n", motor[0]->GetTheta(), motor[0]->GetOmega());
+    print("  M1(BL): theta=%6.2f w=%6.2f\r\n", motor[1]->GetTheta(), motor[1]->GetOmega());
+    print("  M2(BR): theta=%6.2f w=%6.2f\r\n", motor[2]->GetTheta(), motor[2]->GetOmega());
+    print("  M3(FL): theta=%6.2f w=%6.2f\r\n", motor[3]->GetTheta(), motor[3]->GetOmega());
+
     control::MotorDM3519::TransmitOutput(motors, 4);
 #endif  // ENABLE_CHASSIS
 
@@ -516,6 +578,18 @@ void RM_RTOS_Default_Task(const void* args) {
     control::Motor4310::TransmitOutput(pitch_motors, 1);
 #endif  // ENABLE_GIMBAL
 
+#ifdef ENABLE_SHOOTER
+    // Shooter Debug
+    print("-- SHOOTER --\r\n");
+    print("  Flywheel: %s\r\n", flywheel_enabled ? "ON" : "OFF");
+    print("  L_FW: tgt=%6.1f act=%6.1f out=%d\r\n",
+          left_target_velocity, flywheel_motor[0]->GetOmega(), left_output);
+    print("  R_FW: tgt=%6.1f act=%6.1f out=%d\r\n",
+          right_target_velocity, flywheel_motor[1]->GetOmega(), right_output);
+    print("  Feed: tgt=%6.1f act=%6.1f out=%d\r\n",
+          feeder_target_velocity, feeder_motor->GetOmega(), feeder_output);
+#endif  // ENABLE_SHOOTER
+
     // Transmit DJI motors (yaw + shooter)
 #if defined(ENABLE_GIMBAL) && defined(ENABLE_SHOOTER)
     control::MotorCANBase* dji_motors[] = {yaw_motor, feeder_motor, flywheel_motor[0], flywheel_motor[1]};
@@ -529,8 +603,8 @@ void RM_RTOS_Default_Task(const void* args) {
 #endif
 
 #endif  // ENABLE_DBUS
-    print("Tick: %lu\r\n", HAL_GetTick());
-    osDelay(10);
+    print("================================\r\n");
+    osDelay(50);  // Slower rate for readable debug output
   }
   
   #endif  // Minimal USB test mode
