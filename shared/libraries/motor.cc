@@ -23,6 +23,7 @@
 #include "arm_math.h"
 #include "bsp_error_handler.h"
 #include "bsp_os.h"
+#include "cmsis_os.h"
 #include "utils.h"
 
 int16_t motor_val;
@@ -824,7 +825,12 @@ void Motor4310::MotorEnable() {
   data[5] = 0xff;
   data[6] = 0xff;
   data[7] = 0xfc;
-  this->can_->Transmit(this->tx_id_actual_, data, 8);
+
+  connection_flag_ = false;
+  while (!connection_flag_) {
+    this->can_->Transmit(this->tx_id_actual_, data, 8);
+    osDelay(10);
+  }
 }
 
 void Motor4310::MotorDisable() {
@@ -1016,7 +1022,12 @@ void MotorDM3519::MotorEnable() {
   data[5] = 0xff;
   data[6] = 0xff;
   data[7] = 0xfc;  // Enable command - verify with DM3519 datasheet
-  this->can_->Transmit(this->tx_id_actual_, data, 8);
+
+  connection_flag_ = false;
+  while (!connection_flag_) {
+    this->can_->Transmit(this->tx_id_actual_, data, 8);
+    osDelay(10);
+  }
 }
 
 void MotorDM3519::MotorDisable() {
