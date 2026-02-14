@@ -38,5 +38,5 @@ irm_add_arm_executable(dart_openmv_calibration
         SOURCES openmv_calibration.cc)
 
 irm_add_arm_executable(dart_arm_load_test
-        TARGET DJI_Board_TypeC
+        TARGET DJI_Board_TypeA
         SOURCES dart_arm_loader_test.cc)
