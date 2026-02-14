@@ -26,7 +26,7 @@ set(MCU_ARCH cortex-m7)
 set(MCU_FLOAT_ABI hard)
 set(MCU_FPU fpv5-d16)
 # Use custom linker script with heap in AXI SRAM for DMA compatibility
-set(MCU_LINKER_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/cmake/stm32h723vgtx_flash_custom.ld)
+set(MCU_LINKER_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/stm32h723vgtx_flash_mc02.ld)
 set(MCU_OPTIONS -mcpu=${MCU_ARCH} -mthumb -mthumb-interwork
         -mfpu=${MCU_FPU} -mfloat-abi=${MCU_FLOAT_ABI})
 

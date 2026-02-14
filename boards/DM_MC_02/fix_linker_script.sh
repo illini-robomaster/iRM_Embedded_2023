@@ -8,7 +8,7 @@
 #
 
 LINKER_FILE="stm32h723vgtx_flash.ld"
-CUSTOM_LINKER="cmake/stm32h723vgtx_flash_custom.ld"
+CUSTOM_LINKER="stm32h723vgtx_flash_mc02.ld"
 
 cd "$(dirname "$0")"
 
