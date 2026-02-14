@@ -44,7 +44,7 @@
 #define MOTOR_OUT_FREQ 50
 
 #define MAX_IOUT3508 16384
-#define MAX_IOUT6020 60000
+#define MAX_IOUT6020 30000
 #define MAX_OUT 60000
 
 #define MAP_RANGE(x, in_min, in_max, out_min, out_max) (((float)(x) - (float)(in_min)) * ((float)(out_max) - (float)(out_min)) / ((float)(in_max) - (float)(in_min)) + (float)(out_min))
