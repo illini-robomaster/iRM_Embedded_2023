@@ -101,13 +101,10 @@ void dartLoaderTestTask(void* arg){
     } else {
       arm_claw->SetOutput(500); // 0 Degrees  
     }
-
     if (dbus->swr == remote::UP) {
-      // If Right Switch is up then Ch1 and 2 control first two joints.
-      yaw_output = MAP_RANGE(dbus->ch1, -660, 660,-50, 50);
-      joint1_output = MAP_RANGE(dbus->ch2, -660, 660, -50, 50);
+      yaw_output = MAP_RANGE(dbus->ch0, -660, 660,-50, 50);
+      joint1_output = MAP_RANGE(dbus->ch1, -660, 660, -50, 50);
 
-      
 
       diff_yaw = arm_yaw->GetOmegaDelta(yaw_output);
       diff_joint1 = arm_joint1->GetOmegaDelta(joint1_output);
@@ -117,18 +114,12 @@ void dartLoaderTestTask(void* arg){
       arm_joint1->SetOutput(joint1_output);
       control::MotorCANBase::TransmitOutput(arm, 2);
 
-      // Keep the Servo PWM Constant
-      arm_joint2->SetOutput(joint2_output);
-      arm_joint3->SetOutput(joint3_output);
-
       print("Yaw speed: %d , diff_yaw: %.2f, yaw_output: %f \r\n", yaw_output, diff_yaw, diff_yaw_output);
       print("Joint 1 speed: %d , diff_joint1: %.2f, joint_output: %f \r\n", joint1_output, diff_joint1, diff_joint1_output);
       osDelay(10);
 
-    } else if (dbus->swr == remote::DOWN) {
-      // If Right Switch is down then Ch1 and 2 control last two joints
-      joint2_output = MAP_RANGE(dbus->ch1, -660, 660, 500, 2500);
-      joint3_output = MAP_RANGE(dbus->ch2, -660, 660, 500, 2500);
+      joint2_output = MAP_RANGE(dbus->ch2, -660, 660, 500, 2500);
+      joint3_output = MAP_RANGE(dbus->ch3, -660, 660, 500, 2500);
 
       arm_joint2->SetOutput(joint2_output);
       arm_joint3->SetOutput(joint3_output);
