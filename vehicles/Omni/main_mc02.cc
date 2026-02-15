@@ -30,13 +30,16 @@
  */
 
 #include <cmath>
+#include <memory>
 
 #include "MahonyAHRS.h"
+#include "bsp_buzzer.h"
 #include "bsp_imu.h"
 #include "bsp_print.h"
 #include "cmsis_os.h"
 #include "dbus.h"
 #include "main.h"
+#include "minipc_protocol.h"
 #include "motor.h"
 #include "spi.h"
 
@@ -56,6 +59,19 @@ const osThreadAttr_t imuTaskAttribute = {.name = "imuTask",
                                          .tz_module = 0,
                                          .reserved = 0};
 osThreadId_t imuTaskHandle;
+
+const osThreadAttr_t minipcTaskAttribute = {.name = "minipcTask",
+                                            .attr_bits = osThreadDetached,
+                                            .cb_mem = nullptr,
+                                            .cb_size = 0,
+                                            .stack_mem = nullptr,
+                                            .stack_size = 256 * 4,
+                                            .priority = (osPriority_t)osPriorityAboveNormal,
+                                            .tz_module = 0,
+                                            .reserved = 0};
+osThreadId_t minipcTaskHandle;
+
+#define MINIPC_RX_SIGNAL (1 << 0)
 
 // IMU data
 static bsp::BMI088* bmi088 = nullptr;
@@ -94,6 +110,60 @@ class IMU_ACCEL_INT : public bsp::GPIT {
 static IMU_GYRO_INT* gyro_int = nullptr;
 static IMU_ACCEL_INT* accel_int = nullptr;
 
+// Minipc UART class — signals minipcTask on RX complete
+class CustomUART : public bsp::UART {
+ public:
+  using bsp::UART::UART;
+
+ protected:
+  void RxCompleteCallback() override final { osThreadFlagsSet(minipcTaskHandle, MINIPC_RX_SIGNAL); }
+};
+
+// Handshake protocol markers (see docs/HANDSHAKE_IMPLEMENTATION.md)
+#define HANDSHAKE_REQUEST 0xFF  // Jetson -> MCU
+#define HANDSHAKE_ACK 0xFE      // MCU -> Jetson
+
+// Shared data between minipc thread and default task
+static volatile float jetson_rel_yaw = 0.0f;
+static volatile float jetson_rel_pitch = 0.0f;
+static volatile uint8_t jetson_mode = 0;           // 0=ST, 1=MY
+static volatile bool jetson_data_ready = false;    // consumed flag
+static volatile bool jetson_handshake_ok = false;  // true after handshake exchange
+
+// Gimbal feedback: written by default task, read by minipcTask for TX to Jetson
+static volatile float feedback_yaw = 0.0f;    // current gimbal yaw (field-referenced)
+static volatile float feedback_pitch = 0.0f;  // current pitch encoder position
+static volatile uint8_t feedback_mode = 0;    // mirrors jetson_mode for echo
+
+// Jetson chassis control: written by minipcTask, read by default task
+static volatile float jetson_vx = 0.0f;             // forward velocity from Jetson
+static volatile float jetson_vy = 0.0f;             // leftward velocity from Jetson
+static volatile float jetson_vw = 0.0f;             // angular velocity from Jetson
+static volatile bool jetson_chassis_ready = false;  // new chassis command available
+
+// Autoaim closed-loop gain — proportional gain on the Jetson error signal.
+// Each frame, yaw_target += -rel_yaw * KP.  When rel_yaw → 0 the target stops
+// moving and the gimbal is on target.  Increase for faster tracking, decrease
+// to reduce overshoot.  Loop runs at 200 Hz (5 ms).
+static const float AUTOAIM_YAW_KP = 0.08f;    // yaw proportional gain
+static const float AUTOAIM_PITCH_KP = 0.08f;  // pitch proportional gain
+
+// Buzzer for handshake notification (TIM12_CH2 on PB15, MC02 APB1 timer clock = 80 MHz, prescaler = 24)
+#define BUZZER_CLOCK_FREQ (80000000 / 24)
+static bsp::Buzzer* buzzer = nullptr;
+
+using Note = bsp::BuzzerNote;
+
+// Short ascending chime to signal successful Jetson handshake
+static const bsp::BuzzerNoteDelayed handshake_melody[] = {
+    {Note::Do1M, 120},
+    {Note::Mi3M, 120},
+    {Note::So5M, 120},
+    {Note::Do1H, 250},
+    {Note::Silent, 0},
+    {Note::Finish, 0},
+};
+
 void imuTask(void* arg) {
   UNUSED(arg);
 
@@ -127,8 +197,114 @@ void imuTask(void* arg) {
   }
 }
 
+void minipcTask(void* arg) {
+  UNUSED(arg);
+
+  auto uart = std::make_unique<CustomUART>(&huart7);
+  uart->SetupRx(50);
+  uart->SetupTx(50);
+
+  auto minipc_session = communication::MinipcPort();
+
+  communication::color_data_t color_data;
+  color_data.my_color = 0;  // RED=0 default; updated when Jetson sends COLOR_CMD_ID
+
+  const communication::status_data_t* status_data;
+  uint8_t packet_to_send[minipc_session.MAX_PACKET_LENGTH];
+  uint8_t* data;
+  int32_t length;
+  bool handshake_done = false;  // true after handshake exchange completed
+
+  // Gimbal feedback timing: send at ~100Hz (every 10ms)
+  // Guide: "Send feedback at 50-100 Hz (every 10-20ms)"
+  const uint32_t FEEDBACK_INTERVAL_MS = 10;
+  uint32_t last_feedback_tick = 0;
+
+  while (true) {
+    // Use 10ms timeout so we can send periodic feedback even without RX
+    uint32_t flags = osThreadFlagsWait(MINIPC_RX_SIGNAL, osFlagsWaitAll, FEEDBACK_INTERVAL_MS);
+
+    // --- Process incoming packet if RX signal received ---
+    if ((flags & MINIPC_RX_SIGNAL) && !(flags & osFlagsError)) {
+      length = uart->Read(&data);
+      minipc_session.ParseUartBuffer(data, length);
+
+      if (minipc_session.GetValidFlag()) {
+        uint8_t recv_cmd_id = minipc_session.GetCmdId();
+        status_data = minipc_session.GetStatus();
+
+        // ---- Handshake protocol ----
+        // Jetson sends GIMBAL packet with debug_int=0xFF to request handshake.
+        // MCU replies with GIMBAL packet with debug_int=0xFE as ACK.
+        if (recv_cmd_id == communication::GIMBAL_CMD_ID &&
+            status_data->debug_int == HANDSHAKE_REQUEST) {
+          // Build ACK with current gimbal position
+          communication::gimbal_data_t ack;
+          ack.rel_yaw = feedback_yaw;
+          ack.rel_pitch = feedback_pitch;
+          ack.mode = 0;  // ST
+          ack.debug_int = HANDSHAKE_ACK;
+          minipc_session.Pack(packet_to_send, (void*)&ack, communication::GIMBAL_CMD_ID);
+          uart->Write(packet_to_send, minipc_session.GetPacketLen(communication::GIMBAL_CMD_ID));
+
+          if (!handshake_done) {
+            handshake_done = true;
+            jetson_handshake_ok = true;
+            print("Jetson handshake OK (0xFF -> 0xFE)\r\n");
+            if (buzzer != nullptr) {
+              buzzer->SingSong(handshake_melody, [](uint32_t ms) { osDelay(ms); });
+            }
+          }
+          // Do NOT treat handshake packets as autoaim data
+          // Fall through to feedback sending below
+        }
+        // ---- Normal gimbal commands ----
+        else if (recv_cmd_id == communication::GIMBAL_CMD_ID) {
+          jetson_rel_yaw = status_data->rel_yaw;
+          jetson_rel_pitch = status_data->rel_pitch;
+          jetson_mode = status_data->mode;
+          jetson_data_ready = true;
+        }
+        // ---- Color update from Jetson ----
+        else if (recv_cmd_id == communication::COLOR_CMD_ID) {
+          color_data.my_color = status_data->my_color;
+        }
+        // ---- Chassis control from Jetson ----
+        else if (recv_cmd_id == communication::CHASSIS_CMD_ID) {
+          jetson_vx = status_data->vx;
+          jetson_vy = status_data->vy;
+          jetson_vw = status_data->vw;
+          jetson_chassis_ready = true;
+        }
+      }
+    }
+
+    // --- Send periodic gimbal feedback + color after handshake ---
+    if (handshake_done) {
+      uint32_t now = HAL_GetTick();
+      if (now - last_feedback_tick >= FEEDBACK_INTERVAL_MS) {
+        last_feedback_tick = now;
+
+        // Send GIMBAL feedback with current position
+        communication::gimbal_data_t fb;
+        fb.rel_yaw = feedback_yaw;
+        fb.rel_pitch = feedback_pitch;
+        fb.mode = feedback_mode;
+        fb.debug_int = 0;  // normal operation
+        minipc_session.Pack(packet_to_send, (void*)&fb, communication::GIMBAL_CMD_ID);
+        uart->Write(packet_to_send, minipc_session.GetPacketLen(communication::GIMBAL_CMD_ID));
+
+        // Also send color data
+        minipc_session.Pack(packet_to_send, (void*)&color_data, communication::COLOR_CMD_ID);
+        uart->Write(packet_to_send, minipc_session.GetPacketLen(communication::COLOR_CMD_ID));
+      }
+    }
+  }
+}
+
 void RM_RTOS_Threads_Init(void) {
   imuTaskHandle = osThreadNew(imuTask, nullptr, &imuTaskAttribute);
+  minipcTaskHandle = osThreadNew(minipcTask, nullptr, &minipcTaskAttribute);
 }
 
 // Global peripherals
@@ -172,6 +348,9 @@ void RM_RTOS_Init() {
   // MC02 uses UART5 for DBUS
   dbus = new remote::DBUS(&huart5);
 
+  // Buzzer on TIM12_CH2 (PB15)
+  buzzer = new bsp::Buzzer(&htim12, 2, BUZZER_CLOCK_FREQ);
+
   // Shooter motors
   flywheel_motor[0] = new control::Motor3508(can, 0x207); // left flywheel
   flywheel_motor[1] = new control::Motor3508(can, 0x208); // right flywheel
@@ -194,8 +373,7 @@ void RM_RTOS_Default_Task(const void* args) {
   control::PIDController right_flywheel_pid_(40.0, 15.0, 30.0);
   control::PIDController feeder_pid_(40.0, 5.0, 10.0);
 
-  while (dbus->swr == remote::DOWN) {
-  }  // flip swr to start
+  while (dbus->swr == remote::DOWN);
 
   /* Use SetZeroPos if you want to set current motor position as zero position. If uncommented, the
    * zero position is the zero position set before */
@@ -318,8 +496,29 @@ void RM_RTOS_Default_Task(const void* args) {
     float x = clip<float>(dbus->ch1 / 660.0 * 30.0, -30, 30); // left
     float yaw_omega = clip<float>(-dbus->ch2 / 660.0 * 10.0, -10, 10);               // yaw (slower)
     float pitch_omega = clip<float>(dbus->ch3 / 660.0 * 5.0, -5, 5);                 // pitch (slower)
-    yaw_target += yaw_omega * 0.005f;                                                // yaw target in field reference rad * 5ms
-    pitch_target += pitch_omega * 0.005f;                                            // accumulate target with dt≈5ms
+
+    // Closed-loop autoaim: the Jetson sends the angular ERROR between
+    // camera center and the detected target.  Our goal is to drive that
+    // error to zero.  Each frame we accumulate a proportional correction
+    // into yaw_target / pitch_target.  The inner PID loop (below) then
+    // drives the physical gimbal to the target.
+    //
+    // Yaw sign: Jetson positive = target right of center; MCU positive
+    // yaw = CCW.  Negate so that a positive Jetson error moves the
+    // gimbal clockwise (rightward).
+    //
+    // When mode=ST=0, Jetson has no target — fall through to DBUS.
+    if (jetson_data_ready && jetson_mode == 1) {
+      yaw_target += jetson_rel_yaw * AUTOAIM_YAW_KP;
+      pitch_target += -jetson_rel_pitch * AUTOAIM_PITCH_KP;
+      jetson_data_ready = false;
+    } else {
+      // Manual DBUS control (ST mode or no data — operator searches for targets)
+      yaw_target += yaw_omega * 0.005f;                  // yaw target in field reference rad * 5ms
+      pitch_target += pitch_omega * 0.005f;              // accumulate target with dt≈5ms
+      if (jetson_data_ready) jetson_data_ready = false;  // consume ST packets without using yaw/pitch
+    }
+
     pitch_target = clip<float>(pitch_target, PITCH_ENCODER_MIN, PITCH_ENCODER_MAX);  // clamp to encoder limits
 
     float delta_yaw = yaw_target - gimbal_yaw_measured_in_field_reference;
@@ -361,12 +560,21 @@ void RM_RTOS_Default_Task(const void* args) {
 
     // yaw motor tuning
     // print("err: %.2f m_o : %d \r\n", delta_yaw, yaw_output);
-    print("pitch theta: %.2f deg, pitch target: %.2f deg \r\n", RAD2DEG(pitch_motor->GetTheta()), RAD2DEG(pitch_target));
+    // print("pitch theta: %.2f deg, pitch target: %.2f deg \r\n", RAD2DEG(pitch_motor->GetTheta()), RAD2DEG(pitch_target));
+    if (HAL_GetTick() % 1000 < 5) {  // print every ~1s
+      print("Kp=%.2f  err_yaw=%.3f err_pitch=%.3f mode=%d\r\n",
+            AUTOAIM_YAW_KP, jetson_rel_yaw, jetson_rel_pitch, jetson_mode);
+    }
 
     pitch_motor->SetOutput(pitch_target, pitch_omega, 30, 0.5, 0);
     control::MotorDM3519::TransmitOutput(motors, 4);
     control::Motor4310::TransmitOutput(pitch_motors, 1);
     control::Motor3508::TransmitOutput(dji_motors, 4);
+
+    // Update gimbal feedback for minipcTask to send to Jetson
+    feedback_yaw = gimbal_yaw_measured_in_field_reference;
+    feedback_pitch = pitch_motor->GetTheta();
+    feedback_mode = jetson_mode;
 
     osDelay(5);
   }
