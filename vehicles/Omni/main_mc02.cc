@@ -141,12 +141,13 @@ static volatile float jetson_vy = 0.0f;             // leftward velocity from Je
 static volatile float jetson_vw = 0.0f;             // angular velocity from Jetson
 static volatile bool jetson_chassis_ready = false;  // new chassis command available
 
-// Autoaim closed-loop gain — proportional gain on the Jetson error signal.
-// Each frame, yaw_target += -rel_yaw * KP.  When rel_yaw → 0 the target stops
-// moving and the gimbal is on target.  Increase for faster tracking, decrease
-// to reduce overshoot.  Loop runs at 200 Hz (5 ms).
-static const float AUTOAIM_YAW_KP = 0.08f;    // yaw proportional gain
-static const float AUTOAIM_PITCH_KP = 0.08f;  // pitch proportional gain
+// How quickly yaw_target / pitch_target ramp toward the Jetson-derived desired
+// position each 200 Hz tick.  A value of 1.0 snaps immediately (causes D kicks);
+// 0.3 gives ~12 ms rise time, which is well within the 33 ms Jetson packet period
+// and keeps target changes smooth so the inner PID D term stays quiet.
+// Increase for faster response, decrease if the gimbal still shakes.
+static const float AUTOAIM_YAW_SMOOTH = 0.16f;
+static const float AUTOAIM_PITCH_SMOOTH = 0.02f;
 
 // Buzzer for handshake notification (TIM12_CH2 on PB15, MC02 APB1 timer clock = 80 MHz, prescaler = 24)
 #define BUZZER_CLOCK_FREQ (80000000 / 24)
@@ -323,6 +324,7 @@ const float YAW_MOTOR_OFFSET = 4.54f; // in rad
 const float PITCH_ENCODER_MAX = 0.0f;                     // encoder 0° = upper limit (facing up)
 const float PITCH_ENCODER_MIN = -23.77f * PI / 180.0f;    // encoder -23.77° = lower limit (facing down)
 const float PITCH_INITIAL_TARGET = -10.0f * PI / 180.0f;  // initial pitch target in encoder coords
+const float PITCH_INIT_RATE = 0.3f;                       // rad/s ramp speed toward PITCH_INITIAL_TARGET on enable
 
 void RM_RTOS_Init() {
   print_use_uart(&huart10);
@@ -388,7 +390,8 @@ void RM_RTOS_Default_Task(const void* args) {
   motor[3]->MotorEnable();
   // pitch_motor->SetZeroPos();  // pitch motor zero pos, comment if calibrated already
   pitch_motor->MotorEnable();
-  float pitch_target = PITCH_INITIAL_TARGET;  // start at -10° encoder
+  float pitch_target = pitch_motor->GetTheta();  // ramp from current; do NOT snap to PITCH_INITIAL_TARGET
+  bool pitch_init_done = false;
   osDelay(100);
 
   bool enabled = false;
@@ -415,7 +418,8 @@ void RM_RTOS_Default_Task(const void* args) {
 
         // disable gimbal motors
         pitch_motor->MotorDisable();
-        pitch_target = PITCH_INITIAL_TARGET;  // reset to -10° for next enable
+        pitch_target = pitch_motor->GetTheta();  // ramp from current on next enable
+        pitch_init_done = false;
         enabled = false;
 
         // disable flywheel
@@ -434,6 +438,8 @@ void RM_RTOS_Default_Task(const void* args) {
         motor[2]->MotorEnable();
         motor[3]->MotorEnable();
         pitch_motor->MotorEnable();
+        pitch_target = pitch_motor->GetTheta();  // ramp from current on re-enable
+        pitch_init_done = false;
         osDelay(100);
         enabled = true;
       }
@@ -497,26 +503,58 @@ void RM_RTOS_Default_Task(const void* args) {
     float yaw_omega = clip<float>(-dbus->ch2 / 660.0 * 10.0, -10, 10);               // yaw (slower)
     float pitch_omega = clip<float>(dbus->ch3 / 660.0 * 5.0, -5, 5);                 // pitch (slower)
 
-    // Closed-loop autoaim: the Jetson sends the angular ERROR between
-    // camera center and the detected target.  Our goal is to drive that
-    // error to zero.  Each frame we accumulate a proportional correction
-    // into yaw_target / pitch_target.  The inner PID loop (below) then
-    // drives the physical gimbal to the target.
-    //
-    // Yaw sign: Jetson positive = target right of center; MCU positive
-    // yaw = CCW.  Negate so that a positive Jetson error moves the
-    // gimbal clockwise (rightward).
-    //
-    // When mode=ST=0, Jetson has no target — fall through to DBUS.
-    if (jetson_data_ready && jetson_mode == 1) {
-      yaw_target += jetson_rel_yaw * AUTOAIM_YAW_KP;
-      pitch_target += -jetson_rel_pitch * AUTOAIM_PITCH_KP;
-      jetson_data_ready = false;
+    // Closed-loop autoaim: the Jetson sends angular offsets (rel_yaw, rel_pitch)
+    // at ~30 Hz, but the control loop runs at 200 Hz.  Snapping yaw_target to a
+    // new absolute position every 30 Hz packet causes large D-term kicks in the
+    // inner PID (Kd=300000).  Instead:
+    //   1. On each incoming packet, store the desired absolute target position.
+    //   2. Every 200 Hz tick, smoothly ramp yaw_target toward that desired value.
+    // This removes step discontinuities and keeps the D term quiet between packets.
+    static float desired_yaw = 0.0f;
+    static float desired_pitch = 0.0f;
+    static bool autoaim_active = false;
+
+    if (jetson_mode == 1) {
+      if (!autoaim_active) {
+        // First tick entering autoaim: seed desired at current position.
+        desired_yaw = gimbal_yaw_measured_in_field_reference;
+        desired_pitch = pitch_motor->GetTheta();
+        yaw_target = desired_yaw;
+        pitch_target = desired_pitch;
+        autoaim_active = true;
+      }
+      if (jetson_data_ready) {
+        // New packet: update desired absolute target from current position + offset.
+        desired_yaw = gimbal_yaw_measured_in_field_reference + (float)jetson_rel_yaw;
+        desired_pitch = pitch_motor->GetTheta() - (float)jetson_rel_pitch;
+        jetson_data_ready = false;
+      }
+      // Every 200 Hz tick: ramp toward desired — no sudden steps, no D kicks.
+      yaw_target += AUTOAIM_YAW_SMOOTH * (desired_yaw - yaw_target);
+      if (pitch_init_done)
+        pitch_target += AUTOAIM_PITCH_SMOOTH * (desired_pitch - pitch_target);
     } else {
+      if (autoaim_active) {
+        autoaim_active = false;
+      }
       // Manual DBUS control (ST mode or no data — operator searches for targets)
-      yaw_target += yaw_omega * 0.005f;                  // yaw target in field reference rad * 5ms
-      pitch_target += pitch_omega * 0.005f;              // accumulate target with dt≈5ms
-      if (jetson_data_ready) jetson_data_ready = false;  // consume ST packets without using yaw/pitch
+      yaw_target += yaw_omega * 0.005f;
+      if (pitch_init_done)
+        pitch_target += pitch_omega * 0.005f;
+      if (jetson_data_ready) jetson_data_ready = false;
+    }
+
+    // Startup pitch ramp: move pitch_target to PITCH_INITIAL_TARGET at PITCH_INIT_RATE
+    // before handing off to DBUS / autoaim.  Overrides whatever the blocks above set.
+    if (!pitch_init_done) {
+      const float step = PITCH_INIT_RATE * 0.005f;
+      const float diff = PITCH_INITIAL_TARGET - pitch_target;
+      if (fabsf(diff) <= step) {
+        pitch_target = PITCH_INITIAL_TARGET;
+        pitch_init_done = true;
+      } else {
+        pitch_target += (diff > 0.0f ? step : -step);
+      }
     }
 
     pitch_target = clip<float>(pitch_target, PITCH_ENCODER_MIN, PITCH_ENCODER_MAX);  // clamp to encoder limits
@@ -562,8 +600,8 @@ void RM_RTOS_Default_Task(const void* args) {
     // print("err: %.2f m_o : %d \r\n", delta_yaw, yaw_output);
     // print("pitch theta: %.2f deg, pitch target: %.2f deg \r\n", RAD2DEG(pitch_motor->GetTheta()), RAD2DEG(pitch_target));
     if (HAL_GetTick() % 1000 < 5) {  // print every ~1s
-      print("Kp=%.2f  err_yaw=%.3f err_pitch=%.3f mode=%d\r\n",
-            AUTOAIM_YAW_KP, jetson_rel_yaw, jetson_rel_pitch, jetson_mode);
+      print("y_s=%.2f p_s=%.2f  err_yaw=%.3f err_pitch=%.3f mode=%d\r\n",
+            AUTOAIM_YAW_SMOOTH, AUTOAIM_PITCH_SMOOTH, jetson_rel_yaw, jetson_rel_pitch, jetson_mode);
     }
 
     pitch_motor->SetOutput(pitch_target, pitch_omega, 30, 0.5, 0);

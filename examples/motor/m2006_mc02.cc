@@ -19,19 +19,8 @@
  ****************************************************************************/
 
 /**
- * @brief Motor 2006 velocity PID control example for DM_MC_02 board
- * 
- * Hardware configuration:
- * - Board: DM_MC_02 (STM32H723, uses FDCAN)
- * - Motor: M2006 connected to FDCAN1
- * - Control: USB Virtual COM Port
- * 
- * Control:
- * - 'w' or 'W': Spin forward at target velocity (rad/s)
- * - 's' or 'S': Spin backward at target velocity (rad/s)
- * - Any other key: Stop motor
- * 
- * Connect via USB and use a serial terminal (e.g., screen, minicom, or Python serial)
+ * @brief Motor 2006 stiff position control on DM_MC_02.
+ * 'w' = +5 rad, 's' = -5 rad.
  */
 
 #include "bsp_print.h"
@@ -42,7 +31,7 @@
 #include "motor.h"
 
 #define RX_SIGNAL (1 << 0)
-#define TARGET_VELOCITY 40.0f  // Target velocity in rad/s (slow speed)
+#define POSITION_STEP 5.0f  // Position step in rad per keypress
 
 extern osThreadId_t defaultTaskHandle;
 
@@ -51,8 +40,8 @@ static bsp::CAN* can = nullptr;
 static control::MotorCANBase* motor = nullptr;
 static bsp::VirtualUSB* usb = nullptr;
 
-// Target velocity (updated by USB input)
-static volatile float target_velocity = 0.0f;
+// Target position in rad (updated by USB input, starts at 0 = idle)
+static volatile float target_position = 0.0f;
 
 /**
  * @brief Custom USB callback class
@@ -83,68 +72,62 @@ void RM_RTOS_Default_Task(const void* args) {
   control::MotorCANBase* motors[] = {motor};
   char msg[256];
   int len;
-  
-  // Velocity PID controller
-  // Parameters: Kp, Ki, Kd
-  control::PIDController velocity_pid(150.0f, 5.0f, 0.0f);
-  
+
   osDelay(1000);  // Wait for USB to initialize
-  
-  len = snprintf(msg, sizeof(msg), 
-    "\r\n========================================\r\n"
-    "  M2006 Velocity PID Control via USB\r\n"
-    "  Press 'w' = forward %.1f rad/s\r\n"
-    "  Press 's' = backward %.1f rad/s\r\n"
-    "  Any other key = stop\r\n"
-    "========================================\r\n\r\n", 
-    TARGET_VELOCITY, TARGET_VELOCITY);
+
+  len = snprintf(msg, sizeof(msg),
+                 "w = +5 rad | s = -5 rad\r\n");
   usb->Write((uint8_t*)msg, len);
 
+  // Cascade PID: position (outer) -> velocity (inner)
+  // Stiff position PID
+  float position_pid_params[3] = {60.0f, 0.0f, 2.0f};
+  control::ConstrainedPID position_pid(position_pid_params, 0, 60.0f);
+
+  // Stiff velocity PID
+  float velocity_pid_params[3] = {500.0f, 20.0f, 0.0f};
+  control::ConstrainedPID velocity_pid(velocity_pid_params, 10000, 30000);
+
   int print_counter = 0;
-  
+  target_position = motor->GetTheta();  // Start at current position to avoid jumps
   while (true) {
     // Check for USB input with short timeout
     uint32_t flags = osThreadFlagsWait(RX_SIGNAL, osFlagsWaitAll, 10);
-    
+
     if (flags & RX_SIGNAL) {
       uint8_t* data;
       uint32_t length = usb->Read(&data);
-      
+
       if (length > 0) {
         char key = data[0];
-        
+
         if (key == 'w' || key == 'W') {
-          target_velocity = TARGET_VELOCITY;
-          len = snprintf(msg, sizeof(msg), "Target: %.2f rad/s\r\n", target_velocity);
-          usb->Write((uint8_t*)msg, len);
+          target_position += POSITION_STEP;
         } else if (key == 's' || key == 'S') {
-          target_velocity = -TARGET_VELOCITY;
-          len = snprintf(msg, sizeof(msg), "Target: %.2f rad/s\r\n", target_velocity);
-          usb->Write((uint8_t*)msg, len);
-        } else {
-          target_velocity = 0.0f;
-          len = snprintf(msg, sizeof(msg), "Stop\r\n");
-          usb->Write((uint8_t*)msg, len);
+          target_position -= POSITION_STEP;
         }
+        len = snprintf(msg, sizeof(msg), "Target: %.2f rad\r\n", target_position);
+        usb->Write((uint8_t*)msg, len);
       }
     }
-    
-    // Velocity PID control
-    float current_velocity = motor->GetOmega();
-    float velocity_error = target_velocity - current_velocity;
+
+    // Cascade PID
+    float position_error = motor->GetThetaDelta(target_position);
+    float ref_velocity = position_pid.ComputeOutput(position_error);
+    float velocity_error = motor->GetOmegaDelta(ref_velocity);
     int16_t output = static_cast<int16_t>(velocity_pid.ComputeConstrainedOutput(velocity_error));
-    
+
     motor->SetOutput(output);
     control::MotorCANBase::TransmitOutput(motors, 1);
-    
+
     // Print status every 500ms
-    if (++print_counter >= 250) {  // 250 * 2ms = 500ms
+    if (++print_counter >= 250) {
       print_counter = 0;
-      len = snprintf(msg, sizeof(msg), "Target: %6.2f | Actual: %6.2f | Output: %5d\r\n",
-                     target_velocity, current_velocity, output);
+      len = snprintf(msg, sizeof(msg), "Tgt: %6.2f | Pos: %6.2f | Out: %5d\r\n",
+                     target_position, motor->GetTheta(), output);
       usb->Write((uint8_t*)msg, len);
     }
-    
-    osDelay(2);  // Motor control at 500Hz
   }
+
+  osDelay(2);  // Motor control at 500Hz
 }
