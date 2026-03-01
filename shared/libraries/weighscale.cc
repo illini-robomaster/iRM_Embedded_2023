@@ -36,9 +36,58 @@ constexpr uint32_t RESPONSE_TIMEOUT_MS = 50;
 // Extended frame ID prefix
 constexpr uint32_t EXT_ID_PREFIX = 0xAA0000;
 
-WeighScale::WeighScale(bsp::CAN* can, uint8_t addr, WeighScaleFrameType frame_type)
-    : can_(can), addr_(addr), frame_type_(frame_type) {
+// Callback data structure - packs WeighScale instance pointer and ID
+struct WeighScaleCallbackData {
+  WeighScale* instance;
+  uint16_t id;
+};
+
+// Static storage for callback data (one per possible response ID)
+// Response IDs: 0x302-0x308 for standard frames (7 IDs max)
+static WeighScaleCallbackData callback_data_storage[7];
+static uint8_t callback_data_count = 0;
+
+WeighScale::WeighScale(bsp::CAN* can, uint8_t addr, WeighScaleFrameType frame_type,
+                       uint8_t num_channels)
+    : can_(can), addr_(addr), frame_type_(frame_type), num_channels_(num_channels), rx_head_(0), rx_tail_(0), rx_count_(0) {
   memset(&data_, 0, sizeof(data_));
+  memset(rx_buffer_, 0, sizeof(rx_buffer_));
+
+  // Register callbacks for weight response IDs
+  RegisterCallbacks();
+}
+
+void WeighScale::RegisterCallbacks() {
+  // Calculate number of response frames needed (2 channels per frame)
+  uint8_t num_response_ids = (num_channels_ + 1) / 2;
+  if (num_response_ids > 7) num_response_ids = 7;  // Max 14 channels = 7 frames
+
+  // Register callback for each expected response ID
+  // Response IDs: 0x302 (ch1,2), 0x303 (ch3,4), etc.
+  for (uint8_t i = 0; i < num_response_ids; i++) {
+    uint16_t response_id = 0x302 + i;
+
+    // Store callback data
+    if (callback_data_count < 7) {
+      callback_data_storage[callback_data_count].instance = this;
+      callback_data_storage[callback_data_count].id = response_id;
+
+      can_->RegisterRxCallback(response_id, RxCallback,
+                               &callback_data_storage[callback_data_count]);
+      callback_data_count++;
+    }
+  }
+
+  // Also register callbacks for echo responses (Tare: 0x101, ReadWeight: 0x301)
+  // Tare echo - same ID as sent
+  uint16_t tare_id = (static_cast<uint16_t>(WeighScaleFuncCode::TARE) << 8) | addr_;
+  if (callback_data_count < 7) {
+    callback_data_storage[callback_data_count].instance = this;
+    callback_data_storage[callback_data_count].id = tare_id;
+    can_->RegisterRxCallback(tare_id, RxCallback,
+                             &callback_data_storage[callback_data_count]);
+    callback_data_count++;
+  }
 }
 
 void WeighScale::SetAddress(uint8_t addr) {
@@ -97,6 +146,78 @@ void WeighScale::PackF32BE(float value, uint8_t* data) {
   uint32_t raw;
   memcpy(&raw, &value, sizeof(uint32_t));
   PackU32BE(raw, data);
+}
+
+// Static callback - routes to instance method
+void WeighScale::RxCallback(const uint8_t data[], void* args) {
+  WeighScaleCallbackData* cb_data = static_cast<WeighScaleCallbackData*>(args);
+  if (cb_data && cb_data->instance) {
+    cb_data->instance->HandleRxFrame(cb_data->id, data);
+  }
+}
+
+// Instance method - handles received frame
+void WeighScale::HandleRxFrame(uint16_t id, const uint8_t data[8]) {
+  // Store in ring buffer
+  uint8_t idx = rx_head_;
+  rx_buffer_[idx].id = id;
+  memcpy(rx_buffer_[idx].data, data, 8);
+  rx_buffer_[idx].valid = true;
+
+  rx_head_ = (rx_head_ + 1) % WEIGHSCALE_RX_BUFFER_SIZE;
+  if (rx_count_ < WEIGHSCALE_RX_BUFFER_SIZE) {
+    rx_count_++;
+  } else {
+    // Buffer full, advance tail (drop oldest)
+    rx_tail_ = (rx_tail_ + 1) % WEIGHSCALE_RX_BUFFER_SIZE;
+  }
+
+  // Parse weight data from 0x302, 0x303, etc.
+  if (id >= 0x302 && id <= 0x308) {
+    uint8_t base_ch = (id - 0x302) * 2;
+
+    if (base_ch < WEIGHSCALE_MAX_CHANNELS) {
+      data_.weight[base_ch] = static_cast<int32_t>(
+          (static_cast<uint32_t>(data[0]) << 24) |
+          (static_cast<uint32_t>(data[1]) << 16) |
+          (static_cast<uint32_t>(data[2]) << 8) |
+          static_cast<uint32_t>(data[3]));
+    }
+
+    if (base_ch + 1 < WEIGHSCALE_MAX_CHANNELS) {
+      data_.weight[base_ch + 1] = static_cast<int32_t>(
+          (static_cast<uint32_t>(data[4]) << 24) |
+          (static_cast<uint32_t>(data[5]) << 16) |
+          (static_cast<uint32_t>(data[6]) << 8) |
+          static_cast<uint32_t>(data[7]));
+    }
+
+    if (base_ch + 2 > data_.valid_channels) {
+      data_.valid_channels = base_ch + 2;
+    }
+  }
+
+  connection_flag_ = true;
+}
+
+bool WeighScale::GetRxFrame(WeighScaleRxFrame_t* frame) {
+  if (rx_count_ == 0) {
+    return false;
+  }
+
+  *frame = rx_buffer_[rx_tail_];
+  rx_buffer_[rx_tail_].valid = false;
+  rx_tail_ = (rx_tail_ + 1) % WEIGHSCALE_RX_BUFFER_SIZE;
+  rx_count_--;
+
+  return true;
+}
+
+void WeighScale::ClearRxBuffer() {
+  rx_head_ = 0;
+  rx_tail_ = 0;
+  rx_count_ = 0;
+  memset(rx_buffer_, 0, sizeof(rx_buffer_));
 }
 
 bool WeighScale::Tare(uint8_t channel) {

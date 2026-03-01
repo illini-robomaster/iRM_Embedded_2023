@@ -27,142 +27,96 @@
 #include "cmsis_os.h"
 #include "weighscale.h"
 
-// CAN bus instance
-static bsp::CAN* can1 = nullptr;
+// CAN bus instance (using CAN2)
+static bsp::CAN* can2 = nullptr;
 
 // Weighing scale instance
 static control::WeighScale* scale = nullptr;
 
-// Weight data storage
-static control::WeighScaleData_t weight_data;
-
-// Number of channels on the weighing transmitter
-static const uint8_t NUM_CHANNELS = 4;
-
-// Button for user interaction (K1 on TypeA board)
+// Button for manual tare (K1 on TypeA board)
 static bsp::GPIO* key = nullptr;
 
-// Callback to handle weight response frames
-// Response IDs: 0x302 (ch1,2), 0x303 (ch3,4), etc.
-// Per protocol spec: weight values are int32 (two's complement), big-endian
-static void weight_callback(const uint8_t data[], void* args) {
-  UNUSED(args);
-  // Parse two channels from each frame (big-endian int32)
-  // Per protocol spec Section 2.2: device returns two's complement negative values
-
-  // Parse channel N weight (bytes 0-3) as int32_t
-  int32_t weight1 = static_cast<int32_t>(
-      (static_cast<uint32_t>(data[0]) << 24) |
-      (static_cast<uint32_t>(data[1]) << 16) |
-      (static_cast<uint32_t>(data[2]) << 8) |
-      static_cast<uint32_t>(data[3]));
-
-  // Parse channel N+1 weight (bytes 4-7) as int32_t
-  int32_t weight2 = static_cast<int32_t>(
-      (static_cast<uint32_t>(data[4]) << 24) |
-      (static_cast<uint32_t>(data[5]) << 16) |
-      (static_cast<uint32_t>(data[6]) << 8) |
-      static_cast<uint32_t>(data[7]));
-
-  // Store weights - actual channel mapping depends on response ID
-  // This is a simplified example
-  static uint8_t frame_count = 0;
-  uint8_t base_ch = frame_count * 2;
-  if (base_ch < control::WEIGHSCALE_MAX_CHANNELS) {
-    weight_data.weight[base_ch] = weight1;
-    if (base_ch + 1 < control::WEIGHSCALE_MAX_CHANNELS) {
-      weight_data.weight[base_ch + 1] = weight2;
-    }
-  }
-  frame_count++;
-  if (frame_count >= (NUM_CHANNELS + 1) / 2) {
-    frame_count = 0;
-    weight_data.valid_channels = NUM_CHANNELS;
-  }
-}
+// Number of channels
+static const uint8_t NUM_CHANNELS = 4;
 
 void RM_RTOS_Init(void) {
-  // Initialize print output (UART8 on TypeA)
-  print_use_uart(&huart8);
-  
-  // Initialize CAN1
-  can1 = new bsp::CAN(&hcan1, true);
-  
-  // Initialize weighing scale with address 1, standard frame
-  scale = new control::WeighScale(can1, 1, control::WeighScaleFrameType::STANDARD);
-  
-  // Register callbacks for weight response frames
-  // Response IDs for 4-channel device: 0x302 (ch1,2), 0x303 (ch3,4)
-  can1->RegisterRxCallback(0x302, weight_callback, nullptr);
-  can1->RegisterRxCallback(0x303, weight_callback, nullptr);
-  
+  // Initialize print output via USB
+  print_use_usb();
+
+  // Initialize CAN2
+  can2 = new bsp::CAN(&hcan2, false);
+
+  // Initialize weighing scale with address 1, standard frame, using CAN2
+  // Constructor automatically registers CAN callbacks for weight responses
+  scale = new control::WeighScale(can2, 1, control::WeighScaleFrameType::STANDARD, NUM_CHANNELS);
+
   // Initialize button (K1 on TypeA: GPIOE PIN6)
   key = new bsp::GPIO(K1_GPIO_Port, K1_Pin);
-  
-  // Clear weight data
-  memset(&weight_data, 0, sizeof(weight_data));
 }
 
 void RM_RTOS_Default_Task(const void* arguments) {
   UNUSED(arguments);
   
   osDelay(500);  // Wait for system to stabilize
-  
-  print("=== WeighScale Example ===\r\n");
-  print("Device Address: 1\r\n");
-  print("Frame Type: Standard (11-bit ID)\r\n");
-  print("CAN Baud Rate: 1Mbps\r\n");
+
+  print("=== WeighScale Test ===\r\n");
+  print("CAN2, Address: 1\r\n");
   print("Channels: %d\r\n", NUM_CHANNELS);
-  print("\r\n");
-  print("Press K1 button to tare all channels\r\n");
-  print("\r\n");
-  
-  // Set device baud rate to 1Mbps (requires power cycle to take effect)
-  // Only need to do this once if device was configured differently
-  // scale->WriteBaudCode(control::WeighScaleBaudCode::BAUD_1M);
-  // osDelay(10);
-  
-  // Set sample rate to 40Hz for all channels
-  for (uint8_t ch = 1; ch <= NUM_CHANNELS; ch++) {
-    scale->SetSampleRate(ch, control::WeighScaleSampleRate::RATE_40HZ);
-    osDelay(10);
-  }
-  print("Sample rate set to 40Hz\r\n\r\n");
-  
+  print("Press K1 to Tare\r\n");
+  print("=======================\r\n\r\n");
+
+  // Initial tare
+  print("Initial Tare...\r\n");
+  scale->Tare(control::WEIGHSCALE_ALL_CHANNELS);
+  osDelay(500);
+
   uint32_t loop_count = 0;
   bool last_key_state = false;
-  
+
   while (true) {
-    // Check button press for tare
+    // Check button press for manual tare
     bool key_pressed = (key->Read() == 0);  // Active low
     if (key_pressed && !last_key_state) {
-      print("Taring all channels...\r\n");
+      print(">>> Manual Tare (all channels)...\r\n");
       scale->Tare(control::WEIGHSCALE_ALL_CHANNELS);
-      osDelay(100);
+      osDelay(200);
     }
     last_key_state = key_pressed;
-    
-    // Request weight readings every 100ms
-    if (loop_count % 10 == 0) {
-      scale->ReadWeights(&weight_data, NUM_CHANNELS);
+
+    // Send ReadWeights request (responses handled by internal callbacks)
+    control::WeighScaleData_t temp_data;
+    print("[%lu] TX ReadWeights -> ID=0x301\r\n", loop_count);
+    scale->ReadWeights(&temp_data, NUM_CHANNELS);
+
+    // Wait for responses (300ms window for multiple frames)
+    osDelay(300);
+
+    // Print all received raw frames from internal buffer
+    uint8_t rx_frame_count = scale->GetRxFrameCount();
+    print("       RX frames (%d):\r\n", rx_frame_count);
+    control::WeighScaleRxFrame_t frame;
+    while (scale->GetRxFrame(&frame)) {
+      print("         ID=0x%03X [%02X %02X %02X %02X %02X %02X %02X %02X]\r\n",
+            frame.id,
+            frame.data[0], frame.data[1],
+            frame.data[2], frame.data[3],
+            frame.data[4], frame.data[5],
+            frame.data[6], frame.data[7]);
     }
-    
-    // Print weight values every 500ms
-    if (loop_count % 50 == 0) {
-      set_cursor(0, 0);
-      clear_screen();
-      
-      print("=== Weight Readings (g) ===\r\n");
-      for (uint8_t ch = 0; ch < NUM_CHANNELS; ch++) {
-        // Use %ld for int32_t (signed) per protocol spec
-        print("CH%d: %ld g\r\n", ch + 1, static_cast<long>(weight_data.weight[ch]));
-      }
-      print("\r\n");
-      print("Connection: %s\r\n", scale->connection_flag_ ? "OK" : "---");
-      print("Loop: %lu\r\n", loop_count);
+
+    // Get parsed weight data from the scale object
+    const control::WeighScaleData_t& weight_data = scale->GetData();
+
+    // Print parsed weight values
+    print("\r\n       Weights (parsed):\r\n");
+    for (uint8_t ch = 0; ch < NUM_CHANNELS; ch++) {
+      print("         CH%d: %.3f kg\r\n", ch + 1, weight_data.weight[ch] / 1000.0);
     }
-    
-    osDelay(10);
+
+    print("\r\n");
+
+    // Wait before next reading
+    osDelay(500);
     loop_count++;
   }
 }

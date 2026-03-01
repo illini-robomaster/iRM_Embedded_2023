@@ -20,6 +20,8 @@
 
 #pragma once
 
+#include <cstring>
+
 #include "bsp_can.h"
 
 namespace control {
@@ -107,6 +109,20 @@ typedef struct {
 } __packed WeighScaleData_t;
 
 /**
+ * @brief Ring buffer entry for raw CAN frames
+ */
+typedef struct {
+  uint16_t id;
+  uint8_t data[8];
+  bool valid;
+} __packed WeighScaleRxFrame_t;
+
+/**
+ * @brief Ring buffer size for received CAN frames
+ */
+constexpr uint8_t WEIGHSCALE_RX_BUFFER_SIZE = 16;
+
+/**
  * @brief Multi-channel CAN weighing transmitter driver
  *
  * Supports:
@@ -125,13 +141,15 @@ typedef struct {
 class WeighScale {
  public:
   /**
-   * @brief Constructor
+   * @brief Constructor - automatically registers CAN callbacks for weight responses
    * @param can Pointer to CAN instance
    * @param addr Device address (1-255, default 1)
    * @param frame_type Frame type (STANDARD or EXTENDED)
+   * @param num_channels Number of channels to register callbacks for (default 4, max 14)
    */
   WeighScale(bsp::CAN* can, uint8_t addr = 1,
-             WeighScaleFrameType frame_type = WeighScaleFrameType::STANDARD);
+             WeighScaleFrameType frame_type = WeighScaleFrameType::STANDARD,
+             uint8_t num_channels = 4);
 
   /**
    * @brief Set the device address
@@ -146,14 +164,14 @@ class WeighScale {
   void SetFrameType(WeighScaleFrameType frame_type);
 
   /**
-   * @brief Execute tare on specified channel
+   * @brief Execute tare on specified channel, or all channels, after tare, the weight reads zero
    * @param channel Channel number (1-14) or WEIGHSCALE_ALL_CHANNELS (0x0F)
    * @return true if ACK received
    */
   bool Tare(uint8_t channel);
 
   /**
-   * @brief Execute zero point calibration on specified channel
+   * @brief Execute zero point calibration on specified channel, please check documents for specifics
    * @param channel Channel number (1-14) or WEIGHSCALE_ALL_CHANNELS (0x0F)
    * @return true if ACK received
    */
@@ -238,6 +256,31 @@ class WeighScale {
   const WeighScaleData_t& GetData() const { return data_; }
 
   /**
+   * @brief Get the number of raw frames in receive buffer
+   * @return Number of frames available
+   */
+  uint8_t GetRxFrameCount() const { return rx_count_; }
+
+  /**
+   * @brief Get a raw frame from the receive buffer (oldest first)
+   * @param frame Pointer to store the frame
+   * @return true if a frame was available
+   */
+  bool GetRxFrame(WeighScaleRxFrame_t* frame);
+
+  /**
+   * @brief Clear the receive buffer
+   */
+  void ClearRxBuffer();
+
+  /**
+   * @brief Static callback handler - called by CAN ISR
+   * @param data CAN data bytes
+   * @param args Pointer to WeighScale instance packed with ID info
+   */
+  static void RxCallback(const uint8_t data[], void* args);
+
+  /**
    * @brief Connection status flag (set after successful communication)
    */
   volatile bool connection_flag_ = false;
@@ -252,8 +295,29 @@ class WeighScale {
   // Frame type
   WeighScaleFrameType frame_type_;
 
+  // Number of channels configured
+  uint8_t num_channels_;
+
   // Internal weight data storage
   WeighScaleData_t data_;
+
+  // Ring buffer for received CAN frames
+  WeighScaleRxFrame_t rx_buffer_[WEIGHSCALE_RX_BUFFER_SIZE];
+  volatile uint8_t rx_head_;
+  volatile uint8_t rx_tail_;
+  volatile uint8_t rx_count_;
+
+  /**
+   * @brief Internal handler for received CAN frames
+   * @param id CAN ID of received frame
+   * @param data CAN data bytes
+   */
+  void HandleRxFrame(uint16_t id, const uint8_t data[8]);
+
+  /**
+   * @brief Register CAN callbacks for weight response IDs
+   */
+  void RegisterCallbacks();
 
   /**
    * @brief Calculate CAN ID based on function code and current settings
