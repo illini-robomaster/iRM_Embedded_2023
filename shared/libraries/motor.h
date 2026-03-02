@@ -42,6 +42,7 @@ typedef enum {
   MIT = 0,
   POS_VEL = 1,
   VEL = 2,
+  FORCE_POS = 3,  // force-position hybrid (DM-J10010L-2EC only)
 } mode_t;
 
 //==================================================================================================
@@ -1177,6 +1178,114 @@ class MotorDM3519 {
   // torque - adjust these based on DM3519 specifications
   constexpr static float T_MIN = -18;
   constexpr static float T_MAX = 18;
+};
+
+//==================================================================================================
+// MotorDMJ10010
+//==================================================================================================
+
+/**
+ * @brief DAMIAO DM-J10010L-2EC gearbox motor (10:1 reduction, dual encoder, output-shaft absolute).
+ *
+ * Supports four control modes.  Configure the desired mode in the DAMIAO helper tool before use.
+ * CAN frame IDs (based on the motor's configured CAN ID):
+ *   MIT            : CAN id
+ *   position-vel   : CAN id + 0x100
+ *   velocity       : CAN id + 0x200
+ *   force-position : CAN id + 0x300
+ *
+ * Physical constants used for MIT-mode feedback decoding (must match DAMIAO tool config):
+ *   VMAX ≈ 21 rad/s  (output-shaft no-load speed at 48 V)
+ *   TMAX ≈ 40 Nm     (rated continuous torque)
+ */
+class MotorDMJ10010 {
+ public:
+  /**
+   * @param can    CAN object
+   * @param rx_id  Master (feedback) id set in DAMIAO tool
+   * @param tx_id  Motor CAN id set in DAMIAO tool
+   * @param mode   MIT=0, POS_VEL=1, VEL=2, FORCE_POS=3
+   */
+  MotorDMJ10010(bsp::CAN* can, uint16_t rx_id, uint16_t tx_id, mode_t mode);
+
+  /** Update motor state from CAN feedback — called by CAN RX callback. */
+  void UpdateData(const uint8_t data[]);
+
+  /** Enable motor (blocking — waits for CAN feedback confirming enable). */
+  void MotorEnable();
+  /** Disable motor. */
+  void MotorDisable();
+  /** Set current output-shaft position as zero (stored in motor flash). */
+  void SetZeroPos();
+
+  /** Transmit queued commands for all motors in the array. */
+  static void TransmitOutput(MotorDMJ10010* motors[], uint8_t num_motors);
+
+  void PrintData() const;
+
+  /** MIT mode: position [rad], velocity [rad/s], kp, kd, torque [Nm]. */
+  void SetOutput(float position, float velocity, float kp, float kd, float torque);
+  /** Position-velocity mode: position [rad], velocity [rad/s]. */
+  void SetOutput(float position, float velocity);
+  /** Velocity mode: velocity [rad/s]. */
+  void SetOutput(float velocity);
+  /**
+   * Force-position hybrid mode:
+   *   position      — target output-shaft position [rad]
+   *   velocity_limit — max speed during motion [rad/s], clamped to [0, 100]
+   *   current_limit  — peak current as a fraction of the motor maximum [0, 1.0]
+   *                    (maximum current = 99.74 A per datasheet)
+   */
+  void SetOutput(float position, float velocity_limit, float current_limit);
+
+  /** Output-shaft angle [rad], range set by PMAX in DAMIAO tool (default ±π). */
+  float GetTheta() const;
+  /** Output-shaft angular velocity [rad/s]. */
+  float GetOmega() const;
+  /** Output-shaft torque [Nm]. */
+  float GetTorque() const;
+
+  mode_t GetMode() const;
+  float GetRelativeTarget() const;
+  void SetRelativeTarget(float target);
+
+  volatile bool connection_flag_ = false;
+
+ private:
+  bsp::CAN* can_;
+  uint16_t rx_id_;
+  uint16_t tx_id_;
+  uint16_t tx_id_actual_;
+
+  volatile mode_t mode_;
+  volatile float kp_set_      = 0;
+  volatile float kd_set_      = 0;
+  volatile float vel_set_     = 0;
+  volatile float pos_set_     = 0;
+  volatile float torque_set_  = 0;
+  volatile float cur_set_     = 0;  // force-position: current limit [0, 1.0]
+
+  volatile int16_t raw_pos_       = 0;
+  volatile int16_t raw_vel_       = 0;
+  volatile int16_t raw_torque_    = 0;
+  volatile int16_t raw_motorTemp_ = 0;
+  volatile int16_t raw_mosTemp_   = 0;
+  volatile float   theta_         = 0;
+  volatile float   omega_         = 0;
+  volatile float   torque_        = 0;
+  float relative_target_          = 0;
+
+  // MIT-mode linear-mapping ranges — must match DAMIAO tool configuration.
+  constexpr static float KP_MIN = 0;
+  constexpr static float KP_MAX = 500;
+  constexpr static float KD_MIN = 0;
+  constexpr static float KD_MAX = 5;
+  constexpr static float P_MIN  = -PI;
+  constexpr static float P_MAX  =  PI;
+  constexpr static float V_MIN  = -21;   // VMAX = 21 rad/s (output shaft @ 48 V no-load)
+  constexpr static float V_MAX  =  21;
+  constexpr static float T_MIN  = -40;   // TMAX = 40 Nm (rated continuous torque)
+  constexpr static float T_MAX  =  40;
 };
 
 } /* namespace control */

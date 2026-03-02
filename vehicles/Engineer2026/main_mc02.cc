@@ -41,7 +41,7 @@
  *   ch0 → lateral   (vy): right stick horizontal, right = negative
  *   ch1 → forward   (vx): right stick vertical,   push forward = positive
  *   ch2 → rotation  (vw): left  stick horizontal,  push left   = positive (CCW)
- *   swr → enable switch: DOWN = disabled, UP/MID = enabled
+ *   swr → DOWN = disabled, MID = enabled + lift down, UP = enabled + lift up
  */
 
 #include <cmath>
@@ -123,14 +123,21 @@ static const float FR_STEER_OFFSET = 4.389f;
 // is below this threshold to avoid atan2(0,0) instability [m/s].
 static const float STEER_SPEED_DEADZONE = 0.05f;
 
+// Lift soft-down threshold: when the lift angle is within this value of 0,
+// the current limit is set to 0 so the motor does not fight gravity.
+static const float LIFT_SOFT_DOWN_THRESHOLD = 0.02f;  // [rad]
+
 // ── Global peripherals ──────────────────────────────────────────────────────
 static bsp::CAN*  can  = nullptr;
 static remote::DBUS* dbus = nullptr;
 
 // Rear omniwheels (DM3519, velocity-controlled)
-// TODO: replace rx_id / tx_id with the IDs set in your motor configuration tool.
 static control::MotorDM3519* rear_left_motor  = nullptr;
 static control::MotorDM3519* rear_right_motor = nullptr;
+
+// Lift motor (DM-J10010L-2EC, FORCE_POS mode)
+// swr MID → pos = 0 rad (chassis low), swr UP → pos = -1 rad (chassis raised)
+static control::MotorDMJ10010* lift_motor = nullptr;
 
 // Front swerve — drive motors (Motor3508, current-controlled via velocity PID)
 // TODO: replace CAN IDs (0x201–0x208) with your actual IDs.
@@ -154,9 +161,13 @@ void RM_RTOS_Init() {
   dbus = new remote::DBUS(&huart5);
 
   // ── Rear omniwheels (DM3519, VEL mode) ────────────────────────────────
-  // Make sure each motor is configured to VEL mode via the helper tool.
   rear_left_motor  = new control::MotorDM3519(can, 0x20, 0x21, control::VEL);
   rear_right_motor = new control::MotorDM3519(can, 0x22, 0x23, control::VEL);
+
+  // ── Lift motor (DM-J10010L-2EC, FORCE_POS mode) ───────────────────────
+  // Velocity limit 0.5 rad/s keeps the lift slow and safe.
+  // Current limit 0.5 (= 50% of 99.74 A max) — tune down if the motor gets warm.
+  lift_motor = new control::MotorDMJ10010(can, 0x30, 0x31, control::FORCE_POS);
 
   // ── Front swerve drives (Motor3508) ───────────────────────────────────
   front_left_drive  = new control::Motor3508(can, 0x202);
@@ -197,9 +208,10 @@ void RM_RTOS_Default_Task(const void* args) {
   UNUSED(args);
 
   // Convenience arrays for bulk TransmitOutput calls.
-  control::MotorDM3519*  rear_motors[]  = {rear_left_motor, rear_right_motor};
-  control::MotorCANBase* drive_motors[] = {front_left_drive, front_right_drive};
-  control::MotorCANBase* steer_motors[] = {front_left_steer_raw, front_right_steer_raw};
+  control::MotorDM3519*   rear_motors[]  = {rear_left_motor, rear_right_motor};
+  control::MotorCANBase*  drive_motors[] = {front_left_drive, front_right_drive};
+  control::MotorCANBase*  steer_motors[] = {front_left_steer_raw, front_right_steer_raw};
+  control::MotorDMJ10010* lift_motors[]  = {lift_motor};
 
   // Velocity PIDs for the front M3508 drive motors.
   control::PIDController drive_pid_fl(DRIVE_KP, DRIVE_KI, DRIVE_KD);
@@ -229,6 +241,7 @@ void RM_RTOS_Default_Task(const void* args) {
       if (enabled) {
         rear_left_motor->MotorDisable();
         rear_right_motor->MotorDisable();
+        lift_motor->MotorDisable();
 
         front_left_drive->SetOutput(0);
         front_right_drive->SetOutput(0);
@@ -258,7 +271,9 @@ void RM_RTOS_Default_Task(const void* args) {
         print("RL OK. Enabling RR motor (0x22)...\r\n");
         rear_right_motor->SetZeroPos();
         rear_right_motor->MotorEnable();
-        print("RR OK. Enabled\r\n");
+        print("RR OK. Enabling lift motor (0x30)...\r\n");
+        lift_motor->MotorEnable();
+        print("Lift OK. Enabled\r\n");
         enabled = true;
         osDelay(100);
       }
@@ -303,20 +318,55 @@ void RM_RTOS_Default_Task(const void* args) {
     float fl_speed = sqrtf(fl_vx * fl_vx + fl_vy * fl_vy);  // [m/s]
     float fr_speed = sqrtf(fr_vx * fr_vx + fr_vy * fr_vy);  // [m/s]
 
-    // Update steering targets only when the commanded speed is large enough
-    // to give a meaningful heading (avoid atan2(0,0) ambiguity).
+    // Swerve optimization: a wheel can spin either way, so we never need to
+    // rotate more than 90°.  If the naive target is more than 90° from the
+    // current angle, flip it by 180° and reverse the drive direction instead.
+    float fl_raw_angle = atan2f(fl_vy, fl_vx);
+    float fr_raw_angle = atan2f(fr_vy, fr_vx);
+
+    // Wrap helper: fold angle difference into [-π, π].
+    auto wrap_pi = [](float a) -> float {
+      a = fmodf(a, 2.0f * (float)M_PI);
+      if (a >  (float)M_PI) a -= 2.0f * (float)M_PI;
+      if (a < -(float)M_PI) a += 2.0f * (float)M_PI;
+      return a;
+    };
+
+    float fl_diff = wrap_pi(fl_raw_angle - front_left_steer->GetTheta());
+    float fr_diff = wrap_pi(fr_raw_angle - front_right_steer->GetTheta());
+
+    float fl_opt_angle  = fl_raw_angle;
+    float fr_opt_angle  = fr_raw_angle;
+    float fl_drive_sign = 1.0f;
+    float fr_drive_sign = 1.0f;
+
+    if (fl_diff > (float)M_PI / 2.0f) {
+      fl_opt_angle  = fl_raw_angle - (float)M_PI;
+      fl_drive_sign = -1.0f;
+    } else if (fl_diff < -(float)M_PI / 2.0f) {
+      fl_opt_angle  = fl_raw_angle + (float)M_PI;
+      fl_drive_sign = -1.0f;
+    }
+    if (fr_diff > (float)M_PI / 2.0f) {
+      fr_opt_angle  = fr_raw_angle - (float)M_PI;
+      fr_drive_sign = -1.0f;
+    } else if (fr_diff < -(float)M_PI / 2.0f) {
+      fr_opt_angle  = fr_raw_angle + (float)M_PI;
+      fr_drive_sign = -1.0f;
+    }
+
     if (fl_speed > STEER_SPEED_DEADZONE)
-      front_left_steer->SetTarget(atan2f(fl_vy, fl_vx));
+      front_left_steer->SetTarget(fl_opt_angle);
     if (fr_speed > STEER_SPEED_DEADZONE)
-      front_right_steer->SetTarget(atan2f(fr_vy, fr_vx));
+      front_right_steer->SetTarget(fr_opt_angle);
 
     front_left_steer->CalcOutput();
     front_right_steer->CalcOutput();
 
-    // Convert linear wheel speed [m/s] to the motor-velocity unit used by
-    // GetOmegaDelta(), then run the velocity PID to produce a current output.
-    float fl_target_vel = fl_speed * DRIVE_VEL_SCALE;
-    float fr_target_vel = fr_speed * DRIVE_VEL_SCALE;
+    // Drive velocity: scale by the flip sign so the wheel rolls in the correct
+    // direction when the steering module is pointed in the flipped direction.
+    float fl_target_vel = fl_speed * DRIVE_VEL_SCALE * fl_drive_sign;
+    float fr_target_vel = fr_speed * DRIVE_VEL_SCALE * fr_drive_sign;
 
     front_left_drive->SetOutput(
         drive_pid_fl.ComputeConstrainedOutput(front_left_drive->GetOmegaDelta(fl_target_vel)));
@@ -327,13 +377,27 @@ void RM_RTOS_Default_Task(const void* args) {
     rear_left_motor->SetOutput(rl_speed);
     rear_right_motor->SetOutput(rr_speed);
 
+    // ── Lift motor ───────────────────────────────────────────────────
+    // swr MID → chassis down (pos = 0), swr UP → chassis raised (pos = -1 rad).
+    // Soft-down: once the lift reaches the down position (|theta| < threshold),
+    // drop the current limit to 0 so the motor stops fighting gravity.
+    // While still descending (|theta| >= threshold), use normal current to move.
+    float lift_pos = (dbus->swr == remote::UP) ? -1.0f : 0.0f;
+    float lift_cur;
+    if (dbus->swr == remote::UP) {
+      lift_cur = 0.5f;  // lifting or holding up
+    } else if (fabsf(lift_motor->GetTheta()) < LIFT_SOFT_DOWN_THRESHOLD) {
+      lift_cur = 0.0f;  // at rest in down position — release force
+    } else {
+      lift_cur = 0.5f;  // still descending toward 0
+    }
+    lift_motor->SetOutput(lift_pos, 0.5f, lift_cur);
+
     // ── Transmit all CAN frames ──────────────────────────────────────
-    // DM3519 motors use a separate frame format from DJI motors.
     control::MotorDM3519::TransmitOutput(rear_motors, 2);
-    // Motor3508 (0x201–0x204) → frame 0x200
     control::MotorCANBase::TransmitOutput(drive_motors, 2);
-    // Motor6020 (0x205–0x208) → frame 0x2FF
     control::MotorCANBase::TransmitOutput(steer_motors, 2);
+    control::MotorDMJ10010::TransmitOutput(lift_motors, 1);
 
     // ── Debug print (~1 Hz) ──────────────────────────────────────────
     if (HAL_GetTick() % 1000 < 5) {
@@ -341,10 +405,10 @@ void RM_RTOS_Default_Task(const void* args) {
             vx, vy, vw, rl_speed, rr_speed);
       print("  FL: %.2fm/s tgt=%.1fdeg cur=%.1fdeg | FR: %.2fm/s tgt=%.1fdeg cur=%.1fdeg\r\n",
             fl_speed,
-            atan2f(fl_vy, fl_vx) * 180.0f / (float)M_PI,
+            fl_opt_angle * 180.0f / (float)M_PI,
             front_left_steer->GetTheta()  * 180.0f / (float)M_PI,
             fr_speed,
-            atan2f(fr_vy, fr_vx) * 180.0f / (float)M_PI,
+            fr_opt_angle * 180.0f / (float)M_PI,
             front_right_steer->GetTheta() * 180.0f / (float)M_PI);
     }
 
