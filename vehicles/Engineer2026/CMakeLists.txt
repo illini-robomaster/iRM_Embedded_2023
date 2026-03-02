@@ -1,6 +1,6 @@
 # ---------------------------------------------------------------------- #
 #                                                                        #
-#  Copyright (C) 2022                                                    #
+#  Copyright (C) 2025                                                    #
 #  Illini RoboMaster @ University of Illinois at Urbana-Champaign.       #
 #                                                                        #
 #  This program is free software: you can redistribute it and/or modify  #
@@ -18,11 +18,14 @@
 #                                                                        #
 # ---------------------------------------------------------------------- #
 
-add_subdirectory(Engineer)
-add_subdirectory(Fortress)
-add_subdirectory(Sentry)
-add_subdirectory(Steering)
-add_subdirectory(Hero)
-add_subdirectory(Dart)
-add_subdirectory(Omni)
-add_subdirectory(Engineer2026)
+project(vehicle_engineer2026 ASM C CXX)
+
+# Steering6020 is a vehicle-specific class from the Engineer chassis.
+# We pull in just its source file and expose its include directory.
+irm_add_arm_executable(${PROJECT_NAME}_mc02
+    TARGET DM_MC_02
+    SOURCES
+        main_mc02.cc
+        ${CMAKE_SOURCE_DIR}/vehicles/Engineer/chassis/src/steering_6020.cc
+    INCLUDES
+        ${CMAKE_SOURCE_DIR}/vehicles/Engineer/chassis/include)
