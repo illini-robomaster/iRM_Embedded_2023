@@ -1338,4 +1338,156 @@ float MotorDMJ10010::GetTorque()         const { return torque_; }
 float MotorDMJ10010::GetRelativeTarget() const { return relative_target_; }
 void  MotorDMJ10010::SetRelativeTarget(float target) { relative_target_ = target; }
 
+//==================================================================================================
+// MotorDMJ3507 (DAMIAO DM-J3507-2EC)
+//==================================================================================================
+
+static void can_motor_dmj3507_callback(const uint8_t data[], void* args) {
+  MotorDMJ3507* motor = reinterpret_cast<MotorDMJ3507*>(args);
+  motor->UpdateData(data);
+}
+
+MotorDMJ3507::MotorDMJ3507(bsp::CAN* can, uint16_t rx_id, uint16_t tx_id, mode_t mode)
+    : can_(can), rx_id_(rx_id), tx_id_(tx_id), mode_(mode) {
+  can->RegisterRxCallback(rx_id, can_motor_dmj3507_callback, this);
+  if (mode == MIT) {
+    tx_id_actual_ = tx_id;
+  } else if (mode == POS_VEL) {
+    tx_id_actual_ = tx_id + 0x100;
+  } else if (mode == VEL) {
+    tx_id_actual_ = tx_id + 0x200;
+  } else if (mode == FORCE_POS) {
+    tx_id_actual_ = tx_id + 0x300;
+  } else {
+    RM_EXPECT_TRUE(false, "Invalid mode number!");
+  }
+}
+
+void MotorDMJ3507::MotorEnable() {
+  uint8_t data[8] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfc};
+  connection_flag_ = false;
+  while (!connection_flag_) {
+    this->can_->Transmit(this->tx_id_actual_, data, 8);
+    osDelay(10);
+  }
+}
+
+void MotorDMJ3507::MotorDisable() {
+  uint8_t data[8] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfd};
+  this->can_->Transmit(this->tx_id_actual_, data, 8);
+}
+
+void MotorDMJ3507::SetZeroPos() {
+  uint8_t data[8] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe};
+  this->can_->Transmit(this->tx_id_actual_, data, 8);
+}
+
+void MotorDMJ3507::SetOutput(float position, float velocity, float kp, float kd, float torque) {
+  pos_set_    = position;
+  vel_set_    = velocity;
+  kp_set_     = kp;
+  kd_set_     = kd;
+  torque_set_ = torque;
+}
+
+void MotorDMJ3507::SetOutput(float position, float velocity) {
+  pos_set_ = position;
+  vel_set_ = velocity;
+}
+
+void MotorDMJ3507::SetOutput(float velocity) {
+  vel_set_ = velocity;
+}
+
+void MotorDMJ3507::SetOutput(float position, float velocity_limit, float current_limit) {
+  pos_set_ = position;
+  vel_set_ = velocity_limit;  // [rad/s], encoded as uint16 * 100 in TransmitOutput
+  cur_set_ = current_limit;   // [0, 1.0], encoded as uint16 * 10000 in TransmitOutput
+}
+
+mode_t MotorDMJ3507::GetMode() const { return mode_; }
+
+void MotorDMJ3507::TransmitOutput(MotorDMJ3507* motors[], uint8_t num_motors) {
+  for (uint8_t i = 0; i < num_motors; ++i) {
+    uint8_t data[8] = {0};
+
+    if (motors[i]->GetMode() == MIT) {
+      uint16_t kp_tmp  = float_to_uint(motors[i]->kp_set_,     KP_MIN, KP_MAX, 12);
+      uint16_t kd_tmp  = float_to_uint(motors[i]->kd_set_,     KD_MIN, KD_MAX, 12);
+      uint16_t pos_tmp = float_to_uint(motors[i]->pos_set_,    P_MIN,  P_MAX,  16);
+      uint16_t vel_tmp = float_to_uint(motors[i]->vel_set_,    V_MIN,  V_MAX,  12);
+      uint16_t t_tmp   = float_to_uint(motors[i]->torque_set_, T_MIN,  T_MAX,  12);
+      data[0] = pos_tmp >> 8;
+      data[1] = pos_tmp & 0xff;
+      data[2] = (vel_tmp >> 4) & 0xff;
+      data[3] = ((vel_tmp & 0x0f) << 4) | ((kp_tmp >> 8) & 0x0f);
+      data[4] = kp_tmp & 0xff;
+      data[5] = (kd_tmp >> 4) & 0xff;
+      data[6] = ((kd_tmp & 0x0f) << 4) | ((t_tmp >> 8) & 0x0f);
+      data[7] = t_tmp & 0xff;
+
+    } else if (motors[i]->GetMode() == POS_VEL) {
+      uint8_t* pbuf = (uint8_t*)&motors[i]->pos_set_;
+      uint8_t* vbuf = (uint8_t*)&motors[i]->vel_set_;
+      data[0] = pbuf[0]; data[1] = pbuf[1]; data[2] = pbuf[2]; data[3] = pbuf[3];
+      data[4] = vbuf[0]; data[5] = vbuf[1]; data[6] = vbuf[2]; data[7] = vbuf[3];
+
+    } else if (motors[i]->GetMode() == VEL) {
+      uint8_t* vbuf = (uint8_t*)&motors[i]->vel_set_;
+      data[0] = vbuf[0]; data[1] = vbuf[1]; data[2] = vbuf[2]; data[3] = vbuf[3];
+
+    } else if (motors[i]->GetMode() == FORCE_POS) {
+      // D[0-3]: target position [rad] as little-endian float
+      uint8_t* pbuf = (uint8_t*)&motors[i]->pos_set_;
+      data[0] = pbuf[0]; data[1] = pbuf[1]; data[2] = pbuf[2]; data[3] = pbuf[3];
+      // D[4-5]: velocity limit [rad/s] × 100, uint16 little-endian, range 0-10000 (= 0-100 rad/s)
+      uint16_t v_tmp = (uint16_t)clip<float>(motors[i]->vel_set_ * 100.0f, 0.0f, 10000.0f);
+      data[4] = v_tmp & 0xff;
+      data[5] = (v_tmp >> 8) & 0xff;
+      // D[6-7]: current limit [0, 1.0] × 10000, uint16 little-endian, range 0-10000
+      uint16_t i_tmp = (uint16_t)clip<float>(motors[i]->cur_set_ * 10000.0f, 0.0f, 10000.0f);
+      data[6] = i_tmp & 0xff;
+      data[7] = (i_tmp >> 8) & 0xff;
+
+    } else {
+      RM_EXPECT_TRUE(false, "Invalid mode number!");
+    }
+
+    motors[i]->can_->Transmit(motors[i]->tx_id_actual_, data, 8);
+  }
+}
+
+void MotorDMJ3507::UpdateData(const uint8_t data[]) {
+  // Feedback frame layout (same as DM3519 / DMJ10010):
+  //   D[0]: ID | ERR<<4
+  //   D[1]: POS[15:8]   D[2]: POS[7:0]
+  //   D[3]: VEL[11:4]   D[4]: VEL[3:0] | T[11:8]   D[5]: T[7:0]
+  //   D[6]: T_MOS (°C)  D[7]: T_Rotor (°C)
+  raw_pos_       = (int16_t)(data[1] << 8 | data[2]);
+  raw_vel_       = (int16_t)(data[3] << 4 | (data[4] & 0xf0) >> 4);
+  raw_torque_    = (int16_t)(data[5] | (data[4] & 0x0f) << 8);
+  raw_mosTemp_   = data[6];
+  raw_motorTemp_ = data[7];
+
+  theta_  = uint_to_float(raw_pos_,    P_MIN, P_MAX, 16);
+  omega_  = uint_to_float(raw_vel_,    V_MIN, V_MAX, 12);
+  torque_ = uint_to_float(raw_torque_, T_MIN, T_MAX, 12);
+
+  connection_flag_ = true;
+}
+
+void MotorDMJ3507::PrintData() const {
+  set_cursor(0, 0);
+  clear_screen();
+  print("DMJ3507 Pos: %.4f rad  Vel: %.4f rad/s  Torque: %.4f Nm\r\n",
+        GetTheta(), GetOmega(), GetTorque());
+  print("        MOS: %d C  Rotor: %d C\r\n", raw_mosTemp_, raw_motorTemp_);
+}
+
+float MotorDMJ3507::GetTheta()          const { return theta_; }
+float MotorDMJ3507::GetOmega()          const { return omega_; }
+float MotorDMJ3507::GetTorque()         const { return torque_; }
+float MotorDMJ3507::GetRelativeTarget() const { return relative_target_; }
+void  MotorDMJ3507::SetRelativeTarget(float target) { relative_target_ = target; }
+
 } /* namespace control */
