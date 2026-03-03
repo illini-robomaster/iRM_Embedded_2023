@@ -46,6 +46,7 @@
 
 #include <cmath>
 
+#include "arm_mc02.h"
 #include "bsp_print.h"
 #include "cmsis_os.h"
 #include "dbus.h"
@@ -128,7 +129,7 @@ static const float STEER_SPEED_DEADZONE = 0.05f;
 static const float LIFT_SOFT_DOWN_THRESHOLD = 0.02f;  // [rad]
 
 // ── Global peripherals ──────────────────────────────────────────────────────
-static bsp::CAN*  can  = nullptr;
+static bsp::CAN*     can  = nullptr;
 static remote::DBUS* dbus = nullptr;
 
 // Rear omniwheels (DM3519, velocity-controlled)
@@ -196,6 +197,9 @@ void RM_RTOS_Init() {
   steer_cfg.install_offset = FR_STEER_OFFSET;
   steer_cfg.omega_pid_param = new float[3]{STEER_KP, STEER_KI, STEER_KD};
   front_right_steer = new control::Steering6020(steer_cfg);
+
+  // ── Arm controller (hfdcan2 + huart10) ────────────────────────────────
+  ArmInit();
 }
 
 void RM_RTOS_Threads_Init(void) {
@@ -232,6 +236,11 @@ void RM_RTOS_Default_Task(const void* args) {
     osDelay(500);
   }
   print("=== READY — flip swr UP to enable ===\r\n");
+
+  // ── Connection check: block until every motor has sent ≥1 CAN frame ──
+  // Keep swr DOWN while powering motors — robot is safe to handle.
+  // Once all connection_flag_ are set, proceed to the enable sequence.
+  checkAllMotorsConnected(rear_left_motor, rear_right_motor, lift_motor);
 
   bool enabled = false;
 
@@ -398,6 +407,9 @@ void RM_RTOS_Default_Task(const void* args) {
     control::MotorCANBase::TransmitOutput(drive_motors, 2);
     control::MotorCANBase::TransmitOutput(steer_motors, 2);
     control::MotorDMJ10010::TransmitOutput(lift_motors, 1);
+
+    // ── Arm controller tick ───────────────────────────────────────────
+    ArmUpdate();
 
     // ── Debug print (~1 Hz) ──────────────────────────────────────────
     if (HAL_GetTick() % 1000 < 5) {
