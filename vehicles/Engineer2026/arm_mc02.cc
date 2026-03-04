@@ -42,13 +42,13 @@
 // master_id = feedback frame ID configured in DAMIAO tool ("Master ID")
 // can_id    = command frame ID configured in DAMIAO tool ("CAN ID")
 // TODO: replace placeholder values with your DAMIAO-tool-configured IDs.
-static constexpr uint16_t J1_MASTER_ID = 0x01, J1_CAN_ID = 0x01;  // Motor4310
-static constexpr uint16_t J2_MASTER_ID = 0x02, J2_CAN_ID = 0x02;  // MotorDMJ10010
-static constexpr uint16_t J3_MASTER_ID = 0x03, J3_CAN_ID = 0x03;  // MotorDMJ10010
-static constexpr uint16_t J4_MASTER_ID = 0x04, J4_CAN_ID = 0x04;  // Motor4310
-static constexpr uint16_t J5_MASTER_ID = 0x05, J5_CAN_ID = 0x05;  // Motor4310
-static constexpr uint16_t J6_MASTER_ID = 0x06, J6_CAN_ID = 0x06;  // MotorDMJ3507
-static constexpr uint16_t GRIP_RX_ID   = 0x207;                    // Motor2006
+static constexpr uint16_t J1_MASTER_ID = 0x10, J1_CAN_ID = 0x11;  // Motor4310
+static constexpr uint16_t J2_MASTER_ID = 0x12, J2_CAN_ID = 0x13;  // MotorDMJ10010
+static constexpr uint16_t J3_MASTER_ID = 0x14, J3_CAN_ID = 0x15;  // MotorDMJ10010
+static constexpr uint16_t J4_MASTER_ID = 0x16, J4_CAN_ID = 0x17;  // Motor4310
+static constexpr uint16_t J5_MASTER_ID = 0x18, J5_CAN_ID = 0x19;  // Motor4310
+static constexpr uint16_t J6_MASTER_ID = 0x0, J6_CAN_ID = 0x1;  // MotorDMJ3507
+static constexpr uint16_t GRIP_RX_ID   = 0x206;                    // Motor2006
 
 // ── Velocity & current limits ────────────────────────────────────────────────
 // Setpoint ramp rate [deg/s] — matches MoveIt joint_limits.yaml.
