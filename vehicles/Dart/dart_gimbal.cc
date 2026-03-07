@@ -54,12 +54,18 @@ enum class LoadState { IDLE,
                        LOADING_DOWN,
                        LOADED,
                        REVERSING };
+enum class LoadControlMode { AUTO_RELOAD,
+                             MANUAL };
 
 #define TRIGGER_HOLD_OUTPUT 600       // PWM offset to hold dart
 #define TRIGGER_RELEASE_OUTPUT 0      // PWM offset to release
+#define TRIGGER_MID_OUTPUT 300        // PWM offset for manual mid state
 #define LOAD_DOWN_SPEED (-150.0f)     // rad/s downward
 #define REVERSE_SPEED 150.0f          // rad/s reverse (slower)
 #define REVERSE_RELEASE_CURRENT 4000  // |current| below this → dart released
+#define MANUAL_LOAD_FORWARD_SPEED 300.0f
+#define MANUAL_LOAD_REVERSE_SPEED (-270.0f)
+#define LOAD_MODE_SWITCH_THRESHOLD 500
 
 // Peripherals
 bsp::GPIO* key = nullptr;
@@ -72,6 +78,10 @@ using Note = bsp::BuzzerNote;
 static bsp::BuzzerNoteDelayed AlarmSound[] = {
     {Note::Do1H, 100}, {Note::Silent, 50}, {Note::Do1H, 100}, {Note::Silent, 50},
     {Note::Do1H, 100}, {Note::Silent, 200}, {Note::Silent, 0}, {Note::Finish, 0}};
+static bsp::BuzzerNoteDelayed AutoModeSwitchSound[] = {
+    {Note::So5M, 60}, {Note::Silent, 30}, {Note::Do1H, 80}, {Note::Silent, 0}, {Note::Finish, 0}};
+static bsp::BuzzerNoteDelayed ManualModeSwitchSound[] = {
+    {Note::Do1H, 60}, {Note::Silent, 30}, {Note::So5M, 80}, {Note::Silent, 0}, {Note::Finish, 0}};
 
 // Motors
 control::MotorPWMBase* trigger_motor = nullptr;
@@ -125,11 +135,13 @@ void dartLoadTask(void* arg) {
   float load_target_speed = 0;
   float force_target_speed = 0;
   float yaw_target_speed = 0;
+  LoadControlMode load_control_mode = LoadControlMode::AUTO_RELOAD;
   LoadState load_state = LoadState::IDLE;
   uint32_t reverse_debounce = 0;
   BoolEdgeDetector load_trigger(false);
   BoolEdgeDetector reverse_trigger(false);
   BoolEdgeDetector release_trigger(false);
+  BoolEdgeDetector load_mode_switch(false);
 
   trigger_motor->SetOutput(TRIGGER_RELEASE_OUTPUT);
   while (true) {
@@ -152,58 +164,96 @@ void dartLoadTask(void* arg) {
       alarm_counter = 0;
     }
 
-    // ---- Load state machine ----
-    // Bump switch: reads 0 when hit (active low), 1 otherwise
-    bool bump_hit = !bump_switch->Read();
-    load_trigger.input(dbus->swl == remote::UP);
-    reverse_trigger.input(dbus->swl == remote::DOWN);
-    release_trigger.input(dbus->swr == remote::UP);
-    switch (load_state) {
-      case LoadState::IDLE:
-        if (release_trigger.posEdge())
-          trigger_motor->SetOutput(TRIGGER_RELEASE_OUTPUT);
-        load_target_speed = 0;
-        if (load_trigger.posEdge()) {
-          load_state = LoadState::LOADING_DOWN;
-          print(">>> Load: IDLE -> LOADING_DOWN\r\n");
-        }
-        break;
-      // TODO: This will be the place holder for extra loading mechanism for getting the dart out of the storing catridges
-      case LoadState::LOADING_DOWN:
-        if (bump_hit) {
-          // Bump switch hit — dart is seated; hold trigger and stop descent
+    // ---- Load mode switching ----
+    load_mode_switch.input(dbus->ch0 > LOAD_MODE_SWITCH_THRESHOLD);
+    if (load_mode_switch.posEdge()) {
+      if (load_control_mode == LoadControlMode::AUTO_RELOAD) {
+        load_control_mode = LoadControlMode::MANUAL;
+        load_state = LoadState::IDLE;
+        reverse_debounce = 0;
+        buzzer->SingSong(ManualModeSwitchSound, [](uint32_t milli) { osDelay(milli); });
+        print(">>> Load mode switched to MANUAL\r\n");
+      } else {
+        load_control_mode = LoadControlMode::AUTO_RELOAD;
+        load_state = LoadState::IDLE;
+        reverse_debounce = 0;
+        trigger_motor->SetOutput(TRIGGER_RELEASE_OUTPUT);
+        buzzer->SingSong(AutoModeSwitchSound, [](uint32_t milli) { osDelay(milli); });
+        print(">>> Load mode switched to AUTO_RELOAD\r\n");
+      }
+    }
+
+    if (load_control_mode == LoadControlMode::AUTO_RELOAD) {
+      // ---- Automatic load state machine ----
+      // Bump switch: reads 0 when hit (active low), 1 otherwise
+      bool bump_hit = !bump_switch->Read();
+      load_trigger.input(dbus->swl == remote::UP);
+      reverse_trigger.input(dbus->swl == remote::DOWN);
+      release_trigger.input(dbus->swr == remote::UP);
+      switch (load_state) {
+        case LoadState::IDLE:
+          if (release_trigger.posEdge())
+            trigger_motor->SetOutput(TRIGGER_RELEASE_OUTPUT);
+          load_target_speed = 0;
+          if (load_trigger.posEdge()) {
+            load_state = LoadState::LOADING_DOWN;
+            print(">>> Load: IDLE -> LOADING_DOWN\r\n");
+          }
+          break;
+        // TODO: This will be the place holder for extra loading mechanism for getting the dart out of the storing catridges
+        case LoadState::LOADING_DOWN:
+          if (bump_hit) {
+            // Bump switch hit — dart is seated; hold trigger and stop descent
+            trigger_motor->SetOutput(TRIGGER_HOLD_OUTPUT);
+            load_target_speed = 0;
+            load_state = LoadState::LOADED;
+            print(">>> Load: LOADING_DOWN -> LOADED\r\n");
+          } else {
+            load_target_speed = LOAD_DOWN_SPEED;
+          }
+          break;
+
+        case LoadState::LOADED:
           trigger_motor->SetOutput(TRIGGER_HOLD_OUTPUT);
           load_target_speed = 0;
-          load_state = LoadState::LOADED;
-          print(">>> Load: LOADING_DOWN -> LOADED\r\n");
-        } else {
-          load_target_speed = LOAD_DOWN_SPEED;
-        }
-        break;
-
-      case LoadState::LOADED:
-        trigger_motor->SetOutput(TRIGGER_HOLD_OUTPUT);
-        load_target_speed = 0;
-        if (reverse_trigger.posEdge()) {
-          reverse_debounce = 0;
-          load_state = LoadState::REVERSING;
-          print(">>> Load: LOADED -> REVERSING\r\n");
-        }
-        break;
-
-      case LoadState::REVERSING:
-        // Velocity loop at slower speed; monitor current for dart release
-        load_target_speed = REVERSE_SPEED;
-        if (abs(load_motor_1->GetCurr()) >= REVERSE_RELEASE_CURRENT) {
-          if (++reverse_debounce > 10) {  // 20 × 5 ms = 100 ms hold
-            load_state = LoadState::IDLE;
-            print(">>> Load: REVERSING -> IDLE\r\n");
+          if (reverse_trigger.posEdge()) {
+            reverse_debounce = 0;
+            load_state = LoadState::REVERSING;
+            print(">>> Load: LOADED -> REVERSING\r\n");
           }
-        } else {
-          reverse_debounce = 0;
-          print(">>> Load: REVERSING, current=%d (debounce reset)\r\n", load_motor_1->GetCurr());
-        }
-        break;
+          break;
+
+        case LoadState::REVERSING:
+          // Velocity loop at slower speed; monitor current for dart release
+          load_target_speed = REVERSE_SPEED;
+          if (abs(load_motor_1->GetCurr()) >= REVERSE_RELEASE_CURRENT) {
+            if (++reverse_debounce > 10) {  // 20 × 5 ms = 100 ms hold
+              load_state = LoadState::IDLE;
+              print(">>> Load: REVERSING -> IDLE\r\n");
+            }
+          } else {
+            reverse_debounce = 0;
+            print(">>> Load: REVERSING, current=%d (debounce reset)\r\n", load_motor_1->GetCurr());
+          }
+          break;
+      }
+    } else {
+      // ---- Manual load control (legacy behavior) ----
+      if (dbus->swr == remote::UP) {
+        trigger_motor->SetOutput(TRIGGER_RELEASE_OUTPUT);
+      } else if (dbus->swr == remote::DOWN) {
+        trigger_motor->SetOutput(TRIGGER_HOLD_OUTPUT);
+      } else {
+        trigger_motor->SetOutput(TRIGGER_MID_OUTPUT);
+      }
+
+      if (dbus->swl == remote::UP) {
+        load_target_speed = MANUAL_LOAD_FORWARD_SPEED;
+      } else if (dbus->swl == remote::DOWN) {
+        load_target_speed = MANUAL_LOAD_REVERSE_SPEED;
+      } else {
+        load_target_speed = 0;
+      }
     }
 
     // ---- Load motor PID ----
@@ -276,6 +326,7 @@ void RM_RTOS_Default_Task(const void* args) {
 
   print("=== Dart Gimbal + WeighScale ===\r\n");
   print("Trigger: DBUS swr (UP=0, MID=300, DOWN=600)\r\n");
+  print("Load mode toggle: DBUS ch0 > 500 (edge-triggered)\r\n");
   print("WeighScale: CAN2, Addr=1, %d channels\r\n", NUM_CHANNELS);
   print("Press K1 to Tare\r\n");
   print("================================\r\n\r\n");
