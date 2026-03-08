@@ -19,6 +19,8 @@
  *                                                                          *
  ****************************************************************************/
 
+ #include <memory>
+
  #include "bsp_gpio.h"
  #include "bsp_print.h"
  #include "cmsis_os.h"
@@ -35,41 +37,27 @@
 
 #define DEFAULT_TASK_DELAY 100
 
-#define JOINT1_PWM_CHANNEL 2
-#define JOINT2_PWM_CHANNEL 3
-#define JOINT3_PWM_CHANNEL 4
-#define CLAW_MOTOR_PWM_CHANNEL 1
+#define CLAW_PWM_CHANNEL 4 // Pin PH10
+#define CLAW_ROTATE_PWM_CHANNEL 3 // Pin PH11
+#define ARM_ROLL_PWM_CHANNEL 2 // Pin PH12
 
-#define TIM_CLOCK_FREQ 1000000
-#define MOTOR_OUT_FREQ 50
+#define TIM_CLOCK_FREQ 84000000 // Using TIM5
+#define SERVO_OUT_FREQ 333
 
-#define MAX_IOUT3508 16384
-#define MAX_IOUT6020 30000
+#define MAX_IOUT2060 10000
 #define MAX_OUT 60000
 
-#define MAP_RANGE(x, in_min, in_max, out_min, out_max) (((float)(x) - (float)(in_min)) * ((float)(out_max) - (float)(out_min)) / ((float)(in_max) - (float)(in_min)) + (float)(out_min))
+#define RX_SIGNAL (1 << 0)
 
-osThreadId_t dartLoaderTestTaskHandle;
-const osThreadAttr_t dartLoaderTestTaskAttribute = {.name = "dartLoaderTestTask",
-        .attr_bits = osThreadDetached,
-        .cb_mem = nullptr,
-        .cb_size = 0,
-        .stack_mem = nullptr,
-        .stack_size = 256 * 4,
-        .priority = (osPriority_t)osPriorityNormal,
-        .tz_module = 0,
-        .reserved = 0};
-
-
+extern osThreadId_t defaultTaskHandle;
 
 bsp::GPIO* key = nullptr;
 control::MotorPWMBase* arm_claw = nullptr;
-control::MotorCANBase* arm_yaw = nullptr;
-control::MotorCANBase* arm_joint1 = nullptr;
-control::MotorPWMBase* arm_joint2 = nullptr;
-control::MotorPWMBase* arm_joint3 = nullptr;
+control::MotorPWMBase* arm_claw_rotate = nullptr;
+//control::MotorCANBase* arm_slide = nullptr;
+control::MotorPWMBase* arm_roll = nullptr;
 
-control::MotorCANBase* slide_motor = nullptr;
+BoolEdgeDetector control_inputs[9] = {BoolEdgeDetector(false), BoolEdgeDetector(false), BoolEdgeDetector(false), BoolEdgeDetector(false), BoolEdgeDetector(false), BoolEdgeDetector(false), BoolEdgeDetector(false), BoolEdgeDetector(false), BoolEdgeDetector(false)};
 
 static remote::DBUS *dbus = nullptr;
 
@@ -78,88 +66,130 @@ static bsp::CAN* can1 = nullptr;
 float Kp = 50;
 float Ki = 15;
 float Kd = 65;
-float diff_yaw_output = 0;
-float diff_joint1_output = 0;
+float diff_slide_output = 0;
 
-void dartLoaderTestTask(void* arg){
-  UNUSED(arg);
-  int yaw_output = 0;
-  int joint1_output = 0;
-  int joint2_output = 0;
-  int joint3_output = 0;
-
-  control::MotorCANBase* arm[] = {arm_yaw, arm_joint1};
-  float diff_yaw = 0;
-  float diff_joint1 = 0;
-  float param[] = {Kp, Ki, Kd};
-  control::ConstrainedPID pid3508(param, MAX_IOUT3508, MAX_OUT);
-  control::ConstrainedPID pid6020(param, MAX_IOUT6020, MAX_OUT);
-
-  while(1){
-    if (dbus->swl == remote::UP) {
-      arm_claw->SetOutput(1500); // 90 Degrees
-    } else {
-      arm_claw->SetOutput(500); // 0 Degrees  
-    }
-    if (dbus->swr == remote::UP) {
-      yaw_output = MAP_RANGE(dbus->ch0, -660, 660,-50, 50);
-      joint1_output = MAP_RANGE(dbus->ch1, -660, 660, -50, 50);
-
-
-      diff_yaw = arm_yaw->GetOmegaDelta(yaw_output);
-      diff_joint1 = arm_joint1->GetOmegaDelta(joint1_output);
-      diff_yaw_output = pid3508.ComputeConstrainedOutput(diff_yaw);
-      diff_joint1_output = pid6020.ComputeConstrainedOutput(diff_joint1);
-      arm_yaw->SetOutput(yaw_output);
-      arm_joint1->SetOutput(joint1_output);
-      control::MotorCANBase::TransmitOutput(arm, 2);
-
-      print("Yaw speed: %d , diff_yaw: %.2f, yaw_output: %f \r\n", yaw_output, diff_yaw, diff_yaw_output);
-      print("Joint 1 speed: %d , diff_joint1: %.2f, joint_output: %f \r\n", joint1_output, diff_joint1, diff_joint1_output);
-      osDelay(10);
-
-      joint2_output = MAP_RANGE(dbus->ch2, -660, 660, 500, 2500);
-      joint3_output = MAP_RANGE(dbus->ch3, -660, 660, 500, 2500);
-
-      arm_joint2->SetOutput(joint2_output);
-      arm_joint3->SetOutput(joint3_output);
-
-      print("Joint 2: %d\r\n", joint2_output);
-      print("Joint 3: %d\r\n", joint3_output);
-      osDelay(10);
-    }
-  }
-}
-
+class CustomUART : public bsp::UART {
+  public:
+   using bsp::UART::UART;
+ 
+  protected:
+   /* notify application when rx data is pending read */
+   void RxCompleteCallback() override final { osThreadFlagsSet(defaultTaskHandle, RX_SIGNAL); }
+ };
 
 void RM_RTOS_Init(){
-  print_use_uart(&huart1);
+  print_use_usb();
 
   can1 = new bsp::CAN(&hcan1);
 
   key = new bsp::GPIO(KEY_GPIO_GROUP, KEY_GPIO_PIN);
-  arm_claw = new control::MotorPWMBase(&htim1, CLAW_MOTOR_PWM_CHANNEL, TIM_CLOCK_FREQ, MOTOR_OUT_FREQ, 0);
-  arm_joint2 = new control::MotorPWMBase(&htim1, JOINT2_PWM_CHANNEL, TIM_CLOCK_FREQ, MOTOR_OUT_FREQ, 0);
-  arm_joint3 = new control::MotorPWMBase(&htim1, JOINT3_PWM_CHANNEL, TIM_CLOCK_FREQ, MOTOR_OUT_FREQ, 0);
+  arm_claw = new control::MotorPWMBase(&htim4, CLAW_PWM_CHANNEL, TIM_CLOCK_FREQ, SERVO_OUT_FREQ, 0);
+  arm_claw_rotate = new control::MotorPWMBase(&htim4, CLAW_ROTATE_PWM_CHANNEL, TIM_CLOCK_FREQ, SERVO_OUT_FREQ, 0);
+  arm_roll = new control::MotorPWMBase(&htim4, ARM_ROLL_PWM_CHANNEL, TIM_CLOCK_FREQ, SERVO_OUT_FREQ, 0);
 
-  arm_yaw = new control::Motor6020(can1, 0x202);
-  arm_joint1 = new control::Motor3508(can1, 0x203);
+//arm_slide = new control::Motor2006(can1, 0x202);
 
   dbus = new remote::DBUS(&huart3);
 }
 
-
-void RM_RTOS_Threads_Init(void) {
-    dartLoaderTestTaskHandle = osThreadNew(dartLoaderTestTask, NULL, &dartLoaderTestTaskAttribute);
-    if (dartLoaderTestTaskHandle == NULL) {
-        print("Failed to create dart loader test task\r\n");
-        Error_Handler();
-    }
-}
-
 void RM_RTOS_Default_Task(const void* args){
-    UNUSED(args);
-    while(true){
-      osDelay(DEFAULT_TASK_DELAY);
+  UNUSED(args);
+  //int slide_output = 0;
+  int16_t arm_roll_output = 1500;
+  int16_t arm_claw_rotate_output = 1500;
+  int16_t arm_claw_output = 1500;
+
+  /*control::MotorCANBase* arm[] = {arm_slide};
+  float diff_slide = 0;
+  float param[] = {Kp, Ki, Kd};
+  control::ConstrainedPID pid(param, MAX_IOUT2060, MAX_OUT);*/
+
+  uint32_t length;
+  uint8_t* data;
+
+  auto uart = std::make_unique<CustomUART>(&huart8);
+  uart->SetupRx(50);
+  uart->SetupTx(50);
+
+  
+
+  while(1){
+    /*
+    const char buf[] = "alive\n";
+
+    usb_printf(buf, *uart);
+    */
+
+    /* wait until rx data is available */
+    // uint32_t flags = osThreadFlagsWait(RX_SIGNAL, osFlagsWaitAll, osWaitForever);
+    if (1) {  // unnecessary check
+      /* time the non-blocking rx / tx calls (should be <= 1 osTick) */
+      length = uart->Read(&data);
+      uart->Write(data, length);
+
+      control_inputs[0].input(*data == 'z'); // Claw Close
+      control_inputs[1].input(*data == 'x'); // Claw Open
+      control_inputs[2].input(*data == 'q'); // Claw Rotate Left
+      control_inputs[3].input(*data == 'e'); // Claw Rotate Right
+      control_inputs[4].input(*data == 'a'); // Arm Rotate Left
+      control_inputs[5].input(*data == 'd'); // Arm Rotate Right
+      control_inputs[6].input(*data == 'w'); // Slide Forward
+      control_inputs[7].input(*data == 's'); // Slide Backward
+      control_inputs[8].input(*data == 'p'); // Reset
+
+      *data = '\0';
     }
+
+    if (control_inputs[0].posEdge()) {
+      arm_claw_output += 50;
+    } else if (control_inputs[1].posEdge()) {
+      arm_claw_output -= 50;
+    }
+
+    if (control_inputs[2].posEdge()) {
+      arm_claw_rotate_output += 50;
+    } else if (control_inputs[3].posEdge()) {
+      arm_claw_rotate_output -= 50;
+    }
+
+    if (control_inputs[4].posEdge()) {
+      arm_roll_output += 50;
+    } else if (control_inputs[5].posEdge()) {
+      arm_roll_output -= 50;
+    }
+
+    if (control_inputs[6].posEdge()) {
+      // arm _slide plus
+    } else if (control_inputs[7].posEdge()) {
+      // arm_slide minus
+    }
+
+    if (control_inputs[8].posEdge()) {
+      arm_claw_output = 1500;
+      arm_claw_rotate_output = 1500;
+      arm_roll_output = 1500;
+      // arm_slide set
+    }
+    
+
+    /*
+    slide_output = MAP_RANGE(dbus->ch0, -660, 660,-50, 50);
+
+    diff_slide = arm_slide->GetOmegaDelta(slide_output);
+    diff_slide_output = pid.ComputeConstrainedOutput(diff_slide);
+    arm_slide->SetOutput(slide_output);
+    control::MotorCANBase::TransmitOutput(arm, 1);
+    */
+
+    // print("slide speed: %d , diff_slide: %.2f, slide_output: %f \r\n", slide_output, diff_slide, diff_slide_output);
+
+    arm_claw->SetOutput(arm_claw_output);
+    // arm_roll->SetOutput(arm_roll_output);
+    // arm_claw_rotate->SetOutput(arm_claw_rotate_output);
+
+    // print("Arm Claw: %d\r\n", arm_claw_output);
+    print("Arm Claw Rotate: %d\r\n", arm_claw_rotate_output);
+    // print("Arm Roll: %d\r\n", arm_roll_output);
+    osDelay(10);
+  }
 }
