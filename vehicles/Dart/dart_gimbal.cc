@@ -241,10 +241,8 @@ void dartLoadTask(void* arg) {
       // ---- Manual load control (legacy behavior) ----
       if (dbus->swr == remote::UP) {
         trigger_motor->SetOutput(TRIGGER_RELEASE_OUTPUT);
-      } else if (dbus->swr == remote::DOWN) {
-        trigger_motor->SetOutput(TRIGGER_HOLD_OUTPUT);
       } else {
-        trigger_motor->SetOutput(TRIGGER_MID_OUTPUT);
+        trigger_motor->SetOutput(TRIGGER_HOLD_OUTPUT);
       }
 
       if (dbus->swl == remote::UP) {
