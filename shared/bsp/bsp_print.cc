@@ -39,6 +39,20 @@ void print_use_uart(UART_HandleTypeDef* huart) {
   print_usb = NULL;
 }
 
+void print_use_uart_rxtx(UART_HandleTypeDef* huart, uint32_t rx_buf_size) {
+  if (print_uart) delete print_uart;
+
+  print_uart = new bsp::UART(huart);
+  print_uart->SetupTx(MAX_PRINT_LEN * 2);
+  print_uart->SetupRx(rx_buf_size);
+  print_usb = NULL;
+}
+
+int32_t print_uart_read(uint8_t** data) {
+  if (!print_uart) return 0;
+  return print_uart->Read(data);
+}
+
 void print_use_usb() {
   if (!print_usb) print_usb = new bsp::VirtualUSB();
 

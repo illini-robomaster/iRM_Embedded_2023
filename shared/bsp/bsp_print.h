@@ -25,6 +25,22 @@
 #include "usart.h"
 
 /**
+ * @brief use a uart port for both debug print (TX) and input reading (RX)
+ *
+ * @param huart       HAL uart handle
+ * @param rx_buf_size receive DMA buffer size in bytes
+ */
+void print_use_uart_rxtx(UART_HandleTypeDef* huart, uint32_t rx_buf_size = 64);
+
+/**
+ * @brief read pending bytes received on the uart set up by print_use_uart_rxtx
+ *
+ * @param data  pointer that will be set to the internal rx buffer
+ * @return number of bytes available, 0 if none or RX not set up
+ */
+int32_t print_uart_read(uint8_t** data);
+
+/**
  * @brief use a uart port for debug print
  *
  * @param huart HAL uart handle

@@ -418,6 +418,9 @@ typedef struct {
   float* omega_pid_param;   /* pid parameter used to control speed of motor      */
   float max_iout;
   float max_out;
+  float omega_lpf_alpha; /* low-pass filter coefficient for omega feedback [0,1]; 1=no filter */
+  float pos_kp;          /* direct PD: position proportional gain, output-shaft [1/rad]; 0 = legacy velocity-PID mode */
+  float pos_kd;          /* direct PD: velocity damping gain, output-shaft [1/(rad/s)] */
 } servo_t;
 
 /**
@@ -588,7 +591,11 @@ class ServoMotor {
   int16_t* detect_buf_; /* circular buffer                                                    */
 
   // pid controllers
-  ConstrainedPID omega_pid_; /* pid for controlling speed of motor */
+  ConstrainedPID omega_pid_; /* pid for controlling speed of motor (legacy mode only) */
+  float omega_filtered_;     /* low-pass filtered omega feedback, motor-shaft [rad/s] */
+  float omega_lpf_alpha_;    /* IIR coefficient: 1=no filter, 0=never updates */
+  float pos_kp_;             /* direct PD position gain, output-shaft units; 0 = legacy mode */
+  float pos_kd_;             /* direct PD velocity damping gain, output-shaft units */
 
   // edge detectors
   FloatEdgeDetector* inner_wrap_detector_; /* detect motor motion across encoder boarder */

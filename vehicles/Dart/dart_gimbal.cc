@@ -165,7 +165,7 @@ void dartLoadTask(void* arg) {
     }
 
     // ---- Load mode switching ----
-    load_mode_switch.input(dbus->ch0 > LOAD_MODE_SWITCH_THRESHOLD);
+    load_mode_switch.input(dbus->swr == remote::DOWN);
     if (load_mode_switch.posEdge()) {
       if (load_control_mode == LoadControlMode::AUTO_RELOAD) {
         load_control_mode = LoadControlMode::MANUAL;
@@ -239,10 +239,10 @@ void dartLoadTask(void* arg) {
       }
     } else {
       // ---- Manual load control (legacy behavior) ----
-      if (dbus->swr == remote::UP) {
-        trigger_motor->SetOutput(TRIGGER_RELEASE_OUTPUT);
-      } else {
+      if (dbus->swr == remote::UP || dbus->swr == remote::DOWN) {
         trigger_motor->SetOutput(TRIGGER_HOLD_OUTPUT);
+      } else {
+        trigger_motor->SetOutput(TRIGGER_RELEASE_OUTPUT);
       }
 
       if (dbus->swl == remote::UP) {
@@ -255,28 +255,27 @@ void dartLoadTask(void* arg) {
     }
 
     // ---- Load motor PID ----
-    {
+
       float diff_load_1 = load_motor_1->GetOmegaDelta(-load_target_speed);
       float diff_load_2 = load_motor_2->GetOmegaDelta(load_target_speed);
       load_motor_1->SetOutput(pid_left.ComputeConstrainedOutput(diff_load_1));
       load_motor_2->SetOutput(pid_right.ComputeConstrainedOutput(diff_load_2));
-    }
 
-    // ---- Force motor ----
-    force_target_speed = MAP_RANGE(dbus->ch3, -660, 660, -500, 500);
-    float diff_force = force_motor->GetOmegaDelta(force_target_speed);
-    force_motor->SetOutput(pid_force.ComputeConstrainedOutput(diff_force));
+      // ---- Force motor ----
+      force_target_speed = MAP_RANGE(dbus->ch3, -660, 660, -500, 500);
+      float diff_force = force_motor->GetOmegaDelta(force_target_speed);
+      force_motor->SetOutput(pid_force.ComputeConstrainedOutput(diff_force));
 
-    control::MotorCANBase::TransmitOutput(motors_can1_load, 3);
+      control::MotorCANBase::TransmitOutput(motors_can1_load, 3);
 
-    // ---- Yaw motor ----
-    if (dbus->ch0 > 300) {
-      yaw_target_speed = 100;
-    } else if (dbus->ch0 < -300) {
-      yaw_target_speed = -100;
-    } else {
-      yaw_target_speed = 0;
-    }
+      // ---- Yaw motor ----
+      if (dbus->ch0 > 300) {
+        yaw_target_speed = 100;
+      } else if (dbus->ch0 < -300) {
+        yaw_target_speed = -100;
+      } else {
+        yaw_target_speed = 0;
+      }
     float diff_yaw = yaw_motor->GetOmegaDelta(yaw_target_speed);
     yaw_motor->SetOutput(pid_yaw.ComputeConstrainedOutput(diff_yaw));
     control::MotorCANBase::TransmitOutput(yaw_motors, 1);
@@ -286,8 +285,7 @@ void dartLoadTask(void* arg) {
 }
 
 void RM_RTOS_Init() {
-  print_use_usb();
-
+  print_use_uart(&huart8);
   key = new bsp::GPIO(KEY_GPIO_GROUP, KEY_GPIO_PIN);
   buzzer = new bsp::Buzzer(&htim12, 1, 1000000);
   laser = new bsp::Laser(LASER_GPIO_Port, LASER_Pin);

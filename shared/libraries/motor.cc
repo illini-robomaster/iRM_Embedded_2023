@@ -372,8 +372,14 @@ ServoMotor::ServoMotor(servo_t data, float align_angle, float proximity_in, floa
   target_angle_ = 0;
   align_angle_ = align_angle;  // Wait for Update to initialize
   motor_angle_ = 0;
+  offset_angle_ = 0;  // must be initialized; used in UpdateData before any wrap event
   servo_angle_ = 0;
   cumulated_angle_ = 0;
+  start_time_ = 0;  // initialized defensively; set properly on first hold→move transition
+  omega_filtered_ = 0;
+  omega_lpf_alpha_ = data.omega_lpf_alpha > 0.0f ? data.omega_lpf_alpha : 1.0f;
+  pos_kp_ = data.pos_kp;
+  pos_kd_ = data.pos_kd;
   inner_wrap_detector_ = new FloatEdgeDetector(0, PI);
   outer_wrap_detector_ = new FloatEdgeDetector(0, PI);
   hold_detector_ = new BoolEdgeDetector(false);
@@ -419,26 +425,39 @@ void ServoMotor::SetMaxAcceleration(const float max_acceleration) {
 }
 
 void ServoMotor::CalcOutput() {
-  // if holding status toggle, reseting corresponding pid to avoid error building up
-  hold_detector_->input(hold_);
-  if (hold_detector_->edge()) omega_pid_.Reset();
-  if (hold_detector_->negEdge()) start_time_ = GetHighresTickMicroSec();
-
-  // calculate desired output with pid
-  int command;
-  float target_diff = (target_angle_ - servo_angle_ - cumulated_angle_) * transmission_ratio_;
-  // v = sqrt(2 * a * d)
-  uint32_t current_time = GetHighresTickMicroSec();
-  if (!hold_) {
-    float speed_max_start =
-        (current_time - start_time_) / 10e6 * max_acceleration_ * transmission_ratio_;
-    float speed_max_target = sqrt(2 * max_acceleration_ * abs(target_diff));
-    float current_speed = speed_max_start > speed_max_target ? speed_max_target : speed_max_start;
-    current_speed = clip<float>(current_speed, 0, max_speed_);
-    command = omega_pid_.ComputeConstrainedOutput(
-        motor_->GetOmegaDelta(sign<float>(target_diff, 0) * current_speed));
+  int16_t command;
+  if (pos_kp_ > 0.0f) {
+    // Direct positional PD (output-shaft units).
+    // Use raw (unfiltered) velocity for the derivative term — the IIR filter
+    // introduces a phase lag that reduces effective damping and causes oscillation.
+    float pos_err = GetThetaDelta(target_angle_);  // output-shaft rad
+    float vel = GetOmega();                        // output-shaft rad/s, raw
+    // Cap the P contribution so the terminal velocity (where P*err == D*vel)
+    // never exceeds max_speed. max_speed_ is stored in motor-shaft units.
+    float max_speed_out = max_speed_ / transmission_ratio_;  // convert to output shaft
+    float p_term = clip<float>(pos_kp_ * pos_err,
+                               -pos_kd_ * max_speed_out,
+                               pos_kd_ * max_speed_out);
+    command = (int16_t)clip<float>(p_term - pos_kd_ * vel, -32768.0f, 32767.0f);
   } else {
-    command = omega_pid_.ComputeConstrainedOutput(motor_->GetOmegaDelta(target_diff * 50));
+    // Legacy velocity-PID path: LPF on velocity, hold/move state machine.
+    omega_filtered_ = omega_lpf_alpha_ * motor_->GetOmega() + (1.0f - omega_lpf_alpha_) * omega_filtered_;
+    hold_detector_->input(hold_);
+    if (hold_detector_->edge()) omega_pid_.Reset();
+    if (hold_detector_->negEdge()) start_time_ = GetHighresTickMicroSec();
+
+    float target_diff = (target_angle_ - servo_angle_ - cumulated_angle_) * transmission_ratio_;
+    uint32_t current_time = GetHighresTickMicroSec();
+    if (!hold_) {
+      float speed_max_start = (current_time - start_time_) / 1e6f * max_acceleration_;
+      float speed_max_target = sqrt(2 * max_acceleration_ * abs(target_diff));
+      float current_speed = speed_max_start > speed_max_target ? speed_max_target : speed_max_start;
+      current_speed = clip<float>(current_speed, 0, max_speed_);
+      command = omega_pid_.ComputeConstrainedOutput(
+          sign<float>(target_diff, 0) * current_speed - omega_filtered_);
+    } else {
+      command = omega_pid_.ComputeConstrainedOutput(target_diff * 50 - omega_filtered_);
+    }
   }
   motor_->SetOutput(command);
 
@@ -453,9 +472,9 @@ void ServoMotor::CalcOutput() {
     if (detect_total_ >= jam_threshold_) {
       omega_pid_.Reset();
       servo_jam_t data;
+      data.mode = SERVO_NEAREST;
       data.speed = max_speed_;
-      // this function is in shooter.cc called jam_callback.
-      jam_callback_(this, data);
+      if (jam_callback_ != nullptr) jam_callback_(this, data);
     }
   }
 }
@@ -478,7 +497,7 @@ void ServoMotor::RegisterJamCallback(jam_callback_t callback, float effort_thres
   detect_total_ = 0;
   if (detect_buf_ != nullptr) delete detect_buf_;
   detect_buf_ = new int16_t[detect_period];
-  memset(detect_buf_, 0, detect_period);
+  memset(detect_buf_, 0, detect_period * sizeof(int16_t));  // byte count, not element count
 
   // calculate callback trigger threshold and triggering facility
   // the effort_threshold is from shooter.cc constructor for load_servo initialization

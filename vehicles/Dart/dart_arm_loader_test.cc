@@ -19,17 +19,15 @@
  *                                                                          *
  ****************************************************************************/
 
- #include <memory>
-
- #include "bsp_gpio.h"
- #include "bsp_print.h"
- #include "cmsis_os.h"
- #include "controller.h"
- #include "dbus.h"
- #include "main.h"
- #include "math.h"
- #include "motor.h"
- #include "utils.h" 
+#include "bsp_gpio.h"
+#include "bsp_print.h"
+#include "cmsis_os.h"
+#include "controller.h"
+#include "dbus.h"
+#include "main.h"
+#include "math.h"
+#include "motor.h"
+#include "utils.h"
 
 #define KEY_GPIO_GROUP GPIOA
 #define KEY_GPIO_PIN GPIO_PIN_0
@@ -37,48 +35,31 @@
 
 #define DEFAULT_TASK_DELAY 100
 
-#define CLAW_PWM_CHANNEL 4 // Pin PH10
-#define CLAW_ROTATE_PWM_CHANNEL 3 // Pin PH11
-#define ARM_ROLL_PWM_CHANNEL 2 // Pin PH12
+#define CLAW_PWM_CHANNEL 4         // Pin PD15 = TIM4_CH4
+#define CLAW_ROTATE_PWM_CHANNEL 3  // Pin PD14 = TIM4_CH3
+#define ARM_ROLL_PWM_CHANNEL 2     // Pin PD13 = TIM4_CH2
 
-#define TIM_CLOCK_FREQ 84000000 // Using TIM5
+#define TIM_CLOCK_FREQ 1000000  // Using TIM4 (prescaler=83 → counter at 1 MHz)
 #define SERVO_OUT_FREQ 333
 
-#define MAX_IOUT2060 10000
-#define MAX_OUT 60000
-
-#define RX_SIGNAL (1 << 0)
-
-extern osThreadId_t defaultTaskHandle;
+#define MAX_IOUT2006 10000
+#define MAX_OUT 10000
 
 bsp::GPIO* key = nullptr;
 control::MotorPWMBase* arm_claw = nullptr;
 control::MotorPWMBase* arm_claw_rotate = nullptr;
-//control::MotorCANBase* arm_slide = nullptr;
+control::Motor2006* arm_slide_motor = nullptr;
+control::ServoMotor* arm_slide = nullptr;
 control::MotorPWMBase* arm_roll = nullptr;
 
 BoolEdgeDetector control_inputs[9] = {BoolEdgeDetector(false), BoolEdgeDetector(false), BoolEdgeDetector(false), BoolEdgeDetector(false), BoolEdgeDetector(false), BoolEdgeDetector(false), BoolEdgeDetector(false), BoolEdgeDetector(false), BoolEdgeDetector(false)};
 
-static remote::DBUS *dbus = nullptr;
+// static remote::DBUS *dbus = nullptr;
 
 static bsp::CAN* can1 = nullptr;
 
-float Kp = 50;
-float Ki = 15;
-float Kd = 65;
-float diff_slide_output = 0;
-
-class CustomUART : public bsp::UART {
-  public:
-   using bsp::UART::UART;
- 
-  protected:
-   /* notify application when rx data is pending read */
-   void RxCompleteCallback() override final { osThreadFlagsSet(defaultTaskHandle, RX_SIGNAL); }
- };
-
-void RM_RTOS_Init(){
-  print_use_usb();
+void RM_RTOS_Init() {
+  print_use_uart_rxtx(&huart8);  // huart8: TX for print output, RX for key input
 
   can1 = new bsp::CAN(&hcan1);
 
@@ -87,33 +68,44 @@ void RM_RTOS_Init(){
   arm_claw_rotate = new control::MotorPWMBase(&htim4, CLAW_ROTATE_PWM_CHANNEL, TIM_CLOCK_FREQ, SERVO_OUT_FREQ, 0);
   arm_roll = new control::MotorPWMBase(&htim4, ARM_ROLL_PWM_CHANNEL, TIM_CLOCK_FREQ, SERVO_OUT_FREQ, 0);
 
-//arm_slide = new control::Motor2006(can1, 0x202);
+  arm_slide_motor = new control::Motor2006(can1, 0x203);
+  float omega_pid_params[3] = {0.0f, 0.0f, 0.0f};  // unused in direct PD mode (pos_kp > 0)
+  control::servo_t slide_servo = {
+      .motor = arm_slide_motor,
+      .max_speed = 5.0f,  // output-shaft rad/s — caps travel speed via P-term clamping
+      .max_acceleration = 50.0f,
+      .transmission_ratio = 36.0f,  // M2006P36 gear ratio
+      .omega_pid_param = omega_pid_params,
+      .max_iout = MAX_IOUT2006,
+      .max_out = MAX_OUT,
+      .omega_lpf_alpha = 0.5f,
+      .pos_kp = 80000.0f,  // full torque at 0.125 rad (~7°) position error
+      .pos_kd = 2000.0f,   // damping: ~1400 counts at max output speed (~0.7 rad/s)
+  };
+  // align_angle=-1 → auto-latch on first CAN packet
+  arm_slide = new control::ServoMotor(slide_servo, -1);
 
-  dbus = new remote::DBUS(&huart3);
+  // dbus = new remote::DBUS(&huart3);
 }
 
-void RM_RTOS_Default_Task(const void* args){
+void RM_RTOS_Default_Task(const void* args) {
   UNUSED(args);
-  //int slide_output = 0;
-  int16_t arm_roll_output = 1500;
+  // int slide_output = 0;
+  int16_t arm_roll_output = 800;
   int16_t arm_claw_rotate_output = 1500;
-  int16_t arm_claw_output = 1500;
+  int16_t arm_claw_output = 1000;
 
-  /*control::MotorCANBase* arm[] = {arm_slide};
-  float diff_slide = 0;
-  float param[] = {Kp, Ki, Kd};
-  control::ConstrainedPID pid(param, MAX_IOUT2060, MAX_OUT);*/
+  control::MotorCANBase* arm[] = {arm_slide_motor};
+
+  // Wait for first CAN feedback so GetTheta() returns the real position
+  osDelay(100);
+  float slide_target = arm_slide->GetTheta();  // lock onto starting position
+  arm_slide->SetTarget(slide_target);          // arm servo to hold start position
 
   uint32_t length;
   uint8_t* data;
 
-  auto uart = std::make_unique<CustomUART>(&huart8);
-  uart->SetupRx(50);
-  uart->SetupTx(50);
-
-  
-
-  while(1){
+  while (1) {
     /*
     const char buf[] = "alive\n";
 
@@ -124,20 +116,17 @@ void RM_RTOS_Default_Task(const void* args){
     // uint32_t flags = osThreadFlagsWait(RX_SIGNAL, osFlagsWaitAll, osWaitForever);
     if (1) {  // unnecessary check
       /* time the non-blocking rx / tx calls (should be <= 1 osTick) */
-      length = uart->Read(&data);
-      uart->Write(data, length);
+      length = print_uart_read(&data);
 
-      control_inputs[0].input(*data == 'z'); // Claw Close
-      control_inputs[1].input(*data == 'x'); // Claw Open
-      control_inputs[2].input(*data == 'q'); // Claw Rotate Left
-      control_inputs[3].input(*data == 'e'); // Claw Rotate Right
-      control_inputs[4].input(*data == 'a'); // Arm Rotate Left
-      control_inputs[5].input(*data == 'd'); // Arm Rotate Right
-      control_inputs[6].input(*data == 'w'); // Slide Forward
-      control_inputs[7].input(*data == 's'); // Slide Backward
-      control_inputs[8].input(*data == 'p'); // Reset
-
-      *data = '\0';
+      control_inputs[0].input(length > 0 && *data == 'z');  // Claw Close
+      control_inputs[1].input(length > 0 && *data == 'x');  // Claw Open
+      control_inputs[2].input(length > 0 && *data == 'q');  // Claw Rotate Left
+      control_inputs[3].input(length > 0 && *data == 'e');  // Claw Rotate Right
+      control_inputs[4].input(length > 0 && *data == 'a');  // Arm Rotate Left
+      control_inputs[5].input(length > 0 && *data == 'd');  // Arm Rotate Right
+      control_inputs[6].input(length > 0 && *data == 'w');  // Slide Forward
+      control_inputs[7].input(length > 0 && *data == 's');  // Slide Backward
+      control_inputs[8].input(length > 0 && *data == 'p');  // Reset
     }
 
     if (control_inputs[0].posEdge()) {
@@ -147,49 +136,51 @@ void RM_RTOS_Default_Task(const void* args){
     }
 
     if (control_inputs[2].posEdge()) {
-      arm_claw_rotate_output += 50;
+      arm_claw_rotate_output += 10;
     } else if (control_inputs[3].posEdge()) {
-      arm_claw_rotate_output -= 50;
+      arm_claw_rotate_output -= 10;
     }
 
     if (control_inputs[4].posEdge()) {
-      arm_roll_output += 50;
+      arm_roll_output += 10;
     } else if (control_inputs[5].posEdge()) {
-      arm_roll_output -= 50;
+      arm_roll_output -= 10;
     }
 
     if (control_inputs[6].posEdge()) {
-      // arm _slide plus
+      // slide_target += 0.1f;
+      // This Go Up
+      slide_target = -6.7f;  // temporary hard limit to prevent hitting the wall
+      arm_slide->SetTarget(slide_target, true);
     } else if (control_inputs[7].posEdge()) {
-      // arm_slide minus
+      // slide_target -= 0.1f;
+      // This Go Down
+      slide_target = -0.6f;  // temporary hard limit to prevent hitting the
+      arm_slide->SetTarget(slide_target, true);
     }
 
     if (control_inputs[8].posEdge()) {
       arm_claw_output = 1500;
       arm_claw_rotate_output = 1500;
-      arm_roll_output = 1500;
+      arm_roll_output = 800;
       // arm_slide set
     }
-    
 
-    /*
-    slide_output = MAP_RANGE(dbus->ch0, -660, 660,-50, 50);
-
-    diff_slide = arm_slide->GetOmegaDelta(slide_output);
-    diff_slide_output = pid.ComputeConstrainedOutput(diff_slide);
-    arm_slide->SetOutput(slide_output);
+    arm_slide->CalcOutput();
     control::MotorCANBase::TransmitOutput(arm, 1);
-    */
 
-    // print("slide speed: %d , diff_slide: %.2f, slide_output: %f \r\n", slide_output, diff_slide, diff_slide_output);
-
-    arm_claw->SetOutput(arm_claw_output);
-    // arm_roll->SetOutput(arm_roll_output);
-    // arm_claw_rotate->SetOutput(arm_claw_rotate_output);
-
-    // print("Arm Claw: %d\r\n", arm_claw_output);
+    arm_claw_output = clip<int16_t>(arm_claw_output, 500, 2500);
+    arm_claw_rotate_output = clip<int16_t>(arm_claw_rotate_output, 500, 2500);
+    arm_roll_output = clip<int16_t>(arm_roll_output, 500, 2500);
+    // arm_claw->SetOutput(arm_claw_output);
+    arm_claw_rotate->SetOutput(arm_claw_rotate_output);
+    arm_roll->SetOutput(arm_roll_output);
+    print("Arm Claw: %d\r\n", arm_claw_output);
     print("Arm Claw Rotate: %d\r\n", arm_claw_rotate_output);
-    // print("Arm Roll: %d\r\n", arm_roll_output);
+    print("Arm Roll: %d\r\n", arm_roll_output);
+    float slide_pos_err = slide_target - arm_slide->GetTheta();
+    print("Slide: theta=%.3f tgt=%.3f err=%.3f vel=%.3f\r\n",
+          arm_slide->GetTheta(), slide_target, slide_pos_err, arm_slide->GetOmega());
     osDelay(10);
   }
 }
