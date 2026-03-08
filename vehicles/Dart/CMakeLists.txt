@@ -22,7 +22,7 @@ project(Steering ASM C CXX)
 
 
 irm_add_arm_executable(dart_gimbal
-        TARGET DJI_Board_TypeA
+        TARGET DJI_Board_TypeC
         SOURCES dart_gimbal.cc)
 
 irm_add_arm_executable(dart_gimbal_full_func
@@ -37,6 +37,6 @@ irm_add_arm_executable(dart_openmv_calibration
         TARGET DJI_Board_TypeC
         SOURCES openmv_calibration.cc)
 
-irm_add_arm_executable(dart_arm_load_test
+irm_add_arm_executable(lcd
         TARGET DJI_Board_TypeA
-        SOURCES dart_arm_loader_test.cc)
+        SOURCES LCD_Test.cc)

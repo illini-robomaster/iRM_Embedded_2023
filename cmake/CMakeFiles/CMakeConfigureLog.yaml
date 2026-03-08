@@ -1,0 +1,283 @@
+
+---
+events:
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/usr/share/cmake-3.28/Modules/CMakeDetermineSystem.cmake:228 (message)"
+      - "CMakeLists.txt:29 (project)"
+    message: |
+      The target system is: Generic - 1 - 
+      The host system is: Linux - 6.6.87.2-microsoft-standard-WSL2 - x86_64
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/usr/share/cmake-3.28/Modules/CMakeDetermineCompilerId.cmake:17 (message)"
+      - "/usr/share/cmake-3.28/Modules/CMakeDetermineCompilerId.cmake:64 (__determine_compiler_id_test)"
+      - "/usr/share/cmake-3.28/Modules/CMakeDetermineCCompiler.cmake:123 (CMAKE_DETERMINE_COMPILER_ID)"
+      - "CMakeLists.txt:29 (project)"
+    message: |
+      Compiling the C compiler identification source file "CMakeCCompilerId.c" failed.
+      Compiler: /home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/arm-none-eabi-gcc 
+      Build flags: -Wall;-Werror;-Wextra;-fdiagnostics-color=always
+      Id flags:  
+      
+      The output was:
+      1
+      /home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/../../../../arm-none-eabi/bin/ld: /home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/../../../../arm-none-eabi/lib/libc.a(lib_a-exit.o): in function `exit':
+      exit.c:(.text.exit+0x2c): undefined reference to `_exit'
+      collect2: error: ld returned 1 exit status
+      
+      
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/usr/share/cmake-3.28/Modules/CMakeDetermineCompilerId.cmake:17 (message)"
+      - "/usr/share/cmake-3.28/Modules/CMakeDetermineCompilerId.cmake:64 (__determine_compiler_id_test)"
+      - "/usr/share/cmake-3.28/Modules/CMakeDetermineCCompiler.cmake:123 (CMAKE_DETERMINE_COMPILER_ID)"
+      - "CMakeLists.txt:29 (project)"
+    message: |
+      Compiling the C compiler identification source file "CMakeCCompilerId.c" succeeded.
+      Compiler: /home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/arm-none-eabi-gcc 
+      Build flags: -Wall;-Werror;-Wextra;-fdiagnostics-color=always
+      Id flags: -c 
+      
+      The output was:
+      0
+      
+      
+      Compilation of the C compiler identification source "CMakeCCompilerId.c" produced "CMakeCCompilerId.o"
+      
+      The C compiler identification is GNU, found in:
+        /home/zliu131/dart2025/cmake/CMakeFiles/3.28.3/CompilerIdC/CMakeCCompilerId.o
+      
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/usr/share/cmake-3.28/Modules/CMakeDetermineCompilerId.cmake:17 (message)"
+      - "/usr/share/cmake-3.28/Modules/CMakeDetermineCompilerId.cmake:64 (__determine_compiler_id_test)"
+      - "/usr/share/cmake-3.28/Modules/CMakeDetermineCXXCompiler.cmake:126 (CMAKE_DETERMINE_COMPILER_ID)"
+      - "CMakeLists.txt:29 (project)"
+    message: |
+      Compiling the CXX compiler identification source file "CMakeCXXCompilerId.cpp" failed.
+      Compiler: /home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/arm-none-eabi-g++ 
+      Build flags: -Wall;-Werror;-Wextra;-fdiagnostics-color=always;-fno-exceptions
+      Id flags:  
+      
+      The output was:
+      1
+      /home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/../../../../arm-none-eabi/bin/ld: /home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/../../../../arm-none-eabi/lib/libc.a(lib_a-exit.o): in function `exit':
+      exit.c:(.text.exit+0x2c): undefined reference to `_exit'
+      collect2: error: ld returned 1 exit status
+      
+      
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/usr/share/cmake-3.28/Modules/CMakeDetermineCompilerId.cmake:17 (message)"
+      - "/usr/share/cmake-3.28/Modules/CMakeDetermineCompilerId.cmake:64 (__determine_compiler_id_test)"
+      - "/usr/share/cmake-3.28/Modules/CMakeDetermineCXXCompiler.cmake:126 (CMAKE_DETERMINE_COMPILER_ID)"
+      - "CMakeLists.txt:29 (project)"
+    message: |
+      Compiling the CXX compiler identification source file "CMakeCXXCompilerId.cpp" succeeded.
+      Compiler: /home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/arm-none-eabi-g++ 
+      Build flags: -Wall;-Werror;-Wextra;-fdiagnostics-color=always;-fno-exceptions
+      Id flags: -c 
+      
+      The output was:
+      0
+      
+      
+      Compilation of the CXX compiler identification source "CMakeCXXCompilerId.cpp" produced "CMakeCXXCompilerId.o"
+      
+      The CXX compiler identification is GNU, found in:
+        /home/zliu131/dart2025/cmake/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.o
+      
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "/usr/share/cmake-3.28/Modules/CMakeDetermineCompilerABI.cmake:57 (try_compile)"
+      - "/usr/share/cmake-3.28/Modules/CMakeTestCCompiler.cmake:26 (CMAKE_DETERMINE_COMPILER_ABI)"
+      - "CMakeLists.txt:29 (project)"
+    checks:
+      - "Detecting C compiler ABI info"
+    directories:
+      source: "/home/zliu131/dart2025/cmake/CMakeFiles/CMakeScratch/TryCompile-kuWQpW"
+      binary: "/home/zliu131/dart2025/cmake/CMakeFiles/CMakeScratch/TryCompile-kuWQpW"
+    cmakeVariables:
+      CMAKE_C_FLAGS: "-Wall -Wextra -fdiagnostics-color=always"
+      CMAKE_C_FLAGS_DEBUG: "-Og -g -DDEBUG"
+      CMAKE_EXE_LINKER_FLAGS: ""
+    buildResult:
+      variable: "CMAKE_C_ABI_COMPILED"
+      cached: true
+      stdout: |
+        Change Dir: '/home/zliu131/dart2025/cmake/CMakeFiles/CMakeScratch/TryCompile-kuWQpW'
+        
+        Run Build Command(s): /usr/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_ae00a/fast
+        /usr/bin/gmake  -f CMakeFiles/cmTC_ae00a.dir/build.make CMakeFiles/cmTC_ae00a.dir/build
+        gmake[1]: Entering directory '/home/zliu131/dart2025/cmake/CMakeFiles/CMakeScratch/TryCompile-kuWQpW'
+        Building C object CMakeFiles/cmTC_ae00a.dir/CMakeCCompilerABI.c.obj
+        /home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/arm-none-eabi-gcc   -Wall -Wextra -fdiagnostics-color=always  -std=gnu11   -v -o CMakeFiles/cmTC_ae00a.dir/CMakeCCompilerABI.c.obj -c /usr/share/cmake-3.28/Modules/CMakeCCompilerABI.c
+        Using built-in specs.
+        COLLECT_GCC=/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/arm-none-eabi-gcc
+        Target: arm-none-eabi
+        Configured with: /mnt/workspace/workspace/GCC-10-pipeline/jenkins-GCC-10-pipeline-338_20211018_1634516203/src/gcc/configure --target=arm-none-eabi --prefix=/mnt/workspace/workspace/GCC-10-pipeline/jenkins-GCC-10-pipeline-338_20211018_1634516203/install-native --libexecdir=/mnt/workspace/workspace/GCC-10-pipeline/jenkins-GCC-10-pipeline-338_20211018_1634516203/install-native/lib --infodir=/mnt/workspace/workspace/GCC-10-pipeline/jenkins-GCC-10-pipeline-338_20211018_1634516203/install-native/share/doc/gcc-arm-none-eabi/info --mandir=/mnt/workspace/workspace/GCC-10-pipeline/jenkins-GCC-10-pipeline-338_20211018_1634516203/install-native/share/doc/gcc-arm-none-eabi/man --htmldir=/mnt/workspace/workspace/GCC-10-pipeline/jenkins-GCC-10-pipeline-338_20211018_1634516203/install-native/share/doc/gcc-arm-none-eabi/html --pdfdir=/mnt/workspace/workspace/GCC-10-pipeline/jenkins-GCC-10-pipeline-338_20211018_1634516203/install-native/share/doc/gcc-arm-none-eabi/pdf --enable-languages=c,c++ --enable-plugins --disable-decimal-float --disable-libffi --disable-libgomp --disable-libmudflap --disable-libquadmath --disable-libssp --disable-libstdcxx-pch --disable-nls --disable-shared --disable-threads --disable-tls --with-gnu-as --with-gnu-ld --with-newlib --with-headers=yes --with-python-dir=share/gcc-arm-none-eabi --with-sysroot=/mnt/workspace/workspace/GCC-10-pipeline/jenkins-GCC-10-pipeline-338_20211018_1634516203/install-native/arm-none-eabi --build=x86_64-linux-gnu --host=x86_64-linux-gnu --with-gmp=/mnt/workspace/workspace/GCC-10-pipeline/jenkins-GCC-10-pipeline-338_20211018_1634516203/build-native/host-libs/usr --with-mpfr=/mnt/workspace/workspace/GCC-10-pipeline/jenkins-GCC-10-pipeline-338_20211018_1634516203/build-native/host-libs/usr --with-mpc=/mnt/workspace/workspace/GCC-10-pipeline/jenkins-GCC-10-pipeline-338_20211018_1634516203/build-native/host-libs/usr --with-isl=/mnt/workspace/workspace/GCC-10-pipeline/jenkins-GCC-10-pipeline-338_20211018_1634516203/build-native/host-libs/usr --with-libelf=/mnt/workspace/workspace/GCC-10-pipeline/jenkins-GCC-10-pipeline-338_20211018_1634516203/build-native/host-libs/usr --with-host-libstdcxx='-static-libgcc -Wl,-Bstatic,-lstdc++,-Bdynamic -lm' --with-pkgversion='GNU Arm Embedded Toolchain 10.3-2021.10' --with-multilib-list=rmprofile,aprofile
+        Thread model: single
+        Supported LTO compression algorithms: zlib
+        gcc version 10.3.1 20210824 (release) (GNU Arm Embedded Toolchain 10.3-2021.10) 
+        COLLECT_GCC_OPTIONS='-fdiagnostics-color=always' '-Wall' '-Wextra' '-std=gnu11' '-v' '-o' 'CMakeFiles/cmTC_ae00a.dir/CMakeCCompilerABI.c.obj' '-c' '-mcpu=arm7tdmi' '-mfloat-abi=soft' '-marm' '-mlibarch=armv4t' '-march=armv4t'
+         /home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/cc1 -quiet -v -iprefix /home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/ -isysroot /home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../arm-none-eabi -D__USES_INITFINI__ /usr/share/cmake-3.28/Modules/CMakeCCompilerABI.c -quiet -dumpbase CMakeCCompilerABI.c -mcpu=arm7tdmi -mfloat-abi=soft -marm -mlibarch=armv4t -march=armv4t -auxbase-strip CMakeFiles/cmTC_ae00a.dir/CMakeCCompilerABI.c.obj -Wall -Wextra -std=gnu11 -version -fdiagnostics-color=always -o /tmp/ccait1TZ.s
+        GNU C11 (GNU Arm Embedded Toolchain 10.3-2021.10) version 10.3.1 20210824 (release) (arm-none-eabi)
+        	compiled by GNU C version 4.8.4, GMP version 6.1.0, MPFR version 3.1.4, MPC version 1.0.3, isl version isl-0.18-GMP
+        
+        GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072
+        ignoring duplicate directory "/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/../../lib/gcc/arm-none-eabi/10.3.1/include"
+        ignoring nonexistent directory "/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../arm-none-eabi/usr/local/include"
+        ignoring duplicate directory "/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/../../lib/gcc/arm-none-eabi/10.3.1/include-fixed"
+        ignoring duplicate directory "/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/../../lib/gcc/arm-none-eabi/10.3.1/../../../../arm-none-eabi/include"
+        ignoring nonexistent directory "/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../arm-none-eabi/usr/include"
+        #include "..." search starts here:
+        #include <...> search starts here:
+         /home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/include
+         /home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/include-fixed
+         /home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/../../../../arm-none-eabi/include
+        End of search list.
+        GNU C11 (GNU Arm Embedded Toolchain 10.3-2021.10) version 10.3.1 20210824 (release) (arm-none-eabi)
+        	compiled by GNU C version 4.8.4, GMP version 6.1.0, MPFR version 3.1.4, MPC version 1.0.3, isl version isl-0.18-GMP
+        
+        GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072
+        Compiler executable checksum: ada28fdd13bdd399f195284d34df0081
+        COLLECT_GCC_OPTIONS='-fdiagnostics-color=always' '-Wall' '-Wextra' '-std=gnu11' '-v' '-o' 'CMakeFiles/cmTC_ae00a.dir/CMakeCCompilerABI.c.obj' '-c' '-mcpu=arm7tdmi' '-mfloat-abi=soft' '-marm' '-mlibarch=armv4t' '-march=armv4t'
+         /home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/../../../../arm-none-eabi/bin/as -v -march=armv4t -mfloat-abi=soft -meabi=5 -o CMakeFiles/cmTC_ae00a.dir/CMakeCCompilerABI.c.obj /tmp/ccait1TZ.s
+        GNU assembler version 2.36.1 (arm-none-eabi) using BFD version (GNU Arm Embedded Toolchain 10.3-2021.10) 2.36.1.20210621
+        COMPILER_PATH=/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/:/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/:/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/../../../../arm-none-eabi/bin/
+        LIBRARY_PATH=/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/:/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/:/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/../../../../arm-none-eabi/lib/:/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../arm-none-eabi/lib/
+        COLLECT_GCC_OPTIONS='-fdiagnostics-color=always' '-Wall' '-Wextra' '-std=gnu11' '-v' '-o' 'CMakeFiles/cmTC_ae00a.dir/CMakeCCompilerABI.c.obj' '-c' '-mcpu=arm7tdmi' '-mfloat-abi=soft' '-marm' '-mlibarch=armv4t' '-march=armv4t'
+        Linking C executable cmTC_ae00a
+        /usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_ae00a.dir/link.txt --verbose=1
+        /home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/arm-none-eabi-gcc -Wall -Wextra -fdiagnostics-color=always   -v CMakeFiles/cmTC_ae00a.dir/CMakeCCompilerABI.c.obj -o cmTC_ae00a 
+        Using built-in specs.
+        COLLECT_GCC=/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/arm-none-eabi-gcc
+        COLLECT_LTO_WRAPPER=/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/lto-wrapper
+        Target: arm-none-eabi
+        Configured with: /mnt/workspace/workspace/GCC-10-pipeline/jenkins-GCC-10-pipeline-338_20211018_1634516203/src/gcc/configure --target=arm-none-eabi --prefix=/mnt/workspace/workspace/GCC-10-pipeline/jenkins-GCC-10-pipeline-338_20211018_1634516203/install-native --libexecdir=/mnt/workspace/workspace/GCC-10-pipeline/jenkins-GCC-10-pipeline-338_20211018_1634516203/install-native/lib --infodir=/mnt/workspace/workspace/GCC-10-pipeline/jenkins-GCC-10-pipeline-338_20211018_1634516203/install-native/share/doc/gcc-arm-none-eabi/info --mandir=/mnt/workspace/workspace/GCC-10-pipeline/jenkins-GCC-10-pipeline-338_20211018_1634516203/install-native/share/doc/gcc-arm-none-eabi/man --htmldir=/mnt/workspace/workspace/GCC-10-pipeline/jenkins-GCC-10-pipeline-338_20211018_1634516203/install-native/share/doc/gcc-arm-none-eabi/html --pdfdir=/mnt/workspace/workspace/GCC-10-pipeline/jenkins-GCC-10-pipeline-338_20211018_1634516203/install-native/share/doc/gcc-arm-none-eabi/pdf --enable-languages=c,c++ --enable-plugins --disable-decimal-float --disable-libffi --disable-libgomp --disable-libmudflap --disable-libquadmath --disable-libssp --disable-libstdcxx-pch --disable-nls --disable-shared --disable-threads --disable-tls --with-gnu-as --with-gnu-ld --with-newlib --with-headers=yes --with-python-dir=share/gcc-arm-none-eabi --with-sysroot=/mnt/workspace/workspace/GCC-10-pipeline/jenkins-GCC-10-pipeline-338_20211018_1634516203/install-native/arm-none-eabi --build=x86_64-linux-gnu --host=x86_64-linux-gnu --with-gmp=/mnt/workspace/workspace/GCC-10-pipeline/jenkins-GCC-10-pipeline-338_20211018_1634516203/build-native/host-libs/usr --with-mpfr=/mnt/workspace/workspace/GCC-10-pipeline/jenkins-GCC-10-pipeline-338_20211018_1634516203/build-native/host-libs/usr --with-mpc=/mnt/workspace/workspace/GCC-10-pipeline/jenkins-GCC-10-pipeline-338_20211018_1634516203/build-native/host-libs/usr --with-isl=/mnt/workspace/workspace/GCC-10-pipeline/jenkins-GCC-10-pipeline-338_20211018_1634516203/build-native/host-libs/usr --with-libelf=/mnt/workspace/workspace/GCC-10-pipeline/jenkins-GCC-10-pipeline-338_20211018_1634516203/build-native/host-libs/usr --with-host-libstdcxx='-static-libgcc -Wl,-Bstatic,-lstdc++,-Bdynamic -lm' --with-pkgversion='GNU Arm Embedded Toolchain 10.3-2021.10' --with-multilib-list=rmprofile,aprofile
+        Thread model: single
+        Supported LTO compression algorithms: zlib
+        gcc version 10.3.1 20210824 (release) (GNU Arm Embedded Toolchain 10.3-2021.10) 
+        COMPILER_PATH=/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/:/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/:/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/../../../../arm-none-eabi/bin/
+        LIBRARY_PATH=/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/:/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/:/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/../../../../arm-none-eabi/lib/:/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../arm-none-eabi/lib/
+        COLLECT_GCC_OPTIONS='-fdiagnostics-color=always' '-Wall' '-Wextra' '-v' '-o' 'cmTC_ae00a' '-mcpu=arm7tdmi' '-mfloat-abi=soft' '-marm' '-mlibarch=armv4t' '-march=armv4t'
+         /home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/collect2 -plugin /home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/liblto_plugin.so -plugin-opt=/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/lto-wrapper -plugin-opt=-fresolution=/tmp/ccb9a03D.res -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lc --sysroot=/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../arm-none-eabi -X -o cmTC_ae00a /home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/crti.o /home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/crtbegin.o /home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/../../../../arm-none-eabi/lib/crt0.o -L/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1 -L/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc -L/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/../../../../arm-none-eabi/lib -L/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../arm-none-eabi/lib CMakeFiles/cmTC_ae00a.dir/CMakeCCompilerABI.c.obj --start-group -lgcc -lc --end-group /home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/crtend.o /home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/crtn.o
+        /home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/../../../../arm-none-eabi/bin/ld: /home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/../../../../arm-none-eabi/lib/libc.a(lib_a-exit.o): in function `exit':
+        exit.c:(.text.exit+0x2c): undefined reference to `_exit'
+        collect2: error: ld returned 1 exit status
+        gmake[1]: *** [CMakeFiles/cmTC_ae00a.dir/build.make:99: cmTC_ae00a] Error 1
+        gmake[1]: Leaving directory '/home/zliu131/dart2025/cmake/CMakeFiles/CMakeScratch/TryCompile-kuWQpW'
+        gmake: *** [Makefile:127: cmTC_ae00a/fast] Error 2
+        
+      exitCode: 2
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "/usr/share/cmake-3.28/Modules/CMakeDetermineCompilerABI.cmake:57 (try_compile)"
+      - "/usr/share/cmake-3.28/Modules/CMakeTestCXXCompiler.cmake:26 (CMAKE_DETERMINE_COMPILER_ABI)"
+      - "CMakeLists.txt:29 (project)"
+    checks:
+      - "Detecting CXX compiler ABI info"
+    directories:
+      source: "/home/zliu131/dart2025/cmake/CMakeFiles/CMakeScratch/TryCompile-yskk1N"
+      binary: "/home/zliu131/dart2025/cmake/CMakeFiles/CMakeScratch/TryCompile-yskk1N"
+    cmakeVariables:
+      CMAKE_CXX_FLAGS: "-Wall -Wextra -fdiagnostics-color=always -fno-exceptions"
+      CMAKE_CXX_FLAGS_DEBUG: "-Og -g -DDEBUG"
+      CMAKE_EXE_LINKER_FLAGS: ""
+    buildResult:
+      variable: "CMAKE_CXX_ABI_COMPILED"
+      cached: true
+      stdout: |
+        Change Dir: '/home/zliu131/dart2025/cmake/CMakeFiles/CMakeScratch/TryCompile-yskk1N'
+        
+        Run Build Command(s): /usr/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_68a2c/fast
+        /usr/bin/gmake  -f CMakeFiles/cmTC_68a2c.dir/build.make CMakeFiles/cmTC_68a2c.dir/build
+        gmake[1]: Entering directory '/home/zliu131/dart2025/cmake/CMakeFiles/CMakeScratch/TryCompile-yskk1N'
+        Building CXX object CMakeFiles/cmTC_68a2c.dir/CMakeCXXCompilerABI.cpp.obj
+        /home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/arm-none-eabi-g++   -Wall -Wextra -fdiagnostics-color=always -fno-exceptions  -std=gnu++17   -v -o CMakeFiles/cmTC_68a2c.dir/CMakeCXXCompilerABI.cpp.obj -c /usr/share/cmake-3.28/Modules/CMakeCXXCompilerABI.cpp
+        Using built-in specs.
+        COLLECT_GCC=/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/arm-none-eabi-g++
+        Target: arm-none-eabi
+        Configured with: /mnt/workspace/workspace/GCC-10-pipeline/jenkins-GCC-10-pipeline-338_20211018_1634516203/src/gcc/configure --target=arm-none-eabi --prefix=/mnt/workspace/workspace/GCC-10-pipeline/jenkins-GCC-10-pipeline-338_20211018_1634516203/install-native --libexecdir=/mnt/workspace/workspace/GCC-10-pipeline/jenkins-GCC-10-pipeline-338_20211018_1634516203/install-native/lib --infodir=/mnt/workspace/workspace/GCC-10-pipeline/jenkins-GCC-10-pipeline-338_20211018_1634516203/install-native/share/doc/gcc-arm-none-eabi/info --mandir=/mnt/workspace/workspace/GCC-10-pipeline/jenkins-GCC-10-pipeline-338_20211018_1634516203/install-native/share/doc/gcc-arm-none-eabi/man --htmldir=/mnt/workspace/workspace/GCC-10-pipeline/jenkins-GCC-10-pipeline-338_20211018_1634516203/install-native/share/doc/gcc-arm-none-eabi/html --pdfdir=/mnt/workspace/workspace/GCC-10-pipeline/jenkins-GCC-10-pipeline-338_20211018_1634516203/install-native/share/doc/gcc-arm-none-eabi/pdf --enable-languages=c,c++ --enable-plugins --disable-decimal-float --disable-libffi --disable-libgomp --disable-libmudflap --disable-libquadmath --disable-libssp --disable-libstdcxx-pch --disable-nls --disable-shared --disable-threads --disable-tls --with-gnu-as --with-gnu-ld --with-newlib --with-headers=yes --with-python-dir=share/gcc-arm-none-eabi --with-sysroot=/mnt/workspace/workspace/GCC-10-pipeline/jenkins-GCC-10-pipeline-338_20211018_1634516203/install-native/arm-none-eabi --build=x86_64-linux-gnu --host=x86_64-linux-gnu --with-gmp=/mnt/workspace/workspace/GCC-10-pipeline/jenkins-GCC-10-pipeline-338_20211018_1634516203/build-native/host-libs/usr --with-mpfr=/mnt/workspace/workspace/GCC-10-pipeline/jenkins-GCC-10-pipeline-338_20211018_1634516203/build-native/host-libs/usr --with-mpc=/mnt/workspace/workspace/GCC-10-pipeline/jenkins-GCC-10-pipeline-338_20211018_1634516203/build-native/host-libs/usr --with-isl=/mnt/workspace/workspace/GCC-10-pipeline/jenkins-GCC-10-pipeline-338_20211018_1634516203/build-native/host-libs/usr --with-libelf=/mnt/workspace/workspace/GCC-10-pipeline/jenkins-GCC-10-pipeline-338_20211018_1634516203/build-native/host-libs/usr --with-host-libstdcxx='-static-libgcc -Wl,-Bstatic,-lstdc++,-Bdynamic -lm' --with-pkgversion='GNU Arm Embedded Toolchain 10.3-2021.10' --with-multilib-list=rmprofile,aprofile
+        Thread model: single
+        Supported LTO compression algorithms: zlib
+        gcc version 10.3.1 20210824 (release) (GNU Arm Embedded Toolchain 10.3-2021.10) 
+        COLLECT_GCC_OPTIONS='-fdiagnostics-color=always' '-Wall' '-Wextra' '-fno-exceptions' '-std=gnu++17' '-v' '-o' 'CMakeFiles/cmTC_68a2c.dir/CMakeCXXCompilerABI.cpp.obj' '-c' '-mcpu=arm7tdmi' '-mfloat-abi=soft' '-marm' '-mlibarch=armv4t' '-march=armv4t'
+         /home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/cc1plus -quiet -v -iprefix /home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/ -isysroot /home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../arm-none-eabi -D__USES_INITFINI__ /usr/share/cmake-3.28/Modules/CMakeCXXCompilerABI.cpp -quiet -dumpbase CMakeCXXCompilerABI.cpp -mcpu=arm7tdmi -mfloat-abi=soft -marm -mlibarch=armv4t -march=armv4t -auxbase-strip CMakeFiles/cmTC_68a2c.dir/CMakeCXXCompilerABI.cpp.obj -Wall -Wextra -std=gnu++17 -version -fdiagnostics-color=always -fno-exceptions -o /tmp/ccl8Mc2F.s
+        GNU C++17 (GNU Arm Embedded Toolchain 10.3-2021.10) version 10.3.1 20210824 (release) (arm-none-eabi)
+        	compiled by GNU C version 4.8.4, GMP version 6.1.0, MPFR version 3.1.4, MPC version 1.0.3, isl version isl-0.18-GMP
+        
+        GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072
+        ignoring duplicate directory "/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/../../lib/gcc/arm-none-eabi/10.3.1/../../../../arm-none-eabi/include/c++/10.3.1"
+        ignoring duplicate directory "/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/../../lib/gcc/arm-none-eabi/10.3.1/../../../../arm-none-eabi/include/c++/10.3.1/arm-none-eabi"
+        ignoring duplicate directory "/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/../../lib/gcc/arm-none-eabi/10.3.1/../../../../arm-none-eabi/include/c++/10.3.1/backward"
+        ignoring duplicate directory "/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/../../lib/gcc/arm-none-eabi/10.3.1/include"
+        ignoring nonexistent directory "/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../arm-none-eabi/usr/local/include"
+        ignoring duplicate directory "/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/../../lib/gcc/arm-none-eabi/10.3.1/include-fixed"
+        ignoring duplicate directory "/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/../../lib/gcc/arm-none-eabi/10.3.1/../../../../arm-none-eabi/include"
+        ignoring nonexistent directory "/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../arm-none-eabi/usr/include"
+        #include "..." search starts here:
+        #include <...> search starts here:
+         /home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/../../../../arm-none-eabi/include/c++/10.3.1
+         /home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/../../../../arm-none-eabi/include/c++/10.3.1/arm-none-eabi
+         /home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/../../../../arm-none-eabi/include/c++/10.3.1/backward
+         /home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/include
+         /home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/include-fixed
+         /home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/../../../../arm-none-eabi/include
+        End of search list.
+        GNU C++17 (GNU Arm Embedded Toolchain 10.3-2021.10) version 10.3.1 20210824 (release) (arm-none-eabi)
+        	compiled by GNU C version 4.8.4, GMP version 6.1.0, MPFR version 3.1.4, MPC version 1.0.3, isl version isl-0.18-GMP
+        
+        GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072
+        Compiler executable checksum: 62a2c0a0f0d30bb0bbe5c686601adbb0
+        COLLECT_GCC_OPTIONS='-fdiagnostics-color=always' '-Wall' '-Wextra' '-fno-exceptions' '-std=gnu++17' '-v' '-o' 'CMakeFiles/cmTC_68a2c.dir/CMakeCXXCompilerABI.cpp.obj' '-c' '-mcpu=arm7tdmi' '-mfloat-abi=soft' '-marm' '-mlibarch=armv4t' '-march=armv4t'
+         /home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/../../../../arm-none-eabi/bin/as -v -march=armv4t -mfloat-abi=soft -meabi=5 -o CMakeFiles/cmTC_68a2c.dir/CMakeCXXCompilerABI.cpp.obj /tmp/ccl8Mc2F.s
+        GNU assembler version 2.36.1 (arm-none-eabi) using BFD version (GNU Arm Embedded Toolchain 10.3-2021.10) 2.36.1.20210621
+        COMPILER_PATH=/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/:/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/:/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/../../../../arm-none-eabi/bin/
+        LIBRARY_PATH=/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/:/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/:/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/../../../../arm-none-eabi/lib/:/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../arm-none-eabi/lib/
+        COLLECT_GCC_OPTIONS='-fdiagnostics-color=always' '-Wall' '-Wextra' '-fno-exceptions' '-std=gnu++17' '-v' '-o' 'CMakeFiles/cmTC_68a2c.dir/CMakeCXXCompilerABI.cpp.obj' '-c' '-mcpu=arm7tdmi' '-mfloat-abi=soft' '-marm' '-mlibarch=armv4t' '-march=armv4t'
+        Linking CXX executable cmTC_68a2c
+        /usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_68a2c.dir/link.txt --verbose=1
+        /home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/arm-none-eabi-g++ -Wall -Wextra -fdiagnostics-color=always -fno-exceptions   -v CMakeFiles/cmTC_68a2c.dir/CMakeCXXCompilerABI.cpp.obj -o cmTC_68a2c 
+        Using built-in specs.
+        COLLECT_GCC=/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/arm-none-eabi-g++
+        COLLECT_LTO_WRAPPER=/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/lto-wrapper
+        Target: arm-none-eabi
+        Configured with: /mnt/workspace/workspace/GCC-10-pipeline/jenkins-GCC-10-pipeline-338_20211018_1634516203/src/gcc/configure --target=arm-none-eabi --prefix=/mnt/workspace/workspace/GCC-10-pipeline/jenkins-GCC-10-pipeline-338_20211018_1634516203/install-native --libexecdir=/mnt/workspace/workspace/GCC-10-pipeline/jenkins-GCC-10-pipeline-338_20211018_1634516203/install-native/lib --infodir=/mnt/workspace/workspace/GCC-10-pipeline/jenkins-GCC-10-pipeline-338_20211018_1634516203/install-native/share/doc/gcc-arm-none-eabi/info --mandir=/mnt/workspace/workspace/GCC-10-pipeline/jenkins-GCC-10-pipeline-338_20211018_1634516203/install-native/share/doc/gcc-arm-none-eabi/man --htmldir=/mnt/workspace/workspace/GCC-10-pipeline/jenkins-GCC-10-pipeline-338_20211018_1634516203/install-native/share/doc/gcc-arm-none-eabi/html --pdfdir=/mnt/workspace/workspace/GCC-10-pipeline/jenkins-GCC-10-pipeline-338_20211018_1634516203/install-native/share/doc/gcc-arm-none-eabi/pdf --enable-languages=c,c++ --enable-plugins --disable-decimal-float --disable-libffi --disable-libgomp --disable-libmudflap --disable-libquadmath --disable-libssp --disable-libstdcxx-pch --disable-nls --disable-shared --disable-threads --disable-tls --with-gnu-as --with-gnu-ld --with-newlib --with-headers=yes --with-python-dir=share/gcc-arm-none-eabi --with-sysroot=/mnt/workspace/workspace/GCC-10-pipeline/jenkins-GCC-10-pipeline-338_20211018_1634516203/install-native/arm-none-eabi --build=x86_64-linux-gnu --host=x86_64-linux-gnu --with-gmp=/mnt/workspace/workspace/GCC-10-pipeline/jenkins-GCC-10-pipeline-338_20211018_1634516203/build-native/host-libs/usr --with-mpfr=/mnt/workspace/workspace/GCC-10-pipeline/jenkins-GCC-10-pipeline-338_20211018_1634516203/build-native/host-libs/usr --with-mpc=/mnt/workspace/workspace/GCC-10-pipeline/jenkins-GCC-10-pipeline-338_20211018_1634516203/build-native/host-libs/usr --with-isl=/mnt/workspace/workspace/GCC-10-pipeline/jenkins-GCC-10-pipeline-338_20211018_1634516203/build-native/host-libs/usr --with-libelf=/mnt/workspace/workspace/GCC-10-pipeline/jenkins-GCC-10-pipeline-338_20211018_1634516203/build-native/host-libs/usr --with-host-libstdcxx='-static-libgcc -Wl,-Bstatic,-lstdc++,-Bdynamic -lm' --with-pkgversion='GNU Arm Embedded Toolchain 10.3-2021.10' --with-multilib-list=rmprofile,aprofile
+        Thread model: single
+        Supported LTO compression algorithms: zlib
+        gcc version 10.3.1 20210824 (release) (GNU Arm Embedded Toolchain 10.3-2021.10) 
+        COMPILER_PATH=/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/:/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/:/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/../../../../arm-none-eabi/bin/
+        LIBRARY_PATH=/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/:/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/:/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/../../../../arm-none-eabi/lib/:/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../arm-none-eabi/lib/
+        COLLECT_GCC_OPTIONS='-fdiagnostics-color=always' '-Wall' '-Wextra' '-fno-exceptions' '-v' '-o' 'cmTC_68a2c' '-mcpu=arm7tdmi' '-mfloat-abi=soft' '-marm' '-mlibarch=armv4t' '-march=armv4t'
+         /home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/collect2 -plugin /home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/liblto_plugin.so -plugin-opt=/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/lto-wrapper -plugin-opt=-fresolution=/tmp/ccgdf7qX.res -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lc --sysroot=/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../arm-none-eabi -X -o cmTC_68a2c /home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/crti.o /home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/crtbegin.o /home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/../../../../arm-none-eabi/lib/crt0.o -L/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1 -L/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc -L/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/../../../../arm-none-eabi/lib -L/home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../arm-none-eabi/lib CMakeFiles/cmTC_68a2c.dir/CMakeCXXCompilerABI.cpp.obj -lstdc++ -lm --start-group -lgcc -lc --end-group /home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/crtend.o /home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/crtn.o
+        /home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/../../../../arm-none-eabi/bin/ld: /home/zliu131/dependencies/gcc-arm-none-eabi-10.3-2021.10/bin/../lib/gcc/arm-none-eabi/10.3.1/../../../../arm-none-eabi/lib/libc.a(lib_a-exit.o): in function `exit':
+        exit.c:(.text.exit+0x2c): undefined reference to `_exit'
+        collect2: error: ld returned 1 exit status
+        gmake[1]: *** [CMakeFiles/cmTC_68a2c.dir/build.make:99: cmTC_68a2c] Error 1
+        gmake[1]: Leaving directory '/home/zliu131/dart2025/cmake/CMakeFiles/CMakeScratch/TryCompile-yskk1N'
+        gmake: *** [Makefile:127: cmTC_68a2c/fast] Error 2
+        
+      exitCode: 2
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/usr/share/cmake-3.28/Modules/CMakeDetermineCompilerId.cmake:1131 (message)"
+      - "/usr/share/cmake-3.28/Modules/CMakeDetermineASMCompiler.cmake:131 (CMAKE_DETERMINE_COMPILER_ID_VENDOR)"
+      - "boards/DJI_Board_TypeA/CMakeLists.txt:22 (project)"
+    message: |
+      Checking whether the ASM compiler is GNU using "--version" matched "(GNU assembler)|(GCC)|(Free Software Foundation)":
+      arm-none-eabi-gcc (GNU Arm Embedded Toolchain 10.3-2021.10) 10.3.1 20210824 (release)
+      Copyright (C) 2020 Free Software Foundation, Inc.
+      This is free software; see the source for copying conditions.  There is NO
+      warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+      
+...
