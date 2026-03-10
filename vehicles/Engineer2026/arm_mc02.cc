@@ -36,7 +36,23 @@
 #include "controller.h"
 #include "fdcan.h"
 #include "motor.h"
+#include "uart_framing.h"
 #include "usart.h"
+
+#define TEST_UART_TRANSMISSION  // uncomment this line to test the transmission from mcu to ros2
+// #define TEST_UART_RECEIVE       // uncomment this line to test the reception of UART Joint Variables from ros2 to mcu
+
+#ifdef TEST_UART_TRANSMISSION
+bool test_ros_tx = true;
+#else
+bool test_ros_tx = false;
+#endif
+
+#ifdef TEST_UART_RECEIVE
+bool test_ros_rx = true;
+#else
+bool test_ros_rx = false;
+#endif
 
 // ── CAN IDs ─────────────────────────────────────────────────────────────────
 // master_id = feedback frame ID configured in DAMIAO tool ("Master ID")
@@ -44,10 +60,10 @@
 // TODO: replace placeholder values with your DAMIAO-tool-configured IDs.
 static constexpr uint16_t J1_MASTER_ID = 0x10, J1_CAN_ID = 0x11;  // Motor4310
 static constexpr uint16_t J2_MASTER_ID = 0x12, J2_CAN_ID = 0x13;  // MotorDMJ10010
-static constexpr uint16_t J3_MASTER_ID = 0x14, J3_CAN_ID = 0x15;  // MotorDMJ10010
+static constexpr uint16_t J3_MASTER_ID = 0x20, J3_CAN_ID = 0x21;  // MotorDMJ10010
 static constexpr uint16_t J4_MASTER_ID = 0x16, J4_CAN_ID = 0x17;  // Motor4310
 static constexpr uint16_t J5_MASTER_ID = 0x18, J5_CAN_ID = 0x19;  // Motor4310
-static constexpr uint16_t J6_MASTER_ID = 0x0, J6_CAN_ID = 0x1;  // MotorDMJ3507
+static constexpr uint16_t J6_MASTER_ID = 0x14, J6_CAN_ID = 0x15;  // MotorDMJ3507
 static constexpr uint16_t GRIP_RX_ID   = 0x206;                    // Motor2006
 
 // ── Velocity & current limits ────────────────────────────────────────────────
@@ -92,12 +108,12 @@ static inline T clamp(T v, T lo, T hi) {
 static bsp::CAN*  arm_can  = nullptr;  // hfdcan2 — arm motors
 static bsp::UART* arm_uart = nullptr;  // huart10 — OrangePi link
 
-static control::Motor4310*     j1      = nullptr;
-static control::MotorDMJ10010* j2      = nullptr;
-static control::MotorDMJ10010* j3      = nullptr;
-static control::Motor4310*     j4      = nullptr;
-static control::Motor4310*     j5      = nullptr;
-static control::MotorDMJ3507*  j6      = nullptr;
+static control::Motor4310* arm_j1 = nullptr;
+static control::MotorDMJ10010* arm_j2 = nullptr;
+static control::MotorDMJ10010* arm_j3 = nullptr;
+static control::Motor4310* arm_j4 = nullptr;
+static control::Motor4310* arm_j5 = nullptr;
+static control::MotorDMJ3507* arm_j6 = nullptr;
 static control::Motor2006*     gripper = nullptr;
 
 // OrangePi-commanded targets [degrees], updated on valid UART RX.
@@ -119,6 +135,9 @@ static GripState grip_state    = GripState::CLOSING;
 static float     grip_hold_pos = 0.0f;
 static control::ConstrainedPID* grip_pid = nullptr;
 
+// One-shot print flag for test-mode entry message.
+static bool test_mode_printed = false;
+
 // ── ArmInit ───────────────────────────────────────────────────────────────────
 
 void ArmInit() {
@@ -131,12 +150,12 @@ void ArmInit() {
   arm_uart->SetupTx(128);
 
   // Instantiate arm joints — all on the arm CAN bus.
-  j1      = new control::Motor4310(arm_can, J1_MASTER_ID, J1_CAN_ID, control::POS_VEL);
-  j2      = new control::MotorDMJ10010(arm_can, J2_MASTER_ID, J2_CAN_ID, control::FORCE_POS);
-  j3      = new control::MotorDMJ10010(arm_can, J3_MASTER_ID, J3_CAN_ID, control::FORCE_POS);
-  j4      = new control::Motor4310(arm_can, J4_MASTER_ID, J4_CAN_ID, control::POS_VEL);
-  j5      = new control::Motor4310(arm_can, J5_MASTER_ID, J5_CAN_ID, control::POS_VEL);
-  j6      = new control::MotorDMJ3507(arm_can, J6_MASTER_ID, J6_CAN_ID, control::POS_VEL);
+  arm_j1 = new control::Motor4310(arm_can, J1_MASTER_ID, J1_CAN_ID, control::POS_VEL);
+  arm_j2 = new control::MotorDMJ10010(arm_can, J2_MASTER_ID, J2_CAN_ID, control::FORCE_POS);
+  arm_j3 = new control::MotorDMJ10010(arm_can, J3_MASTER_ID, J3_CAN_ID, control::FORCE_POS);
+  arm_j4 = new control::Motor4310(arm_can, J4_MASTER_ID, J4_CAN_ID, control::POS_VEL);
+  arm_j5 = new control::Motor4310(arm_can, J5_MASTER_ID, J5_CAN_ID, control::POS_VEL);
+  arm_j6 = new control::MotorDMJ3507(arm_can, J6_MASTER_ID, J6_CAN_ID, control::POS_VEL);
   gripper = new control::Motor2006(arm_can, GRIP_RX_ID);
 
   grip_pid = new control::ConstrainedPID(GRIP_KP, GRIP_KI, GRIP_KD, GRIP_MAXOUT, 16384.0f);
@@ -158,14 +177,11 @@ void checkAllMotorsConnected(control::MotorDM3519*   rl,
     if (!rr->connection_flag_)   { print("  RR motor (DM3519) not connected\r\n");   ok = false; }
     if (!lift->connection_flag_) { print("  Lift motor (10010L) not connected\r\n"); ok = false; }
 
-    // ── Arm motors (hfdcan2) ────────────────────────────────────────────────
-    if (!j1->connection_flag_)      { print("  J1 (DM4310) not connected\r\n");   ok = false; }
-    if (!j2->connection_flag_)      { print("  J2 (10010L) not connected\r\n");   ok = false; }
-    if (!j3->connection_flag_)      { print("  J3 (10010L) not connected\r\n");   ok = false; }
-    if (!j4->connection_flag_)      { print("  J4 (DM4310) not connected\r\n");   ok = false; }
-    if (!j5->connection_flag_)      { print("  J5 (DM4310) not connected\r\n");   ok = false; }
-    if (!j6->connection_flag_)      { print("  J6 (DM3507) not connected\r\n");   ok = false; }
-    if (!gripper->connection_flag_) { print("  Gripper (2006) not connected\r\n"); ok = false; }
+    // Arm joints are NOT checked here — DM motors only emit CAN feedback
+    // after receiving a command frame, so their connection_flag_ is always
+    // false at this point. Connection for each arm joint is verified inside
+    // ArmEnable() → MotorEnable(), which sends the enable frame and blocks
+    // until the motor replies.
 
     if (ok) {
       print("=== All motors connected ===\r\n");
@@ -179,17 +195,17 @@ void checkAllMotorsConnected(control::MotorDM3519*   rl,
 
 void ArmEnable() {
   print("Enabling J1 (DM4310)...\r\n");
-  j1->MotorEnable();
+  arm_j1->MotorEnable();
   print("Enabling J2 (10010L)...\r\n");
-  j2->MotorEnable();
+  arm_j2->MotorEnable();
   print("Enabling J3 (10010L)...\r\n");
-  j3->MotorEnable();
+  arm_j3->MotorEnable();
   print("Enabling J4 (DM4310)...\r\n");
-  j4->MotorEnable();
+  arm_j4->MotorEnable();
   print("Enabling J5 (DM4310)...\r\n");
-  j5->MotorEnable();
+  arm_j5->MotorEnable();
   print("Enabling J6 (DM3507)...\r\n");
-  j6->MotorEnable();
+  arm_j6->MotorEnable();
   // Motor2006 does not need an explicit enable — it responds as soon as
   // CAN output commands are transmitted.
   print("Arm enabled.\r\n");
@@ -199,43 +215,73 @@ void ArmEnable() {
 
 // ── ArmUpdate ─────────────────────────────────────────────────────────────────
 
-void ArmUpdate() {
-  // ── 1. UART RX: accumulate bytes into a line buffer, parse on '\n' ────────
-  uint8_t* rx_buf = nullptr;
-  int32_t  rx_len = arm_uart->Read(&rx_buf);
-  for (int32_t i = 0; i < rx_len; ++i) {
-    char c = (char)rx_buf[i];
-    if (c == '\n') {
-      rx_line_buf[rx_line_len] = '\0';
-      float t[6];
-      int n = sscanf(rx_line_buf, "%f,%f,%f,%f,%f,%f",
-                     &t[0], &t[1], &t[2], &t[3], &t[4], &t[5]);
-      if (n == 6) {
-        for (int j = 0; j < 6; ++j) cmd_target_deg[j] = t[j];
-        last_valid_rx_tick = HAL_GetTick();
-        if (!arm_enabled) {
-          // First valid frame after power-up: enable motors now.
-          ArmEnable();
-        }
-      }
-      rx_line_len = 0;
-    } else if (rx_line_len < (int)sizeof(rx_line_buf) - 1) {
-      rx_line_buf[rx_line_len++] = c;
-    } else {
-      // Overlong line — discard and restart.
-      rx_line_len = 0;
+void ArmUpdate(bool only_angle_read) {
+  // ── 0. Test mode: poll joint positions without driving any motor ──────────
+  // Sends the DM enable frame (0xFC) non-blocking on each tick to solicit a
+  // CAN feedback packet from every joint — no position setpoint is issued.
+  if (only_angle_read) {
+    if (!test_mode_printed) {
+      // print("ARM TEST MODE: polling joint positions (swl UP)\r\n");
+      test_mode_printed = true;
+    }
+    if (!arm_enabled) ArmEnable();
+
+    // The enable frame is the same for Motor4310, DMJ10010, and DMJ3507.
+    // tx_id_actual_ = can_id + mode_offset:
+    //   Motor4310  POS_VEL  → can_id + 0x100
+    //   DMJ10010   FORCE_POS → can_id + 0x300
+    //   DMJ3507    POS_VEL  → can_id + 0x100
+    // constantly sending the disable frame can obtain the position feedback without enabling the motor, which is useful for testing and debugging without moving the arm. The feedback frame is sent at a low rate (~10 Hz) to avoid flooding the CAN bus.
+
+    arm_j1->MotorDisable();
+    arm_j2->MotorDisable();
+    arm_j3->MotorDisable();
+    arm_j4->MotorDisable();
+    arm_j5->MotorDisable();
+    arm_j6->MotorDisable();
+
+    // Print all joint angles at ~1 Hz.
+    if (HAL_GetTick() % 1000 < 5) {
+      print("ARM TEST | J1=%6.2f J2=%6.2f J3=%6.2f J4=%6.2f J5=%6.2f J6=%6.2f [rad]\r\n",
+            arm_j1->GetTheta(), arm_j2->GetTheta(),
+            arm_j3->GetTheta(), arm_j4->GetTheta(),
+            arm_j5->GetTheta(), arm_j6->GetTheta());
     }
   }
+  // ── 1. UART RX: accumulate bytes into a line buffer, parse on '\n' ────────
+  // Skipped in test mode — targets are already set above.
+  if (!only_angle_read) {
+    uint8_t* rx_buf = nullptr;
+    int32_t rx_len = arm_uart->Read(&rx_buf);
+    for (int32_t i = 0; i < rx_len; ++i) {
+      char c = (char)rx_buf[i];
+      if (c == '\r') continue;  // strip CR in case of CRLF line endings
+      if (c == '\n') {
+        rx_line_buf[rx_line_len] = '\0';
+        if (UartRxParseLine(rx_line_buf, cmd_target_deg)) {
+          last_valid_rx_tick = HAL_GetTick();
+          if (!arm_enabled) ArmEnable();  // first valid frame after power-up
+        }
+        rx_line_len = 0;
+      } else if (rx_line_len < (int)sizeof(rx_line_buf) - 1) {
+        rx_line_buf[rx_line_len++] = c;
+      } else {
+        // Overlong line — discard and restart.
+        rx_line_len = 0;
+      }
+    }
+  }  // end if (!only_angle_read)
 
   // ── 2. Watchdog check ─────────────────────────────────────────────────────
-  if (arm_enabled && (HAL_GetTick() - last_valid_rx_tick > WATCHDOG_MS)) {
+  // Suppressed in test mode — OrangePi is intentionally absent.
+  if (!only_angle_read && arm_enabled && (HAL_GetTick() - last_valid_rx_tick > WATCHDOG_MS)) {
     print("ARM WATCHDOG: no UART for >1 s — disabling arm motors\r\n");
-    j1->MotorDisable();
-    j2->MotorDisable();
-    j3->MotorDisable();
-    j4->MotorDisable();
-    j5->MotorDisable();
-    j6->MotorDisable();
+    arm_j1->MotorDisable();
+    arm_j2->MotorDisable();
+    arm_j3->MotorDisable();
+    arm_j4->MotorDisable();
+    arm_j5->MotorDisable();
+    arm_j6->MotorDisable();
     // Motor2006: send zero current.
     gripper->SetOutput(0);
     control::MotorCANBase* grip_arr[] = {gripper};
@@ -249,22 +295,22 @@ void ArmUpdate() {
   // ── 3. Setpoint ramp (per joint, 200 Hz → dt = 0.005 s) ─────────────────
   for (int i = 0; i < 6; ++i) {
     float max_step = MAX_VEL_DEG[i] * 0.005f;
-    float delta    = cmd_target_deg[i] - ramp_target_deg[i];
+    float delta = cmd_target_deg[i] - ramp_target_deg[i];
     ramp_target_deg[i] += clamp(delta, -max_step, max_step);
   }
 
   // ── 4. Motor commands ────────────────────────────────────────────────────
   // J1, J4, J5 — Motor4310, POS_VEL mode: SetOutput(position_rad, vel_limit_rad_s)
-  j1->SetOutput(ramp_target_deg[0] * DEG2RAD, ARM_VEL_LIM[0]);
-  j4->SetOutput(ramp_target_deg[3] * DEG2RAD, ARM_VEL_LIM[3]);
-  j5->SetOutput(ramp_target_deg[4] * DEG2RAD, ARM_VEL_LIM[4]);
+  arm_j1->SetOutput(ramp_target_deg[0] * DEG2RAD, ARM_VEL_LIM[0]);
+  arm_j4->SetOutput(ramp_target_deg[3] * DEG2RAD, ARM_VEL_LIM[3]);
+  arm_j5->SetOutput(ramp_target_deg[4] * DEG2RAD, ARM_VEL_LIM[4]);
 
   // J2, J3 — MotorDMJ10010, FORCE_POS mode: SetOutput(pos_rad, vel_limit_rad_s, current_frac)
-  j2->SetOutput(ramp_target_deg[1] * DEG2RAD, ARM_VEL_LIM[1], J23_CURRENT_LIM);
-  j3->SetOutput(ramp_target_deg[2] * DEG2RAD, ARM_VEL_LIM[2], J23_CURRENT_LIM);
+  arm_j2->SetOutput(ramp_target_deg[1] * DEG2RAD, ARM_VEL_LIM[1], J23_CURRENT_LIM);
+  arm_j3->SetOutput(ramp_target_deg[2] * DEG2RAD, ARM_VEL_LIM[2], J23_CURRENT_LIM);
 
   // J6 — MotorDMJ3507, POS_VEL mode: SetOutput(position_rad, vel_limit_rad_s)
-  j6->SetOutput(ramp_target_deg[5] * DEG2RAD, ARM_VEL_LIM[5]);
+  arm_j6->SetOutput(ramp_target_deg[5] * DEG2RAD, ARM_VEL_LIM[5]);
 
   // ── 5. Gripper state machine ─────────────────────────────────────────────
   switch (grip_state) {
@@ -272,7 +318,7 @@ void ArmUpdate() {
       gripper->SetOutput(GRIP_CLOSE_CURRENT);
       if (gripper->GetCurr() > GRIP_STALL_THRESH) {
         grip_hold_pos = gripper->GetTheta();
-        grip_state    = GripState::HOLDING;
+        grip_state = GripState::HOLDING;
       }
       break;
     case GripState::HOLDING: {
@@ -284,30 +330,34 @@ void ArmUpdate() {
   }
 
   // ── 6. CAN transmit ──────────────────────────────────────────────────────
-  control::Motor4310*     j145[]   = {j1, j4, j5};
-  control::MotorDMJ10010* j23[]    = {j2, j3};
-  control::MotorDMJ3507*  j6arr[]  = {j6};
-  control::MotorCANBase*  grip[]   = {gripper};
-
-  control::Motor4310::TransmitOutput(j145, 3);
-  control::MotorDMJ10010::TransmitOutput(j23, 2);
-  control::MotorDMJ3507::TransmitOutput(j6arr, 1);
-  control::MotorCANBase::TransmitOutput(grip, 1);
+  control::Motor4310* j145[] = {arm_j1, arm_j4, arm_j5};
+  control::MotorDMJ10010* j23[] = {arm_j2, arm_j3};
+  control::MotorDMJ3507* j6arr[] = {arm_j6};
+  control::MotorCANBase* grip[] = {gripper};
+  if (test_ros_rx) {
+    print("ARM UART RX | J1=%6.2f J2=%6.2f J3=%6.2f J4=%6.2f J5=%6.2f J6=%6.2f [deg]\r\n",
+          cmd_target_deg[0], cmd_target_deg[1], cmd_target_deg[2],
+          cmd_target_deg[3], cmd_target_deg[4], cmd_target_deg[5]);
+  }
+  if (!only_angle_read) {
+    control::Motor4310::TransmitOutput(j145, 3);
+    control::MotorDMJ10010::TransmitOutput(j23, 2);
+    control::MotorDMJ3507::TransmitOutput(j6arr, 1);
+    control::MotorCANBase::TransmitOutput(grip, 1);
+  }
 
   // ── 7. UART TX: send encoder feedback to OrangePi ───────────────────────
   // Convert motor angles from rad → deg.  GetTheta() returns radians.
-  float enc[6] = {
-    j1->GetTheta() * RAD2DEG,
-    j2->GetTheta() * RAD2DEG,
-    j3->GetTheta() * RAD2DEG,
-    j4->GetTheta() * RAD2DEG,
-    j5->GetTheta() * RAD2DEG,
-    j6->GetTheta() * RAD2DEG,
+  const float enc[6] = {
+      arm_j1->GetTheta() * RAD2DEG,
+      arm_j2->GetTheta() * RAD2DEG,
+      arm_j3->GetTheta() * RAD2DEG,
+      arm_j4->GetTheta() * RAD2DEG,
+      arm_j5->GetTheta() * RAD2DEG,
+      arm_j6->GetTheta() * RAD2DEG,
   };
-  char tx_buf[64];
-  int  tx_len = snprintf(tx_buf, sizeof(tx_buf),
-                         "%.3f,%.3f,%.3f,%.3f,%.3f,%.3f\n",
-                         enc[0], enc[1], enc[2], enc[3], enc[4], enc[5]);
-  if (tx_len > 0)
-    arm_uart->Write(reinterpret_cast<const uint8_t*>(tx_buf), (uint32_t)tx_len);
+  if (HAL_GetTick() % 1000 < 5)
+    print("ARM UART TX | J1=%6.2f J2=%6.2f J3=%6.2f J4=%6.2f J5=%6.2f J6=%6.2f [deg]\r\n",
+          enc[0], enc[1], enc[2], enc[3], enc[4], enc[5]);
+  UartTxSendFeedback(arm_uart, enc);
 }

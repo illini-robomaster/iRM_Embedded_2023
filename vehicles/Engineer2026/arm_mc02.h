@@ -73,5 +73,12 @@ void ArmEnable();
  * @brief Run one arm control tick.  Call every 5 ms from RM_RTOS_Default_Task().
  *        Handles UART RX parsing, watchdog, setpoint ramping, motor commands,
  *        gripper state machine, CAN TX, and UART TX feedback.
+ *
+ * @param test_mode  When true, OrangePi UART is ignored.  All six joint
+ *                   targets are forced to 0 °  (home / zero position), the
+ *                   watchdog is suppressed, and the arm is auto-enabled if it
+ *                   was not already.  Useful for bench-testing arm motors
+ *                   without an OrangePi present.  Activate by holding the
+ *                   remote-controller left switch (swl) in the UP position.
  */
-void ArmUpdate();
+void ArmUpdate(bool test_mode = false);

@@ -27,6 +27,7 @@ irm_add_arm_executable(${PROJECT_NAME}_mc02
     SOURCES
         main_mc02.cc
         arm_mc02.cc
+        uart_framing.cc
         ${CMAKE_SOURCE_DIR}/vehicles/Engineer/chassis/src/steering_6020.cc
     INCLUDES
         ${CMAKE_SOURCE_DIR}/vehicles/Engineer/chassis/include)

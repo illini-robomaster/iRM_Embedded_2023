@@ -973,6 +973,13 @@ class Motor4310 {
    */
   void SetRelativeTarget(float target);
 
+  /** @brief Motor CAN ID reported in feedback frame (data[0] bits [3:0]). */
+  uint8_t GetMotorID() const { return motor_id_; }
+  /** @brief ERR status code from feedback frame (data[0] bits [7:4]).
+   *  0=disabled 1=enabled 8=overvoltage 9=undervoltage A=overcurrent
+   *  B=MOS overtemp C=coil overtemp D=comm lost E=overload */
+  uint8_t GetErr() const { return err_; }
+
   volatile bool connection_flag_ = false;
 
  private:
@@ -988,6 +995,8 @@ class Motor4310 {
   volatile float pos_set_ = 0;     // defined position
   volatile float torque_set_ = 0;  // defined torque
 
+  volatile uint8_t motor_id_ = 0;       // CAN ID from data[0] bits [3:0]
+  volatile uint8_t err_ = 0;            // ERR code from data[0] bits [7:4]
   volatile int16_t raw_pos_ = 0;        // actual position
   volatile int16_t raw_vel_ = 0;        // actual velocity
   volatile int16_t raw_torque_ = 0;     // actual torque
@@ -1004,9 +1013,9 @@ class Motor4310 {
   // D control
   constexpr static float KD_MIN = 0;
   constexpr static float KD_MAX = 5;
-  // position
-  constexpr static float P_MIN = -PI;
-  constexpr static float P_MAX = PI;
+  // position — must match DAMIAO tool register 21 (PMAX); firmware encodes over ±12.5 rad
+  constexpr static float P_MIN = -12.5f;
+  constexpr static float P_MAX = 12.5f;
   // velocity
   constexpr static float V_MIN = -45;
   constexpr static float V_MAX = 45;
@@ -1137,6 +1146,13 @@ class MotorDM3519 {
    */
   void SetRelativeTarget(float target);
 
+  /** @brief Motor CAN ID reported in feedback frame (data[0] bits [3:0]). */
+  uint8_t GetMotorID() const { return motor_id_; }
+  /** @brief ERR status code from feedback frame (data[0] bits [7:4]).
+   *  0=disabled 1=enabled 8=overvoltage 9=undervoltage A=overcurrent
+   *  B=MOS overtemp C=coil overtemp D=comm lost E=overload */
+  uint8_t GetErr() const { return err_; }
+
   volatile bool connection_flag_ = false;
 
  private:
@@ -1152,6 +1168,8 @@ class MotorDM3519 {
   volatile float pos_set_ = 0;     // defined position
   volatile float torque_set_ = 0;  // defined torque
 
+  volatile uint8_t motor_id_ = 0;         // CAN ID from data[0] bits [3:0]
+  volatile uint8_t err_ = 0;              // ERR code from data[0] bits [7:4]
   volatile int16_t raw_pos_ = 0;          // actual position
   volatile int16_t raw_vel_ = 0;          // actual velocity
   volatile int16_t raw_torque_ = 0;       // actual torque
@@ -1169,9 +1187,9 @@ class MotorDM3519 {
   // D control
   constexpr static float KD_MIN = 0;
   constexpr static float KD_MAX = 5;
-  // position
-  constexpr static float P_MIN = -PI;
-  constexpr static float P_MAX = PI;
+  // position — must match DAMIAO tool register 21 (PMAX); firmware encodes over ±12.5 rad
+  constexpr static float P_MIN = -12.5f;
+  constexpr static float P_MAX = 12.5f;
   // velocity - adjust these based on DM3519 specifications
   constexpr static float V_MIN = -45;
   constexpr static float V_MAX = 45;
@@ -1249,6 +1267,13 @@ class MotorDMJ10010 {
   float GetRelativeTarget() const;
   void SetRelativeTarget(float target);
 
+  /** @brief Motor CAN ID reported in feedback frame (data[0] bits [3:0]). */
+  uint8_t GetMotorID() const { return motor_id_; }
+  /** @brief ERR status code from feedback frame (data[0] bits [7:4]).
+   *  0=disabled 1=enabled 8=overvoltage 9=undervoltage A=overcurrent
+   *  B=MOS overtemp C=coil overtemp D=comm lost E=overload */
+  uint8_t GetErr() const { return err_; }
+
   volatile bool connection_flag_ = false;
 
  private:
@@ -1265,6 +1290,8 @@ class MotorDMJ10010 {
   volatile float torque_set_  = 0;
   volatile float cur_set_     = 0;  // force-position: current limit [0, 1.0]
 
+  volatile uint8_t motor_id_ = 0;  // CAN ID from data[0] bits [3:0]
+  volatile uint8_t err_ = 0;       // ERR code from data[0] bits [7:4]
   volatile int16_t raw_pos_       = 0;
   volatile int16_t raw_vel_       = 0;
   volatile int16_t raw_torque_    = 0;
@@ -1280,8 +1307,8 @@ class MotorDMJ10010 {
   constexpr static float KP_MAX = 500;
   constexpr static float KD_MIN = 0;
   constexpr static float KD_MAX = 5;
-  constexpr static float P_MIN  = -PI;
-  constexpr static float P_MAX  =  PI;
+  constexpr static float P_MIN = -12.5f;  // must match DAMIAO tool register 21 (PMAX)
+  constexpr static float P_MAX = 12.5f;
   constexpr static float V_MIN  = -21;   // VMAX = 21 rad/s (output shaft @ 48 V no-load)
   constexpr static float V_MAX  =  21;
   constexpr static float T_MIN  = -40;   // TMAX = 40 Nm (rated continuous torque)
@@ -1358,6 +1385,13 @@ class MotorDMJ3507 {
   float GetRelativeTarget() const;
   void SetRelativeTarget(float target);
 
+  /** @brief Motor CAN ID reported in feedback frame (data[0] bits [3:0]). */
+  uint8_t GetMotorID() const { return motor_id_; }
+  /** @brief ERR status code from feedback frame (data[0] bits [7:4]).
+   *  0=disabled 1=enabled 8=overvoltage 9=undervoltage A=overcurrent
+   *  B=MOS overtemp C=coil overtemp D=comm lost E=overload */
+  uint8_t GetErr() const { return err_; }
+
   volatile bool connection_flag_ = false;
 
  private:
@@ -1374,6 +1408,8 @@ class MotorDMJ3507 {
   volatile float torque_set_ = 0;
   volatile float cur_set_    = 0;  // force-position: current limit [0, 1.0]
 
+  volatile uint8_t motor_id_ = 0;  // CAN ID from data[0] bits [3:0]
+  volatile uint8_t err_ = 0;       // ERR code from data[0] bits [7:4]
   volatile int16_t raw_pos_       = 0;
   volatile int16_t raw_vel_       = 0;
   volatile int16_t raw_torque_    = 0;
@@ -1389,8 +1425,8 @@ class MotorDMJ3507 {
   constexpr static float KP_MAX = 500;
   constexpr static float KD_MIN = 0;
   constexpr static float KD_MAX = 5;
-  constexpr static float P_MIN  = -PI;
-  constexpr static float P_MAX  =  PI;
+  constexpr static float P_MIN = -12.5f;  // must match DAMIAO tool register 21 (PMAX)
+  constexpr static float P_MAX = 12.5f;
   constexpr static float V_MIN  = -45;  // VMAX ≈ 45 rad/s (output shaft @ 24 V no-load, ~460 rpm)
   constexpr static float V_MAX  =  45;
   constexpr static float T_MIN  = -3;   // TMAX = 3 Nm (peak output torque)

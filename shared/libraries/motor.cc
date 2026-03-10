@@ -928,6 +928,8 @@ void Motor4310::TransmitOutput(Motor4310* motors[], uint8_t num_motors) {
 }
 
 void Motor4310::UpdateData(const uint8_t data[]) {
+  motor_id_ = data[0] & 0x0fu;
+  err_ = data[0] >> 4;
   raw_pos_ = data[1] << 8 | data[2];
   raw_vel_ = data[3] << 4 | (data[4] & 0xf0) >> 4;
   raw_torque_ = data[5] | (data[4] & 0x0f) << 8;
@@ -1140,6 +1142,8 @@ void MotorDM3519::UpdateData(const uint8_t data[]) {
   // TODO: Implement data parsing for DM3519
   // Parse the incoming CAN data and update motor state
   // This format may differ from Motor4310, verify with DM3519 datasheet
+  motor_id_ = data[0] & 0x0fu;
+  err_ = data[0] >> 4;
   raw_pos_ = data[1] << 8 | data[2];
   raw_vel_ = data[3] << 4 | (data[4] & 0xf0) >> 4;
   raw_torque_ = data[5] | (data[4] & 0x0f) << 8;
@@ -1311,9 +1315,11 @@ void MotorDMJ10010::UpdateData(const uint8_t data[]) {
   //   D[1]: POS[15:8]   D[2]: POS[7:0]
   //   D[3]: VEL[11:4]   D[4]: VEL[3:0] | T[11:8]   D[5]: T[7:0]
   //   D[6]: T_MOS (°C)  D[7]: T_Rotor (°C)
-  raw_pos_       = (int16_t)(data[1] << 8 | data[2]);
-  raw_vel_       = (int16_t)(data[3] << 4 | (data[4] & 0xf0) >> 4);
-  raw_torque_    = (int16_t)(data[5] | (data[4] & 0x0f) << 8);
+  motor_id_ = data[0] & 0x0fu;
+  err_ = data[0] >> 4;
+  raw_pos_ = (data[1] << 8 | data[2]);
+  raw_vel_ = (data[3] << 4 | (data[4] & 0xf0) >> 4);
+  raw_torque_ = (data[5] | (data[4] & 0x0f) << 8);
   raw_mosTemp_   = data[6];
   raw_motorTemp_ = data[7];
 
@@ -1463,6 +1469,8 @@ void MotorDMJ3507::UpdateData(const uint8_t data[]) {
   //   D[1]: POS[15:8]   D[2]: POS[7:0]
   //   D[3]: VEL[11:4]   D[4]: VEL[3:0] | T[11:8]   D[5]: T[7:0]
   //   D[6]: T_MOS (°C)  D[7]: T_Rotor (°C)
+  motor_id_ = data[0] & 0x0fu;
+  err_ = data[0] >> 4;
   raw_pos_       = (int16_t)(data[1] << 8 | data[2]);
   raw_vel_       = (int16_t)(data[3] << 4 | (data[4] & 0xf0) >> 4);
   raw_torque_    = (int16_t)(data[5] | (data[4] & 0x0f) << 8);

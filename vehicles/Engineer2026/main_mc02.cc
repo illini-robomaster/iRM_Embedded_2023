@@ -42,6 +42,8 @@
  *   ch1 → forward   (vx): right stick vertical,   push forward = positive
  *   ch2 → rotation  (vw): left  stick horizontal,  push left   = positive (CCW)
  *   swr → DOWN = disabled, MID = enabled + lift down, UP = enabled + lift up
+ *   swl → UP   = arm test mode (home all joints to 0°, no OrangePi needed)
+ *          MID/DOWN = normal operation (arm commanded by OrangePi UART)
  */
 
 #include <cmath>
@@ -53,6 +55,14 @@
 #include "main.h"
 #include "motor.h"
 #include "steering_6020.h"
+
+#define ANGLE_READ
+
+#ifdef ANGLE_READ
+bool test_mode_printed = true;
+#else
+bool test_mode_printed = false;
+#endif
 
 // ── Chassis geometry ────────────────────────────────────────────────────────
 // Front swerve modules are 40 cm apart → HALF_TRACK_FRONT = 0.20 m
@@ -155,8 +165,8 @@ static control::Steering6020* front_right_steer = nullptr;
 // ── RTOS Init ───────────────────────────────────────────────────────────────
 
 void RM_RTOS_Init() {
-  print_use_uart(&huart7);   // ST-Link VCP → /dev/ttyACM0 @ 921600 baud
-
+  // print_use_uart(&huart7);   // ST-Link VCP → /dev/ttyACM0 @ 921600 baud
+  print_use_usb();  // USB CDC ACM → /dev/ttyUSB0 @ 115200 baud
   // MC02 uses FDCAN instead of classic CAN.
   can  = new bsp::CAN(&hfdcan1, 0);
   dbus = new remote::DBUS(&huart5);
@@ -240,7 +250,7 @@ void RM_RTOS_Default_Task(const void* args) {
   // ── Connection check: block until every motor has sent ≥1 CAN frame ──
   // Keep swr DOWN while powering motors — robot is safe to handle.
   // Once all connection_flag_ are set, proceed to the enable sequence.
-  checkAllMotorsConnected(rear_left_motor, rear_right_motor, lift_motor);
+  // checkAllMotorsConnected(rear_left_motor, rear_right_motor, lift_motor);
 
   bool enabled = false;
 
@@ -409,7 +419,8 @@ void RM_RTOS_Default_Task(const void* args) {
     control::MotorDMJ10010::TransmitOutput(lift_motors, 1);
 
     // ── Arm controller tick ───────────────────────────────────────────
-    ArmUpdate();
+    // if in test mode the ArmUpdate() function will print the current joint angles without sending any commands, which is useful for verifying the arm's physical response and tuning the steering PID without needing the OrangePi or UART communication. In normal mode the ArmUpdate() function will read commands from the OrangePi and control the arm accordingly.
+    ArmUpdate(test_mode_printed);
 
     // ── Debug print (~1 Hz) ──────────────────────────────────────────
     if (HAL_GetTick() % 1000 < 5) {
