@@ -39,8 +39,8 @@
 #include "uart_framing.h"
 #include "usart.h"
 
-#define TEST_UART_TRANSMISSION  // uncomment this line to test the transmission from mcu to ros2
-// #define TEST_UART_RECEIVE       // uncomment this line to test the reception of UART Joint Variables from ros2 to mcu
+// #define TEST_UART_TRANSMISSION  // uncomment this line to test the transmission from mcu to ros2
+#define TEST_UART_RECEIVE  // uncomment this line to test the reception of UART Joint Variables from ros2 to mcu
 
 #ifdef TEST_UART_TRANSMISSION
 bool test_ros_tx = true;
@@ -77,6 +77,15 @@ static constexpr float ARM_VEL_LIM[6] = {1.2f, 1.2f, 1.2f, 1.5f, 1.5f, 1.8f};
 // J2/J3 FORCE_POS: peak current as a fraction of 99.74 A motor max [0, 1.0].
 // Start at 50 % and reduce if motors run warm.
 static constexpr float J23_CURRENT_LIM = 0.5f;
+
+// ── Command sanity limits ────────────────────────────────────────────────────
+// Hard range: ±12.5 rad = ±716°; add a small margin → ±720°.
+// Any parsed value outside this is obviously garbage regardless of CRC.
+static constexpr float CMD_MAX_ABS_DEG = 720.0f;
+// Max allowable change in a single RX frame [deg/frame @ 200 Hz].
+// Fastest joint is J6 @ 103°/s → 0.52°/frame.  30° leaves ample room for
+// MoveIt goal changes while blocking any physically impossible jump.
+static constexpr float CMD_MAX_DELTA_DEG = 30.0f;
 
 // ── UART watchdog ────────────────────────────────────────────────────────────
 // If no valid RX frame arrives within this window, arm motors are disabled.
@@ -119,7 +128,7 @@ static control::Motor2006*     gripper = nullptr;
 // OrangePi-commanded targets [degrees], updated on valid UART RX.
 static float cmd_target_deg[6] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
 // Ramped setpoints sent to motors [degrees].
-static float ramp_target_deg[6] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
+// static float ramp_target_deg[6] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
 
 // Watchdog
 static uint32_t last_valid_rx_tick = 0;
@@ -215,6 +224,43 @@ void ArmEnable() {
 
 // ── ArmUpdate ─────────────────────────────────────────────────────────────────
 
+/**
+ * @brief Updates the arm control system state and sends/receives motor commands.
+ *
+ * This function implements a 7-stage control loop running at ~200 Hz:
+ *
+ * **Stage 0 (Test Mode):** When only_angle_read is true, disables all motors and
+ * polls joint encoder positions via CAN without issuing setpoints. Useful for
+ * diagnostics without moving the arm. Prints joint angles at ~1 Hz.
+ *
+ * **Stage 1 (UART RX):** Accumulates incoming bytes from OrangePi into a line buffer,
+ * parses complete lines (delimited by '\n'), and extracts target joint angles in degrees.
+ * Strips CR characters for CRLF compatibility. Enables the arm on first valid command.
+ *
+ * **Stage 2 (Watchdog):** Monitors for UART communication timeout (>1 second).
+ * If no valid command is received, disables all motors and the gripper to prevent
+ * unsafe sustained motion.
+ *
+ * **Stage 3 (Setpoint Ramping):** Smoothly interpolates target angles toward commanded
+ * values at joint-specific max velocities (0.005 s timestep) to avoid jerky motion.
+ *
+ * **Stage 4 (Motor Command Setup):** Configures output for each joint type:
+ * - J1, J4, J5 (Motor4310): position + velocity limit (POS_VEL mode)
+ * - J2, J3 (MotorDMJ10010): position + velocity + current limit (FORCE_POS mode)
+ * - J6 (MotorDMJ3507): position + velocity limit (POS_VEL mode)
+ *
+ * **Stage 5 (Gripper FSM):** Runs a state machine for gripper control:
+ * - CLOSING: applies constant current until stall threshold; records hold position
+ * - HOLDING: maintains position with PID feedback
+ *
+ * **Stage 6 (CAN Transmit):** Broadcasts motor commands to all joint CAN nodes and gripper.
+ * Skipped if only_angle_read is true.
+ *
+ * **Stage 7 (UART TX Feedback):** Converts encoder readings from radians to degrees
+ * and sends joint angles back to OrangePi at ~1 Hz.
+ *
+ * @param only_angle_read If true, enters test mode: read encoders only, no motor commands.
+ */
 void ArmUpdate(bool only_angle_read) {
   // ── 0. Test mode: poll joint positions without driving any motor ──────────
   // Sends the DM enable frame (0xFC) non-blocking on each tick to solicit a
@@ -248,21 +294,82 @@ void ArmUpdate(bool only_angle_read) {
             arm_j5->GetTheta(), arm_j6->GetTheta());
     }
   }
+
+  // ── 0.5. Pre-enable position polling ─────────────────────────────────────
+  // Before ArmEnable() is called, actively solicit CAN feedback from every
+  // joint by sending MotorDisable frames at ~10 Hz.  The disable command does
+  // not move the motor but does cause each driver to reply with its current
+  // state, so GetTheta() returns real encoder data.  Combined with Stage 7
+  // running unconditionally below, the OrangePi therefore sees the actual
+  // resting position before its first RX command packet arrives.
+  if (!arm_enabled && !only_angle_read) {
+    if (HAL_GetTick() % 100 < 5) {
+      arm_j1->MotorDisable();
+      arm_j2->MotorDisable();
+      arm_j3->MotorDisable();
+      arm_j4->MotorDisable();
+      arm_j5->MotorDisable();
+      arm_j6->MotorDisable();
+    }
+  }
+
   // ── 1. UART RX: accumulate bytes into a line buffer, parse on '\n' ────────
   // Skipped in test mode — targets are already set above.
   if (!only_angle_read) {
     uint8_t* rx_buf = nullptr;
     int32_t rx_len = arm_uart->Read(&rx_buf);
+    print("ARM UART RX | got %d bytes\r\n", rx_len);
     for (int32_t i = 0; i < rx_len; ++i) {
       char c = (char)rx_buf[i];
       if (c == '\r') continue;  // strip CR in case of CRLF line endings
       if (c == '\n') {
         rx_line_buf[rx_line_len] = '\0';
-        if (UartRxParseLine(rx_line_buf, cmd_target_deg)) {
-          last_valid_rx_tick = HAL_GetTick();
-          if (!arm_enabled) ArmEnable();  // first valid frame after power-up
+        float new_targets[6];
+        if (UartRxParseLine(rx_line_buf, new_targets)) {
+          // ── Sanity filter ─────────────────────────────────────────────
+          bool ok = true;
+          for (int j = 0; j < 6 && ok; ++j) {
+            if (!isfinite(new_targets[j])) {
+              print("ARM CMD REJECT: J%d non-finite\r\n", j + 1);
+              ok = false;
+            } else if (fabsf(new_targets[j]) > CMD_MAX_ABS_DEG) {
+              print("ARM CMD REJECT: J%d out of range %.2f deg\r\n", j + 1, new_targets[j]);
+              ok = false;
+            } else if (arm_enabled &&
+                       fabsf(new_targets[j] - cmd_target_deg[j]) > CMD_MAX_DELTA_DEG) {
+              print("ARM CMD REJECT: J%d delta %.2f deg exceeds limit\r\n",
+                    j + 1, new_targets[j] - cmd_target_deg[j]);
+              ok = false;
+            }
+          }
+          if (ok) {
+            for (int j = 0; j < 6; ++j) cmd_target_deg[j] = new_targets[j];
+            last_valid_rx_tick = HAL_GetTick();
+            print("ARM UART RX | J1=%6.2f J2=%6.2f J3=%6.2f J4=%6.2f J5=%6.2f J6=%6.2f [deg]\r\n",
+                  cmd_target_deg[0], cmd_target_deg[1], cmd_target_deg[2],
+                  cmd_target_deg[3], cmd_target_deg[4], cmd_target_deg[5]);
+            if (!arm_enabled) {
+              // Bumpless enable: seed cmd_target_deg from actual encoder
+              // positions before enabling the motors.  This guarantees the
+              // arm holds its current pose on enable even if the first ROS
+              // command arrived slightly before sufficient TX feedback had
+              // been processed on the ROS side.
+              cmd_target_deg[0] = arm_j1->GetTheta() * RAD2DEG;
+              cmd_target_deg[1] = arm_j2->GetTheta() * RAD2DEG;
+              cmd_target_deg[2] = arm_j3->GetTheta() * RAD2DEG;
+              cmd_target_deg[3] = arm_j4->GetTheta() * RAD2DEG;
+              cmd_target_deg[4] = arm_j5->GetTheta() * RAD2DEG;
+              cmd_target_deg[5] = arm_j6->GetTheta() * RAD2DEG;
+              ArmEnable();
+            }
+          }
         }
         rx_line_len = 0;
+      } else if (rx_line_len == 0 && c != '$') {
+        // Re-sync: buffer is empty and this byte is not a frame-start '$'.
+        // Silently skip — we may have caught the tail of a frame that was
+        // already in-flight when the MCU started reading (startup race).
+        print("ARM UART RESYNC: skipped 0x%02X ('%c')\r\n", (unsigned char)c, (c >= 0x20 && c < 0x7F) ? c : '.');
       } else if (rx_line_len < (int)sizeof(rx_line_buf) - 1) {
         rx_line_buf[rx_line_len++] = c;
       } else {
@@ -290,27 +397,52 @@ void ArmUpdate(bool only_angle_read) {
     return;
   }
 
+  // ── 7. UART TX: send encoder feedback to OrangePi ───────────────────────
+  // Runs unconditionally (before the arm_enabled guard) so that the OrangePi
+  // receives the actual arm position from the moment the MCU boots, well
+  // before the first RX command packet triggers ArmEnable().
+  {
+    const float enc[6] = {
+        arm_j1->GetTheta() * RAD2DEG,
+        arm_j2->GetTheta() * RAD2DEG,
+        arm_j3->GetTheta() * RAD2DEG,
+        arm_j4->GetTheta() * RAD2DEG,
+        arm_j5->GetTheta() * RAD2DEG,
+        arm_j6->GetTheta() * RAD2DEG,
+    };
+    if (HAL_GetTick() % 1000 < 5)
+      // print("ARM UART TX | J1=%6.2f J2=%6.2f J3=%6.2f J4=%6.2f J5=%6.2f J6=%6.2f [deg]\r\n",
+      // enc[0], enc[1], enc[2], enc[3], enc[4], enc[5]);
+      UartTxSendFeedback(arm_uart, enc);
+  }
+
   if (!arm_enabled) return;
 
-  // ── 3. Setpoint ramp (per joint, 200 Hz → dt = 0.005 s) ─────────────────
-  for (int i = 0; i < 6; ++i) {
-    float max_step = MAX_VEL_DEG[i] * 0.005f;
-    float delta = cmd_target_deg[i] - ramp_target_deg[i];
-    ramp_target_deg[i] += clamp(delta, -max_step, max_step);
-  }
+  // ── 3. Setpoint ramp DISABLED — using cmd_target_deg directly (MoveIt plans motion) ──
+  // for (int i = 0; i < 6; ++i) {
+  //   float max_step = MAX_VEL_DEG[i] * 0.005f;
+  //   float delta = cmd_target_deg[i] - ramp_target_deg[i];
+  //   ramp_target_deg[i] += clamp(delta, -max_step, max_step);
+  // }
 
   // ── 4. Motor commands ────────────────────────────────────────────────────
   // J1, J4, J5 — Motor4310, POS_VEL mode: SetOutput(position_rad, vel_limit_rad_s)
-  arm_j1->SetOutput(ramp_target_deg[0] * DEG2RAD, ARM_VEL_LIM[0]);
-  arm_j4->SetOutput(ramp_target_deg[3] * DEG2RAD, ARM_VEL_LIM[3]);
-  arm_j5->SetOutput(ramp_target_deg[4] * DEG2RAD, ARM_VEL_LIM[4]);
+  // arm_j1->SetOutput(ramp_target_deg[0] * DEG2RAD, ARM_VEL_LIM[0]);
+  // arm_j4->SetOutput(ramp_target_deg[3] * DEG2RAD, ARM_VEL_LIM[3]);
+  // arm_j5->SetOutput(ramp_target_deg[4] * DEG2RAD, ARM_VEL_LIM[4]);
+  arm_j1->SetOutput(cmd_target_deg[0] * DEG2RAD, ARM_VEL_LIM[0]);
+  arm_j4->SetOutput(cmd_target_deg[3] * DEG2RAD, ARM_VEL_LIM[3]);
+  arm_j5->SetOutput(cmd_target_deg[4] * DEG2RAD, ARM_VEL_LIM[4]);
 
   // J2, J3 — MotorDMJ10010, FORCE_POS mode: SetOutput(pos_rad, vel_limit_rad_s, current_frac)
-  arm_j2->SetOutput(ramp_target_deg[1] * DEG2RAD, ARM_VEL_LIM[1], J23_CURRENT_LIM);
-  arm_j3->SetOutput(ramp_target_deg[2] * DEG2RAD, ARM_VEL_LIM[2], J23_CURRENT_LIM);
+  // arm_j2->SetOutput(ramp_target_deg[1] * DEG2RAD, ARM_VEL_LIM[1], J23_CURRENT_LIM);
+  // arm_j3->SetOutput(ramp_target_deg[2] * DEG2RAD, ARM_VEL_LIM[2], J23_CURRENT_LIM);
+  arm_j2->SetOutput(cmd_target_deg[1] * DEG2RAD, ARM_VEL_LIM[1], J23_CURRENT_LIM);
+  arm_j3->SetOutput(cmd_target_deg[2] * DEG2RAD, ARM_VEL_LIM[2], J23_CURRENT_LIM);
 
   // J6 — MotorDMJ3507, POS_VEL mode: SetOutput(position_rad, vel_limit_rad_s)
-  arm_j6->SetOutput(ramp_target_deg[5] * DEG2RAD, ARM_VEL_LIM[5]);
+  // arm_j6->SetOutput(ramp_target_deg[5] * DEG2RAD, ARM_VEL_LIM[5]);
+  arm_j6->SetOutput(cmd_target_deg[5] * DEG2RAD, ARM_VEL_LIM[5]);
 
   // ── 5. Gripper state machine ─────────────────────────────────────────────
   switch (grip_state) {
@@ -345,19 +477,4 @@ void ArmUpdate(bool only_angle_read) {
     control::MotorDMJ3507::TransmitOutput(j6arr, 1);
     control::MotorCANBase::TransmitOutput(grip, 1);
   }
-
-  // ── 7. UART TX: send encoder feedback to OrangePi ───────────────────────
-  // Convert motor angles from rad → deg.  GetTheta() returns radians.
-  const float enc[6] = {
-      arm_j1->GetTheta() * RAD2DEG,
-      arm_j2->GetTheta() * RAD2DEG,
-      arm_j3->GetTheta() * RAD2DEG,
-      arm_j4->GetTheta() * RAD2DEG,
-      arm_j5->GetTheta() * RAD2DEG,
-      arm_j6->GetTheta() * RAD2DEG,
-  };
-  if (HAL_GetTick() % 1000 < 5)
-    print("ARM UART TX | J1=%6.2f J2=%6.2f J3=%6.2f J4=%6.2f J5=%6.2f J6=%6.2f [deg]\r\n",
-          enc[0], enc[1], enc[2], enc[3], enc[4], enc[5]);
-  UartTxSendFeedback(arm_uart, enc);
 }

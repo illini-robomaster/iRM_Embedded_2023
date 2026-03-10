@@ -56,7 +56,7 @@
 #include "motor.h"
 #include "steering_6020.h"
 
-#define ANGLE_READ
+// #define ANGLE_READ
 
 #ifdef ANGLE_READ
 bool test_mode_printed = true;
@@ -424,15 +424,15 @@ void RM_RTOS_Default_Task(const void* args) {
 
     // ── Debug print (~1 Hz) ──────────────────────────────────────────
     if (HAL_GetTick() % 1000 < 5) {
-      print("vx=%.2f vy=%.2f vw=%.2f | RL=%.2f RR=%.2f rad/s\r\n",
-            vx, vy, vw, rl_speed, rr_speed);
-      print("  FL: %.2fm/s tgt=%.1fdeg cur=%.1fdeg | FR: %.2fm/s tgt=%.1fdeg cur=%.1fdeg\r\n",
-            fl_speed,
-            fl_opt_angle * 180.0f / (float)M_PI,
-            front_left_steer->GetTheta()  * 180.0f / (float)M_PI,
-            fr_speed,
-            fr_opt_angle * 180.0f / (float)M_PI,
-            front_right_steer->GetTheta() * 180.0f / (float)M_PI);
+      //   print("vx=%.2f vy=%.2f vw=%.2f | RL=%.2f RR=%.2f rad/s\r\n",
+      //         vx, vy, vw, rl_speed, rr_speed);
+      //   print("  FL: %.2fm/s tgt=%.1fdeg cur=%.1fdeg | FR: %.2fm/s tgt=%.1fdeg cur=%.1fdeg\r\n",
+      //         fl_speed,
+      //         fl_opt_angle * 180.0f / (float)M_PI,
+      //         front_left_steer->GetTheta()  * 180.0f / (float)M_PI,
+      //         fr_speed,
+      //         fr_opt_angle * 180.0f / (float)M_PI,
+      //         front_right_steer->GetTheta() * 180.0f / (float)M_PI);
     }
 
     osDelay(5);  // 200 Hz control loop

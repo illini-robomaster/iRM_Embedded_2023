@@ -49,6 +49,7 @@ bool UartRxParseLine(char* line, float out_targets[6]) {
   char* star = nullptr;
   if (line[0] != '$' || (star = strchr(line + 1, '*')) == nullptr) {
     print("ARM UART FRAME ERR: missing $ or *\r\n");
+    print("  got: \"%s\"\r\n", line);
     return false;
   }
 
@@ -57,6 +58,7 @@ bool UartRxParseLine(char* line, float out_targets[6]) {
   unsigned long rx_crc = strtoul(star + 1, &end_ptr, 16);
   if (end_ptr == star + 1) {
     print("ARM UART BAD CRC FIELD\r\n");
+    print("  got: \"%s\"\r\n", star + 1);
     return false;
   }
 
@@ -67,6 +69,7 @@ bool UartRxParseLine(char* line, float out_targets[6]) {
   if (calc_crc != (uint16_t)rx_crc) {
     print("ARM UART CRC MISMATCH: got %04lX calc %04X\r\n",
           rx_crc, (unsigned)calc_crc);
+    print("  payload: \"%.*s\"\r\n", (int)payload_len, line + 1);
     return false;
   }
 
@@ -75,6 +78,7 @@ bool UartRxParseLine(char* line, float out_targets[6]) {
   int n = sscanf(line + 1, "%f,%f,%f,%f,%f,%f",
                  &out_targets[0], &out_targets[1], &out_targets[2],
                  &out_targets[3], &out_targets[4], &out_targets[5]);
+
   return n == 6;
 }
 

@@ -170,3 +170,4 @@ tags
 
 # Ignore nested git repositories
 **/.git/
+.gitnexus
