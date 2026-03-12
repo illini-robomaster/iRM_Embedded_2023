@@ -21,8 +21,6 @@
 #include "uart_framing.h"
 
 #include <cstdio>
-#include <cstdlib>
-#include <cstring>
 
 #include "bsp_print.h"
 
@@ -44,60 +42,46 @@ uint16_t crc16_modbus(const uint8_t* data, size_t len) {
 
 // ── RX parser ────────────────────────────────────────────────────────────────
 
-bool UartRxParseLine(char* line, float out_targets[6]) {
-  // Expect: $payload*CCCC
-  char* star = nullptr;
-  if (line[0] != '$' || (star = strchr(line + 1, '*')) == nullptr) {
-    print("ARM UART FRAME ERR: missing $ or *\r\n");
-    print("  got: \"%s\"\r\n", line);
+bool UartRxParseFrame(const uint8_t* buf, float out_targets[6]) {
+  if (buf[0] != 0xA5u) {
+    print("ARM UART FRAME ERR: bad SOF 0x%02X\r\n", (unsigned)buf[0]);
+    return false;
+  }
+  if (buf[1] != 0x0Cu) {
+    print("ARM UART FRAME ERR: bad LEN 0x%02X\r\n", (unsigned)buf[1]);
     return false;
   }
 
-  // CRC field must be valid hex.
-  char* end_ptr = nullptr;
-  unsigned long rx_crc = strtoul(star + 1, &end_ptr, 16);
-  if (end_ptr == star + 1) {
-    print("ARM UART BAD CRC FIELD\r\n");
-    print("  got: \"%s\"\r\n", star + 1);
+  uint16_t rx_crc   = (uint16_t)buf[14] | ((uint16_t)buf[15] << 8);
+  uint16_t calc_crc = crc16_modbus(buf, 14);
+  if (rx_crc != calc_crc) {
+    print("ARM UART CRC MISMATCH: got %04X calc %04X\r\n",
+          (unsigned)rx_crc, (unsigned)calc_crc);
     return false;
   }
 
-  // Recompute CRC over the payload bytes (between '$' and '*').
-  size_t   payload_len = (size_t)(star - line - 1);
-  uint16_t calc_crc =
-      crc16_modbus(reinterpret_cast<const uint8_t*>(line + 1), payload_len);
-  if (calc_crc != (uint16_t)rx_crc) {
-    print("ARM UART CRC MISMATCH: got %04lX calc %04X\r\n",
-          rx_crc, (unsigned)calc_crc);
-    print("  payload: \"%.*s\"\r\n", (int)payload_len, line + 1);
-    return false;
+  for (int i = 0; i < 6; ++i) {
+    int16_t raw = (int16_t)((uint16_t)buf[2 + i * 2] | ((uint16_t)buf[3 + i * 2] << 8));
+    out_targets[i] = (float)raw / 100.0f;
   }
-
-  // Null-terminate payload at '*' so sscanf sees only the CSV.
-  *star = '\0';
-  int n = sscanf(line + 1, "%f,%f,%f,%f,%f,%f",
-                 &out_targets[0], &out_targets[1], &out_targets[2],
-                 &out_targets[3], &out_targets[4], &out_targets[5]);
-
-  return n == 6;
+  return true;
 }
 
 // ── TX encoder ───────────────────────────────────────────────────────────────
 
 void UartTxSendFeedback(bsp::UART* uart, const float enc[6]) {
-  char payload_buf[56];
-  int  payload_len = snprintf(payload_buf, sizeof(payload_buf),
-                               "%.3f,%.3f,%.3f,%.3f,%.3f,%.3f",
-                               enc[0], enc[1], enc[2], enc[3], enc[4], enc[5]);
-  if (payload_len <= 0) return;
-
-  uint16_t tx_crc =
-      crc16_modbus(reinterpret_cast<const uint8_t*>(payload_buf), (size_t)payload_len);
-  char tx_buf[72];
-  int  tx_len = snprintf(tx_buf, sizeof(tx_buf), "$%s*%04X\n",
-                          payload_buf, (unsigned)tx_crc);
-  if (tx_len > 0)
-    uart->Write(reinterpret_cast<const uint8_t*>(tx_buf), (uint32_t)tx_len);
+  uint8_t frame[UART_FRAME_LEN];
+  frame[0] = 0xA5u;
+  frame[1] = 0x0Cu;
+  for (int i = 0; i < 6; ++i) {
+    int16_t val       = (int16_t)(enc[i] * 100.0f);
+    frame[2 + i * 2] = (uint8_t)(val & 0xFF);
+    frame[3 + i * 2] = (uint8_t)((val >> 8) & 0xFF);
+  }
+  uint16_t crc  = crc16_modbus(frame, 14);
+  frame[14]     = (uint8_t)(crc & 0xFF);
+  frame[15]     = (uint8_t)((crc >> 8) & 0xFF);
+  uart->Write(frame, UART_FRAME_LEN);
 }
 
 

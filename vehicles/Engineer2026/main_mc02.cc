@@ -49,6 +49,7 @@
 #include <cmath>
 
 #include "arm_mc02.h"
+#include "arm_uart_task.h"
 #include "bsp_print.h"
 #include "cmsis_os.h"
 #include "dbus.h"
@@ -57,11 +58,12 @@
 #include "steering_6020.h"
 
 // #define ANGLE_READ
+// #define TEST_ARM_HOME  // uncomment to run ArmHomeSequence() instead of normal ArmUpdate()
 
 #ifdef ANGLE_READ
-bool test_mode_printed = true;
+static const bool arm_test_mode = true;
 #else
-bool test_mode_printed = false;
+static const bool arm_test_mode = false;
 #endif
 
 // ── Chassis geometry ────────────────────────────────────────────────────────
@@ -136,11 +138,11 @@ static const float STEER_SPEED_DEADZONE = 0.05f;
 
 // Lift soft-down threshold: when the lift angle is within this value of 0,
 // the current limit is set to 0 so the motor does not fight gravity.
-static const float LIFT_SOFT_DOWN_THRESHOLD = 0.02f;  // [rad]
+static const float LIFT_SOFT_DOWN_THRESHOLD = 0.1f;  // [rad]
 
 // ── Global peripherals ──────────────────────────────────────────────────────
 static bsp::CAN*     can  = nullptr;
-static remote::DBUS* dbus = nullptr;
+remote::DBUS* dbus = nullptr;
 
 // Rear omniwheels (DM3519, velocity-controlled)
 static control::MotorDM3519* rear_left_motor  = nullptr;
@@ -212,8 +214,10 @@ void RM_RTOS_Init() {
   ArmInit();
 }
 
+static osThreadId_t armUartTaskHandle;
+
 void RM_RTOS_Threads_Init(void) {
-  // No extra threads — all control runs in the default task.
+  armUartTaskHandle = osThreadNew(ArmUartTask, nullptr, &armUartTaskAttr);
 }
 
 // ── Default Task ────────────────────────────────────────────────────────────
@@ -258,6 +262,9 @@ void RM_RTOS_Default_Task(const void* args) {
     // ── Kill switch: swr DOWN → disable all motors ─────────────────────
     if (dbus->swr == remote::DOWN) {
       if (enabled) {
+        // Safe-park arm first (blocking — moves J2/J3 to safe positions).
+        ArmSafePark();
+
         rear_left_motor->MotorDisable();
         rear_right_motor->MotorDisable();
         lift_motor->MotorDisable();
@@ -402,15 +409,19 @@ void RM_RTOS_Default_Task(const void* args) {
     // drop the current limit to 0 so the motor stops fighting gravity.
     // While still descending (|theta| >= threshold), use normal current to move.
     float lift_pos = (dbus->swr == remote::UP) ? -1.0f : 0.0f;
+    float lift_vel;
     float lift_cur;
     if (dbus->swr == remote::UP) {
+      lift_vel = 0.5f;  // allow movement while lifting or holding up
       lift_cur = 0.5f;  // lifting or holding up
     } else if (fabsf(lift_motor->GetTheta()) < LIFT_SOFT_DOWN_THRESHOLD) {
+      lift_vel = 0.0f;  // at rest in down position — stop movement
       lift_cur = 0.0f;  // at rest in down position — release force
     } else {
-      lift_cur = 0.5f;  // still descending toward 0
+      lift_vel = 0.5f;  // allow movement while still descending toward 0
+      lift_cur = 0.8f;  // still descending toward 0
     }
-    lift_motor->SetOutput(lift_pos, 0.5f, lift_cur);
+    lift_motor->SetOutput(lift_pos, lift_vel, lift_cur);
 
     // ── Transmit all CAN frames ──────────────────────────────────────
     control::MotorDM3519::TransmitOutput(rear_motors, 2);
@@ -420,7 +431,15 @@ void RM_RTOS_Default_Task(const void* args) {
 
     // ── Arm controller tick ───────────────────────────────────────────
     // if in test mode the ArmUpdate() function will print the current joint angles without sending any commands, which is useful for verifying the arm's physical response and tuning the steering PID without needing the OrangePi or UART communication. In normal mode the ArmUpdate() function will read commands from the OrangePi and control the arm accordingly.
-    ArmUpdate(test_mode_printed);
+#ifdef TEST_ARM_HOME
+    static bool home_done = false;
+    if (!home_done && dbus->swr != remote::DOWN) {
+      ArmHomeSequence();
+      home_done = true;
+    }
+#else
+    ArmUpdate(arm_test_mode);
+#endif
 
     // ── Debug print (~1 Hz) ──────────────────────────────────────────
     if (HAL_GetTick() % 1000 < 5) {

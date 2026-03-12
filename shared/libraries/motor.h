@@ -1290,6 +1290,19 @@ class MotorDMJ10010 {
   volatile float torque_set_  = 0;
   volatile float cur_set_     = 0;  // force-position: current limit [0, 1.0]
 
+ public:
+  /** @brief Raw 16-bit position word from the feedback frame. */
+  int16_t GetRawPos() const { return raw_pos_; }
+  /** @brief Raw 12-bit velocity word from the feedback frame. */
+  int16_t GetRawVel() const { return raw_vel_; }
+  /** @brief Raw 12-bit torque word from the feedback frame. */
+  int16_t GetRawTorque() const { return raw_torque_; }
+  /** @brief MOS (MOSFET) temperature reported in the feedback frame [°C]. */
+  int16_t GetMosTemp() const { return raw_mosTemp_; }
+  /** @brief Rotor/coil temperature reported in the feedback frame [°C]. */
+  int16_t GetMotorTemp() const { return raw_motorTemp_; }
+
+ private:
   volatile uint8_t motor_id_ = 0;  // CAN ID from data[0] bits [3:0]
   volatile uint8_t err_ = 0;       // ERR code from data[0] bits [7:4]
   volatile int16_t raw_pos_       = 0;
