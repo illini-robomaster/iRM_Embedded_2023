@@ -1,7 +1,5 @@
 CompileFlags:
   CompilationDatabase: build
-  QueryDriver:
-    - "**/arm-none-eabi-*"
   Remove:
     - -mthumb-interwork
     - -fdiagnostics-color=always

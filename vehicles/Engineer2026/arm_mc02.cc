@@ -30,6 +30,7 @@
 #include <cstdio>
 #include <cstring>
 
+#include "bsp_buzzer.h"
 #include "bsp_print.h"
 #include "bsp_uart.h"
 #include "cmsis_os.h"
@@ -37,6 +38,7 @@
 #include "dbus.h"
 #include "fdcan.h"
 #include "motor.h"
+#include "tim.h"
 #include "uart_framing.h"
 #include "usart.h"
 #include "utils.h"
@@ -123,8 +125,9 @@ static inline T clamp(T v, T lo, T hi) {
 // Motor pointers and shared variables are non-static so arm_uart_task.cc
 // (the dedicated UART RTOS thread) can access them via extern declarations.
 
-bsp::CAN* arm_can = nullptr;    // hfdcan2 — arm motors
-bsp::UART* arm_uart = nullptr;  // huart10 — OrangePi link
+bsp::CAN*    arm_can    = nullptr;  // hfdcan2 — arm motors
+bsp::UART*   arm_uart   = nullptr;  // huart10 — OrangePi link
+bsp::Buzzer* arm_buzzer = nullptr;  // TIM12 CH2 (PB15) — onboard buzzer
 
 control::Motor4310* arm_j1 = nullptr;
 control::MotorDMJ10010* arm_j2 = nullptr;
@@ -184,6 +187,9 @@ void ArmInit() {
   gripper = new control::Motor2006(arm_can, GRIP_RX_ID);
 
   grip_pid = new control::ConstrainedPID(GRIP_KP, GRIP_KI, GRIP_KD, GRIP_MAXOUT, 16384.0f);
+
+  // Buzzer: TIM12 CH2 (PB15), APB1 timer clock 80 MHz, prescaler 24
+  arm_buzzer = new bsp::Buzzer(&htim12, 2, 80000000 / 24);
 
   // Do NOT seed last_valid_rx_tick here — leave it at 0 so the bumpless-enable
   // in ArmUpdate() won't fire until the UART task has actually received a frame.

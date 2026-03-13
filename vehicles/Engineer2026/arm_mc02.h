@@ -48,6 +48,7 @@
 
 #include <cstdint>
 
+#include "bsp_buzzer.h"
 #include "bsp_uart.h"
 #include "motor.h"
 
@@ -117,6 +118,10 @@ void ArmHomeSequence(float thresh_rad = 0.05f, uint32_t timeout_ms = 10000);
 // Set to true by ArmHomeSequence(), reset to false whenever motors are disabled.
 // Checked by ArmUpdate() to decide whether to enforce per-joint position limits.
 extern bool arm_homed;
+
+// Onboard buzzer (TIM12 CH2). Initialized in ArmInit().
+// Available for boot jingles and status tones throughout the firmware.
+extern bsp::Buzzer* arm_buzzer;
 
 // ── Per-joint position limits — motor-angle space [degrees] ──────────────────
 // The ROS bridge (uart_bridge_node.py) applies sign-flip and gear-ratio before

@@ -50,12 +50,20 @@
 
 #include "arm_mc02.h"
 #include "arm_uart_task.h"
+#include "bsp_buzzer.h"
 #include "bsp_print.h"
 #include "cmsis_os.h"
 #include "dbus.h"
 #include "main.h"
 #include "motor.h"
 #include "steering_6020.h"
+
+// ── Buzzer songs ─────────────────────────────────────────────────────────────
+using Note = bsp::BuzzerNote;
+
+// Boot jingle: ascending 3-note chord (Do–Mi–So)
+static const bsp::BuzzerNoteDelayed mario[] = {
+    {Note::Mi3M, 80}, {Note::Silent, 80}, {Note::Mi3M, 80}, {Note::Silent, 240}, {Note::Mi3M, 80}, {Note::Silent, 240}, {Note::Do1M, 80}, {Note::Silent, 80}, {Note::Mi3M, 80}, {Note::Silent, 240}, {Note::So5M, 80}, {Note::Silent, 560}, {Note::So5L, 80}, {Note::Silent, 0}, {Note::Finish, 0}};
 
 // #define ANGLE_READ
 // #define TEST_ARM_HOME  // uncomment to run ArmHomeSequence() instead of normal ArmUpdate()
@@ -234,6 +242,9 @@ void RM_RTOS_Default_Task(const void* args) {
   // Velocity PIDs for the front M3508 drive motors.
   control::PIDController drive_pid_fl(DRIVE_KP, DRIVE_KI, DRIVE_KD);
   control::PIDController drive_pid_fr(DRIVE_KP, DRIVE_KI, DRIVE_KD);
+
+  // ── Boot jingle ──────────────────────────────────────────────────────
+  arm_buzzer->SingSong(mario, [](uint32_t ms) { osDelay(ms); });
 
   // ── Steer-offset calibration ─────────────────────────────────────────
   // With swr DOWN the robot is safe to handle.

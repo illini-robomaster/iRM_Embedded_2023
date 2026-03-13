@@ -38,11 +38,38 @@
 #include <cstdio>
 
 #include "arm_mc02.h"
+#include "bsp_buzzer.h"
 #include "bsp_print.h"
 #include "bsp_uart.h"
 #include "cmsis_os.h"
 #include "motor.h"
 #include "uart_framing.h"
+
+// ── UART status tones ────────────────────────────────────────────────────────
+using Note = bsp::BuzzerNote;
+
+// Two rising beeps: OrangePi link established
+static const bsp::BuzzerNoteDelayed kUartConnectedSong[] = {
+    {Note::So5M, 100},
+    {Note::Silent, 40},
+    {Note::Do1H, 220},
+    {Note::Silent,  0},
+    {Note::Finish,  0},
+};
+
+// Two falling beeps: OrangePi link lost
+static const bsp::BuzzerNoteDelayed kUartDisconnectedSong[] = {
+    {Note::Do1H, 100},
+    {Note::Silent, 40},
+    {Note::So5L, 220},
+    {Note::Silent,  0},
+    {Note::Finish,  0},
+};
+
+// Timeout (ms) after which the UART link is considered lost.
+// Slightly longer than the arm watchdog (2000 ms) so we only beep on a
+// genuine dropout, not on a brief frame gap.
+static constexpr uint32_t UART_CONNECTED_TIMEOUT_MS = 2500;
 
 // ── Extern shared state from arm_mc02.cc ─────────────────────────────────────
 extern bsp::UART* arm_uart;
@@ -94,6 +121,9 @@ void ArmUartTask(void* arg) {
   uint32_t next_tx_tick = HAL_GetTick();
   // Encoder poll rate when arm is not yet enabled: every 50 ms (20 Hz).
   uint32_t next_poll_tick = HAL_GetTick();
+
+  // UART connection state for connect/disconnect jingles.
+  bool uart_was_connected = false;
 
   while (true) {
     // ── 1. UART RX: accumulate bytes, parse complete frames ──────────────
@@ -152,7 +182,19 @@ void ArmUartTask(void* arg) {
       }
     }
 
-    // ── 2. Pre-enable encoder polling ────────────────────────────────────
+    // ── 2. UART connect/disconnect detection ─────────────────────────────
+    if (arm_buzzer != nullptr) {
+      bool uart_now_connected = (last_valid_rx_tick > 0) &&
+                                (HAL_GetTick() - last_valid_rx_tick < UART_CONNECTED_TIMEOUT_MS);
+      if (uart_now_connected && !uart_was_connected) {
+        arm_buzzer->SingSong(kUartConnectedSong, [](uint32_t ms) { osDelay(ms); });
+      } else if (!uart_now_connected && uart_was_connected) {
+        arm_buzzer->SingSong(kUartDisconnectedSong, [](uint32_t ms) { osDelay(ms); });
+      }
+      uart_was_connected = uart_now_connected;
+    }
+
+    // ── 3. Pre-enable encoder polling ────────────────────────────────────
     // When the arm is not yet enabled, send MotorDisable frames to solicit
     // CAN feedback so GetTheta() returns real encoder data for TX below.
     if (!arm_enabled && HAL_GetTick() >= next_poll_tick) {
@@ -165,7 +207,7 @@ void ArmUartTask(void* arg) {
       arm_j6->MotorDisable();
     }
 
-    // ── 3. UART TX: send encoder feedback at 50 Hz ──────────────────────
+    // ── 4. UART TX: send encoder feedback at 50 Hz ──────────────────────
     if (HAL_GetTick() >= next_tx_tick) {
       next_tx_tick = HAL_GetTick() + 20;  // 50 Hz
       const float enc[6] = {
