@@ -90,7 +90,7 @@ void ArmUartTask(void* arg) {
   uint8_t local_rx_frame[UART_FRAME_LEN];
   int     local_rx_len = 0;
 
-  // TX rate control: send encoder feedback every 20 ms (50 Hz).
+  // TX rate control: send encoder feedback every 5 ms (200 Hz).
   uint32_t next_tx_tick = HAL_GetTick();
   // Encoder poll rate when arm is not yet enabled: every 50 ms (20 Hz).
   uint32_t next_poll_tick = HAL_GetTick();
@@ -157,9 +157,9 @@ void ArmUartTask(void* arg) {
       arm_j6->MotorDisable();
     }
 
-    // ── 4. UART TX: send encoder feedback at 50 Hz (every 20 ms) ───────────
+    // ── 4. UART TX: send encoder feedback at 200 Hz (every 5 ms) ────────────
     if (HAL_GetTick() >= next_tx_tick) {
-      next_tx_tick = HAL_GetTick() + 20;  // 50 Hz
+      next_tx_tick = HAL_GetTick() + 5;  // 200 Hz
       const float enc[6] = {
           arm_j1->GetTheta() * RAD2DEG,
           arm_j2->GetTheta() * RAD2DEG,
@@ -175,6 +175,6 @@ void ArmUartTask(void* arg) {
       UartTxSendFeedback(arm_uart, enc);
     }
 
-    osDelay(2);  // ~500 Hz polling — fast enough for 50 Hz TX and responsive RX
+    osDelay(2);  // ~500 Hz polling — fast enough for 200 Hz TX and responsive RX
   }
 }
