@@ -1,3 +1,21 @@
 CompileFlags:
-  Add: [-ferror-limit=0, -D__weak=__attribute__((weak)), -D__packed=__attribute__((__packed__))]
-  Remove: [-m*, -f*]
+  CompilationDatabase: build
+  Remove:
+    - -mthumb-interwork
+    - -fdiagnostics-color=always
+    - -Werror
+  Add:
+    - -D__weak=__attribute__((weak))
+    - -D__packed=__attribute__((__packed__))
+
+---
+If:
+  PathMatch: .*\.c
+CompileFlags:
+  Compiler: arm-none-eabi-gcc
+
+---
+If:
+  PathMatch: .*\.(cc|cpp|cxx|hpp|hh|hxx)
+CompileFlags:
+  Compiler: arm-none-eabi-g++

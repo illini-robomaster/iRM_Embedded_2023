@@ -172,9 +172,11 @@ void RM_RTOS_Default_Task(const void* args) {
     arm_claw_output = clip<int16_t>(arm_claw_output, 500, 2500);
     arm_claw_rotate_output = clip<int16_t>(arm_claw_rotate_output, 500, 2500);
     arm_roll_output = clip<int16_t>(arm_roll_output, 500, 2500);
-    // arm_claw->SetOutput(arm_claw_output);
+    arm_claw->SetOutput(arm_claw_output);
     arm_claw_rotate->SetOutput(arm_claw_rotate_output);
     arm_roll->SetOutput(arm_roll_output);
+    set_cursor(0,0);
+    clear_screen();
     print("Arm Claw: %d\r\n", arm_claw_output);
     print("Arm Claw Rotate: %d\r\n", arm_claw_rotate_output);
     print("Arm Roll: %d\r\n", arm_roll_output);
