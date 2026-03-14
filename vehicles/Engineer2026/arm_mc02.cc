@@ -92,6 +92,7 @@ static constexpr uint32_t WATCHDOG_MS = 2000;
 // ── Safe-park positions [rad] ───────────────────────────────────────────────
 // Before fully disabling the arm, command J2 and J3 to these positions so the
 // arm doesn't drop under gravity when power is cut.
+static constexpr float PARK_J1_RAD = 0.0f;
 static constexpr float PARK_J2_RAD = -0.8f;
 static constexpr float PARK_J3_RAD = -0.3f;
 static constexpr float PARK_THRESH_RAD = 0.08f;    // settle threshold [rad]
@@ -100,10 +101,16 @@ static constexpr uint32_t PARK_TIMEOUT_MS = 5000;  // give up after 5 s
 // ── Gripper (Motor2006) ───────────────────────────────────────────────────────
 // Open-loop close current [−16384 … +16384 raw units]. Positive = close.
 // TODO: tune direction and magnitude on the bench.
-static constexpr int16_t GRIP_CLOSE_CURRENT = 2000;
-// Current reading above which we consider the gripper stalled (closed).
+static constexpr int16_t GRIP_CLOSE_CURRENT = 16384;  // C610 full-scale
+static constexpr int16_t GRIP_OPEN_CURRENT  = -16384;
+// Current magnitude above which we consider the gripper stalled.
+// Closing: current is positive → stall when GetCurr() > +GRIP_STALL_THRESH.
+// Opening: current is negative → stall when GetCurr() < -GRIP_STALL_THRESH.
 // TODO: tune — start high and lower until reliable.
 static constexpr int16_t GRIP_STALL_THRESH = 4000;
+// Number of consecutive 5 ms ticks above threshold before declaring a stall.
+// Filters single-sample current spikes without adding meaningful latency.
+static constexpr uint8_t GRIP_STALL_DEBOUNCE = 3;
 // Hold-position PID gains (drives Motor2006 in current mode to hold theta).
 static constexpr float GRIP_KP     = 3000.0f;
 static constexpr float GRIP_KI     = 0.0f;
@@ -156,14 +163,17 @@ bool arm_parking = false;  // true while parking sequence is active
 bool arm_homed = false;
 static uint32_t park_deadline = 0;  // HAL tick at which we give up and force-disable
 static float park_hold_j1 = 0.0f;   // freeze other joints at their position when parking started
+static float park_hold_j2 = 0.0f;
+static float park_hold_j3 = 0.0f;
 static float park_hold_j4 = 0.0f;
 static float park_hold_j5 = 0.0f;
 static float park_hold_j6 = 0.0f;
 
 // Gripper state machine.
-enum class GripState { CLOSING, HOLDING };
-static GripState grip_state    = GripState::CLOSING;
-static float     grip_hold_pos = 0.0f;
+enum class GripState { IDLE, OPENING, CLOSING, HOLDING };
+static GripState grip_state         = GripState::IDLE;
+static float     grip_hold_pos      = 0.0f;
+static uint8_t   grip_open_stall_count = 0;  // consecutive ticks above open stall threshold
 static control::ConstrainedPID* grip_pid = nullptr;
 
 // ── ArmInit ───────────────────────────────────────────────────────────────────
@@ -279,7 +289,6 @@ void ArmSafePark() {
         PARK_J2_RAD, PARK_J3_RAD);
 
   // Freeze other joints at their current position (should be ~0 after homing).
-  const float hold_j1 = arm_j1->GetTheta();
   const float hold_j4 = arm_j4->GetTheta();
   const float hold_j5 = arm_j5->GetTheta();
   const float hold_j6 = arm_j6->GetTheta();
@@ -291,7 +300,7 @@ void ArmSafePark() {
 
   uint32_t deadline = HAL_GetTick() + PARK_TIMEOUT_MS;
   while (HAL_GetTick() < deadline) {
-    arm_j1->SetOutput(hold_j1, ARM_VEL_LIM[0]);
+    arm_j1->SetOutput(PARK_J1_RAD, ARM_VEL_LIM[0]);
     arm_j2->SetOutput(PARK_J2_RAD, ARM_VEL_LIM[1], J23_CURRENT_LIM);
     arm_j3->SetOutput(PARK_J3_RAD, ARM_VEL_LIM[2], J23_CURRENT_LIM);
     arm_j4->SetOutput(hold_j4, ARM_VEL_LIM[3]);
@@ -307,7 +316,8 @@ void ArmSafePark() {
 
     bool j2_ok = fabsf(arm_j2->GetTheta() - PARK_J2_RAD) < PARK_THRESH_RAD;
     bool j3_ok = fabsf(arm_j3->GetTheta() - PARK_J3_RAD) < PARK_THRESH_RAD;
-    if (j2_ok && j3_ok) {
+    bool j1_ok = fabsf(arm_j1->GetTheta() - PARK_J1_RAD) < PARK_THRESH_RAD;
+    if (j2_ok && j3_ok && j1_ok) {
       print("ARM SAFE PARK: J2/J3 settled — disabling\r\n");
       break;
     }
@@ -543,6 +553,8 @@ void ArmUpdate(bool test_mode) {
     arm_parking = true;
     park_deadline = HAL_GetTick() + PARK_TIMEOUT_MS;
     park_hold_j1 = arm_j1->GetTheta();
+    park_hold_j2 = arm_j2->GetTheta();
+    park_hold_j3 = arm_j3->GetTheta();
     park_hold_j4 = arm_j4->GetTheta();
     park_hold_j5 = arm_j5->GetTheta();
     park_hold_j6 = arm_j6->GetTheta();
@@ -559,8 +571,10 @@ void ArmUpdate(bool test_mode) {
       arm_parking = false;
       // Fall through to normal control below.
     } else {
-      bool j2_ok = fabsf(arm_j2->GetTheta() - PARK_J2_RAD) < PARK_THRESH_RAD;
-      bool j3_ok = fabsf(arm_j3->GetTheta() - PARK_J3_RAD) < PARK_THRESH_RAD;
+      // A joint is done when it has moved to OR already past the park target
+      // (theta <= target + threshold), matching the SetOutput logic below.
+      bool j2_ok = arm_j2->GetTheta() <= PARK_J2_RAD + PARK_THRESH_RAD;
+      bool j3_ok = arm_j3->GetTheta() <= PARK_J3_RAD + PARK_THRESH_RAD;
       bool timed_out = HAL_GetTick() >= park_deadline;
 
       if ((j2_ok && j3_ok) || timed_out) {
@@ -580,8 +594,8 @@ void ArmUpdate(bool test_mode) {
 
       // Drive J2/J3 to park positions, hold everything else.
       arm_j1->SetOutput(park_hold_j1, ARM_VEL_LIM[0]);
-      arm_j2->SetOutput(PARK_J2_RAD, ARM_VEL_LIM[1], J23_CURRENT_LIM);
-      arm_j3->SetOutput(PARK_J3_RAD, ARM_VEL_LIM[2], J23_CURRENT_LIM);
+      arm_j2->SetOutput(arm_j2->GetTheta()>PARK_J2_RAD ? PARK_J2_RAD:park_hold_j2, ARM_VEL_LIM[1], J23_CURRENT_LIM);
+      arm_j3->SetOutput(arm_j3->GetTheta() > PARK_J3_RAD? PARK_J3_RAD:park_hold_j3, ARM_VEL_LIM[2], J23_CURRENT_LIM);
       arm_j4->SetOutput(park_hold_j4, ARM_VEL_LIM[3]);
       arm_j5->SetOutput(park_hold_j5, ARM_VEL_LIM[4]);
       arm_j6->SetOutput(park_hold_j6, ARM_VEL_LIM[5], J6_CURRENT_LIM);
@@ -594,8 +608,13 @@ void ArmUpdate(bool test_mode) {
       control::MotorDMJ3507::TransmitOutput(j6arr, 1);
 
       if (HAL_GetTick() % 500 < 5)
-        print("ARM PARK: J2=%.3f→%.1f J3=%.3f→%.1f\r\n",
-              arm_j2->GetTheta(), PARK_J2_RAD, arm_j3->GetTheta(), PARK_J3_RAD);
+        print("ARM PARK: J2=%.3f→%.1f%s J3=%.3f→%.1f%s\r\n",
+              arm_j2->GetTheta(),
+              arm_j2->GetTheta() > PARK_J2_RAD ? PARK_J2_RAD : park_hold_j2,
+              arm_j2->GetTheta() > PARK_J2_RAD ? "" : "(hold)",
+              arm_j3->GetTheta(),
+              arm_j3->GetTheta() > PARK_J3_RAD ? PARK_J3_RAD : park_hold_j3,
+              arm_j3->GetTheta() > PARK_J3_RAD ? "" : "(hold)");
       return;
     }
   }
@@ -646,19 +665,61 @@ void ArmUpdate(bool test_mode) {
   const float t3 = arm_homed ? clamp((float)cmd_target_deg[3], ARM_CMD_MIN_DEG[3], ARM_CMD_MAX_DEG[3]) : (float)cmd_target_deg[3];
   const float t4 = arm_homed ? clamp((float)cmd_target_deg[4], ARM_CMD_MIN_DEG[4], ARM_CMD_MAX_DEG[4]) : (float)cmd_target_deg[4];
   const float t5 = arm_homed ? clamp((float)cmd_target_deg[5], ARM_CMD_MIN_DEG[5], ARM_CMD_MAX_DEG[5]) : (float)cmd_target_deg[5];
-  print("ARM CMD (deg) | J1=%6.3f J2=%6.3f J3=%6.3f J4=%6.3f J5=%6.3f J6=%6.3f\r\n",
-        t0, t1, t2, t3, t4, t5);
   arm_j1->SetOutput(t0 * DEG2RAD, ARM_VEL_LIM[0]);
   arm_j2->SetOutput(t1 * DEG2RAD, ARM_VEL_LIM[1], J23_CURRENT_LIM);
   arm_j3->SetOutput(t2 * DEG2RAD, ARM_VEL_LIM[2], J23_CURRENT_LIM);
   arm_j4->SetOutput(t3 * DEG2RAD, ARM_VEL_LIM[3]);
   arm_j5->SetOutput(t4 * DEG2RAD, ARM_VEL_LIM[4]);
   arm_j6->SetOutput(t5 * DEG2RAD, ARM_VEL_LIM[5], J6_CURRENT_LIM);
+  
+  // ── 6. Gripper FSM (edge-triggered via BoolEdgeDetector) ────────────────
+  //   MID  posEdge → start opening
+  //   DOWN posEdge → start closing (HOLDING is preserved)
+  //   UP   posEdge → cancel active motion; IDLE
+  // Stall while opening → IDLE (stable: no new posEdge while MID stays held)
+  static BoolEdgeDetector swl_mid(dbus->swl == remote::MID);
+  static BoolEdgeDetector swl_down(dbus->swl == remote::DOWN);
+  static BoolEdgeDetector swl_up(dbus->swl == remote::UP);
 
-  // ── 6. Gripper FSM ──────────────────────────────────────────────────────
+  swl_mid.input(dbus->swl == remote::MID);
+  swl_down.input(dbus->swl == remote::DOWN);
+  swl_up.input(dbus->swl == remote::UP);
+
+  if (swl_mid.posEdge()) {
+    grip_open_stall_count = 0;
+    grip_state = GripState::OPENING;
+  } else if (swl_down.posEdge()) {
+    if (grip_state != GripState::CLOSING && grip_state != GripState::HOLDING) {
+      grip_state = GripState::CLOSING;
+    }
+  } else if (swl_up.posEdge()) {
+    if (grip_state == GripState::OPENING || grip_state == GripState::CLOSING) {
+      grip_state = GripState::IDLE;
+    }
+  }
+
   switch (grip_state) {
+    case GripState::IDLE:
+      grip_open_stall_count = 0;
+      gripper->SetOutput(0);
+      break;
+    case GripState::OPENING:
+      gripper->SetOutput(GRIP_OPEN_CURRENT);
+      // Open current is negative; stall drives current further negative.
+      if (gripper->GetCurr() < -GRIP_STALL_THRESH) {
+        if (++grip_open_stall_count >= GRIP_STALL_DEBOUNCE) {
+          grip_open_stall_count = 0;
+          grip_state = GripState::IDLE;
+          print("GRIPPER: open stall — idle\r\n");
+        }
+      } else {
+        grip_open_stall_count = 0;
+      }
+      print("gripper current: %d \r\n", gripper->GetCurr());
+      break;
     case GripState::CLOSING:
       gripper->SetOutput(GRIP_CLOSE_CURRENT);
+      print("gripper current: %d \r\n",gripper->GetCurr());
       if (gripper->GetCurr() > GRIP_STALL_THRESH) {
         grip_hold_pos = gripper->GetTheta();
         grip_state = GripState::HOLDING;
@@ -680,6 +741,6 @@ void ArmUpdate(bool test_mode) {
   control::MotorDMJ10010::TransmitOutput(j23, 2);
   control::MotorDMJ3507::TransmitOutput(j6arr, 1);
   // TODO: enable gripper CAN when ready
-  // control::MotorCANBase* grip[] = {gripper};
-  // control::MotorCANBase::TransmitOutput(grip, 1);
+  control::MotorCANBase* grip[] = {gripper};  
+  control::MotorCANBase::TransmitOutput(grip, 1);
 }

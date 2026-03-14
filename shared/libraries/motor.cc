@@ -289,7 +289,7 @@ void Motor2006::PrintData() const {
 }
 
 void Motor2006::SetOutput(int16_t val) {
-  constexpr int16_t MAX_ABS_CURRENT = 10000;  // ~10A
+  constexpr int16_t MAX_ABS_CURRENT = 16384;  // C610 ESC full-scale (10A)
   output_ = clip<int16_t>(val, -MAX_ABS_CURRENT, MAX_ABS_CURRENT);
 }
 

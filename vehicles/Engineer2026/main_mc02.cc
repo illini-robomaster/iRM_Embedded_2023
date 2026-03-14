@@ -58,12 +58,68 @@
 #include "motor.h"
 #include "steering_6020.h"
 
+extern volatile uint32_t last_valid_rx_tick;
+
 // ── Buzzer songs ─────────────────────────────────────────────────────────────
 using Note = bsp::BuzzerNote;
 
-// Boot jingle: ascending 3-note chord (Do–Mi–So)
 static const bsp::BuzzerNoteDelayed mario[] = {
     {Note::Mi3M, 80}, {Note::Silent, 80}, {Note::Mi3M, 80}, {Note::Silent, 240}, {Note::Mi3M, 80}, {Note::Silent, 240}, {Note::Do1M, 80}, {Note::Silent, 80}, {Note::Mi3M, 80}, {Note::Silent, 240}, {Note::So5M, 80}, {Note::Silent, 560}, {Note::So5L, 80}, {Note::Silent, 0}, {Note::Finish, 0}};
+
+// Two rising beeps: OrangePi link established
+static const bsp::BuzzerNoteDelayed kUartConnectedSong[] = {
+    {Note::So5M, 100}, {Note::Silent, 40}, {Note::Do1H, 220},
+    {Note::Silent, 0},  {Note::Finish, 0},
+};
+
+// Two falling beeps: OrangePi link lost
+static const bsp::BuzzerNoteDelayed kUartDisconnectedSong[] = {
+    {Note::Do1H, 100}, {Note::Silent, 40}, {Note::So5L, 220},
+    {Note::Silent, 0},  {Note::Finish, 0},
+};
+
+// Fires BEFORE the 2000 ms arm watchdog so the user hears the alert
+// while the arm is still able to park gracefully.
+static constexpr uint32_t UART_CONNECTED_TIMEOUT_MS = 1500;
+
+// ── BuzzerTask ───────────────────────────────────────────────────────────────
+// Dedicated task: owns all blocking SingSong calls so the UART task and motor
+// loop are never stalled by buzzer delays.
+static const osThreadAttr_t buzzerTaskAttr = {
+    .name       = "buzzerTask",
+    .attr_bits = osThreadDetached,
+    .cb_mem = nullptr,
+    .cb_size = 0,
+    .stack_mem = nullptr,
+    .stack_size = 256 * 4,
+    .priority   = (osPriority_t)osPriorityBelowNormal,
+    .tz_module = 0,
+    .reserved = 0
+};
+
+static void BuzzerTask(void* /*arg*/) {
+  // Wait for ArmInit() to initialise arm_buzzer.
+  while (arm_buzzer == nullptr) osDelay(10);
+
+  // Boot jingle — plays once at startup.
+  arm_buzzer->SingSong(mario, [](uint32_t ms) { osDelay(ms); });
+
+  bool was_connected = false;
+
+  while (true) {
+    bool now_connected = (last_valid_rx_tick > 0) &&
+                         (HAL_GetTick() - last_valid_rx_tick < UART_CONNECTED_TIMEOUT_MS);
+
+    if (now_connected && !was_connected) {
+      arm_buzzer->SingSong(kUartConnectedSong, [](uint32_t ms) { osDelay(ms); });
+    } else if (!now_connected && was_connected) {
+      arm_buzzer->SingSong(kUartDisconnectedSong, [](uint32_t ms) { osDelay(ms); });
+    }
+    was_connected = now_connected;
+
+    osDelay(50);  // check at 20 Hz — fine for edge detection
+  }
+}
 
 // #define ANGLE_READ
 // #define TEST_ARM_HOME  // uncomment to run ArmHomeSequence() instead of normal ArmUpdate()
@@ -223,9 +279,11 @@ void RM_RTOS_Init() {
 }
 
 static osThreadId_t armUartTaskHandle;
+static osThreadId_t buzzerTaskHandle;
 
 void RM_RTOS_Threads_Init(void) {
-  armUartTaskHandle = osThreadNew(ArmUartTask, nullptr, &armUartTaskAttr);
+  armUartTaskHandle = osThreadNew(ArmUartTask,  nullptr, &armUartTaskAttr);
+  buzzerTaskHandle  = osThreadNew(BuzzerTask,   nullptr, &buzzerTaskAttr);
 }
 
 // ── Default Task ────────────────────────────────────────────────────────────
@@ -242,9 +300,6 @@ void RM_RTOS_Default_Task(const void* args) {
   // Velocity PIDs for the front M3508 drive motors.
   control::PIDController drive_pid_fl(DRIVE_KP, DRIVE_KI, DRIVE_KD);
   control::PIDController drive_pid_fr(DRIVE_KP, DRIVE_KI, DRIVE_KD);
-
-  // ── Boot jingle ──────────────────────────────────────────────────────
-  arm_buzzer->SingSong(mario, [](uint32_t ms) { osDelay(ms); });
 
   // ── Steer-offset calibration ─────────────────────────────────────────
   // With swr DOWN the robot is safe to handle.
