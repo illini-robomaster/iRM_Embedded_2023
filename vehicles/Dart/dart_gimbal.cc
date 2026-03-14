@@ -177,7 +177,6 @@ void dartLoadTask(void* arg) {
         load_control_mode = LoadControlMode::AUTO_RELOAD;
         load_state = LoadState::IDLE;
         reverse_debounce = 0;
-        trigger_motor->SetOutput(TRIGGER_RELEASE_OUTPUT);
         buzzer->SingSong(AutoModeSwitchSound, [](uint32_t milli) { osDelay(milli); });
         print(">>> Load mode switched to AUTO_RELOAD\r\n");
       }
@@ -239,10 +238,10 @@ void dartLoadTask(void* arg) {
       }
     } else {
       // ---- Manual load control (legacy behavior) ----
-      if (dbus->swr == remote::UP || dbus->swr == remote::DOWN) {
-        trigger_motor->SetOutput(TRIGGER_HOLD_OUTPUT);
-      } else {
+      if (dbus->swr == remote::UP) {
         trigger_motor->SetOutput(TRIGGER_RELEASE_OUTPUT);
+      } else {
+        trigger_motor->SetOutput(TRIGGER_HOLD_OUTPUT);
       }
 
       if (dbus->swl == remote::UP) {
@@ -256,26 +255,27 @@ void dartLoadTask(void* arg) {
 
     // ---- Load motor PID ----
 
-      float diff_load_1 = load_motor_1->GetOmegaDelta(-load_target_speed);
-      float diff_load_2 = load_motor_2->GetOmegaDelta(load_target_speed);
-      load_motor_1->SetOutput(pid_left.ComputeConstrainedOutput(diff_load_1));
-      load_motor_2->SetOutput(pid_right.ComputeConstrainedOutput(diff_load_2));
+    float diff_load_1 = load_motor_1->GetOmegaDelta(-load_target_speed);
+    float diff_load_2 = load_motor_2->GetOmegaDelta(load_target_speed);
+    load_motor_1->SetOutput(pid_left.ComputeConstrainedOutput(diff_load_1));
+    load_motor_2->SetOutput(pid_right.ComputeConstrainedOutput(diff_load_2));
 
-      // ---- Force motor ----
-      force_target_speed = MAP_RANGE(dbus->ch3, -660, 660, -500, 500);
-      float diff_force = force_motor->GetOmegaDelta(force_target_speed);
-      force_motor->SetOutput(pid_force.ComputeConstrainedOutput(diff_force));
+    // ---- Force motor ----
+    force_target_speed = MAP_RANGE(dbus->ch3, -660, 660, -500, 500);
+    float diff_force = force_motor->GetOmegaDelta(force_target_speed);
+    print("Force Motor Output: ", pid_force.ComputeConstrainedOutput(diff_force));
+    force_motor->SetOutput(pid_force.ComputeConstrainedOutput(diff_force));
 
-      control::MotorCANBase::TransmitOutput(motors_can1_load, 3);
+    control::MotorCANBase::TransmitOutput(motors_can1_load, 3);
 
-      // ---- Yaw motor ----
-      if (dbus->ch0 > 300) {
-        yaw_target_speed = 100;
-      } else if (dbus->ch0 < -300) {
-        yaw_target_speed = -100;
-      } else {
-        yaw_target_speed = 0;
-      }
+    // ---- Yaw motor ----
+    if (dbus->ch0 > 300) {
+      yaw_target_speed = 100;
+    } else if (dbus->ch0 < -300) {
+      yaw_target_speed = -100;
+    } else {
+      yaw_target_speed = 0;
+    }
     float diff_yaw = yaw_motor->GetOmegaDelta(yaw_target_speed);
     yaw_motor->SetOutput(pid_yaw.ComputeConstrainedOutput(diff_yaw));
     control::MotorCANBase::TransmitOutput(yaw_motors, 1);
