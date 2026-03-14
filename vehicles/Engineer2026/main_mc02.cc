@@ -204,6 +204,10 @@ static const float STEER_SPEED_DEADZONE = 0.05f;
 // the current limit is set to 0 so the motor does not fight gravity.
 static const float LIFT_SOFT_DOWN_THRESHOLD = 0.1f;  // [rad]
 
+// ── Stair-climb step 5 chassis parameters ───────────────────────────────────
+static constexpr float    SC_FWD_VX = 0.3f;    // forward speed during step 5 [m/s]
+static constexpr uint32_t SC_FWD_MS = 2000;    // drive duration → ~60 cm
+
 // ── Global peripherals ──────────────────────────────────────────────────────
 static bsp::CAN*     can  = nullptr;
 remote::DBUS* dbus = nullptr;
@@ -324,6 +328,10 @@ void RM_RTOS_Default_Task(const void* args) {
 
   bool enabled = false;
 
+  remote::switch_t swr_prev       = dbus->swr;  // rising-edge detection for stair trigger
+  uint32_t stair_step5_start_tick = 0;
+  bool     stair_step5_running    = false;
+
   while (true) {
     // ── Kill switch: swr DOWN → disable all motors ─────────────────────
     if (dbus->swr == remote::DOWN) {
@@ -350,6 +358,7 @@ void RM_RTOS_Default_Task(const void* args) {
               front_left_steer_raw->GetTheta(),
               front_right_steer_raw->GetTheta());
       }
+      swr_prev = dbus->swr;
       osDelay(100);
       continue;
     } else {
@@ -376,6 +385,30 @@ void RM_RTOS_Default_Task(const void* args) {
     float vx = clip<float>( dbus->ch1 / 660.0f * VX_MAX, -VX_MAX,  VX_MAX);  // forward
     float vy = clip<float>(-dbus->ch0 / 660.0f * VY_MAX, -VY_MAX,  VY_MAX);  // lateral
     float vw = clip<float>(-dbus->ch2 / 660.0f * VW_MAX, -VW_MAX,  VW_MAX);  // rotation
+
+    // ── Stair-climb trigger: swr rising edge to UP ────────────────────
+    if (swr_prev != remote::UP && dbus->swr == remote::UP) {
+      ArmStairClimbBegin();
+      stair_step5_running = false;
+    }
+
+    // ── Stair step 5: drive chassis forward ~60 cm ────────────────────
+    if (stair_climb_active && stair_climb_state == StairClimbState::STEP5) {
+      if (!stair_step5_running) {
+        stair_step5_start_tick = HAL_GetTick();
+        stair_step5_running    = true;
+      }
+      if (HAL_GetTick() - stair_step5_start_tick < SC_FWD_MS) {
+        vx = SC_FWD_VX;
+        vy = 0.0f;
+        vw = 0.0f;
+      } else {
+        stair_step5_running = false;
+        ArmStairClimbMarkDone();
+      }
+    } else if (!stair_climb_active) {
+      stair_step5_running = false;
+    }
 
     // ── Rear omni kinematics ──────────────────────────────────────────
     // The rear omniwheels are fixed in the longitudinal (X) direction.
@@ -471,19 +504,28 @@ void RM_RTOS_Default_Task(const void* args) {
 
     // ── Lift motor ───────────────────────────────────────────────────
     // swr MID → chassis down (pos = 0), swr UP → chassis raised (pos = -1 rad).
+    // Stair step 4+: override lift target to 1.0 rad (simultaneous with arm).
     // Soft-down: once the lift reaches the down position (|theta| < threshold),
     // drop the current limit to 0 so the motor stops fighting gravity.
-    // While still descending (|theta| >= threshold), use normal current to move.
-    float lift_pos = (dbus->swr == remote::UP) ? -1.0f : 0.0f;
-    float lift_vel;
-    float lift_cur;
-    if (dbus->swr == remote::UP) {
-      lift_vel = 0.5f;  // allow movement while lifting or holding up
-      lift_cur = 0.5f;  // lifting or holding up
+    float lift_pos, lift_vel, lift_cur;
+    bool stair_lift_up = stair_climb_active &&
+                         (stair_climb_state == StairClimbState::STEP4_MOVE ||
+                          stair_climb_state == StairClimbState::STEP4_CONFIRM ||
+                          stair_climb_state == StairClimbState::STEP5);
+    if (stair_lift_up) {
+      lift_pos = -1.0f;
+      lift_vel = 0.5f;
+      lift_cur = 0.5f;
+    // } else if (dbus->swr == remote::UP) {
+    //   lift_pos = -1.0f;
+    //   lift_vel = 0.5f;  // allow movement while lifting or holding up
+    //   lift_cur = 0.5f;  // lifting or holding up
     } else if (fabsf(lift_motor->GetTheta()) < LIFT_SOFT_DOWN_THRESHOLD) {
+      lift_pos = 0.0f;
       lift_vel = 0.0f;  // at rest in down position — stop movement
       lift_cur = 0.0f;  // at rest in down position — release force
     } else {
+      lift_pos = 0.0f;
       lift_vel = 0.5f;  // allow movement while still descending toward 0
       lift_cur = 0.8f;  // still descending toward 0
     }
@@ -520,6 +562,7 @@ void RM_RTOS_Default_Task(const void* args) {
       //         front_right_steer->GetTheta() * 180.0f / (float)M_PI);
     }
 
+    swr_prev = dbus->swr;
     osDelay(5);  // 200 Hz control loop
   }
 }

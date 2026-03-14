@@ -119,6 +119,35 @@ void ArmHomeSequence(float thresh_rad = 0.05f, uint32_t timeout_ms = 10000);
 // Checked by ArmUpdate() to decide whether to enforce per-joint position limits.
 extern bool arm_homed;
 
+// ── Stair-climb state machine ────────────────────────────────────────────────
+enum class StairClimbState {
+    IDLE,
+    STEP1_MOVE,    // J4→0°, J5→90°, J6→0°
+    STEP1_CONFIRM, // wait swl MID then UP
+    STEP2_MOVE,    // J2→0°, J3→50°
+    STEP2_CONFIRM,
+    STEP3_MOVE,    // J2→30°
+    STEP3_CONFIRM,
+    STEP4_MOVE,    // J2→62°, J3→28°  (lift override in main_mc02)
+    STEP4_CONFIRM,
+    STEP5,         // arm holds final pose; main_mc02 drives chassis forward ~60 cm
+};
+
+extern StairClimbState stair_climb_state;
+extern bool            stair_climb_active;
+
+/**
+ * @brief Start the stair-climb sequence.  Call on swr rising edge to UP.
+ *        Snapshots current joint positions as hold values and enters STEP1_MOVE.
+ */
+void ArmStairClimbBegin();
+
+/**
+ * @brief End the stair-climb sequence.  Call from main_mc02 after chassis
+ *        step 5 completes.  Clears stair_climb_active and returns to IDLE.
+ */
+void ArmStairClimbMarkDone();
+
 // Onboard buzzer (TIM12 CH2). Initialized in ArmInit().
 // Available for boot jingles and status tones throughout the firmware.
 extern bsp::Buzzer* arm_buzzer;

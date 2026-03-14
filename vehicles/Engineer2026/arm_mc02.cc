@@ -169,6 +169,15 @@ static float park_hold_j4 = 0.0f;
 static float park_hold_j5 = 0.0f;
 static float park_hold_j6 = 0.0f;
 
+// ── Stair-climb state machine ─────────────────────────────────────────────────
+static constexpr float STAIR_SETTLE_RAD = 0.05f;  // ~2.9° settle threshold
+
+StairClimbState stair_climb_state = StairClimbState::IDLE;
+bool            stair_climb_active = false;
+
+static float sc_tgt[6]      = {};     // current stair joint targets [rad]
+static bool  sc_swl_saw_mid = false;  // true once swl goes MID during a CONFIRM wait
+
 // Gripper state machine.
 enum class GripState { IDLE, OPENING, CLOSING, HOLDING };
 static GripState grip_state         = GripState::IDLE;
@@ -502,6 +511,27 @@ void ArmHomeSequence(float thresh_rad, uint32_t timeout_ms) {
   print("ARM HOME: sequence complete\r\n");
 }
 
+// ── ArmStairClimbBegin / ArmStairClimbMarkDone ────────────────────────────────
+
+void ArmStairClimbBegin() {
+    sc_tgt[0] = arm_j1->GetTheta();
+    sc_tgt[1] = arm_j2->GetTheta();
+    sc_tgt[2] = arm_j3->GetTheta();
+    sc_tgt[3] = arm_j4->GetTheta();
+    sc_tgt[4] = arm_j5->GetTheta();
+    sc_tgt[5] = arm_j6->GetTheta();
+    sc_swl_saw_mid    = false;
+    stair_climb_state = StairClimbState::STEP1_MOVE;
+    stair_climb_active = true;
+    print("STAIR: begin\r\n");
+}
+
+void ArmStairClimbMarkDone() {
+    stair_climb_state  = StairClimbState::IDLE;
+    stair_climb_active = false;
+    print("STAIR: done\r\n");
+}
+
 // ── ArmUpdate ─────────────────────────────────────────────────────────────────
 
 /**
@@ -546,7 +576,7 @@ void ArmUpdate(bool test_mode) {
   }
 
   // ── 2. Watchdog → start non-blocking park ────────────────────────────────
-  if (arm_enabled && !arm_parking &&
+  if (arm_enabled && !arm_parking && !stair_climb_active &&
       (HAL_GetTick() - last_valid_rx_tick > WATCHDOG_MS)) {
     print("ARM WATCHDOG: no UART for >%lu ms — parking before disable\r\n",
           (unsigned long)WATCHDOG_MS);
@@ -655,22 +685,117 @@ void ArmUpdate(bool test_mode) {
   if (!arm_enabled) return;
 
   // ── 5. Motor commands ────────────────────────────────────────────────────
-  // After homing, clamp to per-joint motor-angle limits (second defence after
-  // the RX filter).  Before homing the arm may legitimately sit outside the
-  // operational range (startup / post-disable), so clamping is skipped then —
-  // applying it would snap the arm to the limit boundary on first enable.
-  const float t0 = arm_homed ? clamp((float)cmd_target_deg[0], ARM_CMD_MIN_DEG[0], ARM_CMD_MAX_DEG[0]) : (float)cmd_target_deg[0];
-  const float t1 = arm_homed ? clamp((float)cmd_target_deg[1], ARM_CMD_MIN_DEG[1], ARM_CMD_MAX_DEG[1]) : (float)cmd_target_deg[1];
-  const float t2 = arm_homed ? clamp((float)cmd_target_deg[2], ARM_CMD_MIN_DEG[2], ARM_CMD_MAX_DEG[2]) : (float)cmd_target_deg[2];
-  const float t3 = arm_homed ? clamp((float)cmd_target_deg[3], ARM_CMD_MIN_DEG[3], ARM_CMD_MAX_DEG[3]) : (float)cmd_target_deg[3];
-  const float t4 = arm_homed ? clamp((float)cmd_target_deg[4], ARM_CMD_MIN_DEG[4], ARM_CMD_MAX_DEG[4]) : (float)cmd_target_deg[4];
-  const float t5 = arm_homed ? clamp((float)cmd_target_deg[5], ARM_CMD_MIN_DEG[5], ARM_CMD_MAX_DEG[5]) : (float)cmd_target_deg[5];
-  arm_j1->SetOutput(t0 * DEG2RAD, ARM_VEL_LIM[0]);
-  arm_j2->SetOutput(t1 * DEG2RAD, ARM_VEL_LIM[1], J23_CURRENT_LIM);
-  arm_j3->SetOutput(t2 * DEG2RAD, ARM_VEL_LIM[2], J23_CURRENT_LIM);
-  arm_j4->SetOutput(t3 * DEG2RAD, ARM_VEL_LIM[3]);
-  arm_j5->SetOutput(t4 * DEG2RAD, ARM_VEL_LIM[4]);
-  arm_j6->SetOutput(t5 * DEG2RAD, ARM_VEL_LIM[5], J6_CURRENT_LIM);
+  if (stair_climb_active) {
+    // ── Stair state machine ────────────────────────────────────────────
+    auto sc_set_all = [&]() {
+      arm_j1->SetOutput(sc_tgt[0], ARM_VEL_LIM[0]);
+      arm_j2->SetOutput(sc_tgt[1], ARM_VEL_LIM[1], J23_CURRENT_LIM);
+      arm_j3->SetOutput(sc_tgt[2], ARM_VEL_LIM[2], J23_CURRENT_LIM);
+      arm_j4->SetOutput(sc_tgt[3], ARM_VEL_LIM[3]);
+      arm_j5->SetOutput(sc_tgt[4], ARM_VEL_LIM[4]);
+      arm_j6->SetOutput(sc_tgt[5], ARM_VEL_LIM[5], J6_CURRENT_LIM);
+    };
+    auto sc_confirm_check = [&]() -> bool {
+      if (!sc_swl_saw_mid && dbus->swl == remote::MID) sc_swl_saw_mid = true;
+      if (sc_swl_saw_mid  && dbus->swl == remote::UP)  {
+        sc_swl_saw_mid = false;
+        return true;
+      }
+      return false;
+    };
+    switch (stair_climb_state) {
+      case StairClimbState::STEP1_MOVE:
+        sc_tgt[3] = 0.0f;
+        sc_tgt[4] = 90.0f * DEG2RAD;
+        sc_tgt[5] = 0.0f;
+        sc_set_all();
+        if (fabsf(arm_j4->GetTheta() - sc_tgt[3]) < STAIR_SETTLE_RAD &&
+            fabsf(arm_j5->GetTheta() - sc_tgt[4]) < STAIR_SETTLE_RAD &&
+            fabsf(arm_j6->GetTheta() - sc_tgt[5]) < STAIR_SETTLE_RAD) {
+          stair_climb_state = StairClimbState::STEP1_CONFIRM;
+          print("STAIR: step1 settled — flip swl MID→UP to continue\r\n");
+        }
+        break;
+      case StairClimbState::STEP1_CONFIRM:
+        sc_set_all();
+        if (sc_confirm_check()) {
+          stair_climb_state = StairClimbState::STEP2_MOVE;
+          print("STAIR: step2 start\r\n");
+        }
+        break;
+      case StairClimbState::STEP2_MOVE:
+        sc_tgt[1] = 0.0f;
+        sc_tgt[2] = 50.0f * DEG2RAD;
+        sc_set_all();
+        if (fabsf(arm_j2->GetTheta() - sc_tgt[1]) < STAIR_SETTLE_RAD &&
+            fabsf(arm_j3->GetTheta() - sc_tgt[2]) < STAIR_SETTLE_RAD) {
+          stair_climb_state = StairClimbState::STEP2_CONFIRM;
+          print("STAIR: step2 settled — flip swl MID→UP to continue\r\n");
+        }
+        break;
+      case StairClimbState::STEP2_CONFIRM:
+        sc_set_all();
+        if (sc_confirm_check()) {
+          stair_climb_state = StairClimbState::STEP3_MOVE;
+          print("STAIR: step3 start\r\n");
+        }
+        break;
+      case StairClimbState::STEP3_MOVE:
+        sc_tgt[1] = 30.0f * DEG2RAD;
+        sc_set_all();
+        if (fabsf(arm_j2->GetTheta() - sc_tgt[1]) < STAIR_SETTLE_RAD) {
+          stair_climb_state = StairClimbState::STEP3_CONFIRM;
+          print("STAIR: step3 settled — flip swl MID→UP to continue\r\n");
+        }
+        break;
+      case StairClimbState::STEP3_CONFIRM:
+        sc_set_all();
+        if (sc_confirm_check()) {
+          stair_climb_state = StairClimbState::STEP4_MOVE;
+          print("STAIR: step4 start\r\n");
+        }
+        break;
+      case StairClimbState::STEP4_MOVE:
+        sc_tgt[1] = 62.0f * DEG2RAD;
+        sc_tgt[2] = 28.0f * DEG2RAD;
+        sc_set_all();
+        if (fabsf(arm_j2->GetTheta() - sc_tgt[1]) < STAIR_SETTLE_RAD &&
+            fabsf(arm_j3->GetTheta() - sc_tgt[2]) < STAIR_SETTLE_RAD) {
+          stair_climb_state = StairClimbState::STEP4_CONFIRM;
+          print("STAIR: step4 settled — flip swl MID→UP to continue\r\n");
+        }
+        break;
+      case StairClimbState::STEP4_CONFIRM:
+        sc_set_all();
+        if (sc_confirm_check()) {
+          stair_climb_state = StairClimbState::STEP5;
+          print("STAIR: step5 — chassis forward\r\n");
+        }
+        break;
+      case StairClimbState::STEP5:
+      default:
+        sc_set_all();  // hold final arm pose while main_mc02 drives chassis
+        break;
+    }
+  } else {
+    // ── Normal cmd_target_deg path ─────────────────────────────────────
+    // After homing, clamp to per-joint motor-angle limits (second defence after
+    // the RX filter).  Before homing the arm may legitimately sit outside the
+    // operational range (startup / post-disable), so clamping is skipped then —
+    // applying it would snap the arm to the limit boundary on first enable.
+    const float t0 = arm_homed ? clamp((float)cmd_target_deg[0], ARM_CMD_MIN_DEG[0], ARM_CMD_MAX_DEG[0]) : (float)cmd_target_deg[0];
+    const float t1 = arm_homed ? clamp((float)cmd_target_deg[1], ARM_CMD_MIN_DEG[1], ARM_CMD_MAX_DEG[1]) : (float)cmd_target_deg[1];
+    const float t2 = arm_homed ? clamp((float)cmd_target_deg[2], ARM_CMD_MIN_DEG[2], ARM_CMD_MAX_DEG[2]) : (float)cmd_target_deg[2];
+    const float t3 = arm_homed ? clamp((float)cmd_target_deg[3], ARM_CMD_MIN_DEG[3], ARM_CMD_MAX_DEG[3]) : (float)cmd_target_deg[3];
+    const float t4 = arm_homed ? clamp((float)cmd_target_deg[4], ARM_CMD_MIN_DEG[4], ARM_CMD_MAX_DEG[4]) : (float)cmd_target_deg[4];
+    const float t5 = arm_homed ? clamp((float)cmd_target_deg[5], ARM_CMD_MIN_DEG[5], ARM_CMD_MAX_DEG[5]) : (float)cmd_target_deg[5];
+    arm_j1->SetOutput(t0 * DEG2RAD, ARM_VEL_LIM[0]);
+    arm_j2->SetOutput(t1 * DEG2RAD, ARM_VEL_LIM[1], J23_CURRENT_LIM);
+    arm_j3->SetOutput(t2 * DEG2RAD, ARM_VEL_LIM[2], J23_CURRENT_LIM);
+    arm_j4->SetOutput(t3 * DEG2RAD, ARM_VEL_LIM[3]);
+    arm_j5->SetOutput(t4 * DEG2RAD, ARM_VEL_LIM[4]);
+    arm_j6->SetOutput(t5 * DEG2RAD, ARM_VEL_LIM[5], J6_CURRENT_LIM);
+  }
   
   // ── 6. Gripper FSM (edge-triggered via BoolEdgeDetector) ────────────────
   //   MID  posEdge → start opening
@@ -685,16 +810,19 @@ void ArmUpdate(bool test_mode) {
   swl_down.input(dbus->swl == remote::DOWN);
   swl_up.input(dbus->swl == remote::UP);
 
-  if (swl_mid.posEdge()) {
-    grip_open_stall_count = 0;
-    grip_state = GripState::OPENING;
-  } else if (swl_down.posEdge()) {
-    if (grip_state != GripState::CLOSING && grip_state != GripState::HOLDING) {
-      grip_state = GripState::CLOSING;
-    }
-  } else if (swl_up.posEdge()) {
-    if (grip_state == GripState::OPENING || grip_state == GripState::CLOSING) {
-      grip_state = GripState::IDLE;
+  // Suppress gripper transitions during stair mode (swl is used for confirmation).
+  if (!stair_climb_active) {
+    if (swl_mid.posEdge()) {
+      grip_open_stall_count = 0;
+      grip_state = GripState::OPENING;
+    } else if (swl_down.posEdge()) {
+      if (grip_state != GripState::CLOSING && grip_state != GripState::HOLDING) {
+        grip_state = GripState::CLOSING;
+      }
+    } else if (swl_up.posEdge()) {
+      if (grip_state == GripState::OPENING || grip_state == GripState::CLOSING) {
+        grip_state = GripState::IDLE;
+      }
     }
   }
 
