@@ -33,3 +33,10 @@ irm_add_arm_executable(${PROJECT_NAME}_mc02
     INCLUDES
         ${CMAKE_SOURCE_DIR}/vehicles/Engineer2026
         ${CMAKE_SOURCE_DIR}/vehicles/Engineer/chassis/include)
+
+irm_add_arm_executable(${PROJECT_NAME}_gripper_only_mc02
+    TARGET DM_MC_02
+    SOURCES
+        gripper_only_main_mc02.cc
+    INCLUDES
+        ${CMAKE_SOURCE_DIR}/vehicles/Engineer2026)

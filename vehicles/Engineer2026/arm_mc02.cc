@@ -72,7 +72,7 @@ static constexpr uint16_t GRIP_RX_ID   = 0x206;                    // Motor2006
 
 // ── Velocity & current limits ────────────────────────────────────────────────
 // Velocity limit forwarded to motor controllers [rad/s].
-static constexpr float ARM_VEL_LIM[6] = {1.2f, 1.2f, 1.2f, 3.0f, 3.0f, 3.6f};
+static constexpr float ARM_VEL_LIM[6] = {1.2f, 1.2f, 1.2f, 3.0f, 1.5f, 3.6f};
 
 // J2/J3 FORCE_POS: peak current as a fraction of 99.74 A motor max [0, 1.0].
 // Start at 50 % and reduce if motors run warm.
