@@ -93,7 +93,7 @@ void RM_RTOS_Default_Task(const void* args) {
   // int slide_output = 0;
   int16_t arm_roll_output = 800;
   int16_t arm_claw_rotate_output = 1500;
-  int16_t arm_claw_output = 1000;
+  int16_t arm_claw_output = 1400;
 
   control::MotorCANBase* arm[] = {arm_slide_motor};
 
@@ -128,13 +128,13 @@ void RM_RTOS_Default_Task(const void* args) {
       control_inputs[7].input(length > 0 && *data == 's');  // Slide Backward
       control_inputs[8].input(length > 0 && *data == 'p');  // Reset
     }
-
+    
     if (control_inputs[0].posEdge()) {
       arm_claw_output += 50;
     } else if (control_inputs[1].posEdge()) {
       arm_claw_output -= 50;
     }
-
+    
     if (control_inputs[2].posEdge()) {
       arm_claw_rotate_output += 10;
     } else if (control_inputs[3].posEdge()) {
@@ -148,14 +148,14 @@ void RM_RTOS_Default_Task(const void* args) {
     }
 
     if (control_inputs[6].posEdge()) {
-      // slide_target += 0.1f;
+      slide_target -= 0.1f;
       // This Go Up
-      slide_target = -6.7f;  // temporary hard limit to prevent hitting the wall
+      //slide_target = -6.7f;  // temporary hard limit to prevent hitting the wall
       arm_slide->SetTarget(slide_target, true);
     } else if (control_inputs[7].posEdge()) {
-      // slide_target -= 0.1f;
+      slide_target += 0.1f;
       // This Go Down
-      slide_target = -0.6f;  // temporary hard limit to prevent hitting the
+      //slide_target = -0.2f;  // temporary hard limit to prevent hitting the
       arm_slide->SetTarget(slide_target, true);
     }
 
@@ -169,7 +169,7 @@ void RM_RTOS_Default_Task(const void* args) {
     arm_slide->CalcOutput();
     control::MotorCANBase::TransmitOutput(arm, 1);
 
-    arm_claw_output = clip<int16_t>(arm_claw_output, 500, 2500);
+    arm_claw_output = clip<int16_t>(arm_claw_output, 1200, 1750);
     arm_claw_rotate_output = clip<int16_t>(arm_claw_rotate_output, 500, 2500);
     arm_roll_output = clip<int16_t>(arm_roll_output, 500, 2500);
     arm_claw->SetOutput(arm_claw_output);

@@ -45,6 +45,16 @@
 #define MOTOR_TEMP_LOW_THRESHOLD 40
 #define ALARM_INTERVAL 100
 
+#define CLAW_PWM_CHANNEL 4         // Pin PD15 = TIM4_CH4
+#define CLAW_ROTATE_PWM_CHANNEL 3  // Pin PD14 = TIM4_CH3
+#define ARM_ROLL_PWM_CHANNEL 2     // Pin PD13 = TIM4_CH2
+
+#define TIM_CLOCK_FREQ 1000000  // Using TIM4 (prescaler=83 → counter at 1 MHz)
+#define SERVO_OUT_FREQ 333
+
+#define MAX_IOUT2006 10000
+#define MAX_OUT2006 10000
+
 #define MAP_RANGE(x, in_min, in_max, out_min, out_max) \
   (((float)(x) - (float)(in_min)) * ((float)(out_max) - (float)(out_min)) / \
   ((float)(in_max) - (float)(in_min)) + (float)(out_min))
@@ -90,6 +100,19 @@ control::MotorCANBase* load_motor_2 = nullptr;
 control::MotorCANBase* force_motor = nullptr;
 control::MotorCANBase* yaw_motor = nullptr;
 
+void setServoOutput();
+// Claw Motors
+control::MotorPWMBase* arm_claw = nullptr;
+control::MotorPWMBase* arm_claw_rotate = nullptr;
+control::Motor2006* arm_slide_motor = nullptr;
+control::ServoMotor* arm_slide = nullptr;
+control::MotorPWMBase* arm_roll = nullptr;
+
+// Initial Arm Motor Outputs
+int16_t arm_roll_output = 800;
+int16_t arm_claw_rotate_output = 1500;
+int16_t arm_claw_output = 1400;
+
 // Communication
 static remote::DBUS* dbus = nullptr;
 static bsp::CAN* can1 = nullptr;
@@ -123,13 +146,15 @@ const osThreadAttr_t dartLoadTaskAttribute = {.name = "dartLoadTask",
 void dartLoadTask(void* arg) {
   UNUSED(arg);
 
+  int8_t darts_left = 3;
+
   float param[] = {Kp_load, Ki_load, Kd_load};
   control::PIDController pid_yaw(50, 5, 10);
   control::ConstrainedPID pid_left(param, MAX_IOUT, MAX_OUT);
   control::ConstrainedPID pid_right(param, MAX_IOUT, MAX_OUT);
   control::ConstrainedPID pid_force(param, MAX_IOUT, MAX_OUT);
 
-  control::MotorCANBase* motors_can1_load[] = {load_motor_1, load_motor_2, force_motor};
+  control::MotorCANBase* motors_can1_load[] = {load_motor_1, load_motor_2, force_motor, arm_slide_motor};
   control::MotorCANBase* yaw_motors[] = {yaw_motor};
 
   float load_target_speed = 0;
@@ -142,8 +167,15 @@ void dartLoadTask(void* arg) {
   BoolEdgeDetector reverse_trigger(false);
   BoolEdgeDetector release_trigger(false);
   BoolEdgeDetector load_mode_switch(false);
+  BoolEdgeDetector dart_load_toggle(false);
 
   trigger_motor->SetOutput(TRIGGER_RELEASE_OUTPUT);
+
+  // Wait for first CAN feedback so GetTheta() returns the real position
+  osDelay(100);
+  float slide_target = arm_slide->GetTheta();  // lock onto starting position
+  arm_slide->SetTarget(slide_target);          // arm servo to hold start position
+
   while (true) {
     // ---- Temperature protection ----
     load_motor_temperature = load_motor_1->GetTemp();
@@ -163,6 +195,8 @@ void dartLoadTask(void* arg) {
     } else {
       alarm_counter = 0;
     }
+
+    dart_load_toggle.input(dbus->swl == remote::DOWN);
 
     // ---- Load mode switching ----
     load_mode_switch.input(dbus->swr == remote::DOWN);
@@ -187,10 +221,15 @@ void dartLoadTask(void* arg) {
       // Bump switch: reads 0 when hit (active low), 1 otherwise
       bool bump_hit = !bump_switch->Read();
       load_trigger.input(dbus->swl == remote::UP);
-      reverse_trigger.input(dbus->swl == remote::DOWN);
+      reverse_trigger.input(dbus->swl == remote::MID);
       release_trigger.input(dbus->swr == remote::UP);
       switch (load_state) {
         case LoadState::IDLE:
+          slide_target = -5.0f;
+          arm_roll_output = 1600;
+          arm_claw_rotate_output = 1800;
+          arm_claw_output = 1400;
+          osDelay(1000);
           if (release_trigger.posEdge())
             trigger_motor->SetOutput(TRIGGER_RELEASE_OUTPUT);
           load_target_speed = 0;
@@ -201,6 +240,45 @@ void dartLoadTask(void* arg) {
           break;
         // TODO: This will be the place holder for extra loading mechanism for getting the dart out of the storing catridges
         case LoadState::LOADING_DOWN:
+          if (dart_load_toggle.posEdge() && darts_left > 0) {
+            slide_target = -2.0f;
+            arm_claw_output = 1300;
+            if (darts_left == 3) {
+              arm_roll_output = 1280;
+              arm_claw_rotate_output = 2170;
+            } 
+            else if (darts_left == 2) {
+              arm_roll_output = 1630;
+              arm_claw_rotate_output = 1700;
+            }
+            else if (darts_left == 1) {
+              arm_roll_output = 1920;
+              arm_claw_rotate_output = 1450;
+            }
+
+            setServoOutput();
+            osDelay(1000);
+            arm_claw_output = 1500;
+            setServoOutput();
+            osDelay(1000);
+            slide_target = -7.0f;
+            setServoOutput();
+            osDelay(1000);
+            arm_roll_output = 800;
+            arm_claw_rotate_output = 1500;
+            slide_target = -2.0f;
+            setServoOutput();
+            osDelay(1000);
+            arm_claw_output = 1300;
+            setServoOutput();
+            osDelay(1000);
+            slide_target = -7.0f;
+            arm_roll_output = 1600;
+            arm_claw_rotate_output = 1800;
+            setServoOutput();
+            osDelay(1000);
+            darts_left -= 1;
+          }
           if (bump_hit) {
             // Bump switch hit — dart is seated; hold trigger and stop descent
             trigger_motor->SetOutput(TRIGGER_HOLD_OUTPUT);
@@ -240,8 +318,6 @@ void dartLoadTask(void* arg) {
       // ---- Manual load control (legacy behavior) ----
       if (dbus->swr == remote::UP) {
         trigger_motor->SetOutput(TRIGGER_RELEASE_OUTPUT);
-      } else {
-        trigger_motor->SetOutput(TRIGGER_HOLD_OUTPUT);
       }
 
       if (dbus->swl == remote::UP) {
@@ -252,6 +328,9 @@ void dartLoadTask(void* arg) {
         load_target_speed = 0;
       }
     }
+
+    // ---- Arm Motors ----
+    setServoOutput();
 
     // ---- Load motor PID ----
 
@@ -266,7 +345,7 @@ void dartLoadTask(void* arg) {
     print("Force Motor Output: ", pid_force.ComputeConstrainedOutput(diff_force));
     force_motor->SetOutput(pid_force.ComputeConstrainedOutput(diff_force));
 
-    control::MotorCANBase::TransmitOutput(motors_can1_load, 3);
+    control::MotorCANBase::TransmitOutput(motors_can1_load, 4);
 
     // ---- Yaw motor ----
     if (dbus->ch0 > 300) {
@@ -302,6 +381,28 @@ void RM_RTOS_Init() {
   load_motor_2 = new control::Motor3508(can1, 0x202);
   force_motor = new control::Motor2006(can1, 0x204);
   yaw_motor = new control::Motor3508(can1, 0x205);
+
+  // Arm Motors
+  arm_claw = new control::MotorPWMBase(&htim4, CLAW_PWM_CHANNEL, TIM_CLOCK_FREQ, SERVO_OUT_FREQ, 0);
+  arm_claw_rotate = new control::MotorPWMBase(&htim4, CLAW_ROTATE_PWM_CHANNEL, TIM_CLOCK_FREQ, SERVO_OUT_FREQ, 0);
+  arm_roll = new control::MotorPWMBase(&htim4, ARM_ROLL_PWM_CHANNEL, TIM_CLOCK_FREQ, SERVO_OUT_FREQ, 0);
+
+  arm_slide_motor = new control::Motor2006(can1, 0x203);
+  float omega_pid_params[3] = {0.0f, 0.0f, 0.0f};  // unused in direct PD mode (pos_kp > 0)
+  control::servo_t slide_servo = {
+      .motor = arm_slide_motor,
+      .max_speed = 5.0f,  // output-shaft rad/s — caps travel speed via P-term clamping
+      .max_acceleration = 50.0f,
+      .transmission_ratio = 36.0f,  // M2006P36 gear ratio
+      .omega_pid_param = omega_pid_params,
+      .max_iout = MAX_IOUT2006,
+      .max_out = MAX_OUT2006,
+      .omega_lpf_alpha = 0.5f,
+      .pos_kp = 80000.0f,  // full torque at 0.125 rad (~7°) position error
+      .pos_kd = 2000.0f,   // damping: ~1400 counts at max output speed (~0.7 rad/s)
+  };
+  // align_angle=-1 → auto-latch on first CAN packet
+  arm_slide = new control::ServoMotor(slide_servo, -1);
 
   // Initialize weighing scale with address 1, standard frame, using CAN2
   // Constructor automatically registers CAN callbacks for weight responses
@@ -365,4 +466,15 @@ void RM_RTOS_Default_Task(const void* args) {
     osDelay(200);
     loop_count++;
   }
+}
+
+void setServoOutput() {
+  arm_slide->CalcOutput();
+
+  arm_claw_output = clip<int16_t>(arm_claw_output, 1200, 1750);
+  arm_claw_rotate_output = clip<int16_t>(arm_claw_rotate_output, 500, 2500);
+  arm_roll_output = clip<int16_t>(arm_roll_output, 500, 2500);
+  arm_claw->SetOutput(arm_claw_output);
+  arm_claw_rotate->SetOutput(arm_claw_rotate_output);
+  arm_roll->SetOutput(arm_roll_output);
 }

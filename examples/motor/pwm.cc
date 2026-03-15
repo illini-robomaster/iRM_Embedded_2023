@@ -33,9 +33,8 @@ control::MotorPWMBase* motor2;
 
 void RM_RTOS_Init() {
   print_use_uart(&huart8);
-  motor2 = new control::MotorPWMBase(&htim4, 3, 84000000, 333, 0);
+  motor2 = new control::MotorPWMBase(&htim4, 1, 1000000, 333, 0);
   motor2->SetOutput(1500);
-  // Snail need to be run at idle throttle for some
   osDelay(3000);
 }
 
