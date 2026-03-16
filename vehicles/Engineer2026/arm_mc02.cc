@@ -43,8 +43,8 @@
 #include "usart.h"
 #include "utils.h"
 
-// #define TEST_UART_TRANSMISSION  // uncomment this line to test the transmission from mcu to ros2
-// #define TEST_UART_RECEIVE  // uncomment this line to test the reception of UART Joint Variables from ros2 to mcu
+#define TEST_UART_TRANSMISSION  // uncomment this line to test the transmission from mcu to ros2
+#define TEST_UART_RECEIVE  // uncomment this line to test the reception of UART Joint Variables from ros2 to mcu
 
 #ifdef TEST_UART_TRANSMISSION
 bool test_ros_tx = true;
@@ -153,6 +153,12 @@ volatile float cmd_target_deg[6] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
 // Written by ArmUartTask, read by ArmUpdate.
 volatile uint32_t last_valid_rx_tick = 0;
 volatile bool arm_enabled = false;
+
+// Bumpless-enable holdoff — prevents the UART task from overwriting the
+// encoder-based cmd_target_deg snapshot with stale/zero values from ROS
+// during the first few hundred ms after enable.  Set by ArmUpdate's
+// bumpless-enable block, checked by ArmUartTask before writing cmd_target_deg.
+volatile uint32_t bumpless_holdoff_until = 0;
 
 // Safe-park state machine — non-blocking, runs inside ArmUpdate's 200 Hz loop.
 // arm_parking is non-static so arm_uart_task.cc can check it via extern.
@@ -286,18 +292,18 @@ void ArmSafePark() {
   // Prevent the UART task from re-enabling the arm during the park sequence.
   arm_parking = true;
 
-  // ── Phase 1: Home all joints to 0 ─────────────────────────────────────────
-  // Uses the existing sequential homing routine (J3→J2→J4→J5→J6→J1).
-  // This is blocking but safe — called from the kill-switch handler where the
-  // operator has deliberately decided to shut down.
-  print("ARM SAFE PARK: homing all joints to 0 first...\r\n");
-  ArmHomeSequence();
+  // Reset stair-climb state — re-enabling after park should not resume a
+  // half-finished stair sequence from unexpected joint positions.
+  stair_climb_state  = StairClimbState::IDLE;
+  stair_climb_active = false;
 
-  // ── Phase 2: Park J2/J3 to gravity-safe positions ─────────────────────────
+  // Skip ArmHomeSequence() — the kill switch must respond in seconds, not the
+  // 60+ seconds that sequential homing can take.  Park J2/J3 directly from
+  // wherever the arm is; the gravity-safe position is all that matters.
   print("ARM SAFE PARK: moving J2→%.1f J3→%.1f before disable...\r\n",
         PARK_J2_RAD, PARK_J3_RAD);
 
-  // Freeze other joints at their current position (should be ~0 after homing).
+  // Freeze other joints at their current position.
   const float hold_j4 = arm_j4->GetTheta();
   const float hold_j5 = arm_j5->GetTheta();
   const float hold_j6 = arm_j6->GetTheta();
@@ -550,12 +556,11 @@ void ArmStairClimbMarkDone() {
  *
  * @param test_mode  If true, poll encoders only — no motor commands, no watchdog.
  */
-
+BoolEdgeDetector rezero_edge_detector(false);  // detects rising edge of cmd_target_deg[i] crossing zero
 void ArmUpdate(bool test_mode) {
   // ── 1. Test mode: read encoders without driving motors ───────────────────
 
   if (test_mode) {
-    if (!arm_enabled) ArmEnable();
 
     // MotorDisable solicits CAN feedback without commanding motion.
     arm_j1->MotorDisable();
@@ -571,15 +576,23 @@ void ArmUpdate(bool test_mode) {
             arm_j3->GetTheta(), arm_j4->GetTheta(),
             arm_j5->GetTheta(), arm_j6->GetTheta());
     }
+    rezero_edge_detector.input(dbus->swl == remote::UP);
+    if (rezero_edge_detector.posEdge()){
+      arm_j4->SetZeroPos();
+      print("successfully rezeroed J4");
+    }
 
     return;  // nothing else to do in test mode
   }
 
   // ── 2. Watchdog → start non-blocking park ────────────────────────────────
-  if (arm_enabled && !arm_parking && !stair_climb_active &&
+  if (arm_enabled && !arm_parking &&
       (HAL_GetTick() - last_valid_rx_tick > WATCHDOG_MS)) {
     print("ARM WATCHDOG: no UART for >%lu ms — parking before disable\r\n",
           (unsigned long)WATCHDOG_MS);
+    // Reset stair-climb — don't resume a half-finished sequence after re-enable.
+    stair_climb_state  = StairClimbState::IDLE;
+    stair_climb_active = false;
     arm_parking = true;
     park_deadline = HAL_GetTick() + PARK_TIMEOUT_MS;
     park_hold_j1 = arm_j1->GetTheta();
@@ -654,6 +667,12 @@ void ArmUpdate(bool test_mode) {
   // is not called when swr == DOWN.
   if (!arm_enabled && last_valid_rx_tick != 0 &&
       (HAL_GetTick() - last_valid_rx_tick < WATCHDOG_MS)) {
+    // Set holdoff FIRST to prevent the higher-priority UART task from
+    // overwriting cmd_target_deg between our encoder snapshot and enable.
+    // Without this, the UART task can preempt mid-snapshot, see an expired
+    // holdoff, and write ROS commands over our encoder values — causing the
+    // arm to snap to a stale target on enable.
+    bumpless_holdoff_until = HAL_GetTick() + 500;
     for (int i = 0; i < 6; ++i) {
       float theta = 0.0f;
       switch (i) {
@@ -688,12 +707,12 @@ void ArmUpdate(bool test_mode) {
   if (stair_climb_active) {
     // ── Stair state machine ────────────────────────────────────────────
     auto sc_set_all = [&]() {
-      arm_j1->SetOutput(sc_tgt[0], ARM_VEL_LIM[0]);
-      arm_j2->SetOutput(sc_tgt[1], ARM_VEL_LIM[1], J23_CURRENT_LIM);
-      arm_j3->SetOutput(sc_tgt[2], ARM_VEL_LIM[2], J23_CURRENT_LIM);
-      arm_j4->SetOutput(sc_tgt[3], ARM_VEL_LIM[3]);
-      arm_j5->SetOutput(sc_tgt[4], ARM_VEL_LIM[4]);
-      arm_j6->SetOutput(sc_tgt[5], ARM_VEL_LIM[5], J6_CURRENT_LIM);
+      arm_j1->SetOutput(sc_tgt[0], ARM_VEL_LIM[0]/2);
+      arm_j2->SetOutput(sc_tgt[1], ARM_VEL_LIM[1]/2, J23_CURRENT_LIM);
+      arm_j3->SetOutput(sc_tgt[2], ARM_VEL_LIM[2]/2, J23_CURRENT_LIM);
+      arm_j4->SetOutput(sc_tgt[3], ARM_VEL_LIM[3]/2);
+      arm_j5->SetOutput(sc_tgt[4], ARM_VEL_LIM[4]/2);
+      arm_j6->SetOutput(sc_tgt[5], ARM_VEL_LIM[5]/2, J6_CURRENT_LIM);
     };
     auto sc_confirm_check = [&]() -> bool {
       if (!sc_swl_saw_mid && dbus->swl == remote::MID) sc_swl_saw_mid = true;
@@ -725,7 +744,7 @@ void ArmUpdate(bool test_mode) {
         break;
       case StairClimbState::STEP2_MOVE:
         sc_tgt[1] = 0.0f;
-        sc_tgt[2] = 50.0f * DEG2RAD;
+        sc_tgt[2] = -(50.0f * DEG2RAD);
         sc_set_all();
         if (fabsf(arm_j2->GetTheta() - sc_tgt[1]) < STAIR_SETTLE_RAD &&
             fabsf(arm_j3->GetTheta() - sc_tgt[2]) < STAIR_SETTLE_RAD) {
@@ -756,8 +775,8 @@ void ArmUpdate(bool test_mode) {
         }
         break;
       case StairClimbState::STEP4_MOVE:
-        sc_tgt[1] = 62.0f * DEG2RAD;
-        sc_tgt[2] = 28.0f * DEG2RAD;
+        sc_tgt[1] = 65.0f * DEG2RAD;
+        sc_tgt[2] = -25.0f * DEG2RAD;
         sc_set_all();
         if (fabsf(arm_j2->GetTheta() - sc_tgt[1]) < STAIR_SETTLE_RAD &&
             fabsf(arm_j3->GetTheta() - sc_tgt[2]) < STAIR_SETTLE_RAD) {
@@ -838,16 +857,16 @@ void ArmUpdate(bool test_mode) {
         if (++grip_open_stall_count >= GRIP_STALL_DEBOUNCE) {
           grip_open_stall_count = 0;
           grip_state = GripState::IDLE;
-          print("GRIPPER: open stall — idle\r\n");
+          // print("GRIPPER: open stall — idle\r\n");
         }
       } else {
         grip_open_stall_count = 0;
       }
-      print("gripper current: %d \r\n", gripper->GetCurr());
+      // print("gripper current: %d \r\n", gripper->GetCurr());
       break;
     case GripState::CLOSING:
       gripper->SetOutput(GRIP_CLOSE_CURRENT);
-      print("gripper current: %d \r\n",gripper->GetCurr());
+      // print("gripper current: %d \r\n",gripper->GetCurr());
       if (gripper->GetCurr() > GRIP_STALL_THRESH) {
         grip_hold_pos = gripper->GetTheta();
         grip_state = GripState::HOLDING;

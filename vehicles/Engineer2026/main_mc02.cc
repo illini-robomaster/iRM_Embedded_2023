@@ -510,10 +510,9 @@ void RM_RTOS_Default_Task(const void* args) {
     float lift_pos, lift_vel, lift_cur;
     bool stair_lift_up = stair_climb_active &&
                          (stair_climb_state == StairClimbState::STEP4_MOVE ||
-                          stair_climb_state == StairClimbState::STEP4_CONFIRM ||
-                          stair_climb_state == StairClimbState::STEP5);
+                          stair_climb_state == StairClimbState::STEP4_CONFIRM);
     if (stair_lift_up) {
-      lift_pos = -1.0f;
+      lift_pos = -1.0f; 
       lift_vel = 0.5f;
       lift_cur = 0.5f;
     // } else if (dbus->swr == remote::UP) {

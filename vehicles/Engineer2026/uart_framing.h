@@ -72,5 +72,6 @@ bool UartRxParseFrame(const uint8_t* buf, float out_targets[6]);
  *
  * @param uart  Destination UART peripheral (must not be nullptr).
  * @param enc   Six joint angles in degrees.
+ * @return Number of bytes written (UART_FRAME_LEN on success, less on failure).
  */
-void UartTxSendFeedback(bsp::UART* uart, const float enc[6]);
+int32_t UartTxSendFeedback(bsp::UART* uart, const float enc[6]);

@@ -57,6 +57,7 @@ extern control::MotorDMJ3507*  arm_j6;
 extern volatile float    cmd_target_deg[6];
 extern volatile uint32_t last_valid_rx_tick;
 extern volatile bool     arm_enabled;
+extern volatile uint32_t bumpless_holdoff_until;
 
 extern bool test_ros_tx;
 extern bool test_ros_rx;
@@ -78,6 +79,28 @@ const osThreadAttr_t armUartTaskAttr = {.name = "armUartTask",
                                         .tz_module = 0,
                                         .reserved = 0};
 
+// ── Diagnostic counters ──────────────────────────────────────────────────────
+static uint32_t diag_rx_frames  = 0;  // valid RX frames parsed this period
+static uint32_t diag_rx_bad     = 0;  // corrupt/rejected RX frames this period
+static uint32_t diag_rx_bytes   = 0;  // total RX bytes this period
+static uint32_t diag_tx_frames  = 0;  // TX frames sent this period
+static uint32_t diag_tx_fails   = 0;  // TX write failures (short writes)
+static bool     diag_ever_rx    = false;  // has any valid RX frame ever arrived?
+
+// ── UART error recovery ─────────────────────────────────────────────────────
+// The BSP error handler only clears PE (parity error).  ORE (overrun), FE
+// (framing), and NE (noise) flags are NOT cleared, which can silently stop
+// the DMA from receiving further bytes.  We periodically clear all error
+// flags when no RX data has arrived, as a belt-and-suspenders recovery.
+extern UART_HandleTypeDef huart10;
+
+static void UartClearErrorFlags() {
+  __HAL_UART_CLEAR_OREFLAG(&huart10);   // overrun error
+  __HAL_UART_CLEAR_FEFLAG(&huart10);    // framing error
+  __HAL_UART_CLEAR_NEFLAG(&huart10);    // noise error
+  __HAL_UART_CLEAR_PEFLAG(&huart10);    // parity error
+}
+
 // ── ArmUartTask ──────────────────────────────────────────────────────────────
 
 void ArmUartTask(void* arg) {
@@ -94,11 +117,19 @@ void ArmUartTask(void* arg) {
   uint32_t next_tx_tick = HAL_GetTick();
   // Encoder poll rate when arm is not yet enabled: every 50 ms (20 Hz).
   uint32_t next_poll_tick = HAL_GetTick();
+  // Diagnostic print every 5 s.
+  uint32_t next_diag_tick = HAL_GetTick() + 5000;
+  // Error flag recovery every 2 s when no RX has arrived.
+  uint32_t next_recovery_tick = HAL_GetTick() + 2000;
+
+  print("ARM UART: task started, waiting for OrangePi...\r\n");
 
   while (true) {
     // ── 1. UART RX: accumulate bytes, parse complete frames ──────────────
     uint8_t* rx_buf = nullptr;
     int32_t rx_len = arm_uart->Read(&rx_buf);
+    diag_rx_bytes += (rx_len > 0) ? (uint32_t)rx_len : 0;
+
     for (int32_t i = 0; i < rx_len; ++i) {
       uint8_t b = rx_buf[i];
       if (b == 0xA5u) {
@@ -126,8 +157,25 @@ void ArmUartTask(void* arg) {
               }
             }
             if (ok) {
-              for (int j = 0; j < 6; ++j) cmd_target_deg[j] = new_targets[j];
+              if (!diag_ever_rx) {
+                diag_ever_rx = true;
+                print("ARM UART: first RX from OrangePi at t=%lums\r\n",
+                      (unsigned long)HAL_GetTick());
+              }
+              // Always update watchdog — keeps ArmUpdate from triggering the
+              // 2 s timeout even during the bumpless holdoff window.
               last_valid_rx_tick = HAL_GetTick();
+              diag_rx_frames++;
+
+              // During bumpless holdoff, skip cmd_target_deg writes so the
+              // encoder-position snapshot from ArmUpdate isn't overwritten
+              // with stale/zero values from ROS (which hasn't received
+              // encoder feedback yet).  The holdoff expires after 500 ms.
+              if (HAL_GetTick() < bumpless_holdoff_until) {
+                // Holdoff active — discard command but keep watchdog alive.
+              } else {
+                for (int j = 0; j < 6; ++j) cmd_target_deg[j] = new_targets[j];
+              }
               if (test_ros_rx) {
                 print("ARM UART RX | J1=%6.2f J2=%6.2f J3=%6.2f J4=%6.2f J5=%6.2f J6=%6.2f [deg]\r\n",
                       cmd_target_deg[0], cmd_target_deg[1], cmd_target_deg[2],
@@ -137,7 +185,11 @@ void ArmUartTask(void* arg) {
               // handles data (cmd_target_deg + last_valid_rx_tick).  The
               // bumpless-enable decision lives in ArmUpdate() so it naturally
               // respects the kill switch (ArmUpdate isn't called when swr==DOWN).
+            } else {
+              diag_rx_bad++;
             }
+          } else {
+            diag_rx_bad++;
           }
           local_rx_len = 0;
         }
@@ -157,7 +209,17 @@ void ArmUartTask(void* arg) {
       arm_j6->MotorDisable();
     }
 
-    // ── 4. UART TX: send encoder feedback at 200 Hz (every 5 ms) ────────────
+    // ── 3. UART error flag recovery ─────────────────────────────────────
+    // Periodically clear UART error flags (ORE/FE/NE/PE).  Run regardless
+    // of whether any valid frame has arrived: a stuck error flag after the
+    // first successful RX is just as capable of stopping DMA as one at
+    // startup.  Clearing already-clear flags is a harmless no-op.
+    if (HAL_GetTick() >= next_recovery_tick) {
+      next_recovery_tick = HAL_GetTick() + 2000;
+      UartClearErrorFlags();
+    }
+
+    // ── 4. UART TX: send encoder feedback at 200 Hz (every 5 ms) ────────
     if (HAL_GetTick() >= next_tx_tick) {
       next_tx_tick = HAL_GetTick() + 5;  // 200 Hz
       const float enc[6] = {
@@ -172,7 +234,38 @@ void ArmUartTask(void* arg) {
         print("ARM UART TX | J1=%6.2f J2=%6.2f J3=%6.2f J4=%6.2f J5=%6.2f J6=%6.2f [deg]\r\n",
               enc[0], enc[1], enc[2], enc[3], enc[4], enc[5]);
       }
-      UartTxSendFeedback(arm_uart, enc);
+      int32_t written = UartTxSendFeedback(arm_uart, enc);
+      if (written == (int32_t)UART_FRAME_LEN) {
+        diag_tx_frames++;
+      } else {
+        diag_tx_fails++;
+      }
+    }
+
+    // ── 5. Diagnostics: print UART health every 5 s ─────────────────────
+    if (HAL_GetTick() >= next_diag_tick) {
+      next_diag_tick = HAL_GetTick() + 5000;
+      uint32_t rx_age = (last_valid_rx_tick > 0)
+                            ? (HAL_GetTick() - last_valid_rx_tick)
+                            : 0xFFFFFFFFu;
+      print("ARM UART DIAG | rx=%lu bad=%lu bytes=%lu tx=%lu tx_fail=%lu "
+            "rx_age=%lums arm=%s\r\n",
+            (unsigned long)diag_rx_frames, (unsigned long)diag_rx_bad,
+            (unsigned long)diag_rx_bytes,
+            (unsigned long)diag_tx_frames, (unsigned long)diag_tx_fails,
+            (unsigned long)(rx_age == 0xFFFFFFFFu ? 99999u : rx_age),
+            arm_enabled ? "ON" : "off");
+
+      // Clear diagnostic message when no RX has ever arrived.
+      if (!diag_ever_rx) {
+        print("ARM UART: no RX from OrangePi yet — is uart_bridge_node running?\r\n");
+      }
+
+      diag_rx_frames = 0;
+      diag_rx_bad    = 0;
+      diag_rx_bytes  = 0;
+      diag_tx_frames = 0;
+      diag_tx_fails  = 0;
     }
 
     osDelay(2);  // ~500 Hz polling — fast enough for 200 Hz TX and responsive RX

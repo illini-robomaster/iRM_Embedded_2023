@@ -69,7 +69,7 @@ bool UartRxParseFrame(const uint8_t* buf, float out_targets[6]) {
 
 // ── TX encoder ───────────────────────────────────────────────────────────────
 
-void UartTxSendFeedback(bsp::UART* uart, const float enc[6]) {
+int32_t UartTxSendFeedback(bsp::UART* uart, const float enc[6]) {
   uint8_t frame[UART_FRAME_LEN];
   frame[0] = 0xA5u;
   frame[1] = 0x0Cu;
@@ -81,7 +81,7 @@ void UartTxSendFeedback(bsp::UART* uart, const float enc[6]) {
   uint16_t crc  = crc16_modbus(frame, 14);
   frame[14]     = (uint8_t)(crc & 0xFF);
   frame[15]     = (uint8_t)((crc >> 8) & 0xFF);
-  uart->Write(frame, UART_FRAME_LEN);
+  return uart->Write(frame, UART_FRAME_LEN);
 }
 
 
