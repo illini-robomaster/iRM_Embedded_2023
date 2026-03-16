@@ -100,8 +100,13 @@ void RxCompleteCallbackWrapper(UART_HandleTypeDef* huart) {
     __HAL_UART_CLEAR_IDLEFLAG(huart);
   }
 
-  // TODO(alvin): add actual error handler in the future, ignore it for now
+  // Clear all UART error flags (ORE/FE/NE/PE).  On STM32H7 these are
+  // independent ICR bits — clearing only PE leaves ORE/FE/NE set, which
+  // causes the IRQ to re-fire immediately and starve FreeRTOS tasks.
   if (__HAL_UART_GET_IT_SOURCE(huart, UART_IT_ERR)) {
+    __HAL_UART_CLEAR_OREFLAG(huart);
+    __HAL_UART_CLEAR_FEFLAG(huart);
+    __HAL_UART_CLEAR_NEFLAG(huart);
     __HAL_UART_CLEAR_PEFLAG(huart);
   }
 }

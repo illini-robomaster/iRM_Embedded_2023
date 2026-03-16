@@ -373,8 +373,10 @@ ServoMotor::ServoMotor(servo_t data, float align_angle, float proximity_in, floa
   target_angle_ = 0;
   align_angle_ = align_angle;  // Wait for Update to initialize
   motor_angle_ = 0;
+  offset_angle_ = 0;
   servo_angle_ = 0;
   cumulated_angle_ = 0;
+  start_time_ = 0;
   inner_wrap_detector_ = new FloatEdgeDetector(0, PI);
   outer_wrap_detector_ = new FloatEdgeDetector(0, PI);
   hold_detector_ = new BoolEdgeDetector(false);
@@ -432,14 +434,14 @@ void ServoMotor::CalcOutput() {
   uint32_t current_time = GetHighresTickMicroSec();
   if (!hold_) {
     float speed_max_start =
-        (current_time - start_time_) / 10e6 * max_acceleration_ * transmission_ratio_;
+        (current_time - start_time_) / 1e6f * max_acceleration_;
     float speed_max_target = sqrt(2 * max_acceleration_ * abs(target_diff));
     float current_speed = speed_max_start > speed_max_target ? speed_max_target : speed_max_start;
     current_speed = clip<float>(current_speed, 0, max_speed_);
     command = omega_pid_.ComputeConstrainedOutput(
-        motor_->GetOmegaDelta(sign<float>(target_diff, 0) * current_speed));
+        sign<float>(target_diff, 0) * current_speed - motor_->GetOmega());
   } else {
-    command = omega_pid_.ComputeConstrainedOutput(motor_->GetOmegaDelta(target_diff * 50));
+    command = omega_pid_.ComputeConstrainedOutput(target_diff * 50 - motor_->GetOmega());
   }
   motor_->SetOutput(command);
 
