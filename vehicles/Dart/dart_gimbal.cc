@@ -100,8 +100,8 @@ control::MotorCANBase* load_motor_2 = nullptr;
 control::MotorCANBase* force_motor = nullptr;
 control::MotorCANBase* yaw_motor = nullptr;
 
-void setServoOutput(control::MotorCANBase* arm[], float slide_target);
-void waitForMotor(control::MotorCANBase* arm[], float slide_target);
+void setServoOutput(control::MotorCANBase* arm[], float slide_target, float load_target_speed, float force_target_speed);
+void waitForMotor(control::MotorCANBase* arm[], float slide_target, float load_target_speed, float force_target_speed);
 
 // Claw Motors
 control::MotorPWMBase* arm_claw = nullptr;
@@ -149,12 +149,9 @@ void dartLoadTask(void* arg) {
   UNUSED(arg);
 
   int8_t darts_left = 3;
-
-  float param[] = {Kp_load, Ki_load, Kd_load};
+  
   control::PIDController pid_yaw(50, 5, 10);
-  control::ConstrainedPID pid_left(param, MAX_IOUT, MAX_OUT);
-  control::ConstrainedPID pid_right(param, MAX_IOUT, MAX_OUT);
-  control::ConstrainedPID pid_force(param, MAX_IOUT, MAX_OUT);
+  
 
   control::MotorCANBase* motors_can1_load[] = {load_motor_1, load_motor_2, force_motor, arm_slide_motor};
   control::MotorCANBase* yaw_motors[] = {yaw_motor};
@@ -230,11 +227,11 @@ void dartLoadTask(void* arg) {
       switch (load_state) {
         case LoadState::IDLE:
           slide_target = -5.0f;
-          waitForMotor(motors_can1_load, slide_target);
+          waitForMotor(motors_can1_load, slide_target, load_target_speed, force_target_speed);
           arm_roll_output = 1280;
           arm_claw_rotate_output = 1100;
           arm_claw_output = 1250;
-          while ((HAL_GetTick() - current_time) < 2000) setServoOutput(motors_can1_load, slide_target);
+          while ((HAL_GetTick() - current_time) < 2000) setServoOutput(motors_can1_load, slide_target, load_target_speed, force_target_speed);
           if (release_trigger.posEdge())
             trigger_motor->SetOutput(TRIGGER_RELEASE_OUTPUT);
           load_target_speed = 0;
@@ -274,39 +271,39 @@ void dartLoadTask(void* arg) {
             }
               
             current_time = HAL_GetTick();
-            while ((HAL_GetTick() - current_time) < 2000) setServoOutput(motors_can1_load, slide_target);
+            while ((HAL_GetTick() - current_time) < 2000) setServoOutput(motors_can1_load, slide_target, load_target_speed, force_target_speed);
       
             slide_target = 0.1f;
-            waitForMotor(motors_can1_load, slide_target);
+            waitForMotor(motors_can1_load, slide_target, load_target_speed, force_target_speed);
             current_time = HAL_GetTick();
-            while ((HAL_GetTick() - current_time) < 2000) setServoOutput(motors_can1_load, slide_target);
+            while ((HAL_GetTick() - current_time) < 2000) setServoOutput(motors_can1_load, slide_target, load_target_speed, force_target_speed);
       
             arm_claw_output = 1500;
             current_time = HAL_GetTick();
-            while ((HAL_GetTick() - current_time) < 1000) setServoOutput(motors_can1_load, slide_target);
+            while ((HAL_GetTick() - current_time) < 1000) setServoOutput(motors_can1_load, slide_target, load_target_speed, force_target_speed);
       
             slide_target = -5.0f;
-            waitForMotor(motors_can1_load, slide_target);
+            waitForMotor(motors_can1_load, slide_target, load_target_speed, force_target_speed);
             current_time = HAL_GetTick();
-            while ((HAL_GetTick() - current_time) < 2000) setServoOutput(motors_can1_load, slide_target);
+            while ((HAL_GetTick() - current_time) < 2000) setServoOutput(motors_can1_load, slide_target, load_target_speed, force_target_speed);
       
             arm_roll_output = 720;
             arm_claw_rotate_output = 1610;
             current_time = HAL_GetTick();
-            while ((HAL_GetTick() - current_time) < 2000) setServoOutput(motors_can1_load, slide_target);
+            while ((HAL_GetTick() - current_time) < 2000) setServoOutput(motors_can1_load, slide_target, load_target_speed, force_target_speed);
             slide_target = -0.5f;
-            waitForMotor(motors_can1_load, slide_target);
+            waitForMotor(motors_can1_load, slide_target, load_target_speed, force_target_speed);
       
             arm_claw_output = 1250;
             current_time = HAL_GetTick();
-            while ((HAL_GetTick() - current_time) < 1000) setServoOutput(motors_can1_load, slide_target);
+            while ((HAL_GetTick() - current_time) < 1000) setServoOutput(motors_can1_load, slide_target, load_target_speed, force_target_speed);
       
             slide_target = -5.0f;
-            waitForMotor(motors_can1_load, slide_target);
+            waitForMotor(motors_can1_load, slide_target, load_target_speed, force_target_speed);
             arm_roll_output = 1630;
             arm_claw_rotate_output = 770;
             current_time = HAL_GetTick();
-            while ((HAL_GetTick() - current_time) < 2000) setServoOutput(motors_can1_load, slide_target);
+            while ((HAL_GetTick() - current_time) < 2000) setServoOutput(motors_can1_load, slide_target, load_target_speed, force_target_speed);
       
             darts_left -= 1;
           }
@@ -350,39 +347,39 @@ void dartLoadTask(void* arg) {
         }
           
         current_time = HAL_GetTick();
-        while ((HAL_GetTick() - current_time) < 2000) setServoOutput(motors_can1_load, slide_target);
+        while ((HAL_GetTick() - current_time) < 2000) setServoOutput(motors_can1_load, slide_target, load_target_speed, force_target_speed);
   
         slide_target = 0.1f;
-        waitForMotor(motors_can1_load, slide_target);
+        waitForMotor(motors_can1_load, slide_target, load_target_speed, force_target_speed);
         current_time = HAL_GetTick();
-        while ((HAL_GetTick() - current_time) < 2000) setServoOutput(motors_can1_load, slide_target);
+        while ((HAL_GetTick() - current_time) < 2000) setServoOutput(motors_can1_load, slide_target, load_target_speed, force_target_speed);
   
         arm_claw_output = 1500;
         current_time = HAL_GetTick();
-        while ((HAL_GetTick() - current_time) < 1000) setServoOutput(motors_can1_load, slide_target);
+        while ((HAL_GetTick() - current_time) < 1000) setServoOutput(motors_can1_load, slide_target, load_target_speed, force_target_speed);
   
         slide_target = -5.0f;
-        waitForMotor(motors_can1_load, slide_target);
+        waitForMotor(motors_can1_load, slide_target, load_target_speed, force_target_speed);
         current_time = HAL_GetTick();
-        while ((HAL_GetTick() - current_time) < 2000) setServoOutput(motors_can1_load, slide_target);
+        while ((HAL_GetTick() - current_time) < 2000) setServoOutput(motors_can1_load, slide_target, load_target_speed, force_target_speed);
   
         arm_roll_output = 720;
         arm_claw_rotate_output = 1610;
         current_time = HAL_GetTick();
-        while ((HAL_GetTick() - current_time) < 2000) setServoOutput(motors_can1_load, slide_target);
+        while ((HAL_GetTick() - current_time) < 2000) setServoOutput(motors_can1_load, slide_target, load_target_speed, force_target_speed);
         slide_target = -0.5f;
-        waitForMotor(motors_can1_load, slide_target);
+        waitForMotor(motors_can1_load, slide_target, load_target_speed, force_target_speed);
   
         arm_claw_output = 1250;
         current_time = HAL_GetTick();
-        while ((HAL_GetTick() - current_time) < 1000) setServoOutput(motors_can1_load, slide_target);
+        while ((HAL_GetTick() - current_time) < 1000) setServoOutput(motors_can1_load, slide_target, load_target_speed, force_target_speed);
   
         slide_target = -5.0f;
-        waitForMotor(motors_can1_load, slide_target);
+        waitForMotor(motors_can1_load, slide_target, load_target_speed, force_target_speed);
         arm_roll_output = 1630;
         arm_claw_rotate_output = 770;
         current_time = HAL_GetTick();
-        while ((HAL_GetTick() - current_time) < 2000) setServoOutput(motors_can1_load, slide_target);
+        while ((HAL_GetTick() - current_time) < 2000) setServoOutput(motors_can1_load, slide_target, load_target_speed, force_target_speed);
   
         darts_left -= 1;
       }
@@ -399,22 +396,7 @@ void dartLoadTask(void* arg) {
     }
 
     // ---- Arm Motors ----
-    setServoOutput(motors_can1_load, slide_target);
-
-    // ---- Load motor PID ----
-
-    float diff_load_1 = load_motor_1->GetOmegaDelta(-load_target_speed);
-    float diff_load_2 = load_motor_2->GetOmegaDelta(load_target_speed);
-    load_motor_1->SetOutput(pid_left.ComputeConstrainedOutput(diff_load_1));
-    load_motor_2->SetOutput(pid_right.ComputeConstrainedOutput(diff_load_2));
-
-    // ---- Force motor ----
-    force_target_speed = MAP_RANGE((dbus->ch3 < 0) ? dbus->ch3 + 300 : dbus->ch3 - 300, -360, 360, -500, 500);
-    float diff_force = force_motor->GetOmegaDelta(force_target_speed);
-    print("Force Motor Output: ", pid_force.ComputeConstrainedOutput(diff_force));
-    force_motor->SetOutput(pid_force.ComputeConstrainedOutput(diff_force));
-
-    control::MotorCANBase::TransmitOutput(motors_can1_load, 4);
+    setServoOutput(motors_can1_load, slide_target, load_target_speed, force_target_speed);
 
     // ---- Yaw motor ----
     if (dbus->ch0 > 300) {
@@ -537,21 +519,26 @@ void RM_RTOS_Default_Task(const void* args) {
   }
 }
 
-void waitForMotor(control::MotorCANBase* arm[], float slide_target) {
+void waitForMotor(control::MotorCANBase* arm[], float slide_target, float load_target_speed, float force_target_speed) {
   int slide_debounce = 0;
   while (slide_debounce < 3) {
     if (abs(slide_target - arm_slide->GetTheta()) > 0.015) {
-      setServoOutput(arm, slide_target);
+      setServoOutput(arm, slide_target, load_target_speed, force_target_speed);
       slide_debounce = 0;
     } else {
-      setServoOutput(arm, slide_target);
+      setServoOutput(arm, slide_target, load_target_speed, force_target_speed);
       slide_debounce += 1;
     }
   }
 }
 
-void setServoOutput(control::MotorCANBase* arm[], float slide_target) {
-  arm_slide->SetTarget(slide_target, false);
+void setServoOutput(control::MotorCANBase* arm[], float slide_target, float load_target_speed, float force_target_speed) {
+  float param[] = {Kp_load, Ki_load, Kd_load};
+  control::ConstrainedPID pid_left(param, MAX_IOUT, MAX_OUT);
+  control::ConstrainedPID pid_right(param, MAX_IOUT, MAX_OUT);
+  control::ConstrainedPID pid_force(param, MAX_IOUT, MAX_OUT);
+
+  arm_slide->SetTarget(slide_target, true);
   arm_slide->CalcOutput();
   //UNUSED(arm);
 
@@ -561,7 +548,28 @@ void setServoOutput(control::MotorCANBase* arm[], float slide_target) {
   arm_claw->SetOutput(arm_claw_output);
   arm_claw_rotate->SetOutput(arm_claw_rotate_output);
   arm_roll->SetOutput(arm_roll_output);
-  control::MotorCANBase::TransmitOutput(arm, 1);
+
+
+  // ---- Load motor PID ----
+
+  float diff_load_1 = load_motor_1->GetOmegaDelta(-load_target_speed);
+  float diff_load_2 = load_motor_2->GetOmegaDelta(load_target_speed);
+  load_motor_1->SetOutput(pid_left.ComputeConstrainedOutput(diff_load_1));
+  load_motor_2->SetOutput(pid_right.ComputeConstrainedOutput(diff_load_2));
+
+  // ---- Force motor ----
+  if (dbus->ch3 > 300) {
+    force_target_speed = 250;
+  } else if (dbus->ch3 < -300) {
+    force_target_speed = -250;
+  } else {
+    force_target_speed = 0;
+  }
+  float diff_force = force_motor->GetOmegaDelta(force_target_speed);
+  print("Force Motor Output: ", pid_force.ComputeConstrainedOutput(diff_force));
+  force_motor->SetOutput(pid_force.ComputeConstrainedOutput(diff_force));
+
+  control::MotorCANBase::TransmitOutput(arm, 4);
   //set_cursor(0,0);
   //clear_screen();
   print("Arm Claw: %d\r\n", arm_claw_output);
