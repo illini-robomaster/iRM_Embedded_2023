@@ -73,8 +73,8 @@ enum class LoadControlMode { AUTO_RELOAD,
 #define LOAD_DOWN_SPEED (-150.0f)     // rad/s downward
 #define REVERSE_SPEED 150.0f          // rad/s reverse (slower)
 #define REVERSE_RELEASE_CURRENT 4000  // |current| below this → dart released
-#define MANUAL_LOAD_FORWARD_SPEED 300.0f
-#define MANUAL_LOAD_REVERSE_SPEED (-270.0f)
+#define MANUAL_LOAD_UP_SPEED -150.0f
+#define MANUAL_LOAD_DOWN_SPEED (150.0f)
 #define LOAD_MODE_SWITCH_THRESHOLD 500
 
 // Peripherals
@@ -100,7 +100,9 @@ control::MotorCANBase* load_motor_2 = nullptr;
 control::MotorCANBase* force_motor = nullptr;
 control::MotorCANBase* yaw_motor = nullptr;
 
-void setServoOutput();
+void setServoOutput(control::MotorCANBase* arm[], float slide_target);
+void waitForMotor(control::MotorCANBase* arm[], float slide_target);
+
 // Claw Motors
 control::MotorPWMBase* arm_claw = nullptr;
 control::MotorPWMBase* arm_claw_rotate = nullptr;
@@ -109,9 +111,9 @@ control::ServoMotor* arm_slide = nullptr;
 control::MotorPWMBase* arm_roll = nullptr;
 
 // Initial Arm Motor Outputs
-int16_t arm_roll_output = 800;
-int16_t arm_claw_rotate_output = 1500;
-int16_t arm_claw_output = 1400;
+int16_t arm_roll_output = 1280;
+int16_t arm_claw_rotate_output = 1100;
+int16_t arm_claw_output = 1250;
 
 // Communication
 static remote::DBUS* dbus = nullptr;
@@ -176,6 +178,8 @@ void dartLoadTask(void* arg) {
   float slide_target = arm_slide->GetTheta();  // lock onto starting position
   arm_slide->SetTarget(slide_target);          // arm servo to hold start position
 
+  int current_time = 0;
+
   while (true) {
     // ---- Temperature protection ----
     load_motor_temperature = load_motor_1->GetTemp();
@@ -196,7 +200,7 @@ void dartLoadTask(void* arg) {
       alarm_counter = 0;
     }
 
-    dart_load_toggle.input(dbus->swl == remote::DOWN);
+    dart_load_toggle.input(dbus->ch2 > 300);
 
     // ---- Load mode switching ----
     load_mode_switch.input(dbus->swr == remote::DOWN);
@@ -226,10 +230,11 @@ void dartLoadTask(void* arg) {
       switch (load_state) {
         case LoadState::IDLE:
           slide_target = -5.0f;
-          arm_roll_output = 1600;
-          arm_claw_rotate_output = 1800;
-          arm_claw_output = 1400;
-          osDelay(1000);
+          waitForMotor(motors_can1_load, slide_target);
+          arm_roll_output = 1280;
+          arm_claw_rotate_output = 1100;
+          arm_claw_output = 1250;
+          while ((HAL_GetTick() - current_time) < 2000) setServoOutput(motors_can1_load, slide_target);
           if (release_trigger.posEdge())
             trigger_motor->SetOutput(TRIGGER_RELEASE_OUTPUT);
           load_target_speed = 0;
@@ -238,47 +243,7 @@ void dartLoadTask(void* arg) {
             print(">>> Load: IDLE -> LOADING_DOWN\r\n");
           }
           break;
-        // TODO: This will be the place holder for extra loading mechanism for getting the dart out of the storing catridges
         case LoadState::LOADING_DOWN:
-          if (dart_load_toggle.posEdge() && darts_left > 0) {
-            slide_target = -2.0f;
-            arm_claw_output = 1300;
-            if (darts_left == 3) {
-              arm_roll_output = 1280;
-              arm_claw_rotate_output = 2170;
-            } 
-            else if (darts_left == 2) {
-              arm_roll_output = 1630;
-              arm_claw_rotate_output = 1700;
-            }
-            else if (darts_left == 1) {
-              arm_roll_output = 1920;
-              arm_claw_rotate_output = 1450;
-            }
-
-            setServoOutput();
-            osDelay(1000);
-            arm_claw_output = 1500;
-            setServoOutput();
-            osDelay(1000);
-            slide_target = -7.0f;
-            setServoOutput();
-            osDelay(1000);
-            arm_roll_output = 800;
-            arm_claw_rotate_output = 1500;
-            slide_target = -2.0f;
-            setServoOutput();
-            osDelay(1000);
-            arm_claw_output = 1300;
-            setServoOutput();
-            osDelay(1000);
-            slide_target = -7.0f;
-            arm_roll_output = 1600;
-            arm_claw_rotate_output = 1800;
-            setServoOutput();
-            osDelay(1000);
-            darts_left -= 1;
-          }
           if (bump_hit) {
             // Bump switch hit — dart is seated; hold trigger and stop descent
             trigger_motor->SetOutput(TRIGGER_HOLD_OUTPUT);
@@ -293,6 +258,58 @@ void dartLoadTask(void* arg) {
         case LoadState::LOADED:
           trigger_motor->SetOutput(TRIGGER_HOLD_OUTPUT);
           load_target_speed = 0;
+          if (dart_load_toggle.posEdge() && darts_left > 0) {
+            arm_claw_output = 1250;
+            if (darts_left == 3) {
+              arm_roll_output = 1280;
+              arm_claw_rotate_output = 1100;
+            } 
+            else if (darts_left == 2) {
+              arm_roll_output = 1630;
+              arm_claw_rotate_output = 770;
+            }
+            else if (darts_left == 1) {
+              arm_roll_output = 1910;
+              arm_claw_rotate_output = 500;
+            }
+              
+            current_time = HAL_GetTick();
+            while ((HAL_GetTick() - current_time) < 2000) setServoOutput(motors_can1_load, slide_target);
+      
+            slide_target = 0.1f;
+            waitForMotor(motors_can1_load, slide_target);
+            current_time = HAL_GetTick();
+            while ((HAL_GetTick() - current_time) < 2000) setServoOutput(motors_can1_load, slide_target);
+      
+            arm_claw_output = 1500;
+            current_time = HAL_GetTick();
+            while ((HAL_GetTick() - current_time) < 1000) setServoOutput(motors_can1_load, slide_target);
+      
+            slide_target = -5.0f;
+            waitForMotor(motors_can1_load, slide_target);
+            current_time = HAL_GetTick();
+            while ((HAL_GetTick() - current_time) < 2000) setServoOutput(motors_can1_load, slide_target);
+      
+            arm_roll_output = 720;
+            arm_claw_rotate_output = 1610;
+            current_time = HAL_GetTick();
+            while ((HAL_GetTick() - current_time) < 2000) setServoOutput(motors_can1_load, slide_target);
+            slide_target = -0.5f;
+            waitForMotor(motors_can1_load, slide_target);
+      
+            arm_claw_output = 1250;
+            current_time = HAL_GetTick();
+            while ((HAL_GetTick() - current_time) < 1000) setServoOutput(motors_can1_load, slide_target);
+      
+            slide_target = -5.0f;
+            waitForMotor(motors_can1_load, slide_target);
+            arm_roll_output = 1630;
+            arm_claw_rotate_output = 770;
+            current_time = HAL_GetTick();
+            while ((HAL_GetTick() - current_time) < 2000) setServoOutput(motors_can1_load, slide_target);
+      
+            darts_left -= 1;
+          }
           if (reverse_trigger.posEdge()) {
             reverse_debounce = 0;
             load_state = LoadState::REVERSING;
@@ -316,21 +333,73 @@ void dartLoadTask(void* arg) {
       }
     } else {
       // ---- Manual load control (legacy behavior) ----
+      
+      if (dart_load_toggle.posEdge() && darts_left > 0) {
+        arm_claw_output = 1250;
+        if (darts_left == 3) {
+          arm_roll_output = 1280;
+          arm_claw_rotate_output = 1100;
+        } 
+        else if (darts_left == 2) {
+          arm_roll_output = 1630;
+          arm_claw_rotate_output = 770;
+        }
+        else if (darts_left == 1) {
+          arm_roll_output = 1910;
+          arm_claw_rotate_output = 500;
+        }
+          
+        current_time = HAL_GetTick();
+        while ((HAL_GetTick() - current_time) < 2000) setServoOutput(motors_can1_load, slide_target);
+  
+        slide_target = 0.1f;
+        waitForMotor(motors_can1_load, slide_target);
+        current_time = HAL_GetTick();
+        while ((HAL_GetTick() - current_time) < 2000) setServoOutput(motors_can1_load, slide_target);
+  
+        arm_claw_output = 1500;
+        current_time = HAL_GetTick();
+        while ((HAL_GetTick() - current_time) < 1000) setServoOutput(motors_can1_load, slide_target);
+  
+        slide_target = -5.0f;
+        waitForMotor(motors_can1_load, slide_target);
+        current_time = HAL_GetTick();
+        while ((HAL_GetTick() - current_time) < 2000) setServoOutput(motors_can1_load, slide_target);
+  
+        arm_roll_output = 720;
+        arm_claw_rotate_output = 1610;
+        current_time = HAL_GetTick();
+        while ((HAL_GetTick() - current_time) < 2000) setServoOutput(motors_can1_load, slide_target);
+        slide_target = -0.5f;
+        waitForMotor(motors_can1_load, slide_target);
+  
+        arm_claw_output = 1250;
+        current_time = HAL_GetTick();
+        while ((HAL_GetTick() - current_time) < 1000) setServoOutput(motors_can1_load, slide_target);
+  
+        slide_target = -5.0f;
+        waitForMotor(motors_can1_load, slide_target);
+        arm_roll_output = 1630;
+        arm_claw_rotate_output = 770;
+        current_time = HAL_GetTick();
+        while ((HAL_GetTick() - current_time) < 2000) setServoOutput(motors_can1_load, slide_target);
+  
+        darts_left -= 1;
+      }
       if (dbus->swr == remote::UP) {
         trigger_motor->SetOutput(TRIGGER_RELEASE_OUTPUT);
       }
-
       if (dbus->swl == remote::UP) {
-        load_target_speed = MANUAL_LOAD_FORWARD_SPEED;
+        load_target_speed = MANUAL_LOAD_UP_SPEED;
       } else if (dbus->swl == remote::DOWN) {
-        load_target_speed = MANUAL_LOAD_REVERSE_SPEED;
+        load_target_speed = MANUAL_LOAD_DOWN_SPEED;
       } else {
         load_target_speed = 0;
       }
     }
 
     // ---- Arm Motors ----
-    setServoOutput();
+    setServoOutput(motors_can1_load, slide_target);
 
     // ---- Load motor PID ----
 
@@ -340,7 +409,7 @@ void dartLoadTask(void* arg) {
     load_motor_2->SetOutput(pid_right.ComputeConstrainedOutput(diff_load_2));
 
     // ---- Force motor ----
-    force_target_speed = MAP_RANGE(dbus->ch3, -660, 660, -500, 500);
+    force_target_speed = MAP_RANGE((dbus->ch3 < 0) ? dbus->ch3 + 300 : dbus->ch3 - 300, -360, 360, -500, 500);
     float diff_force = force_motor->GetOmegaDelta(force_target_speed);
     print("Force Motor Output: ", pid_force.ComputeConstrainedOutput(diff_force));
     force_motor->SetOutput(pid_force.ComputeConstrainedOutput(diff_force));
@@ -468,8 +537,23 @@ void RM_RTOS_Default_Task(const void* args) {
   }
 }
 
-void setServoOutput() {
+void waitForMotor(control::MotorCANBase* arm[], float slide_target) {
+  int slide_debounce = 0;
+  while (slide_debounce < 3) {
+    if (abs(slide_target - arm_slide->GetTheta()) > 0.015) {
+      setServoOutput(arm, slide_target);
+      slide_debounce = 0;
+    } else {
+      setServoOutput(arm, slide_target);
+      slide_debounce += 1;
+    }
+  }
+}
+
+void setServoOutput(control::MotorCANBase* arm[], float slide_target) {
+  arm_slide->SetTarget(slide_target, false);
   arm_slide->CalcOutput();
+  //UNUSED(arm);
 
   arm_claw_output = clip<int16_t>(arm_claw_output, 1200, 1750);
   arm_claw_rotate_output = clip<int16_t>(arm_claw_rotate_output, 500, 2500);
@@ -477,4 +561,14 @@ void setServoOutput() {
   arm_claw->SetOutput(arm_claw_output);
   arm_claw_rotate->SetOutput(arm_claw_rotate_output);
   arm_roll->SetOutput(arm_roll_output);
+  control::MotorCANBase::TransmitOutput(arm, 1);
+  //set_cursor(0,0);
+  //clear_screen();
+  print("Arm Claw: %d\r\n", arm_claw_output);
+  print("Arm Claw Rotate: %d\r\n", arm_claw_rotate_output);
+  print("Arm Roll: %d\r\n", arm_roll_output);
+  float slide_pos_err = slide_target - arm_slide->GetTheta();
+  print("Slide: theta=%.3f tgt=%.3f err=%.3f vel=%.3f\r\n",
+        arm_slide->GetTheta(), slide_target, slide_pos_err, arm_slide->GetOmega());
+  osDelay(10);
 }

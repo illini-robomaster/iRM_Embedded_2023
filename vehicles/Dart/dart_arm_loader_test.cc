@@ -91,9 +91,9 @@ void RM_RTOS_Init() {
 void RM_RTOS_Default_Task(const void* args) {
   UNUSED(args);
   // int slide_output = 0;
-  int16_t arm_roll_output = 800;
-  int16_t arm_claw_rotate_output = 1500;
-  int16_t arm_claw_output = 1400;
+  int16_t arm_roll_output = 1280;
+  int16_t arm_claw_rotate_output = 1100;
+  int16_t arm_claw_output = 1250;
 
   control::MotorCANBase* arm[] = {arm_slide_motor};
 
@@ -151,21 +151,20 @@ void RM_RTOS_Default_Task(const void* args) {
       slide_target -= 0.1f;
       // This Go Up
       //slide_target = -6.7f;  // temporary hard limit to prevent hitting the wall
-      arm_slide->SetTarget(slide_target, true);
     } else if (control_inputs[7].posEdge()) {
       slide_target += 0.1f;
       // This Go Down
       //slide_target = -0.2f;  // temporary hard limit to prevent hitting the
-      arm_slide->SetTarget(slide_target, true);
     }
 
     if (control_inputs[8].posEdge()) {
-      arm_claw_output = 1500;
-      arm_claw_rotate_output = 1500;
-      arm_roll_output = 800;
-      // arm_slide set
+      arm_claw_output = 1250;
+      arm_claw_rotate_output = 1100;
+      arm_roll_output = 1280;
+      slide_target = 0.0f;
     }
 
+    arm_slide->SetTarget(slide_target, true);
     arm_slide->CalcOutput();
     control::MotorCANBase::TransmitOutput(arm, 1);
 

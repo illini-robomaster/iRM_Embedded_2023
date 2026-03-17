@@ -27,118 +27,191 @@
  #include "main.h"
  #include "math.h"
  #include "motor.h"
- #include "utils.h" 
+ #include "utils.h"
 
-#define KEY_GPIO_GROUP GPIOA
-#define KEY_GPIO_PIN GPIO_PIN_0
+ #define KEY_GPIO_GROUP GPIOA
+ #define KEY_GPIO_PIN GPIO_PIN_0
+ 
+ 
+ #define DEFAULT_TASK_DELAY 100
+ 
+ #define CLAW_PWM_CHANNEL 4         // Pin PD15 = TIM4_CH4
+ #define CLAW_ROTATE_PWM_CHANNEL 3  // Pin PD14 = TIM4_CH3
+ #define ARM_ROLL_PWM_CHANNEL 2     // Pin PD13 = TIM4_CH2
+ 
+ #define TIM_CLOCK_FREQ 1000000  // Using TIM4 (prescaler=83 → counter at 1 MHz)
+ #define SERVO_OUT_FREQ 333
+ 
+ #define MAX_IOUT2006 10000
+ #define MAX_OUT 10000
+ 
+ bsp::GPIO* key = nullptr;
+ control::MotorPWMBase* trigger_motor = nullptr;
+ control::MotorPWMBase* arm_claw = nullptr;
+ control::MotorPWMBase* arm_claw_rotate = nullptr;
+ control::Motor2006* arm_slide_motor = nullptr;
+ control::ServoMotor* arm_slide = nullptr;
+ control::MotorPWMBase* arm_roll = nullptr;
+ 
+ // Initial Arm Motor Outputs
+ int16_t arm_roll_output = 1280;
+ int16_t arm_claw_rotate_output = 1100;
+ int16_t arm_claw_output = 1250;
 
-
-#define DEFAULT_TASK_DELAY 100
-
-#define JOINT1_PWM_CHANNEL 2
-#define JOINT2_PWM_CHANNEL 3
-#define CLAW_MOTOR_PWM_CHANNEL 1
-
-#define TIM_CLOCK_FREQ 1000000
-#define MOTOR_OUT_FREQ 50
-
-#define MAX_IOUT 16384
-#define MAX_OUT 60000
-
-#define MAP_RANGE(x, in_min, in_max, out_min, out_max) (((float)(x) - (float)(in_min)) * ((float)(out_max) - (float)(out_min)) / ((float)(in_max) - (float)(in_min)) + (float)(out_min))
-
-osThreadId_t dartLoadTaskHandle;
-const osThreadAttr_t dartLoadTaskAttribute = {.name = "dartLoadTask",
-        .attr_bits = osThreadDetached,
-        .cb_mem = nullptr,
-        .cb_size = 0,
-        .stack_mem = nullptr,
-        .stack_size = 256 * 4,
-        .priority = (osPriority_t)osPriorityNormal,
-        .tz_module = 0,
-        .reserved = 0};
-
-
-
-bsp::GPIO* key = nullptr;
-control::MotorPWMBase* claw_motor = nullptr;
-control::MotorPWMBase* loader_joint1 = nullptr;
-control::MotorPWMBase* loader_joint2 = nullptr;
-
-control::MotorCANBase* slide_motor = nullptr;
-
-static remote::DBUS *dbus = nullptr;
-
-static bsp::CAN* can1 = nullptr;
-
-float Kp_slide = 50;
-float Ki_slide = 15;
-float Kd_slide = 65;
-float diff_output = 0;
-
-void dartLoadTask(void*arg){
-  UNUSED(arg);
-  int joint1_output = 900;
-  int joint2_output = 0;
-  float slide_speed = 0;
-
-  control::MotorCANBase* slide_[] = {slide_motor};
-  float diff_slide = 0;
-  float param[] = {Kp_slide, Ki_slide, Kd_slide};
-  control::ConstrainedPID pid(param, MAX_IOUT, MAX_OUT);
-
-  while(1){
-    if (dbus->swl == remote::UP) {
-      claw_motor->SetOutput(1000);
-    } else {
-      claw_motor->SetOutput(500);
-    }
-    // joint1_output = MAP_RANGE(dbus->ch3, -660, 660, 500, 2500);
-    joint2_output = MAP_RANGE(dbus->ch1, -660, 660, 500, 2500);
-    slide_speed = MAP_RANGE(dbus->ch2, -660, 660, -50, 50);
-    // loader_joint1->SetOutput(joint1_output);
-    loader_joint2->SetOutput(joint2_output);
-
-    diff_slide = slide_motor->GetOmegaDelta(slide_speed);
-    diff_output = pid.ComputeConstrainedOutput(diff_slide);
-    slide_motor->SetOutput(diff_output);
-    control::MotorCANBase::TransmitOutput(slide_, 1);
-
-    print("joint1: %d\r\n", joint1_output);
-    print("joint2: %d\r\n", joint2_output);
-    print("slide speed: %d , diff_slide: %.2f, diff_output: %f \r\n", slide_speed, diff_slide, diff_output);
-    osDelay(10);
-  }
-}
-
+ void setServoOutput(control::MotorCANBase* arm[], float slide_target);
+ void waitForMotor(control::MotorCANBase* arm[], float slide_target);
+ 
+ static remote::DBUS *dbus = nullptr;
+ 
+ static bsp::CAN* can1 = nullptr;
 
 void RM_RTOS_Init(){
-  print_use_uart(&huart1);
+  print_use_uart_rxtx(&huart8);  // huart8: TX for print output, RX for key input
 
   can1 = new bsp::CAN(&hcan1);
 
   key = new bsp::GPIO(KEY_GPIO_GROUP, KEY_GPIO_PIN);
-  claw_motor = new control::MotorPWMBase(&htim1, CLAW_MOTOR_PWM_CHANNEL, TIM_CLOCK_FREQ, MOTOR_OUT_FREQ, 0);
-  loader_joint1 = new control::MotorPWMBase(&htim1, JOINT1_PWM_CHANNEL, TIM_CLOCK_FREQ, MOTOR_OUT_FREQ, 0);
-  loader_joint2 = new control::MotorPWMBase(&htim1, JOINT2_PWM_CHANNEL, TIM_CLOCK_FREQ, MOTOR_OUT_FREQ, 0);
+  arm_claw = new control::MotorPWMBase(&htim4, CLAW_PWM_CHANNEL, TIM_CLOCK_FREQ, SERVO_OUT_FREQ, 0);
+  arm_claw_rotate = new control::MotorPWMBase(&htim4, CLAW_ROTATE_PWM_CHANNEL, TIM_CLOCK_FREQ, SERVO_OUT_FREQ, 0);
+  arm_roll = new control::MotorPWMBase(&htim4, ARM_ROLL_PWM_CHANNEL, TIM_CLOCK_FREQ, SERVO_OUT_FREQ, 0);
+  trigger_motor = new control::MotorPWMBase(&htim4, 1, TIM_CLOCK_FREQ,
+    50, 1500);
 
-  slide_motor = new control::Motor3508(can1, 0x202);
-
-  dbus = new remote::DBUS(&huart3);
-}
+  trigger_motor->SetOutput(600);
 
 
-void RM_RTOS_Threads_Init(void) {
-    dartLoadTaskHandle = osThreadNew(dartLoadTask, NULL, &dartLoadTaskAttribute);
-    if (dartLoadTaskHandle == NULL) {
-        print("Failed to create dart load task\r\n");
-        Error_Handler();
-    }
+  arm_slide_motor = new control::Motor2006(can1, 0x203);
+  float omega_pid_params[3] = {0.0f, 0.0f, 0.0f};  // unused in direct PD mode (pos_kp > 0)
+  control::servo_t slide_servo = {
+      .motor = arm_slide_motor,
+      .max_speed = 5.0f,  // output-shaft rad/s — caps travel speed via P-term clamping
+      .max_acceleration = 50.0f,
+      .transmission_ratio = 36.0f,  // M2006P36 gear ratio
+      .omega_pid_param = omega_pid_params,
+      .max_iout = MAX_IOUT2006,
+      .max_out = MAX_OUT,
+      .omega_lpf_alpha = 0.5f,
+      .pos_kp = 80000.0f,  // full torque at 0.125 rad (~7°) position error
+      .pos_kd = 2000.0f,   // damping: ~1400 counts at max output speed (~0.7 rad/s)
+  };
+  // align_angle=-1 → auto-latch on first CAN packet
+  arm_slide = new control::ServoMotor(slide_servo, -1);
+
+  dbus = new remote::DBUS(&huart1);
 }
 
 void RM_RTOS_Default_Task(const void* args){
-    UNUSED(args);
-    while(true){
-      osDelay(DEFAULT_TASK_DELAY);
+  UNUSED(args);
+  control::MotorCANBase* arm[] = {arm_slide_motor};
+  //UNUSED(arm);
+  BoolEdgeDetector dart_load_toggle(false);
+
+  // Wait for first CAN feedback so GetTheta() returns the real position
+  osDelay(100);
+  float slide_target = arm_slide->GetTheta();  // lock onto starting position
+  arm_slide->SetTarget(slide_target);          // arm servo to hold start position
+
+  uint8_t darts_left = 3;
+
+  uint32_t current_time = 0;
+
+
+  while(1){
+    dart_load_toggle.input(dbus->swl == remote::DOWN);
+
+    if (dbus->swr == remote::MID) {
+      trigger_motor->SetOutput(600);
+    } else {
+      trigger_motor->SetOutput(0);
     }
+
+    if (dart_load_toggle.posEdge() && darts_left > 0) {
+      arm_claw_output = 1250;
+      if (darts_left == 3) {
+        arm_roll_output = 1280;
+        arm_claw_rotate_output = 1100;
+      } 
+      else if (darts_left == 2) {
+        arm_roll_output = 1630;
+        arm_claw_rotate_output = 770;
+      }
+      else if (darts_left == 1) {
+        arm_roll_output = 1910;
+        arm_claw_rotate_output = 500;
+      }
+        
+      current_time = HAL_GetTick();
+      while ((HAL_GetTick() - current_time) < 2000) setServoOutput(arm, slide_target);
+
+      slide_target = 0.1f;
+      waitForMotor(arm, slide_target);
+      current_time = HAL_GetTick();
+      while ((HAL_GetTick() - current_time) < 2000) setServoOutput(arm, slide_target);
+
+      arm_claw_output = 1500;
+      current_time = HAL_GetTick();
+      while ((HAL_GetTick() - current_time) < 1000) setServoOutput(arm, slide_target);
+
+      slide_target = -5.0f;
+      waitForMotor(arm, slide_target);
+      current_time = HAL_GetTick();
+      while ((HAL_GetTick() - current_time) < 2000) setServoOutput(arm, slide_target);
+
+      arm_roll_output = 720;
+      arm_claw_rotate_output = 1610;
+      current_time = HAL_GetTick();
+      while ((HAL_GetTick() - current_time) < 2000) setServoOutput(arm, slide_target);
+      slide_target = -0.5f;
+      waitForMotor(arm, slide_target);
+
+      arm_claw_output = 1250;
+      current_time = HAL_GetTick();
+      while ((HAL_GetTick() - current_time) < 1000) setServoOutput(arm, slide_target);
+
+      slide_target = -5.0f;
+      waitForMotor(arm, slide_target);
+      arm_roll_output = 1630;
+      arm_claw_rotate_output = 770;
+      current_time = HAL_GetTick();
+      while ((HAL_GetTick() - current_time) < 2000) setServoOutput(arm, slide_target);
+
+      darts_left -= 1;
+    }
+  }
+}
+
+void waitForMotor(control::MotorCANBase* arm[], float slide_target) {
+  int slide_debounce = 0;
+  while (slide_debounce < 3) {
+    if (abs(slide_target - arm_slide->GetTheta()) > 0.015) {
+      setServoOutput(arm, slide_target);
+      slide_debounce = 0;
+    } else {
+      setServoOutput(arm, slide_target);
+      slide_debounce += 1;
+    }
+  }
+}
+
+void setServoOutput(control::MotorCANBase* arm[], float slide_target) {
+  arm_slide->SetTarget(slide_target, true);
+  arm_slide->CalcOutput();
+  //UNUSED(arm);
+
+  arm_claw_output = clip<int16_t>(arm_claw_output, 1200, 1750);
+  arm_claw_rotate_output = clip<int16_t>(arm_claw_rotate_output, 500, 2500);
+  arm_roll_output = clip<int16_t>(arm_roll_output, 500, 2500);
+  arm_claw->SetOutput(arm_claw_output);
+  arm_claw_rotate->SetOutput(arm_claw_rotate_output);
+  arm_roll->SetOutput(arm_roll_output);
+  control::MotorCANBase::TransmitOutput(arm, 1);
+  //set_cursor(0,0);
+  //clear_screen();
+  print("Arm Claw: %d\r\n", arm_claw_output);
+  print("Arm Claw Rotate: %d\r\n", arm_claw_rotate_output);
+  print("Arm Roll: %d\r\n", arm_roll_output);
+  float slide_pos_err = slide_target - arm_slide->GetTheta();
+  print("Slide: theta=%.3f tgt=%.3f err=%.3f vel=%.3f\r\n",
+        arm_slide->GetTheta(), slide_target, slide_pos_err, arm_slide->GetOmega());
+  osDelay(10);
 }
