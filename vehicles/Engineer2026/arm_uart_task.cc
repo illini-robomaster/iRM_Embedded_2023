@@ -57,6 +57,7 @@ extern control::MotorDMJ3507*  arm_j6;
 extern volatile float    cmd_target_deg[6];
 extern volatile uint32_t last_valid_rx_tick;
 extern volatile bool     arm_enabled;
+extern volatile bool     arm_enabling;  // true during MotorEnable() sequence
 extern volatile uint32_t bumpless_holdoff_until;
 
 extern bool test_ros_tx;
@@ -86,6 +87,15 @@ static uint32_t diag_rx_bytes   = 0;  // total RX bytes this period
 static uint32_t diag_tx_frames  = 0;  // TX frames sent this period
 static uint32_t diag_tx_fails   = 0;  // TX write failures (short writes)
 static bool     diag_ever_rx    = false;  // has any valid RX frame ever arrived?
+
+// ── Startup delta-check gate ─────────────────────────────────────────────────
+// cmd_target_deg is initialised from encoder positions at bumpless-enable time,
+// not from a real ROS command.  The first real post-holdoff command may differ
+// by any amount (operator set up EE at a different pose than the arm's parked
+// position).  Skip the frame-to-frame delta check until at least one real
+// command has been written so we don't reject that first legitimate frame.
+static bool     cmd_target_real = false;  // true after first real post-holdoff cmd
+static bool     prev_arm_enabled = false; // edge-detect arm_enabled rising edge
 
 // ── UART error recovery ─────────────────────────────────────────────────────
 // The BSP error handler only clears PE (parity error).  ORE (overrun), FE
@@ -122,6 +132,11 @@ void ArmUartTask(void* arg) {
   // Error flag recovery every 2 s when no RX has arrived.
   uint32_t next_recovery_tick = HAL_GetTick() + 2000;
 
+  // Debug hex dump rate limiter: print raw bytes once per second until first valid frame.
+  uint32_t next_hex_dump_tick = HAL_GetTick();
+  uint32_t diag_sof_seen = 0;   // how many 0xA5 bytes seen this debug period
+  uint32_t diag_junk_bytes = 0; // bytes skipped (no SOF context)
+
   print("ARM UART: task started, waiting for OrangePi...\r\n");
 
   while (true) {
@@ -130,26 +145,80 @@ void ArmUartTask(void* arg) {
     int32_t rx_len = arm_uart->Read(&rx_buf);
     diag_rx_bytes += (rx_len > 0) ? (uint32_t)rx_len : 0;
 
+    // ── DEBUG: hex dump of raw DMA bytes (rate-limited, pre-first-frame only) ──
+    if (!diag_ever_rx && rx_len > 0 && HAL_GetTick() >= next_hex_dump_tick) {
+      next_hex_dump_tick = HAL_GetTick() + 1000;  // once per second
+      // Print up to 32 bytes in hex
+      int dump_len = (rx_len > 32) ? 32 : rx_len;
+      print("ARM UART DBG | len=%d hex:", rx_len);
+      for (int d = 0; d < dump_len; ++d) {
+        print(" %02X", (unsigned)rx_buf[d]);
+      }
+      if (rx_len > 32) print(" ...(+%d)", rx_len - 32);
+      print("\r\n");
+      // Print UART error flag status (STM32H7 ISR register)
+      uint32_t isr = huart10.Instance->ISR;
+      print("ARM UART DBG | ISR=0x%08lX (ORE=%lu FE=%lu NE=%lu PE=%lu RXNE=%lu IDLE=%lu)\r\n",
+            (unsigned long)isr,
+            (unsigned long)((isr >> 3) & 1),  // ORE
+            (unsigned long)((isr >> 1) & 1),  // FE
+            (unsigned long)((isr >> 2) & 1),  // NE
+            (unsigned long)((isr >> 0) & 1),  // PE
+            (unsigned long)((isr >> 5) & 1),  // RXNE
+            (unsigned long)((isr >> 4) & 1)); // IDLE
+      print("ARM UART DBG | sof_seen=%lu junk=%lu accum_len=%d\r\n",
+            (unsigned long)diag_sof_seen, (unsigned long)diag_junk_bytes,
+            local_rx_len);
+      diag_sof_seen = 0;
+      diag_junk_bytes = 0;
+    }
+
     for (int32_t i = 0; i < rx_len; ++i) {
       uint8_t b = rx_buf[i];
-      if (b == 0xA5u) {
-        // SOF — always reset and start a new frame.
-        local_rx_len = 0;
-        local_rx_frame[local_rx_len++] = b;
-      } else if (local_rx_len == 0) {
-        // No SOF seen yet — skip junk bytes.
+      if (local_rx_len == 0) {
+        // ── Hunting for SOF ──────────────────────────────────────────
+        if (b == 0xA5u) {
+          diag_sof_seen++;
+          local_rx_frame[local_rx_len++] = b;
+        } else {
+          diag_junk_bytes++;
+        }
+      } else if (local_rx_len == 1) {
+        // ── Verify LEN byte (0x0C) right after SOF ──────────────────
+        if (b == 0x0Cu) {
+          local_rx_frame[local_rx_len++] = b;
+        } else {
+          // Bad LEN — false SOF.  Check if THIS byte is the real SOF.
+          local_rx_len = 0;
+          if (b == 0xA5u) {
+            diag_sof_seen++;
+            local_rx_frame[local_rx_len++] = b;
+          }
+        }
       } else {
+        // ── Accumulating payload + CRC (no 0xA5 restart) ─────────────
+        // Payload bytes can legitimately be 0xA5 (e.g. J3 = -75.15°
+        // encodes as centidegrees 0xE2A5, low byte = 0xA5).
         local_rx_frame[local_rx_len++] = b;
         if (local_rx_len == (int)UART_FRAME_LEN) {
           float new_targets[6];
           if (UartRxParseFrame(local_rx_frame, new_targets)) {
             // ── Sanity filter ─────────────────────────────────────────
+            // Detect arm_enabled rising edge — reset cmd_target_real so
+            // the first real command after bumpless enable bypasses the
+            // delta check (cmd_target_deg holds encoder snapshot, not a
+            // prior ROS command, so any delta is expected and safe).
+            if (arm_enabled && !prev_arm_enabled) {
+              cmd_target_real = false;
+            }
+            prev_arm_enabled = arm_enabled;
+
             bool ok = true;
             for (int j = 0; j < 6 && ok; ++j) {
               if (!isfinite(new_targets[j])) {
                 print("ARM CMD REJECT: J%d non-finite\r\n", j + 1);
                 ok = false;
-              } else if (arm_enabled &&
+              } else if (arm_enabled && cmd_target_real &&
                          fabsf(new_targets[j] - cmd_target_deg[j]) > CMD_MAX_DELTA_DEG) {
                 print("ARM CMD REJECT: J%d delta %.2f deg exceeds limit\r\n",
                       j + 1, new_targets[j] - cmd_target_deg[j]);
@@ -175,6 +244,8 @@ void ArmUartTask(void* arg) {
                 // Holdoff active — discard command but keep watchdog alive.
               } else {
                 for (int j = 0; j < 6; ++j) cmd_target_deg[j] = new_targets[j];
+                // First real command written — delta check active from next frame.
+                cmd_target_real = true;
               }
               if (test_ros_rx) {
                 print("ARM UART RX | J1=%6.2f J2=%6.2f J3=%6.2f J4=%6.2f J5=%6.2f J6=%6.2f [deg]\r\n",
@@ -199,7 +270,7 @@ void ArmUartTask(void* arg) {
     // ── 2. Pre-enable encoder polling ────────────────────────────────────
     // When the arm is not yet enabled, send MotorDisable frames to solicit
     // CAN feedback so GetTheta() returns real encoder data for TX below.
-    if (!arm_enabled && HAL_GetTick() >= next_poll_tick) {
+    if (!arm_enabled && !arm_enabling && HAL_GetTick() >= next_poll_tick) {
       next_poll_tick = HAL_GetTick() + 50;
       arm_j1->MotorDisable();
       arm_j2->MotorDisable();

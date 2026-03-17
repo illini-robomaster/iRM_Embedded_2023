@@ -352,6 +352,10 @@ void RM_RTOS_Default_Task(const void* args) {
         enabled = false;
         print("Disabled\r\n");
       }
+      // Arm status: show that kill switch is blocking ArmUpdate at 1 Hz.
+      if (HAL_GetTick() % 1000 < 100) {
+        print("ARM BLOCKED: swr=DOWN (kill switch) — flip swr to MID to allow arm enable\r\n");
+      }
       // Print raw steer angles at 2 Hz while disabled for re-calibration.
       if (HAL_GetTick() % 500 < 100) {
         print("  FL_STEER_OFFSET = %.4ff;  FR_STEER_OFFSET = %.4ff;\r\n",
@@ -537,7 +541,7 @@ void RM_RTOS_Default_Task(const void* args) {
     control::MotorDMJ10010::TransmitOutput(lift_motors, 1);
 
     // ── Arm controller tick ───────────────────────────────────────────
-    // if in test mode the ArmUpdate() function will print the current joint angles without sending any commands, which is useful for verifying the arm's physical response and tuning the steering PID without needing the OrangePi or UART communication. In normal mode the ArmUpdate() function will read commands from the OrangePi and control the arm accordingly.
+    ArmGripperUpdate();
 #ifdef TEST_ARM_HOME
     static bool home_done = false;
     if (!home_done && dbus->swr != remote::DOWN) {

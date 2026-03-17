@@ -62,8 +62,8 @@ namespace {
 static constexpr uint16_t GRIP_RX_ID = 0x206;
 
 // Close into the hard stop to establish the closed zero reference.
-static constexpr int16_t GRIP_HOME_CURRENT = 8000;
-static constexpr int16_t GRIP_STALL_THRESH = 6000;
+static constexpr int16_t GRIP_HOME_CURRENT = 6000;
+static constexpr int16_t GRIP_STALL_THRESH = 4000;
 static constexpr uint8_t GRIP_STALL_DEBOUNCE = 3;
 
 // Position targets are in output-shaft radians relative to the homed closed position.
@@ -75,7 +75,7 @@ static constexpr float GRIP_CLOSE_SERVO_MAX_SPEED = 30.0f;
 static constexpr float GRIP_CLOSE_SERVO_MAX_ACCEL = 120.0f;
 static constexpr float GRIP_OPEN_SERVO_MAX_SPEED = 30.0f;
 static constexpr float GRIP_OPEN_SERVO_MAX_ACCEL = 120.0f;
-static float GRIP_SERVO_PID_PARAM[3] = {220.0f, 10.0f, 2.0f};
+static float GRIP_SERVO_PID_PARAM[3] = {220.0f, 0.0f, 30.0f};
 static constexpr float GRIP_SERVO_MAX_IOUT = 12000.0f;
 static constexpr float GRIP_SERVO_MAX_OUT = 16384.0f;
 static constexpr float GRIP_SERVO_PROXIMITY_IN = 0.01f;
@@ -90,6 +90,7 @@ enum class GripState { WAIT_HOME, ZEROING, OPENING, CLOSING, HOLDING };
 static bsp::CAN* arm_can = nullptr;
 static remote::DBUS* dbus = nullptr;
 static control::Motor2006* gripper = nullptr;
+control::MotorDMJ3507* arm_j6 = nullptr;
 static control::ServoMotor* grip_servo = nullptr;
 static bsp::GPIO* grip_home_key = nullptr;
 
@@ -224,6 +225,7 @@ void UpdateGripperStateMachine() {
       grip_home_stall_count = 0;
       grip_state = GripState::ZEROING;
       print("GRIP TEST: ZEROING -> close into hard stop\r\n");
+      arm_j6->SetZeroPos();
     } else if (open_cmd || close_cmd) {
       print("GRIP TEST: press the MCU key first to home/zero the gripper\r\n");
     }
@@ -249,7 +251,8 @@ void UpdateGripperStateMachine() {
       break;
 
     case GripState::ZEROING:
-      gripper->SetOutput(GRIP_HOME_CURRENT);
+      print("arm_j6 zero pos: %.3f rad\r\n", arm_j6->GetTheta());
+      // gripper->SetOutput(GRIP_HOME_CURRENT);
       if (gripper->GetCurr() > GRIP_STALL_THRESH) {
         if (++grip_home_stall_count >= GRIP_STALL_DEBOUNCE) {
           grip_home_stall_count = 0;
@@ -303,7 +306,7 @@ void UpdateGripperStateMachine() {
 }
 
 }  // namespace
-
+static constexpr uint16_t J6_MASTER_ID = 0x14, J6_CAN_ID = 0x15;  // MotorDMJ3507
 void RM_RTOS_Init(void) {
   print_use_usb();
   bsp::SetHighresClockTimer(&htim2);
@@ -311,6 +314,7 @@ void RM_RTOS_Init(void) {
   dbus = new remote::DBUS(&huart5);
   gripper = new control::Motor2006(arm_can, GRIP_RX_ID);
   grip_home_key = new bsp::GPIO(GPIOA, GPIO_PIN_15);
+  arm_j6 = new control::MotorDMJ3507(arm_can, J6_MASTER_ID, J6_CAN_ID, control::FORCE_POS);
 
   ResetGripperControl();
   ResetGripHomeKeyEdgeDetector();

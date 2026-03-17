@@ -31,10 +31,11 @@
 #include <cstring>
 
 #include "bsp_buzzer.h"
+#include "bsp_gpio.h"
+#include "bsp_os.h"
 #include "bsp_print.h"
 #include "bsp_uart.h"
 #include "cmsis_os.h"
-#include "controller.h"
 #include "dbus.h"
 #include "fdcan.h"
 #include "motor.h"
@@ -43,8 +44,18 @@
 #include "usart.h"
 #include "utils.h"
 
-#define TEST_UART_TRANSMISSION  // uncomment this line to test the transmission from mcu to ros2
-#define TEST_UART_RECEIVE  // uncomment this line to test the reception of UART Joint Variables from ros2 to mcu
+extern "C" unsigned long getRunTimeCounterValue(void);
+
+namespace bsp {
+
+void SetHighresClockTimer(TIM_HandleTypeDef* htim) { UNUSED(htim); }
+
+uint32_t GetHighresTickMicroSec(void) { return getRunTimeCounterValue(); }
+
+}  // namespace bsp
+
+// #define TEST_UART_TRANSMISSION  // uncomment this line to test the transmission from mcu to ros2
+// #define TEST_UART_RECEIVE  // uncomment this line to test the reception of UART Joint Variables from ros2 to mcu
 
 #ifdef TEST_UART_TRANSMISSION
 bool test_ros_tx = true;
@@ -99,23 +110,20 @@ static constexpr float PARK_THRESH_RAD = 0.08f;    // settle threshold [rad]
 static constexpr uint32_t PARK_TIMEOUT_MS = 5000;  // give up after 5 s
 
 // ── Gripper (Motor2006) ───────────────────────────────────────────────────────
-// Open-loop close current [−16384 … +16384 raw units]. Positive = close.
-// TODO: tune direction and magnitude on the bench.
-static constexpr int16_t GRIP_CLOSE_CURRENT = 16384;  // C610 full-scale
-static constexpr int16_t GRIP_OPEN_CURRENT  = -16384;
-// Current magnitude above which we consider the gripper stalled.
-// Closing: current is positive → stall when GetCurr() > +GRIP_STALL_THRESH.
-// Opening: current is negative → stall when GetCurr() < -GRIP_STALL_THRESH.
-// TODO: tune — start high and lower until reliable.
+static constexpr int16_t GRIP_HOME_CURRENT = 6000;
 static constexpr int16_t GRIP_STALL_THRESH = 4000;
-// Number of consecutive 5 ms ticks above threshold before declaring a stall.
-// Filters single-sample current spikes without adding meaningful latency.
 static constexpr uint8_t GRIP_STALL_DEBOUNCE = 3;
-// Hold-position PID gains (drives Motor2006 in current mode to hold theta).
-static constexpr float GRIP_KP     = 3000.0f;
-static constexpr float GRIP_KI     = 0.0f;
-static constexpr float GRIP_KD     = 100.0f;
-static constexpr float GRIP_MAXOUT = 8000.0f;
+static constexpr float GRIP_CLOSED_TARGET_POS = 0.0f;
+static constexpr float GRIP_OPEN_TARGET_POS = -39.0f;
+static constexpr float GRIP_CLOSE_SERVO_MAX_SPEED = 30.0f;
+static constexpr float GRIP_CLOSE_SERVO_MAX_ACCEL = 120.0f;
+static constexpr float GRIP_OPEN_SERVO_MAX_SPEED = 30.0f;
+static constexpr float GRIP_OPEN_SERVO_MAX_ACCEL = 120.0f;
+static float GRIP_SERVO_PID_PARAM[3] = {220.0f, 0.0f, 30.0f};
+static constexpr float GRIP_SERVO_MAX_IOUT = 12000.0f;
+static constexpr float GRIP_SERVO_MAX_OUT = 16384.0f;
+static constexpr float GRIP_SERVO_PROXIMITY_IN = 0.01f;
+static constexpr float GRIP_SERVO_PROXIMITY_OUT = 0.03f;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 static constexpr float DEG2RAD = (float)M_PI / 180.0f;
@@ -143,6 +151,8 @@ control::Motor4310* arm_j4 = nullptr;
 control::Motor4310* arm_j5 = nullptr;
 control::MotorDMJ3507* arm_j6 = nullptr;
 control::Motor2006* gripper = nullptr;
+static control::ServoMotor* grip_servo = nullptr;
+static bsp::GPIO* grip_home_key = nullptr;
 
 // OrangePi-commanded targets [degrees], updated on valid UART RX.
 // Written by ArmUartTask, read by ArmUpdate (single-core STM32 — no mutex needed
@@ -152,7 +162,8 @@ volatile float cmd_target_deg[6] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
 // Watchdog — last tick at which a valid UART RX frame was received.
 // Written by ArmUartTask, read by ArmUpdate.
 volatile uint32_t last_valid_rx_tick = 0;
-volatile bool arm_enabled = false;
+volatile bool arm_enabled  = false;
+volatile bool arm_enabling = false;  // true while MotorEnable() sequence is running
 
 // Bumpless-enable holdoff — prevents the UART task from overwriting the
 // encoder-based cmd_target_deg snapshot with stale/zero values from ROS
@@ -185,17 +196,65 @@ static float sc_tgt[6]      = {};     // current stair joint targets [rad]
 static bool  sc_swl_saw_mid = false;  // true once swl goes MID during a CONFIRM wait
 
 // Gripper state machine.
-enum class GripState { IDLE, OPENING, CLOSING, HOLDING };
-static GripState grip_state         = GripState::IDLE;
-static float     grip_hold_pos      = 0.0f;
-static uint8_t   grip_open_stall_count = 0;  // consecutive ticks above open stall threshold
-static control::ConstrainedPID* grip_pid = nullptr;
+enum class GripState { WAIT_HOME, ZEROING, OPENING, CLOSING, HOLDING };
+static GripState grip_state = GripState::WAIT_HOME;
+static float grip_target_pos = GRIP_CLOSED_TARGET_POS;
+static bool grip_homed = false;
+static uint8_t grip_home_stall_count = 0;
+static BoolEdgeDetector* grip_home_key_edge = nullptr;
+
+static bool GripHomeKeyPressed() {
+  return grip_home_key != nullptr && !grip_home_key->Read();
+}
+
+static void ResetGripHomeKeyEdgeDetector() {
+  delete grip_home_key_edge;
+  grip_home_key_edge = new BoolEdgeDetector(GripHomeKeyPressed());
+}
+
+static void SetGripServoMotionProfile(float max_speed, float max_acceleration) {
+  if (grip_servo == nullptr) return;
+  grip_servo->SetMaxSpeed(max_speed);
+  grip_servo->SetMaxAcceleration(max_acceleration);
+}
+
+static void ConfigureGripServoZero() {
+  if (grip_servo != nullptr || gripper == nullptr) return;
+
+  control::servo_t servo_data;
+  servo_data.motor = gripper;
+  servo_data.max_speed = GRIP_CLOSE_SERVO_MAX_SPEED;
+  servo_data.max_acceleration = GRIP_CLOSE_SERVO_MAX_ACCEL;
+  servo_data.transmission_ratio = M2006P36_RATIO;
+  servo_data.omega_pid_param = GRIP_SERVO_PID_PARAM;
+  servo_data.max_iout = GRIP_SERVO_MAX_IOUT;
+  servo_data.max_out = GRIP_SERVO_MAX_OUT;
+
+  grip_servo = new control::ServoMotor(
+      servo_data, gripper->GetTheta(), GRIP_SERVO_PROXIMITY_IN,
+      GRIP_SERVO_PROXIMITY_OUT);
+  SetGripServoMotionProfile(GRIP_CLOSE_SERVO_MAX_SPEED, GRIP_CLOSE_SERVO_MAX_ACCEL);
+  grip_target_pos = GRIP_CLOSED_TARGET_POS;
+  grip_servo->SetTarget(grip_target_pos, true);
+  grip_homed = true;
+}
+
+static void ResetGripperControl() {
+  grip_home_stall_count = 0;
+  grip_target_pos =
+      grip_servo != nullptr ? grip_servo->GetTheta() : GRIP_CLOSED_TARGET_POS;
+  grip_state = grip_homed ? GripState::HOLDING : GripState::WAIT_HOME;
+  if (grip_servo != nullptr) grip_servo->SetTarget(grip_target_pos, true);
+  if (gripper != nullptr) gripper->SetOutput(0);
+  ResetGripHomeKeyEdgeDetector();
+}
 
 // ── ArmInit ───────────────────────────────────────────────────────────────────
 
 void ArmInit() {
   // Arm motors on FDCAN2, separate from the chassis FDCAN1 bus.
   arm_can = new bsp::CAN(&hfdcan2, 0);
+  bsp::SetHighresClockTimer(&htim2);
 
   // OrangePi UART on huart10 @ 115200 8N1 (wired to /dev/ttyS4 on the OrangePi).
   arm_uart = new bsp::UART(&huart10);
@@ -210,8 +269,8 @@ void ArmInit() {
   arm_j5 = new control::Motor4310(arm_can, J5_MASTER_ID, J5_CAN_ID, control::POS_VEL);
   arm_j6 = new control::MotorDMJ3507(arm_can, J6_MASTER_ID, J6_CAN_ID, control::FORCE_POS);
   gripper = new control::Motor2006(arm_can, GRIP_RX_ID);
-
-  grip_pid = new control::ConstrainedPID(GRIP_KP, GRIP_KI, GRIP_KD, GRIP_MAXOUT, 16384.0f);
+  grip_home_key = new bsp::GPIO(GPIOA, GPIO_PIN_15);
+  ResetGripperControl();
 
   // Buzzer: TIM12 CH2 (PB15), APB1 timer clock 80 MHz, prescaler 24
   arm_buzzer = new bsp::Buzzer(&htim12, 2, 80000000 / 24);
@@ -260,12 +319,11 @@ void checkAllMotorsConnected(control::MotorDM3519* rl,
 // ── ArmEnable ─────────────────────────────────────────────────────────────────
 
 void ArmEnable() {
-  // Set arm_enabled FIRST to prevent the UART task's pre-enable polling from
-  // sending MotorDisable frames that race with our MotorEnable calls below.
-  // The UART task checks (!arm_enabled) before sending MotorDisable — setting
-  // this early suppresses that immediately.
-  arm_enabled = true;
-  last_valid_rx_tick = HAL_GetTick();  // reset watchdog so we have 2 s grace
+  // Set arm_enabling to suppress the UART task's pre-enable MotorDisable
+  // polling while we send MotorEnable frames.  arm_enabled is only set
+  // AFTER all motors confirm, so arm=ON in diagnostics truly means the
+  // hardware is enabled.
+  arm_enabling = true;
 
   print("Enabling J1 (DM4310)...\r\n");
   arm_j1->MotorEnable();
@@ -281,7 +339,11 @@ void ArmEnable() {
   arm_j6->MotorEnable();
   // Motor2006 does not need an explicit enable — it responds as soon as
   // CAN output commands are transmitted.
-  print("Arm enabled.\r\n");
+
+  arm_enabled = true;
+  arm_enabling = false;
+  last_valid_rx_tick = HAL_GetTick();  // reset watchdog so we have 2 s grace
+  print("Arm enabled — all motors confirmed.\r\n");
 }
 
 // ── ArmSafePark ───────────────────────────────────────────────────────────────
@@ -304,6 +366,8 @@ void ArmSafePark() {
         PARK_J2_RAD, PARK_J3_RAD);
 
   // Freeze other joints at their current position.
+  const float hold_j2 = arm_j2->GetTheta();
+  const float hold_j3 = arm_j3->GetTheta();
   const float hold_j4 = arm_j4->GetTheta();
   const float hold_j5 = arm_j5->GetTheta();
   const float hold_j6 = arm_j6->GetTheta();
@@ -316,8 +380,8 @@ void ArmSafePark() {
   uint32_t deadline = HAL_GetTick() + PARK_TIMEOUT_MS;
   while (HAL_GetTick() < deadline) {
     arm_j1->SetOutput(PARK_J1_RAD, ARM_VEL_LIM[0]);
-    arm_j2->SetOutput(PARK_J2_RAD, ARM_VEL_LIM[1], J23_CURRENT_LIM);
-    arm_j3->SetOutput(PARK_J3_RAD, ARM_VEL_LIM[2], J23_CURRENT_LIM);
+    arm_j2->SetOutput(arm_j2->GetTheta()>PARK_J2_RAD ? PARK_J2_RAD:hold_j2, ARM_VEL_LIM[1], J23_CURRENT_LIM);
+    arm_j3->SetOutput(arm_j3->GetTheta()>PARK_J3_RAD ? PARK_J3_RAD:hold_j3, ARM_VEL_LIM[2], J23_CURRENT_LIM);
     arm_j4->SetOutput(hold_j4, ARM_VEL_LIM[3]);
     arm_j5->SetOutput(hold_j5, ARM_VEL_LIM[4]);
     arm_j6->SetOutput(hold_j6, ARM_VEL_LIM[5], J6_CURRENT_LIM);
@@ -538,6 +602,102 @@ void ArmStairClimbMarkDone() {
     print("STAIR: done\r\n");
 }
 
+void ArmGripperUpdate() {
+  if (arm_parking) {
+    gripper->SetOutput(0);
+    control::MotorCANBase* grip[] = {gripper};
+    control::MotorCANBase::TransmitOutput(grip, 1);
+    return;
+  }
+
+  static BoolEdgeDetector swl_mid(dbus->swl == remote::MID);
+  static BoolEdgeDetector swl_down(dbus->swl == remote::DOWN);
+
+  swl_mid.input(dbus->swl == remote::MID);
+  swl_down.input(dbus->swl == remote::DOWN);
+  if (grip_home_key_edge != nullptr) grip_home_key_edge->input(GripHomeKeyPressed());
+
+  const bool home_cmd = grip_home_key_edge != nullptr && grip_home_key_edge->posEdge();
+  const bool open_cmd = swl_mid.posEdge();
+  const bool close_cmd = swl_down.posEdge();
+
+  if (!stair_climb_active) {
+    if (!grip_homed) {
+      if (grip_state == GripState::WAIT_HOME && home_cmd) {
+        grip_home_stall_count = 0;
+        grip_state = GripState::ZEROING;
+        print("GRIPPER: ZEROING -> close into hard stop\r\n");
+      } else if (open_cmd || close_cmd) {
+        print("GRIPPER: press MCU key (PA15) to home/zero first\r\n");
+      }
+    } else if (grip_servo != nullptr) {
+      if (open_cmd) {
+        SetGripServoMotionProfile(GRIP_OPEN_SERVO_MAX_SPEED, GRIP_OPEN_SERVO_MAX_ACCEL);
+        grip_target_pos = GRIP_OPEN_TARGET_POS;
+        grip_servo->SetTarget(grip_target_pos, true);
+        grip_state = GripState::OPENING;
+      } else if (close_cmd) {
+        SetGripServoMotionProfile(GRIP_CLOSE_SERVO_MAX_SPEED, GRIP_CLOSE_SERVO_MAX_ACCEL);
+        grip_target_pos = GRIP_CLOSED_TARGET_POS;
+        grip_servo->SetTarget(grip_target_pos, true);
+        grip_state = GripState::CLOSING;
+      }
+    }
+  }
+
+  switch (grip_state) {
+    case GripState::WAIT_HOME:
+      gripper->SetOutput(0);
+      break;
+
+    case GripState::ZEROING:
+      gripper->SetOutput(GRIP_HOME_CURRENT);
+      if (gripper->GetCurr() > GRIP_STALL_THRESH) {
+        if (++grip_home_stall_count >= GRIP_STALL_DEBOUNCE) {
+          grip_home_stall_count = 0;
+          ConfigureGripServoZero();
+          grip_state = GripState::HOLDING;
+          print("GRIPPER: homed -> zero set at hard stop\r\n");
+        }
+      } else {
+        grip_home_stall_count = 0;
+      }
+      break;
+
+    case GripState::CLOSING:
+      if (grip_servo == nullptr) {
+        grip_state = GripState::WAIT_HOME;
+        gripper->SetOutput(0);
+        break;
+      }
+      grip_servo->CalcOutput();
+      if (grip_servo->Holding()) grip_state = GripState::HOLDING;
+      break;
+
+    case GripState::OPENING:
+      if (grip_servo == nullptr) {
+        grip_state = GripState::WAIT_HOME;
+        gripper->SetOutput(0);
+        break;
+      }
+      grip_servo->CalcOutput();
+      if (grip_servo->Holding()) grip_state = GripState::HOLDING;
+      break;
+
+    case GripState::HOLDING:
+      if (grip_servo == nullptr) {
+        grip_state = GripState::WAIT_HOME;
+        gripper->SetOutput(0);
+        break;
+      }
+      grip_servo->CalcOutput();
+      break;
+  }
+
+  control::MotorCANBase* grip[] = {gripper};
+  control::MotorCANBase::TransmitOutput(grip, 1);
+}
+
 // ── ArmUpdate ─────────────────────────────────────────────────────────────────
 
 /**
@@ -549,8 +709,7 @@ void ArmStairClimbMarkDone() {
  *   3. Park state machine → drive J2/J3 to safe positions, then disable
  *   4. Bumpless enable → auto-enable on first valid UART frame
  *   5. Motor commands → set position/velocity targets for J1–J6
- *   6. Gripper FSM → close-then-hold
- *   7. CAN transmit
+ *   6. Arm CAN transmit
  *
  * UART RX/TX runs in ArmUartTask (arm_uart_task.cc), a separate RTOS thread.
  *
@@ -616,11 +775,12 @@ void ArmUpdate(bool test_mode) {
     } else {
       // A joint is done when it has moved to OR already past the park target
       // (theta <= target + threshold), matching the SetOutput logic below.
-      bool j2_ok = arm_j2->GetTheta() <= PARK_J2_RAD + PARK_THRESH_RAD;
-      bool j3_ok = arm_j3->GetTheta() <= PARK_J3_RAD + PARK_THRESH_RAD;
+      bool j2_ok = fabsf(arm_j2->GetTheta() - PARK_J2_RAD) < PARK_THRESH_RAD;
+      bool j3_ok = fabsf(arm_j3->GetTheta() - PARK_J3_RAD) < PARK_THRESH_RAD;
+      bool j1_ok = fabsf(arm_j1->GetTheta() - PARK_J1_RAD) < PARK_THRESH_RAD;
       bool timed_out = HAL_GetTick() >= park_deadline;
 
-      if ((j2_ok && j3_ok) || timed_out) {
+      if ((j2_ok && j3_ok && j1_ok) || timed_out) {
         print(timed_out ? "ARM PARK: timeout — forcing disable\r\n"
                         : "ARM PARK: J2/J3 settled — disabling\r\n");
         arm_j1->MotorDisable();
@@ -636,7 +796,7 @@ void ArmUpdate(bool test_mode) {
       }
 
       // Drive J2/J3 to park positions, hold everything else.
-      arm_j1->SetOutput(park_hold_j1, ARM_VEL_LIM[0]);
+      arm_j1->SetOutput(PARK_J1_RAD, ARM_VEL_LIM[0]);
       arm_j2->SetOutput(arm_j2->GetTheta()>PARK_J2_RAD ? PARK_J2_RAD:park_hold_j2, ARM_VEL_LIM[1], J23_CURRENT_LIM);
       arm_j3->SetOutput(arm_j3->GetTheta() > PARK_J3_RAD? PARK_J3_RAD:park_hold_j3, ARM_VEL_LIM[2], J23_CURRENT_LIM);
       arm_j4->SetOutput(park_hold_j4, ARM_VEL_LIM[3]);
@@ -665,6 +825,30 @@ void ArmUpdate(bool test_mode) {
   // ── 4. Bumpless enable on first valid UART frame ─────────────────────────
   // Runs here (not in UART task) so it respects the kill switch — ArmUpdate
   // is not called when swr == DOWN.
+  {
+    // Diagnostic at 2 Hz: print exactly why the arm is still disabled.
+    // Covers all gates: park in progress, no UART, stale UART, or about to fire.
+    static uint32_t next_enable_diag = 0;
+    if (!arm_enabled && HAL_GetTick() >= next_enable_diag) {
+      next_enable_diag = HAL_GetTick() + 500;
+      if (arm_parking) {
+        print("ARM WAIT: park sequence in progress — enable blocked until park completes\r\n");
+      } else if (last_valid_rx_tick == 0) {
+        print("ARM WAIT: no UART from OrangePi yet — is uart_bridge_node running?\r\n");
+      } else {
+        uint32_t age = HAL_GetTick() - last_valid_rx_tick;
+        if (age >= WATCHDOG_MS) {
+          print("ARM WAIT: UART stale (age=%lums / limit=%lums) — uart_bridge stopped sending?\r\n",
+                (unsigned long)age, (unsigned long)WATCHDOG_MS);
+        } else {
+          // All conditions met — bumpless enable should fire this tick.
+          print("ARM WAIT: UART OK (age=%lums) — firing bumpless enable now...\r\n",
+                (unsigned long)age);
+        }
+      }
+    }
+  }
+
   if (!arm_enabled && last_valid_rx_tick != 0 &&
       (HAL_GetTick() - last_valid_rx_tick < WATCHDOG_MS)) {
     // Set holdoff FIRST to prevent the higher-priority UART task from
@@ -673,31 +857,22 @@ void ArmUpdate(bool test_mode) {
     // holdoff, and write ROS commands over our encoder values — causing the
     // arm to snap to a stale target on enable.
     bumpless_holdoff_until = HAL_GetTick() + 500;
+    float snap[6];
     for (int i = 0; i < 6; ++i) {
       float theta = 0.0f;
       switch (i) {
-        case 0:
-          theta = arm_j1->GetTheta();
-          break;
-        case 1:
-          theta = arm_j2->GetTheta();
-          break;
-        case 2:
-          theta = arm_j3->GetTheta();
-          break;
-        case 3:
-          theta = arm_j4->GetTheta();
-          break;
-        case 4:
-          theta = arm_j5->GetTheta();
-          break;
-        case 5:
-          theta = arm_j6->GetTheta();
-          break;
+        case 0: theta = arm_j1->GetTheta(); break;
+        case 1: theta = arm_j2->GetTheta(); break;
+        case 2: theta = arm_j3->GetTheta(); break;
+        case 3: theta = arm_j4->GetTheta(); break;
+        case 4: theta = arm_j5->GetTheta(); break;
+        case 5: theta = arm_j6->GetTheta(); break;
       }
-      cmd_target_deg[i] = theta * RAD2DEG;
+      snap[i] = theta * RAD2DEG;
+      cmd_target_deg[i] = snap[i];
     }
-    print("ARM: UART active — bumpless enable\r\n");
+    print("ARM: bumpless enable — snap J1=%.1f J2=%.1f J3=%.1f J4=%.1f J5=%.1f J6=%.1f [deg]\r\n",
+          snap[0], snap[1], snap[2], snap[3], snap[4], snap[5]);
     ArmEnable();
   }
 
@@ -816,70 +991,6 @@ void ArmUpdate(bool test_mode) {
     arm_j6->SetOutput(t5 * DEG2RAD, ARM_VEL_LIM[5], J6_CURRENT_LIM);
   }
   
-  // ── 6. Gripper FSM (edge-triggered via BoolEdgeDetector) ────────────────
-  //   MID  posEdge → start opening
-  //   DOWN posEdge → start closing (HOLDING is preserved)
-  //   UP   posEdge → cancel active motion; IDLE
-  // Stall while opening → IDLE (stable: no new posEdge while MID stays held)
-  static BoolEdgeDetector swl_mid(dbus->swl == remote::MID);
-  static BoolEdgeDetector swl_down(dbus->swl == remote::DOWN);
-  static BoolEdgeDetector swl_up(dbus->swl == remote::UP);
-
-  swl_mid.input(dbus->swl == remote::MID);
-  swl_down.input(dbus->swl == remote::DOWN);
-  swl_up.input(dbus->swl == remote::UP);
-
-  // Suppress gripper transitions during stair mode (swl is used for confirmation).
-  if (!stair_climb_active) {
-    if (swl_mid.posEdge()) {
-      grip_open_stall_count = 0;
-      grip_state = GripState::OPENING;
-    } else if (swl_down.posEdge()) {
-      if (grip_state != GripState::CLOSING && grip_state != GripState::HOLDING) {
-        grip_state = GripState::CLOSING;
-      }
-    } else if (swl_up.posEdge()) {
-      if (grip_state == GripState::OPENING || grip_state == GripState::CLOSING) {
-        grip_state = GripState::IDLE;
-      }
-    }
-  }
-
-  switch (grip_state) {
-    case GripState::IDLE:
-      grip_open_stall_count = 0;
-      gripper->SetOutput(0);
-      break;
-    case GripState::OPENING:
-      gripper->SetOutput(GRIP_OPEN_CURRENT);
-      // Open current is negative; stall drives current further negative.
-      if (gripper->GetCurr() < -GRIP_STALL_THRESH) {
-        if (++grip_open_stall_count >= GRIP_STALL_DEBOUNCE) {
-          grip_open_stall_count = 0;
-          grip_state = GripState::IDLE;
-          // print("GRIPPER: open stall — idle\r\n");
-        }
-      } else {
-        grip_open_stall_count = 0;
-      }
-      // print("gripper current: %d \r\n", gripper->GetCurr());
-      break;
-    case GripState::CLOSING:
-      gripper->SetOutput(GRIP_CLOSE_CURRENT);
-      // print("gripper current: %d \r\n",gripper->GetCurr());
-      if (gripper->GetCurr() > GRIP_STALL_THRESH) {
-        grip_hold_pos = gripper->GetTheta();
-        grip_state = GripState::HOLDING;
-      }
-      break;
-    case GripState::HOLDING: {
-      int16_t pid_out = grip_pid->ComputeConstrainedOutput(
-          gripper->GetThetaDelta(grip_hold_pos));
-      gripper->SetOutput(pid_out);
-      break;
-    }
-  }
-
   // ── 7. CAN transmit ─────────────────────────────────────────────────────
   control::Motor4310* j145[] = {arm_j1, arm_j4, arm_j5};
   control::MotorDMJ10010* j23[] = {arm_j2, arm_j3};
@@ -887,7 +998,4 @@ void ArmUpdate(bool test_mode) {
   control::Motor4310::TransmitOutput(j145, 3);
   control::MotorDMJ10010::TransmitOutput(j23, 2);
   control::MotorDMJ3507::TransmitOutput(j6arr, 1);
-  // TODO: enable gripper CAN when ready
-  control::MotorCANBase* grip[] = {gripper};  
-  control::MotorCANBase::TransmitOutput(grip, 1);
 }

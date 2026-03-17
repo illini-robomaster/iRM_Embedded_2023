@@ -33,7 +33,7 @@
  *   J4 — Motor4310     (DM4310),   POS_VEL mode
  *   J5 — Motor4310     (DM4310),   POS_VEL mode
  *   J6 — MotorDMJ3507  (DM3507),   POS_VEL mode
- *   Gripper — Motor2006 (2006),    open-loop → hold-on-stall
+ *   Gripper — Motor2006 (2006),    ServoMotor wrapper with manual hard-stop homing
  *
  * OrangePi UART: huart10 @ 115200 8N1
  *   RX: binary 16-byte frames — target angles in centidegrees, 50 Hz
@@ -88,7 +88,7 @@ void ArmSafePark();
 
 /**
  * @brief Run one arm motor-control tick.  Call every 5 ms from RM_RTOS_Default_Task().
- *        Handles watchdog, motor commands, gripper state machine, and CAN TX.
+ *        Handles watchdog, arm motor commands, and CAN TX.
  *        UART RX/TX now runs in ArmUartTask (see arm_uart_task.h).
  *
  * @param test_mode  When true, OrangePi UART is ignored.  All six joint
@@ -99,6 +99,15 @@ void ArmSafePark();
  *                   remote-controller left switch (swl) in the UP position.
  */
 void ArmUpdate(bool test_mode = false);
+
+/**
+ * @brief Run one gripper-control tick independent of the arm UART/enable path.
+ *        Call every 5 ms from the main control loop when the robot is enabled.
+ *
+ * Handles gripper homing, open/close target updates, ServoMotor output
+ * calculation, and gripper CAN transmit.
+ */
+void ArmGripperUpdate();
 
 /**
  * @brief Move all arm joints to position 0 in sequence: J3→J2→J4→J5→J6→J1.
@@ -162,10 +171,10 @@ extern bsp::Buzzer* arm_buzzer;
 //   J2 (gear 1:1, sign -1):  ±90°  joint  →   ±90° motor
 //   J3 (gear 1:1, sign +1):  -1.20…+4.0 rad  →  -68.75°…+229.18° motor
 //   J4 (gear 1:1, sign -1):  ±180° joint  →  ±180° motor
-//   J5 (gear 1:1, sign -1):  ±90°  joint  →   ±90° motor
+//   J5 (gear 1:1, sign -1):  ±150° joint  →  ±150° motor
 //   J6 (gear 1:1, sign +1):  ±180° joint  →  ±180° motor
 //
 // Used in arm_mc02.cc (ArmUpdate SetOutput clamping) and
 // arm_uart_task.cc (RX sanity clamp).
-static constexpr float ARM_CMD_MIN_DEG[6] = {-360.0f, -90.0f, -68.75f, -180.0f, -90.0f, -180.0f};
-static constexpr float ARM_CMD_MAX_DEG[6] = { 360.0f,  90.0f, 229.18f,  180.0f,  90.0f,  180.0f};
+static constexpr float ARM_CMD_MIN_DEG[6] = {-360.0f, -90.0f, -68.75f, -180.0f, -150.0f, -180.0f};
+static constexpr float ARM_CMD_MAX_DEG[6] = { 360.0f,  90.0f, 229.18f,  180.0f,  150.0f,  180.0f};
