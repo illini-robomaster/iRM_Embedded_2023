@@ -87,10 +87,10 @@ static constexpr float ARM_VEL_LIM[6] = {1.2f, 1.2f, 1.2f, 3.0f, 1.5f, 3.6f};
 
 // J2/J3 FORCE_POS: peak current as a fraction of 99.74 A motor max [0, 1.0].
 // Start at 50 % and reduce if motors run warm.
-static constexpr float J23_CURRENT_LIM = 0.5f;
+static constexpr float J23_CURRENT_LIM = 0.8f;
 
 // J6 FORCE_POS current limit (MotorDMJ3507).
-static constexpr float J6_CURRENT_LIM = 0.5f;
+static constexpr float J6_CURRENT_LIM = 0.8f;
 
 // ── Command sanity limits ────────────────────────────────────────────────────
 // Per-joint motor-angle limits (ARM_CMD_MIN_DEG / ARM_CMD_MAX_DEG) are defined
@@ -114,7 +114,7 @@ static constexpr int16_t GRIP_HOME_CURRENT = 6000;
 static constexpr int16_t GRIP_STALL_THRESH = 4000;
 static constexpr uint8_t GRIP_STALL_DEBOUNCE = 3;
 static constexpr float GRIP_CLOSED_TARGET_POS = 0.0f;
-static constexpr float GRIP_OPEN_TARGET_POS = -39.0f;
+static constexpr float GRIP_OPEN_TARGET_POS = -45.0f;
 static constexpr float GRIP_CLOSE_SERVO_MAX_SPEED = 30.0f;
 static constexpr float GRIP_CLOSE_SERVO_MAX_ACCEL = 120.0f;
 static constexpr float GRIP_OPEN_SERVO_MAX_SPEED = 30.0f;
@@ -187,7 +187,10 @@ static float park_hold_j5 = 0.0f;
 static float park_hold_j6 = 0.0f;
 
 // ── Stair-climb state machine ─────────────────────────────────────────────────
-static constexpr float STAIR_SETTLE_RAD = 0.05f;  // ~2.9° settle threshold
+static constexpr float STAIR_SETTLE_RAD = 0.05f;         // ~2.9° joint settle threshold
+static constexpr float STAIR_LIFT_RECOVERED_RAD = 0.1f;  // lift ≈ 0 → chassis back down
+
+volatile float shared_lift_theta = 0.0f;  // written by main_mc02.cc each tick
 
 StairClimbState stair_climb_state = StairClimbState::IDLE;
 bool            stair_climb_active = false;
@@ -500,27 +503,27 @@ void ArmHomeSequence(float thresh_rad, uint32_t timeout_ms) {
         next_print = HAL_GetTick() + 200;
         print("-- ARM HOME status (homing %s) --\r\n", step.name);
         // tgt1..tgt6 already computed above — reuse them here.
-        print_joint("J1", J1_MASTER_ID, arm_j1->GetMotorID(), arm_j1->GetErr(), arm_j1->GetMode(),
+        print_joint("J1", J1_MASTER_ID, arm_j1->GetMotorID(), arm_j1->GetMode(), arm_j1->GetMode(),
                     arm_j1->connection_flag_,
                     arm_j1->GetTheta(), tgt1, arm_j1->GetOmega(), arm_j1->GetTorque(),
                     step.joint == 0);
-        print_joint("J2", J2_MASTER_ID, arm_j2->GetMotorID(), arm_j2->GetErr(), arm_j2->GetMode(),
+        print_joint("J2", J2_MASTER_ID, arm_j2->GetMotorID(), arm_j2->GetMode(), arm_j2->GetMode(),
                     arm_j2->connection_flag_,
                     arm_j2->GetTheta(), tgt2, arm_j2->GetOmega(), arm_j2->GetTorque(),
                     step.joint == 1);
-        print_joint("J3", J3_MASTER_ID, arm_j3->GetMotorID(), arm_j3->GetErr(), arm_j3->GetMode(),
+        print_joint("J3", J3_MASTER_ID, arm_j3->GetMotorID(), arm_j3->GetMode(), arm_j3->GetMode(),
                     arm_j3->connection_flag_,
                     arm_j3->GetTheta(), tgt3, arm_j3->GetOmega(), arm_j3->GetTorque(),
                     step.joint == 2);
-        print_joint("J4", J4_MASTER_ID, arm_j4->GetMotorID(), arm_j4->GetErr(), arm_j4->GetMode(),
+        print_joint("J4", J4_MASTER_ID, arm_j4->GetMotorID(), arm_j4->GetMode(), arm_j4->GetMode(),
                     arm_j4->connection_flag_,
                     arm_j4->GetTheta(), tgt4, arm_j4->GetOmega(), arm_j4->GetTorque(),
                     step.joint == 3);
-        print_joint("J5", J5_MASTER_ID, arm_j5->GetMotorID(), arm_j5->GetErr(), arm_j5->GetMode(),
+        print_joint("J5", J5_MASTER_ID, arm_j5->GetMotorID(), arm_j5->GetMode(), arm_j5->GetMode(),
                     arm_j5->connection_flag_,
                     arm_j5->GetTheta(), tgt5, arm_j5->GetOmega(), arm_j5->GetTorque(),
                     step.joint == 4);
-        print_joint("J6", J6_MASTER_ID, arm_j6->GetMotorID(), arm_j6->GetErr(), arm_j6->GetMode(),
+        print_joint("J6", J6_MASTER_ID, arm_j6->GetMotorID(), arm_j6->GetMode(), arm_j6->GetMode(),
                     arm_j6->connection_flag_,
                     arm_j6->GetTheta(), tgt6, arm_j6->GetOmega(), arm_j6->GetTorque(),
                     step.joint == 5);
@@ -715,7 +718,6 @@ void ArmGripperUpdate() {
  *
  * @param test_mode  If true, poll encoders only — no motor commands, no watchdog.
  */
-BoolEdgeDetector rezero_edge_detector(false);  // detects rising edge of cmd_target_deg[i] crossing zero
 void ArmUpdate(bool test_mode) {
   // ── 1. Test mode: read encoders without driving motors ───────────────────
 
@@ -734,11 +736,6 @@ void ArmUpdate(bool test_mode) {
             arm_j1->GetTheta(), arm_j2->GetTheta(),
             arm_j3->GetTheta(), arm_j4->GetTheta(),
             arm_j5->GetTheta(), arm_j6->GetTheta());
-    }
-    rezero_edge_detector.input(dbus->swl == remote::UP);
-    if (rezero_edge_detector.posEdge()){
-      arm_j4->SetZeroPos();
-      print("successfully rezeroed J4");
     }
 
     return;  // nothing else to do in test mode
@@ -792,6 +789,9 @@ void ArmUpdate(bool test_mode) {
         arm_enabled = false;
         arm_parking = false;
         arm_homed = false;  // arm may be moved by hand after disable
+        print("Get Modes after park: J1=%d J2=%d J3=%d J4=%d J5=%d J6=%d\r\n",
+              arm_j1->GetMode(), arm_j2->GetMode(), arm_j3->GetMode(),
+              arm_j4->GetMode(), arm_j5->GetMode(), arm_j6->GetMode());
         return;
       }
 
@@ -899,76 +899,82 @@ void ArmUpdate(bool test_mode) {
     };
     switch (stair_climb_state) {
       case StairClimbState::STEP1_MOVE:
-        sc_tgt[3] = 0.0f;
-        sc_tgt[4] = 90.0f * DEG2RAD;
-        sc_tgt[5] = 0.0f;
+        // All joints to vertical-down position: shoulder+wrist pointing straight down
+        sc_tgt[0] = 0.0f;             // J1
+        sc_tgt[1] = 0.0f;             // J2
+        sc_tgt[2] = 0.0f;             // J3
+        sc_tgt[3] = 0.0f;             // J4
+        sc_tgt[4] = 90.0f * DEG2RAD;  // J5 → 90° (wrist vertical)
+        sc_tgt[5] = 0.0f;             // J6
         sc_set_all();
-        if (fabsf(arm_j4->GetTheta() - sc_tgt[3]) < STAIR_SETTLE_RAD &&
+        if (fabsf(arm_j1->GetTheta() - sc_tgt[0]) < STAIR_SETTLE_RAD &&
+            fabsf(arm_j2->GetTheta() - sc_tgt[1]) < STAIR_SETTLE_RAD &&
+            fabsf(arm_j3->GetTheta() - sc_tgt[2]) < STAIR_SETTLE_RAD &&
+            fabsf(arm_j4->GetTheta() - sc_tgt[3]) < STAIR_SETTLE_RAD &&
             fabsf(arm_j5->GetTheta() - sc_tgt[4]) < STAIR_SETTLE_RAD &&
             fabsf(arm_j6->GetTheta() - sc_tgt[5]) < STAIR_SETTLE_RAD) {
           stair_climb_state = StairClimbState::STEP1_CONFIRM;
-          print("STAIR: step1 settled — flip swl MID→UP to continue\r\n");
+          print("STAIR: step1 settled — flip swl MID→UP to push down\r\n");
         }
         break;
       case StairClimbState::STEP1_CONFIRM:
         sc_set_all();
         if (sc_confirm_check()) {
           stair_climb_state = StairClimbState::STEP2_MOVE;
-          print("STAIR: step2 start\r\n");
+          print("STAIR: step2 — pushing down to lift\r\n");
         }
         break;
       case StairClimbState::STEP2_MOVE:
-        sc_tgt[1] = 0.0f;
-        sc_tgt[2] = -(50.0f * DEG2RAD);
+        // Push down: J2 and J3 extend arm downward to lift the robot
+        sc_tgt[1] = 65.0f * DEG2RAD;   // J2 → 65°
+        sc_tgt[2] = -20.0f * DEG2RAD;  // J3 → −20°
         sc_set_all();
         if (fabsf(arm_j2->GetTheta() - sc_tgt[1]) < STAIR_SETTLE_RAD &&
             fabsf(arm_j3->GetTheta() - sc_tgt[2]) < STAIR_SETTLE_RAD) {
           stair_climb_state = StairClimbState::STEP2_CONFIRM;
-          print("STAIR: step2 settled — flip swl MID→UP to continue\r\n");
+          print("STAIR: step2 settled — flip swl MID→UP to drive chassis\r\n");
         }
         break;
       case StairClimbState::STEP2_CONFIRM:
         sc_set_all();
         if (sc_confirm_check()) {
-          stair_climb_state = StairClimbState::STEP3_MOVE;
-          print("STAIR: step3 start\r\n");
-        }
-        break;
-      case StairClimbState::STEP3_MOVE:
-        sc_tgt[1] = 30.0f * DEG2RAD;
-        sc_set_all();
-        if (fabsf(arm_j2->GetTheta() - sc_tgt[1]) < STAIR_SETTLE_RAD) {
-          stair_climb_state = StairClimbState::STEP3_CONFIRM;
-          print("STAIR: step3 settled — flip swl MID→UP to continue\r\n");
-        }
-        break;
-      case StairClimbState::STEP3_CONFIRM:
-        sc_set_all();
-        if (sc_confirm_check()) {
-          stair_climb_state = StairClimbState::STEP4_MOVE;
-          print("STAIR: step4 start\r\n");
-        }
-        break;
-      case StairClimbState::STEP4_MOVE:
-        sc_tgt[1] = 65.0f * DEG2RAD;
-        sc_tgt[2] = -25.0f * DEG2RAD;
-        sc_set_all();
-        if (fabsf(arm_j2->GetTheta() - sc_tgt[1]) < STAIR_SETTLE_RAD &&
-            fabsf(arm_j3->GetTheta() - sc_tgt[2]) < STAIR_SETTLE_RAD) {
-          stair_climb_state = StairClimbState::STEP4_CONFIRM;
-          print("STAIR: step4 settled — flip swl MID→UP to continue\r\n");
-        }
-        break;
-      case StairClimbState::STEP4_CONFIRM:
-        sc_set_all();
-        if (sc_confirm_check()) {
           stair_climb_state = StairClimbState::STEP5;
-          print("STAIR: step5 — chassis forward\r\n");
+          print("STAIR: step5 — drive chassis manually\r\n");
         }
         break;
       case StairClimbState::STEP5:
+        sc_set_all();  // hold step4 support pose while operator drives chassis
+        if (sc_confirm_check()) {
+          stair_climb_state = StairClimbState::STEP6_MOVE;
+          print("STAIR: step6 — arm holding support; lift descending...\r\n");
+        }
+        break;
+      case StairClimbState::STEP6_MOVE:
+        sc_set_all();  // keep holding step4 support pose while lift comes down
+        if (fabsf(shared_lift_theta) < STAIR_LIFT_RECOVERED_RAD) {
+          stair_climb_state = StairClimbState::STEP6_CONFIRM;
+          print("STAIR: lift recovered — flip swl MID→UP to restore arm\r\n");
+        }
+        break;
+      case StairClimbState::STEP6_CONFIRM:
+        sc_set_all();  // still holding support pose
+        if (sc_confirm_check()) {
+          for (int j = 0; j < 6; ++j) sc_tgt[j] = 0.0f;
+          stair_climb_state = StairClimbState::STEP6_RESTORE;
+          print("STAIR: restoring arm to home...\r\n");
+        }
+        break;
+      case StairClimbState::STEP6_RESTORE:
       default:
-        sc_set_all();  // hold final arm pose while main_mc02 drives chassis
+        sc_set_all();  // drive arm to all-0 home
+        if (fabsf(arm_j1->GetTheta() - sc_tgt[0]) < STAIR_SETTLE_RAD &&
+            fabsf(arm_j2->GetTheta() - sc_tgt[1]) < STAIR_SETTLE_RAD &&
+            fabsf(arm_j3->GetTheta() - sc_tgt[2]) < STAIR_SETTLE_RAD &&
+            fabsf(arm_j4->GetTheta() - sc_tgt[3]) < STAIR_SETTLE_RAD &&
+            fabsf(arm_j5->GetTheta() - sc_tgt[4]) < STAIR_SETTLE_RAD &&
+            fabsf(arm_j6->GetTheta() - sc_tgt[5]) < STAIR_SETTLE_RAD) {
+          ArmStairClimbMarkDone();
+        }
         break;
     }
   } else {
@@ -977,6 +983,9 @@ void ArmUpdate(bool test_mode) {
     // the RX filter).  Before homing the arm may legitimately sit outside the
     // operational range (startup / post-disable), so clamping is skipped then —
     // applying it would snap the arm to the limit boundary on first enable.
+    print("ARM CMD: J1=%.1f J2=%.1f J3=%.1f J4=%.1f J5=%.1f J6=%.1f [deg]\r\n",
+          cmd_target_deg[0], cmd_target_deg[1], cmd_target_deg[2],
+          cmd_target_deg[3], cmd_target_deg[4], cmd_target_deg[5]);
     const float t0 = arm_homed ? clamp((float)cmd_target_deg[0], ARM_CMD_MIN_DEG[0], ARM_CMD_MAX_DEG[0]) : (float)cmd_target_deg[0];
     const float t1 = arm_homed ? clamp((float)cmd_target_deg[1], ARM_CMD_MIN_DEG[1], ARM_CMD_MAX_DEG[1]) : (float)cmd_target_deg[1];
     const float t2 = arm_homed ? clamp((float)cmd_target_deg[2], ARM_CMD_MIN_DEG[2], ARM_CMD_MAX_DEG[2]) : (float)cmd_target_deg[2];
@@ -989,6 +998,9 @@ void ArmUpdate(bool test_mode) {
     arm_j4->SetOutput(t3 * DEG2RAD, ARM_VEL_LIM[3]);
     arm_j5->SetOutput(t4 * DEG2RAD, ARM_VEL_LIM[4]);
     arm_j6->SetOutput(t5 * DEG2RAD, ARM_VEL_LIM[5], J6_CURRENT_LIM);
+    print("Error mode: J1=0x%X J2=0x%X J3=0x%X J4=0x%X J5=0x%X J6=0x%X\r\n",
+          arm_j1->GetMode(), arm_j2->GetMode(), arm_j3->GetMode(),
+          arm_j4->GetMode(), arm_j5->GetMode(), arm_j6->GetMode());
   }
   
   // ── 7. CAN transmit ─────────────────────────────────────────────────────

@@ -1,5 +1,13 @@
+# Shared clangd config for this repo.
+#
+# Toolchain paths stay out of this file on purpose:
+# - the actual compiler path should come from build/compile_commands.json
+# - GCC-style system include extraction requires clangd to be launched with
+#   --query-driver=**/arm-none-eabi-gcc,**/arm-none-eabi-g++
+
 CompileFlags:
   CompilationDatabase: build
+  BuiltinHeaders: QueryDriver
   Remove:
     - -mthumb-interwork
     - -fdiagnostics-color=always
@@ -7,15 +15,3 @@ CompileFlags:
   Add:
     - -D__weak=__attribute__((weak))
     - -D__packed=__attribute__((__packed__))
-
----
-If:
-  PathMatch: .*\.c
-CompileFlags:
-  Compiler: arm-none-eabi-gcc
-
----
-If:
-  PathMatch: .*\.(cc|cpp|cxx|hpp|hh|hxx)
-CompileFlags:
-  Compiler: arm-none-eabi-g++

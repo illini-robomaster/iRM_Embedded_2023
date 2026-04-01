@@ -131,16 +131,19 @@ extern bool arm_homed;
 // ── Stair-climb state machine ────────────────────────────────────────────────
 enum class StairClimbState {
     IDLE,
-    STEP1_MOVE,    // J4→0°, J5→90°, J6→0°
-    STEP1_CONFIRM, // wait swl MID then UP
-    STEP2_MOVE,    // J2→0°, J3→50°
-    STEP2_CONFIRM,
-    STEP3_MOVE,    // J2→30°
-    STEP3_CONFIRM,
-    STEP4_MOVE,    // J2→62°, J3→28°  (lift override in main_mc02)
-    STEP4_CONFIRM,
-    STEP5,         // arm holds final pose; main_mc02 drives chassis forward ~60 cm
+    STEP1_MOVE,    // all joints → vertical-down: J1=0°,J2=0°,J3=0°,J4=0°,J5=90°,J6=0°
+    STEP1_CONFIRM, // wait swl MID→UP
+    STEP2_MOVE,    // push down: J2→65°, J3→−25°  (lift raises in main_mc02)
+    STEP2_CONFIRM, // wait swl MID→UP
+    STEP5,         // chassis drives manually; lift held up; swl MID→UP → STEP6
+    STEP6_MOVE,    // arm holds step2 support pose; lift lowers; auto when lift ≈ 0
+    STEP6_CONFIRM, // lift recovered; swl MID→UP → arm returns home
+    STEP6_RESTORE, // arm moving to home (all 0°); auto MarkDone when settled
 };
+
+// Lift output-shaft angle [rad], written by main_mc02.cc each tick.
+// Read by arm_mc02.cc STEP6_MOVE to detect lift fully recovered.
+extern volatile float shared_lift_theta;
 
 extern StairClimbState stair_climb_state;
 extern bool            stair_climb_active;
@@ -176,5 +179,5 @@ extern bsp::Buzzer* arm_buzzer;
 //
 // Used in arm_mc02.cc (ArmUpdate SetOutput clamping) and
 // arm_uart_task.cc (RX sanity clamp).
-static constexpr float ARM_CMD_MIN_DEG[6] = {-360.0f, -90.0f, -68.75f, -180.0f, -150.0f, -180.0f};
+static constexpr float ARM_CMD_MIN_DEG[6] = {-360.0f, -90.0f, -80.2f, -180.0f, -150.0f, -180.0f};
 static constexpr float ARM_CMD_MAX_DEG[6] = { 360.0f,  90.0f, 229.18f,  180.0f,  150.0f,  180.0f};

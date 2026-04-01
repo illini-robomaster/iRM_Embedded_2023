@@ -23,10 +23,13 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 include(cmake/arm_toolchain.cmake)
 include(cmake/build_helper.cmake)
+include(cmake/clangd_config.cmake)
 include(cmake/clang_format.cmake)
 include(cmake/doxygen.cmake)
 
 project(iRM_Embedded_2023)
+
+irm_generate_clangd()
 
 add_subdirectory(boards)
 add_subdirectory(shared)

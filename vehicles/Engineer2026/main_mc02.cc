@@ -204,10 +204,6 @@ static const float STEER_SPEED_DEADZONE = 0.05f;
 // the current limit is set to 0 so the motor does not fight gravity.
 static const float LIFT_SOFT_DOWN_THRESHOLD = 0.1f;  // [rad]
 
-// ── Stair-climb step 5 chassis parameters ───────────────────────────────────
-static constexpr float    SC_FWD_VX = 0.3f;    // forward speed during step 5 [m/s]
-static constexpr uint32_t SC_FWD_MS = 2000;    // drive duration → ~60 cm
-
 // ── Global peripherals ──────────────────────────────────────────────────────
 static bsp::CAN*     can  = nullptr;
 remote::DBUS* dbus = nullptr;
@@ -328,9 +324,7 @@ void RM_RTOS_Default_Task(const void* args) {
 
   bool enabled = false;
 
-  remote::switch_t swr_prev       = dbus->swr;  // rising-edge detection for stair trigger
-  uint32_t stair_step5_start_tick = 0;
-  bool     stair_step5_running    = false;
+  remote::switch_t swr_prev = dbus->swr;  // rising-edge detection for stair trigger
 
   while (true) {
     // ── Kill switch: swr DOWN → disable all motors ─────────────────────
@@ -393,25 +387,6 @@ void RM_RTOS_Default_Task(const void* args) {
     // ── Stair-climb trigger: swr rising edge to UP ────────────────────
     if (swr_prev != remote::UP && dbus->swr == remote::UP) {
       ArmStairClimbBegin();
-      stair_step5_running = false;
-    }
-
-    // ── Stair step 5: drive chassis forward ~60 cm ────────────────────
-    if (stair_climb_active && stair_climb_state == StairClimbState::STEP5) {
-      if (!stair_step5_running) {
-        stair_step5_start_tick = HAL_GetTick();
-        stair_step5_running    = true;
-      }
-      if (HAL_GetTick() - stair_step5_start_tick < SC_FWD_MS) {
-        vx = SC_FWD_VX;
-        vy = 0.0f;
-        vw = 0.0f;
-      } else {
-        stair_step5_running = false;
-        ArmStairClimbMarkDone();
-      }
-    } else if (!stair_climb_active) {
-      stair_step5_running = false;
     }
 
     // ── Rear omni kinematics ──────────────────────────────────────────
@@ -513,8 +488,9 @@ void RM_RTOS_Default_Task(const void* args) {
     // drop the current limit to 0 so the motor stops fighting gravity.
     float lift_pos, lift_vel, lift_cur;
     bool stair_lift_up = stair_climb_active &&
-                         (stair_climb_state == StairClimbState::STEP4_MOVE ||
-                          stair_climb_state == StairClimbState::STEP4_CONFIRM);
+                         (stair_climb_state == StairClimbState::STEP2_MOVE    ||
+                          stair_climb_state == StairClimbState::STEP2_CONFIRM ||
+                          stair_climb_state == StairClimbState::STEP5);
     if (stair_lift_up) {
       lift_pos = -1.0f; 
       lift_vel = 0.5f;
@@ -530,9 +506,10 @@ void RM_RTOS_Default_Task(const void* args) {
     } else {
       lift_pos = 0.0f;
       lift_vel = 0.5f;  // allow movement while still descending toward 0
-      lift_cur = 0.8f;  // still descending toward 0
+      lift_cur = 1.0f;  // still descending toward 0
     }
     lift_motor->SetOutput(lift_pos, lift_vel, lift_cur);
+    shared_lift_theta = lift_motor->GetTheta();  // shared with arm stair state machine
 
     // ── Transmit all CAN frames ──────────────────────────────────────
     control::MotorDM3519::TransmitOutput(rear_motors, 2);

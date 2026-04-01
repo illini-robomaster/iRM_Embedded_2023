@@ -158,6 +158,9 @@ compile_commands.json
 # Vim YCM config
 .ycm_extra_conf.py
 
+# Generated local clangd config
+.clangd
+
 # VS Code
 .vscode
 
