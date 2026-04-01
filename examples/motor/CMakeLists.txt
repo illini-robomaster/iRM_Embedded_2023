@@ -104,3 +104,7 @@ irm_add_arm_executable(${PROJECT_NAME}_m3508_mc02
 irm_add_arm_executable(${PROJECT_NAME}_m2006_mc02
         TARGET DM_MC_02
         SOURCES m2006_mc02.cc)
+
+irm_add_arm_executable(${PROJECT_NAME}_arm_set_zero
+        TARGET DM_MC_02
+        SOURCES arm_set_zero.cc)
