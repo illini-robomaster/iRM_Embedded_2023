@@ -60,7 +60,7 @@ static const int GIMBAL_TASK_DELAY = 2;
 static const int SHOOTER_INNER_TASK_DELAY = 2;
 static const int SHOOTER_OUTER_TASK_DELAY = 100;
 static const int SHOOTER_TASK_DELAY = 10;
-static const int SELFTEST_TASK_DELAY = 100;
+// static const int SELFTEST_TASK_DELAY = 100;  // disabled: dead self-test code below
 
 // Params used in both chassis and gimbal task
 static volatile float yaw_sum = 0;
@@ -567,6 +567,10 @@ void shooter_task(void* arg) {
 // SelfTest(TODO: need to modify the position)
 //==================================================================================================
 
+// Disabled: this task is never started (osThreadNew is commented out in RM_RTOS_Init)
+// and it dereferences buzzer/OLED pointers that are never initialized. GCC 14
+// -Wnonnull correctly diagnoses the guaranteed null 'this' pointer here.
+#if 0
 const osThreadAttr_t selfTestingTask = {.name = "selfTestTask",
                                         .attr_bits = osThreadDetached,
                                         .cb_mem = nullptr,
@@ -656,6 +660,7 @@ void self_Check_Task(void* arg) {
     osDelay(100);
   }
 }
+#endif  // 0 (dead self-test code)
 
 //==================================================================================================
 // RM Init
