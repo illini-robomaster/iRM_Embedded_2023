@@ -180,7 +180,11 @@ int32_t UART::Read(uint8_t** data) {
     taskENTER_CRITICAL();
   }
 
-  __HAL_DMA_DISABLE(huart_->hdmarx);
+  /* NOTE: the STM32H7 HAL expands __HAL_DMA_DISABLE to a ternary expression whose
+   * discarded volatile result trips GCC 11+ -Wvolatile (promoted to error by -Werror).
+   * Capturing the returned register value keeps the write and silences the warning. */
+  uint32_t dma_cr = __HAL_DMA_DISABLE(huart_->hdmarx);
+  (void)dma_cr;
   length = rx_size_ - __HAL_DMA_GET_COUNTER(huart_->hdmarx);
   rx_index_ = 1 - rx_index_;
 
