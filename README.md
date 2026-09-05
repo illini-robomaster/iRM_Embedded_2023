@@ -12,10 +12,9 @@ building the source code and flashing the embedded chips.
 ### Install ARM Toolchain
 
 1. Go to the [official download page](https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads)
-   for the Arm GNU Toolchain. (The old `gnu-rm/downloads` page is retired and no
-   longer lists releases after 10.3-2021.10.)
+   for the Arm GNU Toolchain.
 2. Download the pre-built `arm-none-eabi` toolchain according to your operating
-   system (tested with 10.3-2021.10 and 14.3.rel1).
+   system.
 3. Decompress it to some directory and find an absolute path to the `bin` directory.
 
    e.g.: `/opt/arm-gnu-toolchain-14.3.rel1-x86_64-arm-none-eabi/bin`.
