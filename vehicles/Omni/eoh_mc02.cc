@@ -259,7 +259,7 @@ void RM_RTOS_Default_Task(const void* args) {
 
     // max output for omega while ensure translation
     float max_omega = abs(30.0f - max(fabsf(alpha), fabsf(beta)));
-    float manual_yaw_omega = 0; //-dbus->ch2 / 660.0f * 15.0f;
+    float manual_yaw_omega = -dbus->ch3 / 660.0f * 15.0f;
     float auto_yaw_omega = dbus->swl == remote::UP ? 15.0f : 0.0f;
     float chassis_yaw_omega_target = manual_yaw_omega + auto_yaw_omega;
     chassis_yaw_omega_target = clip<float>(chassis_yaw_omega_target, -max_omega, max_omega);
