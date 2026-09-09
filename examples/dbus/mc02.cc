@@ -58,8 +58,8 @@
 static remote::DBUS* dbus;
 
 void RM_RTOS_Init(void) {
-  // print_use_uart(&huart7);
-  print_use_usb();
+  print_use_uart(&huart7);
+  //print_use_usb();
   dbus = new remote::DBUS(&huart5);
 }
 
@@ -68,11 +68,11 @@ void RM_RTOS_Default_Task(const void* arguments) {
 
  // NOTE(alvin): print is split because of stack usage is almost reaching limits
  while (true) {
-  //  set_cursor(0, 0);
-  //  clear_screen();
-   print("CH0: %-4d CH1: %-4d CH2: %-4d CH3: %-4d ", dbus->ch0, dbus->ch1, dbus->ch2, dbus->ch3);
-   print("SWL: %d SWR: %d DIAL: %d @ %d ms\r\n", dbus->swl, dbus->swr, dbus->wheel, dbus->timestamp);
-   osDelay(100);
+  set_cursor(0, 0);
+  clear_screen();
+  print("CH0: %-4d CH1: %-4d CH2: %-4d CH3: %-4d ", dbus->ch0, dbus->ch1, dbus->ch2, dbus->ch3);
+  print("SWL: %d SWR: %d DIAL: %d @ %d ms\r\n", dbus->swl, dbus->swr, dbus->wheel, dbus->timestamp);
+  osDelay(100);
  }
 }
 

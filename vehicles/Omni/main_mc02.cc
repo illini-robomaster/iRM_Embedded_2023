@@ -129,12 +129,12 @@ static volatile float jetson_rel_pitch = 0.0f;
 static volatile uint8_t jetson_mode = 0;           // 0=ST, 1=MY
 static volatile bool jetson_data_ready = false;    // consumed flag
 static volatile bool jetson_handshake_ok = false;  // true after handshake exchange
-
+/*
 // Gimbal feedback: written by default task, read by minipcTask for TX to Jetson
 static volatile float feedback_yaw = 0.0f;    // current gimbal yaw (field-referenced)
 static volatile float feedback_pitch = 0.0f;  // current pitch encoder position
 static volatile uint8_t feedback_mode = 0;    // mirrors jetson_mode for echo
-
+*/
 // Jetson chassis control: written by minipcTask, read by default task
 static volatile float jetson_vx = 0.0f;             // forward velocity from Jetson
 static volatile float jetson_vy = 0.0f;             // leftward velocity from Jetson
@@ -207,19 +207,19 @@ void minipcTask(void* arg) {
 
   auto minipc_session = communication::MinipcPort();
 
-  communication::color_data_t color_data;
-  color_data.my_color = 0;  // RED=0 default; updated when Jetson sends COLOR_CMD_ID
+  //communication::color_data_t color_data;
+  //color_data.my_color = 0;  // RED=0 default; updated when Jetson sends COLOR_CMD_ID
 
   const communication::status_data_t* status_data;
-  uint8_t packet_to_send[minipc_session.MAX_PACKET_LENGTH];
+  //uint8_t packet_to_send[minipc_session.MAX_PACKET_LENGTH];
   uint8_t* data;
   int32_t length;
-  bool handshake_done = false;  // true after handshake exchange completed
+  //bool handshake_done = false;  // true after handshake exchange completed
 
   // Gimbal feedback timing: send at ~100Hz (every 10ms)
   // Guide: "Send feedback at 50-100 Hz (every 10-20ms)"
   const uint32_t FEEDBACK_INTERVAL_MS = 10;
-  uint32_t last_feedback_tick = 0;
+  //uint32_t last_feedback_tick = 0;
 
   while (true) {
     // Use 10ms timeout so we can send periodic feedback even without RX
@@ -235,6 +235,7 @@ void minipcTask(void* arg) {
         status_data = minipc_session.GetStatus();
 
         // ---- Handshake protocol ----
+        /*
         // Jetson sends GIMBAL packet with debug_int=0xFF to request handshake.
         // MCU replies with GIMBAL packet with debug_int=0xFE as ACK.
         if (recv_cmd_id == communication::GIMBAL_CMD_ID &&
@@ -266,12 +267,14 @@ void minipcTask(void* arg) {
           jetson_mode = status_data->mode;
           jetson_data_ready = true;
         }
+          
         // ---- Color update from Jetson ----
-        else if (recv_cmd_id == communication::COLOR_CMD_ID) {
+        if (recv_cmd_id == communication::COLOR_CMD_ID) {
           color_data.my_color = status_data->my_color;
         }
+          */
         // ---- Chassis control from Jetson ----
-        else if (recv_cmd_id == communication::CHASSIS_CMD_ID) {
+        if (recv_cmd_id == communication::CHASSIS_CMD_ID) {
           jetson_vx = status_data->vx;
           jetson_vy = status_data->vy;
           jetson_vw = status_data->vw;
@@ -281,6 +284,7 @@ void minipcTask(void* arg) {
     }
 
     // --- Send periodic gimbal feedback + color after handshake ---
+    /*
     if (handshake_done) {
       uint32_t now = HAL_GetTick();
       if (now - last_feedback_tick >= FEEDBACK_INTERVAL_MS) {
@@ -300,6 +304,7 @@ void minipcTask(void* arg) {
         uart->Write(packet_to_send, minipc_session.GetPacketLen(communication::COLOR_CMD_ID));
       }
     }
+      */
   }
 }
 
@@ -610,9 +615,11 @@ void RM_RTOS_Default_Task(const void* args) {
     control::Motor3508::TransmitOutput(dji_motors, 4);
 
     // Update gimbal feedback for minipcTask to send to Jetson
+    /*
     feedback_yaw = gimbal_yaw_measured_in_field_reference;
     feedback_pitch = pitch_motor->GetTheta();
     feedback_mode = jetson_mode;
+    */
 
     osDelay(5);
   }

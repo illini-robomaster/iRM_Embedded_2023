@@ -1,0 +1,285 @@
+/****************************************************************************
+ *                                                                          *
+ *  Copyright (C) 2025 RoboMaster.                                          *
+ *  Illini RoboMaster @ University of Illinois at Urbana-Champaign          *
+ *                                                                          *
+ *  This program is free software: you can redistribute it and/or modify    *
+ *  it under the terms of the GNU General Public License as published by    *
+ *  the Free Software Foundation, either version 3 of the License, or       *
+ *  (at your option) any later version.                                     *
+ *                                                                          *
+ *  This program is distributed in the hope that it will be useful,         *
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of          *
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the           *
+ *  GNU General Public License for more details.                            *
+ *                                                                          *
+ *  You should have received a copy of the GNU General Public License       *
+ *  along with this program. If not, see <http://www.gnu.org/licenses/\>.    *
+ *                                                                          *
+ ****************************************************************************/
+
+/**
+ * @brief Omni robot control for DM_MC_02 board
+ *
+ * Hardware differences from TypeC (main.cc):
+ * - Uses FDCAN instead of CAN (hfdcan1)
+ * - Print via UART10 (huart10)
+ * - DBUS via UART5 (huart5)
+ * - IMU via SPI2 (hspi2) with BMI088 only (no IST8310/heater)
+ * - IMU initialized in imuTask (HAL_Delay in BMI088 ctor needs RTOS running)
+ */
+
+#include <cmath>
+#include <memory>
+
+#include "MahonyAHRS.h"
+#include "bsp_imu.h"
+#include "bsp_print.h"
+#include "cmsis_os.h"
+#include "dbus.h"
+#include "main.h"
+#include "motor.h"
+#include "spi.h"
+
+#define RX_SIGNAL (1 << 0)
+
+// Convert radians to degrees and vice versa
+#define RAD2DEG(x) ((x) * 180.0f / M_PI)
+#define DEG2RAD(x) ((x) * M_PI / 180.0f)
+
+const osThreadAttr_t imuTaskAttribute = {.name = "imuTask",
+                                         .attr_bits = osThreadDetached,
+                                         .cb_mem = nullptr,
+                                         .cb_size = 0,
+                                         .stack_mem = nullptr,
+                                         .stack_size = 256 * 4,
+                                         .priority = (osPriority_t)osPriorityNormal,
+                                         .tz_module = 0,
+                                         .reserved = 0};
+osThreadId_t imuTaskHandle;
+
+// IMU data
+static bsp::BMI088* bmi088 = nullptr;
+static float gyro[3];
+static float accel[3];
+static float temp;
+static float quat[4] = {1.0f, 0.0f, 0.0f, 0.0f};
+static float INS_angle[3] = {0.0f, 0.0f, 0.0f};  // yaw, pitch, roll
+
+/**
+ * @brief IMU Gyroscope interrupt handler class
+ */
+class IMU_GYRO_INT : public bsp::GPIT {
+ public:
+    IMU_GYRO_INT() : GPIT(INT1_GYRO_Pin) {}
+    
+ protected:
+    void IntCallback() override {
+        osThreadFlagsSet(imuTaskHandle, RX_SIGNAL);
+    }
+};
+
+/**
+ * @brief IMU Accelerometer interrupt handler class
+ */
+class IMU_ACCEL_INT : public bsp::GPIT {
+ public:
+    IMU_ACCEL_INT() : GPIT(INT1_ACCEL_Pin) {}
+    
+ protected:
+    void IntCallback() override {
+        // Accelerometer data ready - optional handling
+    }
+};
+
+static IMU_GYRO_INT* gyro_int = nullptr;
+static IMU_ACCEL_INT* accel_int = nullptr;
+
+void imuTask(void* arg) {
+  UNUSED(arg);
+
+  // Initialize BMI088 here (after RTOS scheduler starts) so HAL_Delay() works
+  bmi088 = new bsp::BMI088(&hspi2,
+                           CS1_ACCEL_GPIO_Port, CS1_ACCEL_Pin,
+                           CS1_GYRO_GPIO_Port, CS1_GYRO_Pin);
+
+  // Create interrupt handlers after BMI088 is ready
+  gyro_int = new IMU_GYRO_INT();
+  accel_int = new IMU_ACCEL_INT();
+
+  while (true) {
+    uint32_t flags = osThreadFlagsWait(RX_SIGNAL, osFlagsWaitAll, osWaitForever);
+    if (flags & RX_SIGNAL) {
+      bmi088->Read(gyro, accel, &temp);
+
+      float gx_rad = DEG2RAD(gyro[0]);
+      float gy_rad = DEG2RAD(gyro[1]);
+      float gz_rad = DEG2RAD(gyro[2]);
+
+      MahonyAHRSupdateIMU(quat, gx_rad, gy_rad, gz_rad, 
+                         accel[0], accel[1], accel[2]);
+
+      INS_angle[0] = atan2f(2.0f * (quat[0] * quat[3] + quat[1] * quat[2]),
+                           1.0f - 2.0f * (quat[2] * quat[2] + quat[3] * quat[3]));  // yaw
+      INS_angle[1] = asinf(2.0f * (quat[0] * quat[2] - quat[3] * quat[1]));          // pitch
+      INS_angle[2] = atan2f(2.0f * (quat[0] * quat[1] + quat[2] * quat[3]),
+                           1.0f - 2.0f * (quat[1] * quat[1] + quat[2] * quat[2]));  // roll
+    }
+  }
+}
+
+void RM_RTOS_Threads_Init(void) {
+  imuTaskHandle = osThreadNew(imuTask, nullptr, &imuTaskAttribute);
+}
+
+// Global peripherals
+bsp::CAN* can = nullptr;
+control::MotorDM3519* motor[4];
+
+control::Motor6020* yaw_motor;
+
+remote::DBUS* dbus = nullptr;
+
+
+const float YAW_MOTOR_OFFSET = 4.54f; // in rad
+
+void RM_RTOS_Init() {
+  print_use_uart(&huart7);
+
+  // MC02 uses FDCAN instead of CAN
+  can = new bsp::CAN(&hfdcan1, 0);
+
+  /* rx_id = Master id
+   * tx_id = CAN id
+   * mode:
+   *  MIT: MIT mode
+   *  POS_VEL: position-velocity mode
+   *  VEL: velocity mode  */
+
+  /* Make sure motor is set to the correct mode (in helper tool). Otherwise, motor won't start */
+  motor[0] = new control::MotorDM3519(can, 0x10, 0x11, control::VEL); // front right
+  motor[1] = new control::MotorDM3519(can, 0x12, 0x13, control::VEL); // back left
+  motor[2] = new control::MotorDM3519(can, 0x18, 0x19, control::VEL); // back right
+  motor[3] = new control::MotorDM3519(can, 0x16, 0x17, control::VEL);  // front left
+  
+  yaw_motor = new control::Motor6020(can, 0x205);
+
+  // MC02 uses UART5 for DBUS
+  dbus = new remote::DBUS(&huart5);
+
+
+  // IMU initialization is in imuTask() - HAL_Delay() in BMI088 constructor
+  // hangs when called before the RTOS scheduler starts
+}
+
+void RM_RTOS_Default_Task(const void* args) {
+  /* press reset if no response */
+  UNUSED(args);
+
+  control::MotorDM3519* motors[] = {motor[0], motor[1], motor[2], motor[3]};
+  control::MotorCANBase* yaw_container[] = {yaw_motor};
+  control::PIDController pid_(40000.0, 0.0, 300000.0);
+
+  /* Use SetZeroPos if you want to set current motor position as zero position. If uncommented, the
+   * zero position is the zero position set before */
+  osDelay(1000);
+  motor[0]->SetZeroPos();
+  motor[0]->MotorEnable();
+  motor[1]->SetZeroPos();
+  motor[1]->MotorEnable();
+  motor[2]->SetZeroPos();
+  motor[2]->MotorEnable();
+  motor[3]->SetZeroPos();
+  motor[3]->MotorEnable();
+  osDelay(100);
+
+  bool enabled = false;
+  float yaw_target = INS_angle[0] + yaw_motor->GetTheta() - YAW_MOTOR_OFFSET;
+  int16_t yaw_feedback;
+  float gimbal_yaw_measured_in_field_reference = 0.0f;
+
+  while (true) {
+    float vel[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+    
+    set_cursor(0, 0);
+    clear_screen();
+    print("CH0: %-4d CH1: %-4d CH2: %-4d CH3: %-4d ", dbus->ch0, dbus->ch1, dbus->ch2, dbus->ch3);
+    print("V0: %-7.2f V1: %-7.2f V2: %-7.2f V3: %-7.2f\r\n", vel[0], vel[1], vel[2], vel[3]);
+
+    // disable logic
+    if(dbus->swr == remote::DOWN){
+      if(enabled){
+        motor[0]->MotorDisable();
+        motor[1]->MotorDisable();
+        motor[2]->MotorDisable();
+        motor[3]->MotorDisable();
+        print("Disabled \r\n");
+        enabled = false;
+      }
+      osDelay(100);
+      continue;
+    } else {
+      if(!enabled){
+        print("Enabled \r\n");
+        motor[0]->MotorEnable();
+        motor[1]->MotorEnable();
+        motor[2]->MotorEnable();
+        motor[3]->MotorEnable();
+        osDelay(100);
+        enabled = true;
+      }
+    }
+
+    // chassis
+    gimbal_yaw_measured_in_field_reference = INS_angle[0] + yaw_motor->GetTheta() - YAW_MOTOR_OFFSET;
+
+    float y = -clip<float>(dbus->ch0 / 660.0 * 30.0, -30, 30); // forward
+    float x = clip<float>(dbus->ch1 / 660.0 * 30.0, -30, 30); // left
+    float yaw_omega = clip<float>(-dbus->ch2 / 660.0 * 10.0, -10, 10);               // yaw (slower)
+
+    yaw_target += yaw_omega * 0.005f;
+
+    float delta_yaw = yaw_target - gimbal_yaw_measured_in_field_reference;
+    float cos = cosf(delta_yaw);
+    float sin = sinf(delta_yaw);
+    delta_yaw = atan2f(sin, cos);  // wrap to [-pi, pi]
+    yaw_feedback = pid_.ComputeConstrainedOutput(delta_yaw);
+
+    float chasis_yaw_measured_in_field_reference = gimbal_yaw_measured_in_field_reference - INS_angle[0];  // in rad
+
+    // rotate the x,y according to the robot's heading
+    float temp_x = x * cosf(chasis_yaw_measured_in_field_reference) - y * sinf(chasis_yaw_measured_in_field_reference);
+    float temp_y = x * sinf(chasis_yaw_measured_in_field_reference) + y * cosf(chasis_yaw_measured_in_field_reference);
+    x = temp_x;
+    y = temp_y;
+
+    // alpha, beta equals to x y rotated by -45 degrees
+    float alpha = (x - y) / 1.4142f;
+    float beta = (y + x) / 1.4142f;
+
+    // max output for omega while ensure translation
+    float max_omega = abs(30.0f - max(fabsf(alpha), fabsf(beta)));
+    float manual_yaw_omega = 0; //-dbus->ch2 / 660.0f * 15.0f;
+    float auto_yaw_omega = dbus->swl == remote::UP ? 15.0f : 0.0f;
+    float chassis_yaw_omega_target = manual_yaw_omega + auto_yaw_omega;
+    chassis_yaw_omega_target = clip<float>(chassis_yaw_omega_target, -max_omega, max_omega);
+
+    vel[0] = -beta + chassis_yaw_omega_target;
+    vel[1] = beta + chassis_yaw_omega_target;
+    vel[2] = -alpha + chassis_yaw_omega_target;
+    vel[3] = alpha + chassis_yaw_omega_target;
+
+    UNUSED(yaw_feedback);
+    motor[0]->SetOutput(vel[0]);
+    motor[1]->SetOutput(vel[1]);
+    motor[2]->SetOutput(vel[2]);
+    motor[3]->SetOutput(vel[3]);
+    float yaw_kF = 400.0f;
+    int16_t yaw_output = yaw_feedback + chassis_yaw_omega_target * yaw_kF;
+    yaw_motor->SetOutput(yaw_output);
+    control::MotorDM3519::TransmitOutput(motors, 4);
+    control::MotorCANBase::TransmitOutput(yaw_container, 1);
+
+    osDelay(5);
+  }
+}
